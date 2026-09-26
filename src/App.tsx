@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { fetchStarterData, useStore } from './store';
 import PlanView from './views/PlanView';
 import PacksView from './views/PacksView';
 import CardsView from './views/CardsView';
@@ -14,7 +15,18 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id'];
 
 export default function App() {
+  const { state, replace } = useStore();
   const [tab, setTab] = useState<TabId>(() => (location.hash.slice(1) as TabId) || 'plan');
+
+  // ?starter loads the OneNote starter data, but only into an empty app so it never overwrites real progress.
+  useEffect(() => {
+    const url = new URL(location.href);
+    if (!url.searchParams.has('starter')) return;
+    url.searchParams.delete('starter');
+    history.replaceState(null, '', url);
+    if (state.cards.length === 0) fetchStarterData().then(replace, (e) => console.error(e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const go = (t: TabId) => {
     setTab(t);
     history.replaceState(null, '', `#${t}`);

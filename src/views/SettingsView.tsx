@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { newId, normalize, useStore } from '../store';
+import { fetchStarterData, newId, normalize, useStore } from '../store';
 import { defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, NumInput, TIER_LABEL } from '../ui';
 import { copiesTotal, levelLabel } from '../engine';
@@ -182,6 +182,15 @@ export default function SettingsView() {
           </button>
           <button onClick={() => fileRef.current?.click()}>Import backup</button>
           <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} />
+          <ConfirmButton
+            label="Load OneNote data"
+            onConfirm={() =>
+              fetchStarterData().then(
+                (s) => (replace(s), setMsg('OneNote data loaded.')),
+                (e) => setMsg(`Couldn't load it: ${(e as Error).message}`),
+              )
+            }
+          />
           <ConfirmButton label="Load sample data" onConfirm={() => (replace(sampleState()), setMsg('Sample data loaded.'))} />
           <ConfirmButton label="Erase everything" onConfirm={() => (replace(defaultState()), setMsg('All data erased.'))} />
         </div>

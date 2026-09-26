@@ -70,7 +70,7 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
           <li>Enter your Souls, Koins and Fusion Up Kards below. The plan will show up here.</li>
         </ol>
         <p className="muted small">
-          To try it out first, go to <a onClick={() => goto('settings')}>Settings</a> and load the sample data.
+          Or go to <a onClick={() => goto('settings')}>Settings</a> to load your OneNote data or the sample data.
         </p>
         {wallet}
       </section>
