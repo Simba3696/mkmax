@@ -11,7 +11,7 @@ npm run build     # production build in dist/ (installable PWA)
 
 Data lives in the browser's localStorage. Use Settings → Export backup to save it or move it to another device.
 
-`data/mkmax-onenote-import.json` is a starter backup transcribed from the OneNote "MK Mobile" page. Load it with Settings → Import backup.
+`public/onenote-import.json` is starter data transcribed from the OneNote "MK Mobile" page. To load it, use Settings → Load OneNote data, or open the app with `?starter` (for example `http://localhost:5173/?starter`). The `?starter` link only loads the file when the app has no cards yet, so it never overwrites your progress.
 
 ## Card images
 
