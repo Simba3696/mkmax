@@ -16,7 +16,7 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 ## Sync and hosting
 
 - **Hosting:** pushing to `main` runs `.github/workflows/deploy.yml`, which tests and builds the app, then publishes it to GitHub Pages at `https://<user>.github.io/<repo>/`. In the repo settings, set **Pages → Source** to **GitHub Actions** first. On the free plan, Pages needs a public repo.
-- **Sync:** go to Settings → Sync between devices and paste a fine-grained GitHub token with **Gists: Read and write**. Do this once on each device. Your data is saved as `mkmax-data.json` in a secret gist named "MK Max sync data". It uploads a moment after each change and downloads when the app opens or comes back to the foreground. If both devices changed data since they last synced, the app asks which copy to keep.
+- **Sync:** go to Settings → Sync between devices and paste a classic GitHub token that has only the `gist` scope ([create one](https://github.com/settings/tokens/new?scopes=gist&description=MK%20Max%20sync)). Do this once on each device. Your data is saved as `mkmax-data.json` in a secret gist named "MK Max sync data". It uploads a moment after each change and downloads when the app opens or comes back to the foreground. If both devices changed data since they last synced, the app asks which copy to keep.
 - **Token storage:** the token stays in each device's localStorage. It's never part of the synced data or of exported backups.
 
 ## Card images

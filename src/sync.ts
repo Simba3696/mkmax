@@ -42,7 +42,7 @@ async function gh<T>(token: string, path: string, init?: RequestInit): Promise<T
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
     },
   });
-  if (res.status === 401) throw new Error('GitHub rejected the token. Check it has Gists read/write access and hasn’t expired.');
+  if (res.status === 401) throw new Error('GitHub rejected the token. Check it has the gist scope and hasn’t expired.');
   if (!res.ok) throw new Error(`GitHub error ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return res.json() as Promise<T>;
 }
