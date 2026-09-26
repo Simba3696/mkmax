@@ -13,6 +13,12 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 
 `public/onenote-import.json` is starter data transcribed from the OneNote "MK Mobile" page. To load it, use Settings → Load OneNote data, or open the app with `?starter` (for example `http://localhost:5173/?starter`). The `?starter` link only loads the file when the app has no cards yet, so it never overwrites your progress.
 
+## Sync and hosting
+
+- **Hosting:** pushing to `main` runs `.github/workflows/deploy.yml`, which tests and builds the app, then publishes it to GitHub Pages at `https://<user>.github.io/<repo>/`. In the repo settings, set **Pages → Source** to **GitHub Actions** first. On the free plan, Pages needs a public repo.
+- **Sync:** go to Settings → Sync between devices and paste a fine-grained GitHub token with **Gists: Read and write**. Do this once on each device. Your data is saved as `mkmax-data.json` in a secret gist named "MK Max sync data". It uploads a moment after each change and downloads when the app opens or comes back to the foreground. If both devices changed data since they last synced, the app asks which copy to keep.
+- **Token storage:** the token stays in each device's localStorage. It's never part of the synced data or of exported backups.
+
 ## Card images
 
 Cards → **Find images** looks up art on the [MK Mobile wiki](https://mortalkombat-mobile.fandom.com/) through its public API. It works best with names written like "Sub-Zero, Klassic" (name, variant). Only the image URLs are saved; the art stays on the wiki's CDN and the service worker caches it for offline use. For anything the wiki doesn't have, paste a URL with the card's **Image** button.
