@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppState } from './types';
 import { defaultState, defaultWeights } from './defaults';
+import { decideSync, findOrCreateGist, loadSyncConfig, readRemote, saveSyncConfig, stamp, writeRemote, type SyncConfig } from './sync';
 
 const KEY = 'mkmax:v1';
 
@@ -56,15 +57,44 @@ export function normalize(input: unknown): AppState {
     packs: s.packs!,
     towers: s.towers ?? [],
     weights: { ...defaultWeights, ...s.weights, tier: { ...defaultWeights.tier, ...s.weights?.tier } },
+    updatedAt: s.updatedAt,
   };
 }
 
 type Update = (recipe: (draft: AppState) => void) => void;
 
-const Ctx = createContext<{ state: AppState; update: Update; replace: (s: AppState) => void } | null>(null);
+export type SyncStatus =
+  | { kind: 'off' }
+  | { kind: 'idle'; at: number | null }
+  | { kind: 'syncing' }
+  | { kind: 'error'; message: string }
+  /** Both devices changed data since the last sync; the user picks which copy wins. */
+  | { kind: 'conflict'; remote: AppState };
+
+export interface SyncApi {
+  status: SyncStatus;
+  connected: boolean;
+  connect: (token: string) => Promise<void>;
+  disconnect: () => void;
+  syncNow: () => Promise<void>;
+  resolve: (keep: 'mine' | 'theirs') => Promise<void>;
+}
+
+const Ctx = createContext<{ state: AppState; update: Update; replace: (s: AppState) => void; sync: SyncApi } | null>(null);
+
+const PUSH_DELAY_MS = 1500;
+const PULL_EVERY_MS = 2 * 60 * 1000;
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(load);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const cfgRef = useRef<SyncConfig | null>(loadSyncConfig());
+  const [connected, setConnected] = useState(!!cfgRef.current);
+  const [status, setStatus] = useState<SyncStatus>(cfgRef.current ? { kind: 'idle', at: null } : { kind: 'off' });
+  const busy = useRef(false);
+  const pushTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     try {
@@ -74,14 +104,132 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [state]);
 
-  const update: Update = (recipe) =>
+  const setConfig = (cfg: SyncConfig | null) => {
+    cfgRef.current = cfg;
+    saveSyncConfig(cfg);
+    setConnected(!!cfg);
+  };
+
+  const applyRemote = (remote: AppState) => {
+    const s = normalize(remote);
+    stateRef.current = s;
+    setState(s);
+  };
+
+  /** Pull if the gist moved on, push if only this device did, or report a conflict if both did. */
+  async function syncNow() {
+    const cfg = cfgRef.current;
+    if (!cfg || busy.current) return;
+    busy.current = true;
+    setStatus({ kind: 'syncing' });
+    try {
+      const remote = await readRemote(cfg);
+      const local = stateRef.current;
+      const action = decideSync(remote, local, cfg.baseUpdatedAt);
+      if (action === 'conflict') {
+        setStatus({ kind: 'conflict', remote: remote! });
+        return;
+      }
+      if (action === 'pull') {
+        applyRemote(remote!);
+        setConfig({ ...cfg, baseUpdatedAt: stamp(remote) });
+      } else if (action === 'push') {
+        await writeRemote(cfg, local);
+        setConfig({ ...cfg, baseUpdatedAt: stamp(local) });
+      } else {
+        setConfig({ ...cfg, baseUpdatedAt: Math.max(cfg.baseUpdatedAt, stamp(local)) });
+      }
+      setStatus({ kind: 'idle', at: Date.now() });
+    } catch (e) {
+      setStatus({ kind: 'error', message: (e as Error).message });
+    } finally {
+      busy.current = false;
+      // Edits made while this sync was in flight still need pushing.
+      const cfgNow = cfgRef.current;
+      if (cfgNow && stamp(stateRef.current) > cfgNow.baseUpdatedAt) schedulePush();
+    }
+  }
+  const syncRef = useRef(syncNow);
+  syncRef.current = syncNow;
+
+  function schedulePush() {
+    if (!cfgRef.current) return;
+    clearTimeout(pushTimer.current);
+    pushTimer.current = setTimeout(() => syncRef.current(), PUSH_DELAY_MS);
+  }
+
+  // Pull when the app opens, comes back to the foreground, reconnects, and every couple of minutes.
+  useEffect(() => {
+    const pull = () => document.visibilityState === 'visible' && syncRef.current();
+    pull();
+    document.addEventListener('visibilitychange', pull);
+    window.addEventListener('online', pull);
+    const t = setInterval(pull, PULL_EVERY_MS);
+    return () => {
+      document.removeEventListener('visibilitychange', pull);
+      window.removeEventListener('online', pull);
+      clearInterval(t);
+    };
+  }, []);
+
+  const update: Update = (recipe) => {
     setState((prev) => {
       const draft = structuredClone(prev);
       recipe(draft);
+      draft.updatedAt = Date.now();
       return draft;
     });
+    schedulePush();
+  };
 
-  return <Ctx.Provider value={{ state, update, replace: setState }}>{children}</Ctx.Provider>;
+  const replace = (s: AppState) => {
+    setState({ ...s, updatedAt: Date.now() });
+    schedulePush();
+  };
+
+  const sync: SyncApi = {
+    status,
+    connected,
+    async connect(token) {
+      setStatus({ kind: 'syncing' });
+      try {
+        const { gistId, created } = await findOrCreateGist(token.trim(), stateRef.current);
+        // A new gist already holds this device's data; an existing one gets compared on the first sync.
+        setConfig({ token: token.trim(), gistId, baseUpdatedAt: created ? stamp(stateRef.current) : 0 });
+        setStatus({ kind: 'idle', at: created ? Date.now() : null });
+        if (!created) await syncRef.current();
+      } catch (e) {
+        setStatus({ kind: 'error', message: (e as Error).message });
+        throw e;
+      }
+    },
+    disconnect() {
+      clearTimeout(pushTimer.current);
+      setConfig(null);
+      setStatus({ kind: 'off' });
+    },
+    syncNow: () => syncRef.current(),
+    async resolve(keep) {
+      const cfg = cfgRef.current;
+      if (!cfg || status.kind !== 'conflict') return;
+      if (keep === 'theirs') {
+        applyRemote(status.remote);
+        setConfig({ ...cfg, baseUpdatedAt: stamp(status.remote) });
+        setStatus({ kind: 'idle', at: Date.now() });
+        return;
+      }
+      setStatus({ kind: 'syncing' });
+      try {
+        await writeRemote(cfg, stateRef.current);
+        setConfig({ ...cfg, baseUpdatedAt: stamp(stateRef.current) });
+        setStatus({ kind: 'idle', at: Date.now() });
+      } catch (e) {
+        setStatus({ kind: 'error', message: (e as Error).message });
+      }
+    },
+  };
+
+  return <Ctx.Provider value={{ state, update, replace, sync }}>{children}</Ctx.Provider>;
 }
 
 export function useStore() {

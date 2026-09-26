@@ -110,4 +110,6 @@ export interface AppState {
   packs: Pack[];
   towers: TowerEntry[];
   weights: Weights;
+  /** When this data was last changed (ms since epoch); drives cross-device sync. */
+  updatedAt?: number;
 }

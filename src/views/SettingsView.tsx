@@ -3,6 +3,7 @@ import { fetchStarterData, newId, normalize, useStore } from '../store';
 import { defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, NumInput, TIER_LABEL } from '../ui';
 import { copiesTotal, levelLabel } from '../engine';
+import SyncPanel from './SyncPanel';
 import type { Tier, Weights } from '../types';
 
 const WEIGHT_HELP: { key: Exclude<keyof Weights, 'tier'>; label: string; help: string }[] = [
@@ -39,6 +40,8 @@ export default function SettingsView() {
 
   return (
     <>
+      <SyncPanel />
+
       <section className="card">
         <h2>Fusion rules</h2>
         <p className="muted small">
