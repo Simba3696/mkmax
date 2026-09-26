@@ -156,7 +156,9 @@
       "guest": false,
       "name": "Scorpion, Strike Force",
       "rarityId": "diamond",
-      "fusion": 9
+      "fusion": 9,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/3/39/MKM_SF_Sc.png/revision/latest/scale-to-width-down/240?cb=20220327100214",
+      "wikiTitle": "Scorpion/Strike Force"
     },
     {
       "id": "c2",
@@ -164,7 +166,9 @@
       "guest": false,
       "name": "Scorpion, MK1",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/d/df/MK1_Scorpion.png/revision/latest/scale-to-width-down/151?cb=20260812110701",
+      "wikiTitle": "Scorpion/MK1"
     },
     {
       "id": "c3",
@@ -172,7 +176,9 @@
       "guest": false,
       "name": "Takeda, Ronin",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/2/20/Render_Ronin_Takeda.png/revision/latest/scale-to-width-down/240?cb=20220503175217",
+      "wikiTitle": "Takeda/Ronin"
     },
     {
       "id": "c4",
@@ -180,7 +186,9 @@
       "guest": false,
       "name": "Geras, MK1",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/7/76/MK1_Geras.png/revision/latest/scale-to-width-down/151?cb=20260815024132",
+      "wikiTitle": "Geras/MK1"
     },
     {
       "id": "c5",
@@ -188,7 +196,9 @@
       "guest": false,
       "name": "Shang Tsung, MK1",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/f/f5/ShangTsung_MK1_CardF.png/revision/latest/scale-to-width-down/240?cb=20241130194730",
+      "wikiTitle": "Shang Tsung/MK1"
     },
     {
       "id": "c6",
@@ -196,7 +206,9 @@
       "guest": false,
       "name": "Kenshi, Ronin",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/4/4b/Render_Ronin_Kenshi.png/revision/latest/scale-to-width-down/240?cb=20220503173126",
+      "wikiTitle": "Kenshi/Ronin"
     },
     {
       "id": "c7",
@@ -204,7 +216,9 @@
       "guest": false,
       "name": "Kitana, MKII Movie",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 7,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/b/b9/Kitana_NM.png/revision/latest/scale-to-width-down/240?cb=20251102101327",
+      "wikiTitle": "Kitana/MK2 Movie"
     },
     {
       "id": "c8",
@@ -212,7 +226,9 @@
       "guest": false,
       "name": "Erron Black, Day of the Dead",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/3/3f/Render_DotD_EB.png/revision/latest/scale-to-width-down/240?cb=20220329084130",
+      "wikiTitle": "Erron Black/Day of the Dead"
     },
     {
       "id": "c9",
@@ -220,7 +236,9 @@
       "guest": false,
       "name": "Kitana, Assassin",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 7,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/0/0a/Render_Assassin_Kitana.png/revision/latest/scale-to-width-down/240?cb=20220328082951",
+      "wikiTitle": "Kitana/Assassin"
     },
     {
       "id": "c10",
@@ -228,7 +246,9 @@
       "guest": false,
       "name": "Johnny Cage, Strike Force",
       "rarityId": "diamond",
-      "fusion": 9
+      "fusion": 9,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/f/f5/Render_SFJC.png/revision/latest/scale-to-width-down/240?cb=20220404075628",
+      "wikiTitle": "Johnny Cage/Strike Force"
     },
     {
       "id": "c11",
@@ -236,7 +256,9 @@
       "guest": false,
       "name": "Tremor, Black Dragon",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/d/d9/Render_-_BD_Tremor.png/revision/latest/scale-to-width-down/240?cb=20220407133631",
+      "wikiTitle": "Tremor/Black Dragon"
     },
     {
       "id": "c12",
@@ -244,7 +266,9 @@
       "guest": false,
       "name": "Quan Chi, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 7,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/1/11/Render_CoS_QC.png/revision/latest/scale-to-width-down/240?cb=20220524123911",
+      "wikiTitle": "Quan Chi/Circle of Shadow"
     },
     {
       "id": "c13",
@@ -252,7 +276,9 @@
       "guest": false,
       "name": "Jade, Assassin",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 7,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/d/d9/Render_-_A_Jade.png/revision/latest/scale-to-width-down/240?cb=20220327112202",
+      "wikiTitle": "Jade/Assassin"
     },
     {
       "id": "c14",
@@ -260,7 +286,9 @@
       "guest": false,
       "name": "Sub-Zero, Kold",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/7/7b/Render_KWSZ.png/revision/latest/scale-to-width-down/240?cb=20220331110314",
+      "wikiTitle": "Sub-Zero/Kold War"
     },
     {
       "id": "c15",
@@ -268,7 +296,9 @@
       "guest": false,
       "name": "Scorpion, Kold",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/e/e0/MKM_KW_Sc.png/revision/latest/scale-to-width-down/240?cb=20220327101728",
+      "wikiTitle": "Scorpion/Kold War"
     },
     {
       "id": "c16",
@@ -276,7 +306,9 @@
       "guest": false,
       "name": "Sonya Blade, Klassic Movie",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 6,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/a/ad/Sonya_MV.png/revision/latest/scale-to-width-down/240?cb=20241201090806",
+      "wikiTitle": "Sonya Blade/Klassic Movie"
     },
     {
       "id": "c17",
@@ -284,7 +316,9 @@
       "guest": false,
       "name": "Sub-Zero, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/3/36/Render_CoS_SZ.png/revision/latest/scale-to-width-down/240?cb=20220331110746",
+      "wikiTitle": "Sub-Zero/Circle of Shadow"
     },
     {
       "id": "c18",
@@ -300,7 +334,9 @@
       "guest": false,
       "name": "Kitana, Ronin",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 6,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/6/6e/Render_Ronin_Kitana.png/revision/latest/scale-to-width-down/240?cb=20220328080442",
+      "wikiTitle": "Kitana/Ronin"
     },
     {
       "id": "c20",
@@ -308,7 +344,9 @@
       "guest": false,
       "name": "Skarlet, Kold",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 6,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/5/53/Render_KW_Skarlet.png/revision/latest/scale-to-width-down/240?cb=20220328073952",
+      "wikiTitle": "Skarlet/Kold War"
     },
     {
       "id": "c21",
@@ -316,7 +354,9 @@
       "guest": false,
       "name": "Liu Kang, Fire God",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 5,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/2/2e/Render_FGLK.png/revision/latest/scale-to-width-down/240?cb=20220329080411",
+      "wikiTitle": "Liu Kang/Fire God"
     },
     {
       "id": "c22",
@@ -324,7 +364,9 @@
       "guest": false,
       "name": "D'Vorah, Wretch",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 6,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/c/c6/Wretch_D%27Vorah.jpg/revision/latest/scale-to-width-down/153?cb=20170616134331",
+      "wikiTitle": "D'Vorah/Wretch"
     },
     {
       "id": "c23",
@@ -332,7 +374,9 @@
       "guest": false,
       "name": "Kitana, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 6,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/9/92/Render_CoS_Kitana.png/revision/latest/scale-to-width-down/240?cb=20220328082756",
+      "wikiTitle": "Kitana/Circle of Shadow"
     },
     {
       "id": "c24",
@@ -340,7 +384,9 @@
       "guest": false,
       "name": "Kano, Black Dragon",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 6,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/2/2e/Render_BD_Kano.png/revision/latest/scale-to-width-down/240?cb=20220410084203",
+      "wikiTitle": "Kano/Black Dragon"
     },
     {
       "id": "c25",
@@ -348,7 +394,9 @@
       "guest": false,
       "name": "Kabal, Black Dragon",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 5,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/8/85/Render_BD_Kabal.png/revision/latest/scale-to-width-down/240?cb=20220327104040",
+      "wikiTitle": "Kabal/Black Dragon"
     },
     {
       "id": "c26",
@@ -356,7 +404,9 @@
       "guest": false,
       "name": "Skarlet, Assassin",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 5,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/5/5e/Render_Assassin_Skarlet.png/revision/latest/scale-to-width-down/240?cb=20220328073826",
+      "wikiTitle": "Skarlet/Assassin"
     },
     {
       "id": "c27",
@@ -364,7 +414,9 @@
       "guest": false,
       "name": "Smoke, MK1",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 4,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/c/cd/Mk1smkab.png/revision/latest/scale-to-width-down/240?cb=20241212124211",
+      "wikiTitle": "Smoke/MK1"
     },
     {
       "id": "c28",
@@ -372,7 +424,9 @@
       "guest": false,
       "name": "Jax Briggs, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 5,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/0/07/Render_CoS_Jax.png/revision/latest/scale-to-width-down/240?cb=20220403082016",
+      "wikiTitle": "Jax Briggs/Circle of Shadow"
     },
     {
       "id": "c29",
@@ -380,7 +434,9 @@
       "guest": false,
       "name": "Erron Black, Black Dragon",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 5,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/c/c6/Render_BD_EB.png/revision/latest/scale-to-width-down/240?cb=20220329084523",
+      "wikiTitle": "Erron Black/Black Dragon"
     },
     {
       "id": "c30",
@@ -388,7 +444,9 @@
       "guest": false,
       "name": "Jade, Day of the Dead",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 5,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/5/58/Render_-_DotD_Jade.png/revision/latest/scale-to-width-down/240?cb=20220327113018",
+      "wikiTitle": "Jade/Day of the Dead"
     },
     {
       "id": "c31",
@@ -396,7 +454,9 @@
       "guest": false,
       "name": "Johnny Cage, Klassic Movie",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 4,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/5/54/JohnnyCage_MV.png/revision/latest/scale-to-width-down/240?cb=20241201084917",
+      "wikiTitle": "Johnny Cage/Klassic Movie"
     },
     {
       "id": "c32",
@@ -404,7 +464,9 @@
       "guest": true,
       "name": "Leatherface, Nightmare",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 4,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/7/70/Render_Leatherface.png/revision/latest/scale-to-width-down/240?cb=20220503184050",
+      "wikiTitle": "Leatherface/Nightmare"
     },
     {
       "id": "c33",
@@ -412,7 +474,9 @@
       "guest": false,
       "name": "Scorpion, MKII Movie",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 4,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/c/ce/MK2M_Scorpion.png/revision/latest/scale-to-width-down/155?cb=20260715160302",
+      "wikiTitle": "Scorpion/MK2 Movie"
     },
     {
       "id": "c34",
@@ -420,7 +484,9 @@
       "guest": false,
       "name": "Kung Lao, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 5,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/4/41/Render_CoS_KL.png/revision/latest/scale-to-width-down/240?cb=20220331113850",
+      "wikiTitle": "Kung Lao/Circle of Shadow"
     },
     {
       "id": "c35",
@@ -428,7 +494,9 @@
       "guest": false,
       "name": "Baraka, Klassic",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 4,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/6/6a/Baraka_damage.png/revision/latest/scale-to-width-down/155?cb=20220404074551",
+      "wikiTitle": "Baraka/Klassic"
     },
     {
       "id": "c36",
@@ -436,7 +504,9 @@
       "guest": false,
       "name": "Kitana, Day of the Dead",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 4,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/8/8a/Render_DotD_Kitana.png/revision/latest/scale-to-width-down/240?cb=20220328081331",
+      "wikiTitle": "Kitana/Day of the Dead"
     },
     {
       "id": "c37",
@@ -444,7 +514,9 @@
       "guest": false,
       "name": "Shao Kahn, MKII Movie",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 3,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/c/c8/ShaoKahn_NM.png/revision/latest/scale-to-width-down/240?cb=20260730105944",
+      "wikiTitle": "Shao Kahn/MK2 Movie"
     },
     {
       "id": "c38",
@@ -452,7 +524,9 @@
       "guest": false,
       "name": "Nightwolf, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 3,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/7/74/Nightwolf_CoS.png/revision/latest/scale-to-width-down/240?cb=20241201085611",
+      "wikiTitle": "Nightwolf/Circle of Shadow"
     },
     {
       "id": "c39",
@@ -468,7 +542,9 @@
       "guest": true,
       "name": "Terminator, Dark Fate",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 3,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/e/ee/Render_DFT.png/revision/latest/scale-to-width-down/240?cb=20220331081558",
+      "wikiTitle": "Terminator/Dark Fate"
     },
     {
       "id": "c41",
@@ -476,7 +552,9 @@
       "guest": true,
       "name": "Spawn, Tormented Soul",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 3,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/0/0c/Spawn_11_PR.png/revision/latest/scale-to-width-down/240?cb=20241201082152",
+      "wikiTitle": "Spawn/Tormented Soul"
     },
     {
       "id": "c42",
@@ -484,7 +562,9 @@
       "guest": false,
       "name": "Noob Saibot, Darkest Knight",
       "rarityId": "diamond",
-      "fusion": 2
+      "fusion": 2,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/d/d5/Darkest_Knight_Noob.JPG/revision/latest/scale-to-width-down/151?cb=20250816001105",
+      "wikiTitle": "Noob Saibot/Darkest Knight"
     },
     {
       "id": "c43",
@@ -492,7 +572,9 @@
       "guest": true,
       "name": "Ghostface, Nightmare",
       "rarityId": "diamond",
-      "fusion": 2
+      "fusion": 2,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/1/13/Jasonvoorhees_damage.png/revision/latest/scale-to-width-down/155?cb=20220503184727",
+      "wikiTitle": "Ghostface/Nightmare"
     },
     {
       "id": "c44",
@@ -500,7 +582,9 @@
       "guest": true,
       "name": "The Joker, Ace of Knaves",
       "rarityId": "diamond",
-      "fusion": 2
+      "fusion": 2,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/3/37/Joker_AK.png/revision/latest/scale-to-width-down/240?cb=20221119075231",
+      "wikiTitle": "The Joker/Ace of Knaves"
     },
     {
       "id": "c45",
@@ -508,7 +592,9 @@
       "guest": true,
       "name": "Terminator, Guardian",
       "rarityId": "diamond",
-      "fusion": 2
+      "fusion": 2,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/7/77/Render_GT.png/revision/latest/scale-to-width-down/240?cb=20220331082105",
+      "wikiTitle": "Terminator/Guardian"
     },
     {
       "id": "c46",
@@ -516,7 +602,9 @@
       "guest": true,
       "name": "Freddy Krueger, Nightmare",
       "rarityId": "diamond",
-      "fusion": 1
+      "fusion": 1,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/5/56/Render_Freddy.png/revision/latest/scale-to-width-down/240?cb=20220503183417",
+      "wikiTitle": "Freddy Krueger/Nightmare"
     },
     {
       "id": "c47",
@@ -524,7 +612,9 @@
       "guest": false,
       "name": "Kenshi, MK1",
       "rarityId": "diamond",
-      "fusion": 10
+      "fusion": 10,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/4/44/Kenshi_MK1_CardF.png/revision/latest/scale-to-width-down/240?cb=20241201074402",
+      "wikiTitle": "Kenshi/MK1"
     },
     {
       "id": "c48",
@@ -532,7 +622,9 @@
       "guest": false,
       "name": "Raiden, Klassic Movie",
       "rarityId": "diamond",
-      "fusion": 10
+      "fusion": 10,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/9/9e/Raiden_MV.png/revision/latest/scale-to-width-down/240?cb=20241201091205",
+      "wikiTitle": "Raiden/Klassic Movie"
     },
     {
       "id": "c49",
@@ -540,7 +632,9 @@
       "guest": false,
       "name": "Liu Kang, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 10
+      "fusion": 10,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/4/44/Render_CoSLK.png/revision/latest/scale-to-width-down/240?cb=20220329081852",
+      "wikiTitle": "Liu Kang/Circle of Shadow"
     },
     {
       "id": "c50",
@@ -548,7 +642,9 @@
       "guest": true,
       "name": "Jason Voorhees, Nightmare",
       "rarityId": "diamond",
-      "fusion": 10
+      "fusion": 10,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/0/0b/Jasonvoorhees_c.png/revision/latest/scale-to-width-down/240?cb=20220503184729",
+      "wikiTitle": "Jason Voorhees/Nightmare"
     },
     {
       "id": "c51",
@@ -557,7 +653,9 @@
       "name": "Goro, Tigrar Fury",
       "rarityId": "gold",
       "fusion": 15,
-      "maxLevel": 16
+      "maxLevel": 16,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/7/74/TFG.jpg/revision/latest/scale-to-width-down/150?cb=20210726163213",
+      "wikiTitle": "Goro/Tigrar Fury"
     },
     {
       "id": "c52",
@@ -566,7 +664,9 @@
       "name": "Jason Voorhees, Slasher",
       "rarityId": "gold",
       "fusion": 12,
-      "maxLevel": 16
+      "maxLevel": 16,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/7/7f/Jasonvoorhees_a1.png/revision/latest/scale-to-width-down/240?cb=20220503185024",
+      "wikiTitle": "Jason Voorhees/Slasher"
     },
     {
       "id": "c53",
@@ -575,7 +675,9 @@
       "name": "Sub-Zero, Klassic",
       "rarityId": "gold",
       "fusion": 17,
-      "maxLevel": null
+      "maxLevel": null,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/4/47/Render_Kl_SZ.png/revision/latest/scale-to-width-down/240?cb=20220331111302",
+      "wikiTitle": "Sub-Zero/Klassic"
     },
     {
       "id": "c54",
@@ -583,7 +685,9 @@
       "guest": false,
       "name": "Bloody Tomahawk",
       "rarityId": "blood-ruby",
-      "fusion": 1
+      "fusion": 1,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/f/f1/Bloody_Tomahawk_Full_Pic.jpg/revision/latest/scale-to-width-down/240?cb=20160729222841",
+      "wikiTitle": "Bloody Tomahawk"
     },
     {
       "id": "c56",
@@ -591,7 +695,9 @@
       "guest": false,
       "name": "Datusha, Bane of Moroi",
       "rarityId": "blood-ruby",
-      "fusion": 1
+      "fusion": 1,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/4/4c/Datusha%2C_Bane_of_the_Moroi_Maxed_v1.png/revision/latest/scale-to-width-down/151?cb=20161004024546",
+      "wikiTitle": "Datusha, Bane of the Moroi"
     },
     {
       "id": "c58",
@@ -599,7 +705,9 @@
       "guest": false,
       "name": "Devastator",
       "rarityId": "blood-ruby",
-      "fusion": 1
+      "fusion": 1,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/f/f1/Devestator.jpg/revision/latest/scale-to-width-down/150?cb=20170429144822",
+      "wikiTitle": "Devastator"
     },
     {
       "id": "c60",
@@ -607,7 +715,9 @@
       "guest": false,
       "name": "Moloch's Ball and Chain",
       "rarityId": "blood-ruby",
-      "fusion": 1
+      "fusion": 1,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/1/1c/Moloch%27s_Ball_and_Chain_Maxed_Stats.png/revision/latest/scale-to-width-down/240?cb=20180528060817",
+      "wikiTitle": "Moloch's Ball and Chain"
     },
     {
       "id": "c62",
@@ -615,7 +725,9 @@
       "guest": false,
       "name": "Shadow Sash",
       "rarityId": "blood-ruby",
-      "fusion": 8
+      "fusion": 8,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/7/77/ShadowSash.jpg/revision/latest/scale-to-width-down/157?cb=20180913084333",
+      "wikiTitle": "Shadow Sash"
     },
     {
       "id": "c64",
@@ -624,7 +736,9 @@
       "name": "Rebirth Liquid",
       "rarityId": "epic",
       "fusion": 3,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/c/ce/Rebirth_Liquid_FX.png/revision/latest?cb=20260729143632",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c65",
@@ -633,7 +747,9 @@
       "name": "Necromancer's Death Favor",
       "rarityId": "epic",
       "fusion": 3,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/8/88/Necromancer%27s_Death_Favor_FX.PNG/revision/latest?cb=20260729144248",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c66",
@@ -642,7 +758,9 @@
       "name": "Midnight Stalker's Curse",
       "rarityId": "epic",
       "fusion": 3,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/0/00/Midnight_Stalker%27s_Curse_FX.png/revision/latest/scale-to-width-down/240?cb=20260729144849",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c67",
@@ -651,7 +769,9 @@
       "name": "Hellborne Chains",
       "rarityId": "epic",
       "fusion": 3,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/c/ce/Hellborne_Chains_FX.png/revision/latest/scale-to-width-down/240?cb=20260729152625",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c68",
@@ -660,7 +780,9 @@
       "name": "Augmentation: Neural Link",
       "rarityId": "epic",
       "fusion": 3,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/c/ca/Augmentation_-_Neural_Link_FX.png/revision/latest?cb=20260729133622",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c69",
@@ -669,7 +791,9 @@
       "name": "Takahashi's Gauntlets",
       "rarityId": "epic",
       "fusion": 2,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/e/e9/Takahashi%27s_Gauntlet_FX.png/revision/latest/scale-to-width-down/240?cb=20260729152258",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c70",
@@ -678,7 +802,9 @@
       "name": "Coldhearted Ninja's Dark Cryomancy",
       "rarityId": "epic",
       "fusion": 2,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/0/04/Coldhearted_Ninja%27s_Dark_Cryomancy_FX.png/revision/latest/scale-to-width-down/240?cb=20260729152422",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c71",
@@ -687,7 +813,9 @@
       "name": "Wind of Rebellion",
       "rarityId": "epic",
       "fusion": 1,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/e/e5/Wind_of_Rebellion_FX.png/revision/latest?cb=20260729144457",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c72",
@@ -696,7 +824,9 @@
       "name": "Taira's Clan 6th Sense",
       "rarityId": "epic",
       "fusion": 1,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/3/3d/Taira%27s_Clan_6th_Sense_FX.png/revision/latest?cb=20260729152200",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c73",
@@ -705,7 +835,9 @@
       "name": "Draconic Bloodline",
       "rarityId": "epic",
       "fusion": 1,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/1/14/Draconic_Bloodline_FX.png/revision/latest?cb=20260729151248",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c74",
@@ -723,7 +855,9 @@
       "name": "Man in Control",
       "rarityId": "epic",
       "fusion": 0,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/b/b6/Man_in_Control_FX.png/revision/latest?cb=20260729144158",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c76",
@@ -732,7 +866,9 @@
       "name": "Horde Chief's Paraphernalia",
       "rarityId": "epic",
       "fusion": 0,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/b/b6/Horde_Chief%27s_Paraphernalia_FX.png/revision/latest?cb=20260729143817",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c77",
@@ -741,7 +877,9 @@
       "name": "Flame Forged Will",
       "rarityId": "epic",
       "fusion": 0,
-      "source": "krypt"
+      "source": "krypt",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/a/aa/Flame_Forged_Will_FX.png/revision/latest?cb=20260729152537",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c78",
@@ -760,7 +898,9 @@
       "rarityId": "epic",
       "fusion": 0,
       "source": "tower",
-      "sourceNote": "Black Dragon Tower"
+      "sourceNote": "Black Dragon Tower",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/2/20/SmugglerLuck_postEvo.png/revision/latest/scale-to-width-down/240?cb=20241201100343",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c80",
@@ -770,7 +910,9 @@
       "rarityId": "epic",
       "fusion": 0,
       "source": "tower",
-      "sourceNote": "Sorcerer's Tower"
+      "sourceNote": "Sorcerer's Tower",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/b/be/SoulReaversServant_proEvo.png/revision/latest/scale-to-width-down/240?cb=20210401233805",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c81",
@@ -780,7 +922,9 @@
       "rarityId": "epic",
       "fusion": 0,
       "source": "tower",
-      "sourceNote": "Tower of Horror"
+      "sourceNote": "Tower of Horror",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/7/71/WailingSpirit_PostEvo.png/revision/latest/scale-to-width-down/240?cb=20241201095947",
+      "wikiTitle": "Equipment/Epic"
     },
     {
       "id": "c82",
@@ -790,7 +934,9 @@
       "rarityId": "epic",
       "fusion": 0,
       "source": "tower",
-      "sourceNote": "Vought Tower"
+      "sourceNote": "Vought Tower",
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/1/1e/The_Patriot_Shield_FX.png/revision/latest?cb=20260729150833",
+      "wikiTitle": "Equipment/Epic"
     }
   ],
   "packs": [
