@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
-import { buildCtx, cardPriority, copiesToMax, copiesToThreshold, isMaxed, levelLabel, maxFusion, stepCopy, targetLevel } from '../engine';
+import { buildCtx, cardPriority, copiesToMax, copiesToThreshold, fLevel, isMaxed, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
 import { ConfirmButton, LevelOptions, RarityBadge, TIER_LABEL } from '../ui';
 import TowersPanel from './TowersPanel';
 import type { Card, RarityRule, Tier } from '../types';
@@ -22,12 +22,13 @@ const TIERS: Tier[] = ['must', 'want', 'nice', 'skip'];
 /** Ascension cap choices for rarities that ascend past their fusion levels (e.g. gold: A5 or A10). */
 function CapSelect({ rule, value, onChange }: { rule: RarityRule; value: number | null | undefined; onChange: (v: number | null) => void }) {
   const max = maxFusion(rule);
-  if (max <= rule.fusionMax) return null;
+  const fusionTop = fLevel(rule.fusionMax);
+  if (max <= fusionTop) return null;
   return (
     <label className="check">
       Max
       <select value={value ?? max} onChange={(e) => onChange(Number(e.target.value) === max ? null : Number(e.target.value))}>
-        <LevelOptions rule={rule} from={rule.fusionMax} />
+        <LevelOptions rule={rule} from={fusionTop} />
       </select>
     </label>
   );
@@ -198,7 +199,7 @@ function CardList() {
                     <span className="chip maxed">{rule.goal === 'threshold' ? `F${rule.fusionUpThreshold}, Kards can finish it` : 'maxed'}</span>
                   ) : (
                     <>
-                      {toThr > 0 && rule.fusionUpThreshold! < target && <span className="chip phase-toThreshold">{toThr} to F{rule.fusionUpThreshold}</span>}
+                      {toThr > 0 && thresholdLevel(rule)! < target && <span className="chip phase-toThreshold">{toThr} to F{rule.fusionUpThreshold}</span>}
                       <span className={`chip ${rule.goal === 'threshold' ? 'phase-toThreshold' : 'muted'}`}>
                         {toMax} to {levelLabel(rule, target)}
                       </span>
@@ -208,14 +209,11 @@ function CardList() {
                 </div>
               </div>
               <div className="stepper">
-                <button onClick={() => patch(c.id, stepCopy(c, rule, -1))} disabled={c.fusion <= 0} aria-label="Remove a copy">
+                <button onClick={() => patch(c.id, { fusion: Math.max(0, c.fusion - 1) })} disabled={c.fusion <= 0} aria-label="Lower level">
                   −
                 </button>
-                <span className="stepper-val" title={c.spare ? `${c.spare} dupe(s) toward the next level` : undefined}>
-                  {c.fusion === 0 ? '—' : levelLabel(rule, c.fusion)}
-                  {!!c.spare && <small>+{c.spare}</small>}
-                </span>
-                <button onClick={() => patch(c.id, stepCopy(c, rule, 1))} disabled={c.fusion >= max} aria-label="Add a copy">
+                <span className="stepper-val">{c.fusion === 0 ? '—' : levelLabel(rule, c.fusion)}</span>
+                <button onClick={() => patch(c.id, { fusion: Math.min(max, c.fusion + 1) })} disabled={c.fusion >= max} aria-label="Raise level">
                   +
                 </button>
               </div>

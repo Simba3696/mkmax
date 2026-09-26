@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
-import { buildCtx, buildPlan, levelLabel, rankPacks, rankTargets, type Phase } from '../engine';
+import { buildCtx, buildPlan, levelLabel, rankPacks, rankTargets, thresholdLevel, type Phase } from '../engine';
 import { fmt, FusionLabel, NumInput, pct, RarityBadge, timeUntil, useNow } from '../ui';
 import type { Pack } from '../types';
 
@@ -159,6 +159,7 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
         {targets.map((t) => {
           const rule = ctx.rules.get(t.card.rarityId);
           const thr = rule?.fusionUpThreshold;
+          const thrLevel = rule ? thresholdLevel(rule) : null;
           return (
             <div key={t.card.id} className="row">
               <div className="grow">
@@ -168,7 +169,7 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
                 </div>
                 <div className="muted small">
                   <RarityBadge rule={rule} /> <FusionLabel card={t.card} rule={rule} /> · {t.copiesToMax} to {levelLabel(rule, t.target)}
-                  {t.copiesToThreshold > 0 && thr != null && thr < t.target && ` · ${t.copiesToThreshold} to F${thr}`}
+                  {t.copiesToThreshold > 0 && thrLevel != null && thrLevel < t.target &&` · ${t.copiesToThreshold} to F${thr}`}
                   {t.inPacks === 0 && ' · not in any current pack'}
                 </div>
               </div>

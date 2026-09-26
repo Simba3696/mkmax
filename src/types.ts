@@ -9,13 +9,13 @@ export interface RarityRule {
   color: string;
   /** dupesPerLevel[i] = duplicate copies needed to go from level i+1 to i+2. Max level = length + 1. */
   dupesPerLevel: number[];
-  /** Levels 1..fusionMax are fusion (F1..F10); levels above are ascension (A1, A2, …). */
+  /** Highest fusion number (F10); levels past it are ascension (A1, A2, …). */
   fusionMax: number;
   /** 'threshold' = only track until the Fusion Up Kard threshold; kards finish the rest. */
   goal: 'max' | 'threshold';
   /** Whether cards of this rarity can be guest / limited-event cards. */
   hasGuests: boolean;
-  /** Fusion level at which Fusion Up Kards can be used; null if this rarity has none. */
+  /** Fusion number (F3 → 3) at which Fusion Up Kards can be used; null if this rarity has none. */
   fusionUpThreshold: number | null;
   /** Fusion Up Kards currently held for this rarity (1 kard = +1 fusion level). */
   fusionUpKards: number;
@@ -25,15 +25,13 @@ export interface Card {
   id: string;
   name: string;
   rarityId: string;
-  /** 0 = not owned, otherwise level 1..max (fusion levels, then ascension). */
+  /** Stored copy level: 0 = not owned, 1 = F0 (first copy), 11 = F10, then ascension. See engine levelLabel. */
   fusion: number;
-  /** Per-card cap below the rarity max (e.g. a gold card that only ascends to A5). */
+  /** Per-card cap below the rarity max, as a stored level (e.g. a gold card that only ascends to A5). */
   maxLevel?: number | null;
   tier: Tier;
   /** Guest / limited-event card — only obtainable for a short time. */
   guest: boolean;
-  /** Dupes already collected toward the next level (for levels that need more than 1). */
-  spare?: number;
   /** Gear that comes from the Krypt or a tower: tracked, but not planned for unless a pack sells it. */
   source?: 'krypt' | 'tower';
   /** e.g. the tower it drops from. */
@@ -100,7 +98,8 @@ export interface TowerEntry {
 }
 
 export interface AppState {
-  version: 1;
+  /** 2 = levels stored from F0 (first copy = 1). Version 1 stored the first copy as F1. */
+  version: 2;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];

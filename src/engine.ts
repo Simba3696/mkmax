@@ -1,60 +1,51 @@
 import type { AppState, Card, Pack, RarityRule } from './types';
 
-// ---------- Fusion math (in "copies": the unlock copy counts as 1) ----------
+// ---------- Fusion math ----------
+// Levels are stored as "copy levels": 0 = not owned, 1 = first copy (F0), 2 = F1, … fusionMax + 1 = F10,
+// then ascension A1, A2, … Display F/A numbers go through levelLabel / fLevel.
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
 export const maxFusion = (rule: RarityRule) => rule.dupesPerLevel.length + 1;
 export const copiesTotal = (rule: RarityRule) => 1 + sum(rule.dupesPerLevel);
 
-/** "F7" for fusion levels, "A3" for ascension levels. */
-export const levelLabel = (rule: RarityRule | undefined, level: number) =>
-  level <= 0 ? 'Not owned' : !rule || level <= rule.fusionMax ? `F${level}` : `A${level - rule.fusionMax}`;
+/** Stored level for a displayed fusion number (F3 → 4). */
+export const fLevel = (f: number) => f + 1;
 
-/** Copies represented by being at level f (0 = not owned). */
-export function copiesAtFusion(rule: RarityRule, f: number) {
-  return f <= 0 ? 0 : 1 + sum(rule.dupesPerLevel.slice(0, f - 1));
+/** "F7" for fusion levels, "A3" for ascension levels. */
+export function levelLabel(rule: RarityRule | undefined, level: number) {
+  if (level <= 0) return 'Not owned';
+  const f = level - 1;
+  return !rule || f <= rule.fusionMax ? `F${f}` : `A${f - rule.fusionMax}`;
 }
+
+/** Copies represented by being at stored level `level` (0 = not owned). */
+export function copiesAtFusion(rule: RarityRule, level: number) {
+  return level <= 0 ? 0 : 1 + sum(rule.dupesPerLevel.slice(0, level - 1));
+}
+
+/** Stored level where Fusion Up Kards become usable, or null. */
+export const thresholdLevel = (rule: RarityRule) => (rule.fusionUpThreshold == null ? null : fLevel(rule.fusionUpThreshold));
 
 /** The level this card is being worked toward: rarity max, per-card cap, or the kard threshold. */
 export function targetLevel(card: Card, rule: RarityRule) {
   let t = maxFusion(rule);
   if (card.maxLevel != null) t = Math.min(t, card.maxLevel);
-  if (rule.goal === 'threshold' && rule.fusionUpThreshold != null) t = Math.min(t, rule.fusionUpThreshold);
+  const thr = thresholdLevel(rule);
+  if (rule.goal === 'threshold' && thr != null) t = Math.min(t, thr);
   return t;
 }
 
-/** Dupes needed to go from level f to f+1 (0 at max). */
-const dupesForNext = (rule: RarityRule, f: number) => rule.dupesPerLevel[f - 1] ?? 0;
-
-/** Copies a card represents: its level plus spare dupes collected toward the next level. */
-export function copiesHave(card: Card, rule: RarityRule) {
-  if (card.fusion <= 0) return 0;
-  return copiesAtFusion(rule, card.fusion) + Math.min(card.spare ?? 0, Math.max(0, dupesForNext(rule, card.fusion) - 1));
-}
-
 export const copiesToMax = (card: Card, rule: RarityRule) =>
-  Math.max(0, copiesAtFusion(rule, targetLevel(card, rule)) - copiesHave(card, rule));
+  Math.max(0, copiesAtFusion(rule, targetLevel(card, rule)) - copiesAtFusion(rule, card.fusion));
 
 export function copiesToThreshold(card: Card, rule: RarityRule) {
-  if (rule.fusionUpThreshold == null) return 0;
-  return Math.max(0, copiesAtFusion(rule, rule.fusionUpThreshold) - copiesHave(card, rule));
+  const thr = thresholdLevel(rule);
+  if (thr == null) return 0;
+  return Math.max(0, copiesAtFusion(rule, thr) - copiesAtFusion(rule, card.fusion));
 }
 
 export const isMaxed = (card: Card, rule: RarityRule) => card.fusion >= targetLevel(card, rule);
-
-/** Level + spare after receiving (delta = 1) or undoing (delta = -1) one copy. */
-export function stepCopy(card: Card, rule: RarityRule, delta: 1 | -1): Pick<Card, 'fusion' | 'spare'> {
-  const spare = card.spare ?? 0;
-  if (delta > 0) {
-    if (card.fusion <= 0) return { fusion: 1, spare: 0 };
-    if (card.fusion >= maxFusion(rule)) return { fusion: card.fusion, spare: 0 };
-    return spare + 1 >= dupesForNext(rule, card.fusion) ? { fusion: card.fusion + 1, spare: 0 } : { fusion: card.fusion, spare: spare + 1 };
-  }
-  if (spare > 0) return { fusion: card.fusion, spare: spare - 1 };
-  if (card.fusion <= 1) return { fusion: 0, spare: 0 };
-  return { fusion: card.fusion - 1, spare: Math.max(0, dupesForNext(rule, card.fusion - 1) - 1) };
-}
 
 // ---------- Context ----------
 
@@ -86,10 +77,11 @@ function allocateKards(state: AppState) {
   const kardCopies = new Map<string, number>();
   const kardPlan = new Map<string, KardAssignment[]>();
   for (const rule of state.rarities) {
-    if (rule.fusionUpThreshold == null || rule.fusionUpKards <= 0 || rule.goal === 'threshold') continue;
-    const cap = (c: Card) => Math.min(targetLevel(c, rule), rule.fusionMax);
+    const thr = thresholdLevel(rule);
+    if (thr == null || rule.fusionUpKards <= 0 || rule.goal === 'threshold') continue;
+    const cap = (c: Card) => Math.min(targetLevel(c, rule), fLevel(rule.fusionMax));
     const eligible = state.cards
-      .filter((c) => c.rarityId === rule.id && c.tier !== 'skip' && c.fusion >= rule.fusionUpThreshold! && c.fusion < cap(c))
+      .filter((c) => c.rarityId === rule.id && c.tier !== 'skip' && c.fusion >= thr && c.fusion < cap(c))
       .sort((a, b) => cardPriority(state, b) - cardPriority(state, a) || b.fusion - a.fusion);
     let left = rule.fusionUpKards;
     const plan: KardAssignment[] = [];
@@ -97,7 +89,7 @@ function allocateKards(state: AppState) {
       if (left <= 0) break;
       const use = Math.min(left, cap(c) - c.fusion);
       plan.push({ cardId: c.id, from: c.fusion, to: c.fusion + use });
-      kardCopies.set(c.id, copiesAtFusion(rule, c.fusion + use) - copiesHave(c, rule));
+      kardCopies.set(c.id, copiesAtFusion(rule, c.fusion + use) - copiesAtFusion(rule, c.fusion));
       left -= use;
     }
     kardPlan.set(rule.id, plan);
@@ -122,9 +114,10 @@ export function copyPhase(ctx: Ctx, card: Card, g = 0): Phase {
   if (ctx.state.weights.tier[card.tier] <= 0) return 'skip';
   const remaining = copiesToMax(card, rule);
   if (g >= remaining) return 'maxed';
-  const pos = copiesHave(card, rule) + g;
+  const pos = copiesAtFusion(rule, card.fusion) + g;
   if (pos < 1) return 'unlock';
-  if (rule.fusionUpThreshold != null && pos < copiesAtFusion(rule, rule.fusionUpThreshold)) return 'toThreshold';
+  const thr = thresholdLevel(rule);
+  if (thr != null && pos < copiesAtFusion(rule, thr)) return 'toThreshold';
   if (g >= remaining - (ctx.kardCopies.get(card.id) ?? 0)) return 'kardCovered';
   return 'normal';
 }
@@ -135,7 +128,7 @@ export function copyValue(ctx: Ctx, card: Card, g = 0): number {
   const w = ctx.state.weights;
   const rule = ctx.rules.get(card.rarityId)!;
   const mult = { unlock: w.unlock, toThreshold: w.belowThreshold, kardCovered: w.coveredByKards, normal: 1 }[phase];
-  const progress = (copiesHave(card, rule) + g) / copiesAtFusion(rule, targetLevel(card, rule));
+  const progress = (copiesAtFusion(rule, card.fusion) + g) / copiesAtFusion(rule, targetLevel(card, rule));
   return cardPriority(ctx.state, card) * mult * (1 + w.closenessBonus * progress);
 }
 

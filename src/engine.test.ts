@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
 import {
-  buildCtx, buildPlan, copiesAtFusion, copiesToMax, copiesToThreshold, copyPhase, isMaxed, levelLabel, packEV, stepCopy, targetLevel,
+  buildCtx, buildPlan, copiesAtFusion, copiesToMax, copiesToThreshold, copyPhase, fLevel as F, isMaxed, levelLabel, packEV, targetLevel,
 } from './engine';
+import { normalize } from './store';
 import type { AppState, Card, Pack } from './types';
 
 const NOW = new Date('2026-01-10T12:00:00');
+/** Stored level for ascension An on a rarity whose fusion tops out at F10. */
+const A = (n: number) => F(10) + n;
 
 function setup(cards: Card[], packs: Pack[] = [], tweak?: (s: AppState) => void) {
   const s = defaultState();
@@ -19,54 +22,52 @@ const card = (id: string, fusion: number, extra: Partial<Card> = {}): Card => ({
 const pack = (id: string, drops: Pack['drops'], extra: Partial<Pack> = {}): Pack => ({
   id, name: id, currencyId: 'souls', cost: 100, rolls: 1, maxPurchases: null, purchased: 0, startsAt: null, endsAt: null, drops, ...extra,
 });
+const rules = () => new Map(defaultState().rarities.map((r) => [r.id, r]));
 
 describe('fusion math', () => {
-  it('counts copies with 1 dupe per level', () => {
-    const rule = defaultState().rarities[0];
-    expect(copiesAtFusion(rule, 0)).toBe(0);
-    expect(copiesAtFusion(rule, 1)).toBe(1);
-    expect(copiesAtFusion(rule, 10)).toBe(10);
-    expect(copiesToThreshold(card('a', 1), rule)).toBe(2);
-    expect(copiesToThreshold(card('a', 5), rule)).toBe(0);
+  it('starts at F0 with 1 dupe per level', () => {
+    const rule = rules().get('diamond')!;
+    expect(levelLabel(rule, 0)).toBe('Not owned');
+    expect(levelLabel(rule, 1)).toBe('F0');
+    expect(copiesAtFusion(rule, F(0))).toBe(1);
+    expect(copiesAtFusion(rule, F(10))).toBe(11);
+    expect(copiesToMax(card('a', 0), rule)).toBe(11);
+    expect(copiesToThreshold(card('a', F(1)), rule)).toBe(2);
+    expect(copiesToThreshold(card('a', F(4)), rule)).toBe(0);
   });
 });
 
 describe('goals and caps', () => {
-  const rules = () => new Map(defaultState().rarities.map((r) => [r.id, r]));
-
   it('caps gold at the per-card ascension level', () => {
     const gold = rules().get('gold')!;
-    const a5 = card('g', 11, { rarityId: 'gold', maxLevel: 15 }); // A1, cap A5
-    expect(levelLabel(gold, 11)).toBe('A1');
-    expect(targetLevel(a5, gold)).toBe(15);
+    const a5 = card('g', A(1), { rarityId: 'gold', maxLevel: A(5) });
+    expect(levelLabel(gold, A(1))).toBe('A1');
+    expect(levelLabel(gold, F(10))).toBe('F10');
+    expect(targetLevel(a5, gold)).toBe(A(5));
     expect(copiesToMax(a5, gold)).toBe(4);
-    expect(copiesToMax(card('g', 16, { rarityId: 'gold' }), gold)).toBe(4); // A6 → A10
+    expect(copiesToMax(card('g', A(6), { rarityId: 'gold' }), gold)).toBe(4); // A6 → A10
   });
 
-  it('tracks threshold-goal equipment only until F3, counting spare dupes', () => {
+  it('tracks threshold-goal equipment only until F3 (4 copies from nothing)', () => {
     const epic = rules().get('epic')!;
     expect(copiesToMax(card('e', 0, { rarityId: 'epic' }), epic)).toBe(4);
-    expect(copiesToMax(card('e', 2, { rarityId: 'epic', spare: 1 }), epic)).toBe(1);
-    expect(isMaxed(card('e', 3, { rarityId: 'epic' }), epic)).toBe(true);
+    expect(copiesToMax(card('e', F(2), { rarityId: 'epic' }), epic)).toBe(1);
+    expect(isMaxed(card('e', F(3), { rarityId: 'epic' }), epic)).toBe(true);
   });
+});
 
-  it('steps copies through levels that need more than one dupe', () => {
-    const epic = rules().get('epic')!;
-    let c = card('e', 0, { rarityId: 'epic' });
-    const seen: string[] = [];
-    for (let i = 0; i < 4; i++) {
-      c = { ...c, ...stepCopy(c, epic, 1) };
-      seen.push(`${c.fusion}+${c.spare}`);
-    }
-    expect(seen).toEqual(['1+0', '2+0', '2+1', '3+0']);
-    c = { ...c, ...stepCopy(c, epic, -1) };
-    expect([c.fusion, c.spare]).toEqual([2, 1]);
+describe('save migration', () => {
+  it('shifts version-1 levels (first copy = F1) to F0-based storage', () => {
+    const v1 = { version: 1, rarities: [], currencies: [], packs: [], cards: [card('a', 2, { maxLevel: 15 }), card('b', 0)] };
+    const s = normalize(v1);
+    expect(s.version).toBe(2);
+    expect(s.cards.map((c) => [c.fusion, c.maxLevel])).toEqual([[3, 16], [0, undefined]]);
   });
 });
 
 describe('phases', () => {
   it('classifies unlock, threshold, normal, kard-covered and maxed copies', () => {
-    const s = setup([card('new', 0), card('low', 2), card('mid', 5), card('max', 10)], [], (s) => (s.rarities[0].fusionUpKards = 2));
+    const s = setup([card('new', 0), card('low', F(1)), card('mid', F(5)), card('max', F(10))], [], (s) => (s.rarities[0].fusionUpKards = 2));
     const ctx = buildCtx(s);
     const c = (id: string) => ctx.cards.get(id)!;
     expect(copyPhase(ctx, c('new'))).toBe('unlock');
@@ -77,27 +78,27 @@ describe('phases', () => {
   });
 
   it('gives kards to higher-priority cards first', () => {
-    const s = setup([card('nice', 8, { tier: 'nice' }), card('must', 4, { tier: 'must' })], [], (s) => (s.rarities[0].fusionUpKards = 3));
+    const s = setup([card('nice', F(8), { tier: 'nice' }), card('must', F(4), { tier: 'must' })], [], (s) => (s.rarities[0].fusionUpKards = 3));
     const plan = buildCtx(s).kardPlan.get('diamond')!;
-    expect(plan).toEqual([{ cardId: 'must', from: 4, to: 7 }]);
+    expect(plan).toEqual([{ cardId: 'must', from: F(4), to: F(7) }]);
   });
 });
 
 describe('scoring', () => {
   it('values a copy that reaches F3 more than one past it', () => {
-    const s = setup([card('low', 2), card('high', 5)], [pack('a', [{ cardId: 'low', chance: 10 }]), pack('b', [{ cardId: 'high', chance: 10 }])]);
+    const s = setup([card('low', F(1)), card('high', F(5))], [pack('a', [{ cardId: 'low', chance: 10 }]), pack('b', [{ cardId: 'high', chance: 10 }])]);
     const ctx = buildCtx(s);
     expect(packEV(ctx, s.packs[0])).toBeGreaterThan(packEV(ctx, s.packs[1]));
   });
 
   it('boosts guest cards', () => {
-    const s = setup([card('g', 5, { guest: true }), card('n', 5)], [pack('a', [{ cardId: 'g', chance: 10 }]), pack('b', [{ cardId: 'n', chance: 10 }])]);
+    const s = setup([card('g', F(5), { guest: true }), card('n', F(5))], [pack('a', [{ cardId: 'g', chance: 10 }]), pack('b', [{ cardId: 'n', chance: 10 }])]);
     const ctx = buildCtx(s);
     expect(packEV(ctx, s.packs[0])).toBeCloseTo(packEV(ctx, s.packs[1]) * 1.5);
   });
 
   it('ignores skipped and maxed cards', () => {
-    const s = setup([card('s', 3, { tier: 'skip' }), card('m', 10)], [pack('a', [{ cardId: 's', chance: 50 }, { cardId: 'm', chance: 50 }])]);
+    const s = setup([card('s', F(3), { tier: 'skip' }), card('m', F(10))], [pack('a', [{ cardId: 's', chance: 50 }, { cardId: 'm', chance: 50 }])]);
     expect(packEV(buildCtx(s), s.packs[0])).toBe(0);
   });
 });
@@ -105,7 +106,7 @@ describe('scoring', () => {
 describe('planner', () => {
   it('stays within budget and purchase limits, and prefers expiring packs', () => {
     const s = setup(
-      [card('a', 5), card('b', 5)],
+      [card('a', F(5)), card('b', F(5))],
       [
         pack('perm', [{ cardId: 'a', chance: 10 }]),
         pack('limited', [{ cardId: 'b', chance: 10 }], { endsAt: '2026-01-12T00:00', maxPurchases: 2 }),
@@ -125,7 +126,7 @@ describe('planner', () => {
   });
 
   it('stops buying once expected copies would max the card', () => {
-    const s = setup([card('a', 9)], [pack('p', [{ cardId: 'a', chance: 100 }])], (s) => (s.currencies[0].balance = 1000));
+    const s = setup([card('a', F(9))], [pack('p', [{ cardId: 'a', chance: 100 }])], (s) => (s.currencies[0].balance = 1000));
     const souls = buildPlan(buildCtx(s), NOW).currencies[0];
     expect(souls.buys[0].count).toBe(1);
   });

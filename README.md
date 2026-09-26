@@ -15,6 +15,8 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 
 ## What's tracked
 
+Your first copy of any card is F0, and each level after that takes 1 duplicate. So F10 from nothing is 11 copies, and F3 is 4.
+
 - **Diamond** characters to F10. Guest cards are Diamond cards flagged as limited-time.
 - **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Each card has its own cap of A5 or A10.
 - **Blood Ruby** equipment from the Realm Klash store, to max. Store items give one guaranteed copy per purchase.
