@@ -581,7 +581,7 @@
       "fusion": 0
     },
     {
-      "id": "c55",
+      "id": "c56",
       "tier": "want",
       "guest": false,
       "name": "Datusha, Bane of Moroi",
@@ -589,7 +589,7 @@
       "fusion": 0
     },
     {
-      "id": "c56",
+      "id": "c58",
       "tier": "want",
       "guest": false,
       "name": "Devastator",
@@ -597,7 +597,7 @@
       "fusion": 0
     },
     {
-      "id": "c57",
+      "id": "c60",
       "tier": "want",
       "guest": false,
       "name": "Moloch's Ball and Chain",
@@ -605,7 +605,7 @@
       "fusion": 0
     },
     {
-      "id": "c58",
+      "id": "c62",
       "tier": "want",
       "guest": false,
       "name": "Shadow Sash",
@@ -613,7 +613,7 @@
       "fusion": 7
     },
     {
-      "id": "c59",
+      "id": "c64",
       "tier": "want",
       "guest": false,
       "name": "Rebirth Liquid",
@@ -623,7 +623,7 @@
       "source": "krypt"
     },
     {
-      "id": "c60",
+      "id": "c65",
       "tier": "want",
       "guest": false,
       "name": "Necromancer's Death Favor",
@@ -633,7 +633,7 @@
       "source": "krypt"
     },
     {
-      "id": "c61",
+      "id": "c66",
       "tier": "want",
       "guest": false,
       "name": "Midnight Stalker's Curse",
@@ -643,7 +643,7 @@
       "source": "krypt"
     },
     {
-      "id": "c62",
+      "id": "c67",
       "tier": "want",
       "guest": false,
       "name": "Hellborne Chains",
@@ -653,7 +653,7 @@
       "source": "krypt"
     },
     {
-      "id": "c63",
+      "id": "c68",
       "tier": "want",
       "guest": false,
       "name": "Augmentation: Neural Link",
@@ -663,7 +663,7 @@
       "source": "krypt"
     },
     {
-      "id": "c64",
+      "id": "c69",
       "tier": "want",
       "guest": false,
       "name": "Takahashi's Gauntlets",
@@ -673,7 +673,7 @@
       "source": "krypt"
     },
     {
-      "id": "c65",
+      "id": "c70",
       "tier": "want",
       "guest": false,
       "name": "Coldhearted Ninja's Dark Cryomancy",
@@ -683,7 +683,7 @@
       "source": "krypt"
     },
     {
-      "id": "c66",
+      "id": "c71",
       "tier": "want",
       "guest": false,
       "name": "Wind of Rebellion",
@@ -693,7 +693,7 @@
       "source": "krypt"
     },
     {
-      "id": "c67",
+      "id": "c72",
       "tier": "want",
       "guest": false,
       "name": "Taira's Clan 6th Sense",
@@ -703,7 +703,7 @@
       "source": "krypt"
     },
     {
-      "id": "c68",
+      "id": "c73",
       "tier": "want",
       "guest": false,
       "name": "Draconic Bloodline",
@@ -713,7 +713,7 @@
       "source": "krypt"
     },
     {
-      "id": "c69",
+      "id": "c74",
       "tier": "want",
       "guest": false,
       "name": "Man in the Sky",
@@ -723,7 +723,7 @@
       "source": "krypt"
     },
     {
-      "id": "c70",
+      "id": "c75",
       "tier": "want",
       "guest": false,
       "name": "Man in Control",
@@ -733,7 +733,7 @@
       "source": "krypt"
     },
     {
-      "id": "c71",
+      "id": "c76",
       "tier": "want",
       "guest": false,
       "name": "Horde Chief's Paraphernalia",
@@ -743,7 +743,7 @@
       "source": "krypt"
     },
     {
-      "id": "c72",
+      "id": "c77",
       "tier": "want",
       "guest": false,
       "name": "Flame Forged Will",
@@ -753,7 +753,7 @@
       "source": "krypt"
     },
     {
-      "id": "c73",
+      "id": "c78",
       "tier": "want",
       "guest": false,
       "name": "Flame Forged Ferocity",
@@ -763,7 +763,7 @@
       "source": "krypt"
     },
     {
-      "id": "c74",
+      "id": "c79",
       "tier": "want",
       "guest": false,
       "name": "Smuggler's Luck",
@@ -773,7 +773,7 @@
       "sourceNote": "Black Dragon Tower"
     },
     {
-      "id": "c75",
+      "id": "c80",
       "tier": "want",
       "guest": false,
       "name": "Soul Reaver's Servant",
@@ -783,7 +783,7 @@
       "sourceNote": "Sorcerer's Tower"
     },
     {
-      "id": "c76",
+      "id": "c81",
       "tier": "want",
       "guest": false,
       "name": "Wailing Spirit",
@@ -793,7 +793,7 @@
       "sourceNote": "Tower of Horror"
     },
     {
-      "id": "c77",
+      "id": "c82",
       "tier": "want",
       "guest": false,
       "name": "The Patriot Shield",
@@ -803,171 +803,267 @@
       "sourceNote": "Vought Tower"
     }
   ],
-  "packs": [],
+  "packs": [
+    {
+      "id": "p55",
+      "name": "Bloody Tomahawk",
+      "currencyId": "blood-rubies",
+      "cost": 800,
+      "rolls": 1,
+      "maxPurchases": null,
+      "purchased": 0,
+      "startsAt": null,
+      "endsAt": null,
+      "store": true,
+      "drops": [
+        {
+          "cardId": "c54",
+          "chance": 100
+        }
+      ],
+      "notes": "Realm Klash store"
+    },
+    {
+      "id": "p57",
+      "name": "Datusha, Bane of Moroi",
+      "currencyId": "blood-rubies",
+      "cost": 800,
+      "rolls": 1,
+      "maxPurchases": null,
+      "purchased": 0,
+      "startsAt": null,
+      "endsAt": null,
+      "store": true,
+      "drops": [
+        {
+          "cardId": "c56",
+          "chance": 100
+        }
+      ],
+      "notes": "Realm Klash store"
+    },
+    {
+      "id": "p59",
+      "name": "Devastator",
+      "currencyId": "blood-rubies",
+      "cost": 800,
+      "rolls": 1,
+      "maxPurchases": null,
+      "purchased": 0,
+      "startsAt": null,
+      "endsAt": null,
+      "store": true,
+      "drops": [
+        {
+          "cardId": "c58",
+          "chance": 100
+        }
+      ],
+      "notes": "Realm Klash store"
+    },
+    {
+      "id": "p61",
+      "name": "Moloch's Ball and Chain",
+      "currencyId": "blood-rubies",
+      "cost": 800,
+      "rolls": 1,
+      "maxPurchases": null,
+      "purchased": 0,
+      "startsAt": null,
+      "endsAt": null,
+      "store": true,
+      "drops": [
+        {
+          "cardId": "c60",
+          "chance": 100
+        }
+      ],
+      "notes": "Realm Klash store"
+    },
+    {
+      "id": "p63",
+      "name": "Shadow Sash",
+      "currencyId": "blood-rubies",
+      "cost": 800,
+      "rolls": 1,
+      "maxPurchases": null,
+      "purchased": 0,
+      "startsAt": null,
+      "endsAt": null,
+      "store": true,
+      "drops": [
+        {
+          "cardId": "c62",
+          "chance": 100
+        }
+      ],
+      "notes": "Realm Klash store"
+    }
+  ],
   "towers": [
     {
-      "id": "t78",
+      "id": "t83",
       "tower": "Black Dragon Tower",
       "grade": "Uncommon",
       "goal": "max",
       "itemsLeft": 1
     },
     {
-      "id": "t79",
+      "id": "t84",
       "tower": "Twisted Tower",
       "grade": "Uncommon",
       "goal": "max",
       "itemsLeft": 1
     },
     {
-      "id": "t80",
+      "id": "t85",
       "tower": "Black Dragon Tower",
       "grade": "Rare",
       "goal": "F3",
       "itemsLeft": null
     },
     {
-      "id": "t81",
+      "id": "t86",
       "tower": "Kold Tower",
       "grade": "Rare",
       "goal": "F3",
       "itemsLeft": null
     },
     {
-      "id": "t82",
+      "id": "t87",
       "tower": "Lin Kuei Tower",
       "grade": "Rare",
       "goal": "F3",
       "itemsLeft": null
     },
     {
-      "id": "t83",
+      "id": "t88",
       "tower": "Nightmare Tower",
       "grade": "Rare",
       "goal": "F3",
       "itemsLeft": null
     },
     {
-      "id": "t84",
+      "id": "t89",
       "tower": "Sorcerer's Tower",
       "grade": "Rare",
       "goal": "F3",
       "itemsLeft": null
     },
     {
-      "id": "t85",
+      "id": "t90",
       "tower": "Action Movie Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 3
     },
     {
-      "id": "t86",
+      "id": "t91",
       "tower": "Black Dragon Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 4
     },
     {
-      "id": "t87",
+      "id": "t92",
       "tower": "Dark Queen's Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 3
     },
     {
-      "id": "t88",
+      "id": "t93",
       "tower": "Earthrealm Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 4
     },
     {
-      "id": "t89",
+      "id": "t94",
       "tower": "Edenian Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 4
     },
     {
-      "id": "t90",
+      "id": "t95",
       "tower": "Elder Wind Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 4
     },
     {
-      "id": "t91",
+      "id": "t96",
       "tower": "Hellspawn Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 2
     },
     {
-      "id": "t92",
+      "id": "t97",
       "tower": "Klassic Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 3
     },
     {
-      "id": "t93",
+      "id": "t98",
       "tower": "Kold Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 4
     },
     {
-      "id": "t94",
+      "id": "t99",
       "tower": "Lin Kuei Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 4
     },
     {
-      "id": "t95",
+      "id": "t100",
       "tower": "Nightmare Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 3
     },
     {
-      "id": "t96",
+      "id": "t101",
       "tower": "Shirai Ryu Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 3
     },
     {
-      "id": "t97",
+      "id": "t102",
       "tower": "Sorcerer's Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 3
     },
     {
-      "id": "t98",
+      "id": "t103",
       "tower": "Tower of Horror",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 4
     },
     {
-      "id": "t99",
+      "id": "t104",
       "tower": "Twisted Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 3
     },
     {
-      "id": "t100",
+      "id": "t105",
       "tower": "Vought Tower",
       "grade": "Epic",
       "goal": "F3",
       "itemsLeft": 3
     },
     {
-      "id": "t101",
+      "id": "t106",
       "tower": "White Lotus Tower",
       "grade": "Epic",
       "goal": "F3",
