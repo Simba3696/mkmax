@@ -33,6 +33,27 @@ export function useNow() {
   return now;
 }
 
+/** Card art thumbnail; falls back to initials in the rarity color when there's no image or it fails to load. */
+export function CardThumb({ card, rule, size = 44 }: { card: Card; rule?: RarityRule; size?: number }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [card.imageUrl]);
+  const style = { width: size, height: size, borderColor: rule?.color };
+  if (card.imageUrl && !broken) {
+    return <img className="thumb" style={style} src={card.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
+  }
+  const initials = card.name
+    .split(/[\s,/]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('');
+  return (
+    <span className="thumb thumb-empty" style={{ ...style, color: rule?.color }} aria-hidden>
+      {initials}
+    </span>
+  );
+}
+
 export function RarityBadge({ rule }: { rule?: RarityRule }) {
   if (!rule) return <span className="badge">?</span>;
   return (

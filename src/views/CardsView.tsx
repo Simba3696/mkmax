@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
 import { buildCtx, cardPriority, copiesToMax, copiesToThreshold, fLevel, isMaxed, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
-import { ConfirmButton, LevelOptions, RarityBadge, TIER_LABEL } from '../ui';
+import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, TIER_LABEL } from '../ui';
 import TowersPanel from './TowersPanel';
+import { findCardImages, wikiUrl } from '../wiki';
 import type { Card, RarityRule, Tier } from '../types';
 
 type Source = NonNullable<Card['source']> | '';
@@ -59,9 +60,29 @@ function CardList() {
   const [hideMaxed, setHideMaxed] = useState(true);
   const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [imageEditId, setImageEditId] = useState<string | null>(null);
+  const [imgStatus, setImgStatus] = useState<{ busy: boolean; msg: string } | null>(null);
   const [draft, setDraft] = useState<Omit<Card, 'id'>>({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0, maxLevel: null, tier: 'want', guest: false });
 
   const draftRule = ctx.rules.get(draft.rarityId) ?? state.rarities[0];
+  const missingImages = state.cards.filter((c) => !c.imageUrl);
+
+  async function findImages() {
+    setImgStatus({ busy: true, msg: 'Starting…' });
+    try {
+      const found = await findCardImages(missingImages, ctx.rules, (msg) => setImgStatus({ busy: true, msg }));
+      update((d) => {
+        for (const c of d.cards) {
+          const m = found.get(c.id);
+          if (m) Object.assign(c, m);
+        }
+      });
+      const left = missingImages.length - found.size;
+      setImgStatus({ busy: false, msg: `Found ${found.size} of ${missingImages.length}.${left ? ` ${left} not on the wiki: open "Image" on those cards to paste a URL.` : ''}` });
+    } catch (e) {
+      setImgStatus({ busy: false, msg: `Couldn't reach the wiki: ${(e as Error).message}` });
+    }
+  }
 
   const patch = (id: string, p: Partial<Card>) =>
     update((d) => {
@@ -97,7 +118,7 @@ function CardList() {
         <div className="form">
           <label className="field wide">
             <span>Name</span>
-            <input value={draft.name} placeholder="e.g. Klassic Sub-Zero" onChange={(e) => setDraft({ ...draft, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
+            <input value={draft.name} placeholder="e.g. Sub-Zero, Klassic (name, variant)" onChange={(e) => setDraft({ ...draft, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
           </label>
           <label className="field">
             <span>Rarity</span>
@@ -169,7 +190,13 @@ function CardList() {
           <input type="checkbox" checked={hideMaxed} onChange={(e) => setHideMaxed(e.target.checked)} />
           Hide done{hiddenMaxed > 0 && ` (${hiddenMaxed})`}
         </label>
+        {missingImages.length > 0 && (
+          <button onClick={findImages} disabled={imgStatus?.busy} title="Look up card art on the MK Mobile wiki">
+            {imgStatus?.busy ? 'Finding…' : `Find images (${missingImages.length})`}
+          </button>
+        )}
       </div>
+      {imgStatus && <p className="small muted">{imgStatus.msg}</p>}
 
       {cards.length === 0 && <p className="muted">No cards match.</p>}
       {cards.map((c) => {
@@ -183,6 +210,7 @@ function CardList() {
         return (
           <div key={c.id} className="card card-row">
             <div className="row">
+              <CardThumb card={c} rule={rule} />
               <div className="grow">
                 {editingId === c.id ? (
                   <input value={c.name} autoFocus onChange={(e) => patch(c.id, { name: e.target.value })} onBlur={() => setEditingId(null)} onKeyDown={(e) => e.key === 'Enter' && setEditingId(null)} />
@@ -234,6 +262,9 @@ function CardList() {
                 </label>
               )}
               {rule.kind === 'equipment' && <SourceSelect value={c.source} onChange={(v) => patch(c.id, { source: v })} />}
+              <button className="ghost" onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
+                Image
+              </button>
               <ConfirmButton
                 label="Delete"
                 className="ghost"
@@ -245,6 +276,21 @@ function CardList() {
                 }
               />
             </div>
+            {imageEditId === c.id && (
+              <div className="drop-row wrap">
+                <input
+                  className="grow"
+                  value={c.imageUrl ?? ''}
+                  placeholder="Paste an image URL"
+                  onChange={(e) => patch(c.id, { imageUrl: e.target.value.trim() || undefined, wikiTitle: undefined })}
+                />
+                {c.wikiTitle && (
+                  <a className="small" href={wikiUrl(c.wikiTitle)} target="_blank" rel="noreferrer">
+                    Wiki page
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         );
       })}

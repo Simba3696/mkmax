@@ -36,6 +36,10 @@ export interface Card {
   source?: 'krypt' | 'tower';
   /** e.g. the tower it drops from. */
   sourceNote?: string;
+  /** Card art URL (found on the MK Mobile wiki, or pasted by hand). */
+  imageUrl?: string;
+  /** Wiki page the image came from. */
+  wikiTitle?: string;
   notes?: string;
 }
 

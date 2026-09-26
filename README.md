@@ -13,6 +13,10 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 
 `data/mkmax-onenote-import.json` is a starter backup transcribed from the OneNote "MK Mobile" page. Load it with Settings → Import backup.
 
+## Card images
+
+Cards → **Find images** looks up art on the [MK Mobile wiki](https://mortalkombat-mobile.fandom.com/) through its public API. It works best with names written like "Sub-Zero, Klassic" (name, variant). Only the image URLs are saved; the art stays on the wiki's CDN and the service worker caches it for offline use. For anything the wiki doesn't have, paste a URL with the card's **Image** button.
+
 ## What's tracked
 
 Your first copy of any card is F0, and each level after that takes 1 duplicate. So F10 from nothing is 11 copies, and F3 is 4.
