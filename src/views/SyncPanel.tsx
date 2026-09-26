@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useStore } from '../store';
 import { ConfirmButton } from '../ui';
 
-const TOKEN_URL = 'https://github.com/settings/personal-access-tokens/new';
+// Classic token pre-filled with only the gist scope; fine-grained tokens don't reliably offer Gists access.
+const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&description=MK%20Max%20sync';
 
 export function syncLabel(status: ReturnType<typeof useStore>['sync']['status']) {
   switch (status.kind) {
@@ -34,11 +35,11 @@ export default function SyncPanel() {
           </p>
           <ol className="small steps">
             <li>
-              Create a fine-grained token at{' '}
+              Open{' '}
               <a href={TOKEN_URL} target="_blank" rel="noreferrer">
-                github.com/settings/personal-access-tokens
+                this GitHub token page
               </a>
-              . Under <b>Account permissions</b>, set <b>Gists</b> to <b>Read and write</b>. Nothing else is needed.
+              . It's pre-filled with only the <b>gist</b> scope. Pick an expiration and click <b>Generate token</b>.
             </li>
             <li>Paste it below. The token stays on this device only; it is never put into the synced data or your backups.</li>
           </ol>
