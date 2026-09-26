@@ -42,7 +42,7 @@ export default function SettingsView() {
       <section className="card">
         <h2>Fusion rules</h2>
         <p className="muted small">
-          Duplicates needed for each fusion step. These are defaults, so check them against the game and fix any that are wrong. One Fusion Up Kard counts as +1 fusion level.
+          Your first copy of a card is F0. Each step below is the number of duplicates needed for the next level. One Fusion Up Kard counts as +1 fusion level.
         </p>
         {state.rarities.map((r, ri) => (
           <div key={r.id} className="subpanel">
@@ -58,7 +58,7 @@ export default function SettingsView() {
                   onChange={(e) => update((d) => void (d.rarities[ri].fusionUpThreshold = e.target.value ? Number(e.target.value) : null))}
                 >
                   <option value="">No kards for this rarity</option>
-                  {Array.from({ length: r.dupesPerLevel.length }, (_, i) => (
+                  {Array.from({ length: r.fusionMax }, (_, i) => (
                     <option key={i} value={i + 1}>
                       F{i + 1}
                     </option>
@@ -75,7 +75,7 @@ export default function SettingsView() {
                 </select>
               </label>
               <label className="field">
-                <span>Fusion levels (rest are ascension)</span>
+                <span>Highest fusion (F…), rest are ascension</span>
                 <NumInput value={r.fusionMax} min={1} step={1} onChange={(v) => update((d) => void (d.rarities[ri].fusionMax = v ?? 10))} />
               </label>
               <label className="field">
@@ -128,7 +128,7 @@ export default function SettingsView() {
           onClick={() =>
             update(
               (d) =>
-                void d.rarities.push({ id: newId(), label: 'New rarity', kind: 'equipment', color: '#cccccc', dupesPerLevel: Array(9).fill(1), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0 }),
+                void d.rarities.push({ id: newId(), label: 'New rarity', kind: 'equipment', color: '#cccccc', dupesPerLevel: Array(10).fill(1), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0 }),
             )
           }
         >

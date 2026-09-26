@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "rarities": [
     {
       "id": "diamond",
@@ -7,6 +7,7 @@
       "kind": "character",
       "color": "#7fd8ff",
       "dupesPerLevel": [
+        1,
         1,
         1,
         1,
@@ -47,6 +48,7 @@
         1,
         1,
         1,
+        1,
         1
       ],
       "fusionMax": 10,
@@ -61,6 +63,7 @@
       "kind": "equipment",
       "color": "#ff4d6d",
       "dupesPerLevel": [
+        1,
         1,
         1,
         1,
@@ -84,7 +87,8 @@
       "color": "#c38bff",
       "dupesPerLevel": [
         1,
-        2,
+        1,
+        1,
         1,
         1,
         1,
@@ -106,7 +110,8 @@
       "color": "#6fcf97",
       "dupesPerLevel": [
         1,
-        2,
+        1,
+        1,
         1,
         1,
         1,
@@ -151,7 +156,7 @@
       "guest": false,
       "name": "Scorpion, Strike Force",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 9
     },
     {
       "id": "c2",
@@ -159,7 +164,7 @@
       "guest": false,
       "name": "Scorpion, MK1",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c3",
@@ -167,7 +172,7 @@
       "guest": false,
       "name": "Takeda, Ronin",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c4",
@@ -175,7 +180,7 @@
       "guest": false,
       "name": "Geras, MK1",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c5",
@@ -183,7 +188,7 @@
       "guest": false,
       "name": "Shang Tsung, MK1",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c6",
@@ -191,7 +196,7 @@
       "guest": false,
       "name": "Kenshi, Ronin",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c7",
@@ -199,7 +204,7 @@
       "guest": false,
       "name": "Kitana, MKII Movie",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 7
     },
     {
       "id": "c8",
@@ -207,7 +212,7 @@
       "guest": false,
       "name": "Erron Black, Day of the Dead",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c9",
@@ -215,7 +220,7 @@
       "guest": false,
       "name": "Kitana, Assassin",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 7
     },
     {
       "id": "c10",
@@ -223,7 +228,7 @@
       "guest": false,
       "name": "Johnny Cage, Strike Force",
       "rarityId": "diamond",
-      "fusion": 8
+      "fusion": 9
     },
     {
       "id": "c11",
@@ -231,7 +236,7 @@
       "guest": false,
       "name": "Tremor, Black Dragon",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c12",
@@ -239,7 +244,7 @@
       "guest": false,
       "name": "Quan Chi, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 7
     },
     {
       "id": "c13",
@@ -247,7 +252,7 @@
       "guest": false,
       "name": "Jade, Assassin",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 7
     },
     {
       "id": "c14",
@@ -255,7 +260,7 @@
       "guest": false,
       "name": "Sub-Zero, Kold",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c15",
@@ -263,7 +268,7 @@
       "guest": false,
       "name": "Scorpion, Kold",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c16",
@@ -271,7 +276,7 @@
       "guest": false,
       "name": "Sonya Blade, Klassic Movie",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 6
     },
     {
       "id": "c17",
@@ -279,7 +284,7 @@
       "guest": false,
       "name": "Sub-Zero, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c18",
@@ -287,7 +292,7 @@
       "guest": false,
       "name": "Raiden, Injustice 2",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 6
     },
     {
       "id": "c19",
@@ -295,7 +300,7 @@
       "guest": false,
       "name": "Kitana, Ronin",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 6
     },
     {
       "id": "c20",
@@ -303,7 +308,7 @@
       "guest": false,
       "name": "Skarlet, Kold",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 6
     },
     {
       "id": "c21",
@@ -311,7 +316,7 @@
       "guest": false,
       "name": "Liu Kang, Fire God",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 5
     },
     {
       "id": "c22",
@@ -319,7 +324,7 @@
       "guest": false,
       "name": "D'Vorah, Wretch",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 6
     },
     {
       "id": "c23",
@@ -327,7 +332,7 @@
       "guest": false,
       "name": "Kitana, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 6
     },
     {
       "id": "c24",
@@ -335,7 +340,7 @@
       "guest": false,
       "name": "Kano, Black Dragon",
       "rarityId": "diamond",
-      "fusion": 5
+      "fusion": 6
     },
     {
       "id": "c25",
@@ -343,7 +348,7 @@
       "guest": false,
       "name": "Kabal, Black Dragon",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 5
     },
     {
       "id": "c26",
@@ -351,7 +356,7 @@
       "guest": false,
       "name": "Skarlet, Assassin",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 5
     },
     {
       "id": "c27",
@@ -359,7 +364,7 @@
       "guest": false,
       "name": "Smoke, MK1",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 4
     },
     {
       "id": "c28",
@@ -367,7 +372,7 @@
       "guest": false,
       "name": "Jax Briggs, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 5
     },
     {
       "id": "c29",
@@ -375,7 +380,7 @@
       "guest": false,
       "name": "Erron Black, Black Dragon",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 5
     },
     {
       "id": "c30",
@@ -383,7 +388,7 @@
       "guest": false,
       "name": "Jade, Day of the Dead",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 5
     },
     {
       "id": "c31",
@@ -391,7 +396,7 @@
       "guest": false,
       "name": "Johnny Cage, Klassic Movie",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 4
     },
     {
       "id": "c32",
@@ -399,7 +404,7 @@
       "guest": true,
       "name": "Leatherface, Nightmare",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 4
     },
     {
       "id": "c33",
@@ -407,7 +412,7 @@
       "guest": false,
       "name": "Scorpion, MKII Movie",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 4
     },
     {
       "id": "c34",
@@ -415,7 +420,7 @@
       "guest": false,
       "name": "Kung Lao, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 4
+      "fusion": 5
     },
     {
       "id": "c35",
@@ -423,7 +428,7 @@
       "guest": false,
       "name": "Baraka, Klassic",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 4
     },
     {
       "id": "c36",
@@ -431,7 +436,7 @@
       "guest": false,
       "name": "Kitana, Day of the Dead",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 4
     },
     {
       "id": "c37",
@@ -439,7 +444,7 @@
       "guest": false,
       "name": "Shao Kahn, MKII Movie",
       "rarityId": "diamond",
-      "fusion": 2
+      "fusion": 3
     },
     {
       "id": "c38",
@@ -447,7 +452,7 @@
       "guest": false,
       "name": "Nightwolf, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 2
+      "fusion": 3
     },
     {
       "id": "c39",
@@ -455,7 +460,7 @@
       "guest": false,
       "name": "Sub-Zero, MK1",
       "rarityId": "diamond",
-      "fusion": 2
+      "fusion": 3
     },
     {
       "id": "c40",
@@ -463,7 +468,7 @@
       "guest": true,
       "name": "Terminator, Dark Fate",
       "rarityId": "diamond",
-      "fusion": 2
+      "fusion": 3
     },
     {
       "id": "c41",
@@ -471,7 +476,7 @@
       "guest": true,
       "name": "Spawn, Tormented Soul",
       "rarityId": "diamond",
-      "fusion": 2
+      "fusion": 3
     },
     {
       "id": "c42",
@@ -479,7 +484,7 @@
       "guest": false,
       "name": "Noob Saibot, Darkest Knight",
       "rarityId": "diamond",
-      "fusion": 1
+      "fusion": 2
     },
     {
       "id": "c43",
@@ -487,7 +492,7 @@
       "guest": true,
       "name": "Ghostface, Nightmare",
       "rarityId": "diamond",
-      "fusion": 1
+      "fusion": 2
     },
     {
       "id": "c44",
@@ -495,7 +500,7 @@
       "guest": true,
       "name": "The Joker, Ace of Knaves",
       "rarityId": "diamond",
-      "fusion": 1
+      "fusion": 2
     },
     {
       "id": "c45",
@@ -503,7 +508,7 @@
       "guest": true,
       "name": "Terminator, Guardian",
       "rarityId": "diamond",
-      "fusion": 1
+      "fusion": 2
     },
     {
       "id": "c46",
@@ -511,7 +516,7 @@
       "guest": true,
       "name": "Freddy Krueger, Nightmare",
       "rarityId": "diamond",
-      "fusion": 0
+      "fusion": 1
     },
     {
       "id": "c47",
@@ -519,7 +524,7 @@
       "guest": false,
       "name": "Kenshi, MK1",
       "rarityId": "diamond",
-      "fusion": 9
+      "fusion": 10
     },
     {
       "id": "c48",
@@ -527,7 +532,7 @@
       "guest": false,
       "name": "Raiden, Klassic Movie",
       "rarityId": "diamond",
-      "fusion": 9
+      "fusion": 10
     },
     {
       "id": "c49",
@@ -535,7 +540,7 @@
       "guest": false,
       "name": "Liu Kang, Circle of Shadow",
       "rarityId": "diamond",
-      "fusion": 9
+      "fusion": 10
     },
     {
       "id": "c50",
@@ -543,7 +548,7 @@
       "guest": true,
       "name": "Jason Voorhees, Nightmare",
       "rarityId": "diamond",
-      "fusion": 9
+      "fusion": 10
     },
     {
       "id": "c51",
@@ -551,8 +556,8 @@
       "guest": false,
       "name": "Goro, Tigrar Fury",
       "rarityId": "gold",
-      "fusion": 14,
-      "maxLevel": 15
+      "fusion": 15,
+      "maxLevel": 16
     },
     {
       "id": "c52",
@@ -560,8 +565,8 @@
       "guest": false,
       "name": "Jason Voorhees, Slasher",
       "rarityId": "gold",
-      "fusion": 11,
-      "maxLevel": 15
+      "fusion": 12,
+      "maxLevel": 16
     },
     {
       "id": "c53",
@@ -569,7 +574,7 @@
       "guest": false,
       "name": "Sub-Zero, Klassic",
       "rarityId": "gold",
-      "fusion": 16,
+      "fusion": 17,
       "maxLevel": null
     },
     {
@@ -578,7 +583,7 @@
       "guest": false,
       "name": "Bloody Tomahawk",
       "rarityId": "blood-ruby",
-      "fusion": 0
+      "fusion": 1
     },
     {
       "id": "c56",
@@ -586,7 +591,7 @@
       "guest": false,
       "name": "Datusha, Bane of Moroi",
       "rarityId": "blood-ruby",
-      "fusion": 0
+      "fusion": 1
     },
     {
       "id": "c58",
@@ -594,7 +599,7 @@
       "guest": false,
       "name": "Devastator",
       "rarityId": "blood-ruby",
-      "fusion": 0
+      "fusion": 1
     },
     {
       "id": "c60",
@@ -602,7 +607,7 @@
       "guest": false,
       "name": "Moloch's Ball and Chain",
       "rarityId": "blood-ruby",
-      "fusion": 0
+      "fusion": 1
     },
     {
       "id": "c62",
@@ -610,7 +615,7 @@
       "guest": false,
       "name": "Shadow Sash",
       "rarityId": "blood-ruby",
-      "fusion": 7
+      "fusion": 8
     },
     {
       "id": "c64",
@@ -618,8 +623,7 @@
       "guest": false,
       "name": "Rebirth Liquid",
       "rarityId": "epic",
-      "fusion": 2,
-      "spare": 1,
+      "fusion": 3,
       "source": "krypt"
     },
     {
@@ -628,8 +632,7 @@
       "guest": false,
       "name": "Necromancer's Death Favor",
       "rarityId": "epic",
-      "fusion": 2,
-      "spare": 1,
+      "fusion": 3,
       "source": "krypt"
     },
     {
@@ -638,8 +641,7 @@
       "guest": false,
       "name": "Midnight Stalker's Curse",
       "rarityId": "epic",
-      "fusion": 2,
-      "spare": 1,
+      "fusion": 3,
       "source": "krypt"
     },
     {
@@ -648,8 +650,7 @@
       "guest": false,
       "name": "Hellborne Chains",
       "rarityId": "epic",
-      "fusion": 2,
-      "spare": 1,
+      "fusion": 3,
       "source": "krypt"
     },
     {
@@ -658,8 +659,7 @@
       "guest": false,
       "name": "Augmentation: Neural Link",
       "rarityId": "epic",
-      "fusion": 2,
-      "spare": 1,
+      "fusion": 3,
       "source": "krypt"
     },
     {
@@ -669,7 +669,6 @@
       "name": "Takahashi's Gauntlets",
       "rarityId": "epic",
       "fusion": 2,
-      "spare": 0,
       "source": "krypt"
     },
     {
@@ -679,7 +678,6 @@
       "name": "Coldhearted Ninja's Dark Cryomancy",
       "rarityId": "epic",
       "fusion": 2,
-      "spare": 0,
       "source": "krypt"
     },
     {
@@ -689,7 +687,6 @@
       "name": "Wind of Rebellion",
       "rarityId": "epic",
       "fusion": 1,
-      "spare": 0,
       "source": "krypt"
     },
     {
@@ -699,7 +696,6 @@
       "name": "Taira's Clan 6th Sense",
       "rarityId": "epic",
       "fusion": 1,
-      "spare": 0,
       "source": "krypt"
     },
     {
@@ -709,7 +705,6 @@
       "name": "Draconic Bloodline",
       "rarityId": "epic",
       "fusion": 1,
-      "spare": 0,
       "source": "krypt"
     },
     {
@@ -719,7 +714,6 @@
       "name": "Man in the Sky",
       "rarityId": "epic",
       "fusion": 1,
-      "spare": 0,
       "source": "krypt"
     },
     {
@@ -729,7 +723,6 @@
       "name": "Man in Control",
       "rarityId": "epic",
       "fusion": 0,
-      "spare": 0,
       "source": "krypt"
     },
     {
@@ -739,7 +732,6 @@
       "name": "Horde Chief's Paraphernalia",
       "rarityId": "epic",
       "fusion": 0,
-      "spare": 0,
       "source": "krypt"
     },
     {
@@ -749,7 +741,6 @@
       "name": "Flame Forged Will",
       "rarityId": "epic",
       "fusion": 0,
-      "spare": 0,
       "source": "krypt"
     },
     {
@@ -759,7 +750,6 @@
       "name": "Flame Forged Ferocity",
       "rarityId": "epic",
       "fusion": 0,
-      "spare": 0,
       "source": "krypt"
     },
     {

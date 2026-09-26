@@ -14,20 +14,20 @@ export const defaultWeights: Weights = {
 
 export function defaultRarities(): RarityRule[] {
   return [
-    // F1..F10, max.
-    { id: 'diamond', label: 'Diamond', kind: 'character', color: '#7fd8ff', dupesPerLevel: ones(9), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0 },
-    // F1..F10 then A1..A10 (set each card's own cap to A5 or A10).
-    { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(19), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
-    { id: 'blood-ruby', label: 'Blood Ruby Equip', kind: 'equipment', color: '#ff4d6d', dupesPerLevel: ones(9), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0 },
+    // First copy is F0, then 1 dupe per level to F10 (11 copies).
+    { id: 'diamond', label: 'Diamond', kind: 'character', color: '#7fd8ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0 },
+    // F0..F10 then A1..A10 (set each card's own cap to A5 or A10).
+    { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(20), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
+    { id: 'blood-ruby', label: 'Blood Ruby Equip', kind: 'equipment', color: '#ff4d6d', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0 },
     // Only tracked until F3 (4 copies from scratch); Fusion Up Kards finish them.
-    { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: [1, 2, ...ones(7)], fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
-    { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#6fcf97', dupesPerLevel: [1, 2, ...ones(7)], fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
+    { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
+    { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#6fcf97', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
   ];
 }
 
 export function defaultState(): AppState {
   return {
-    version: 1,
+    version: 2,
     rarities: defaultRarities(),
     currencies: [
       { id: 'souls', name: 'Souls', balance: 0 },
@@ -55,15 +55,16 @@ export function sampleState(): AppState {
   s.currencies[1].balance = 900;
   s.rarities[0].fusionUpKards = 3;
   s.cards = [
-    { id: 'c1', name: 'Klassic Sub-Zero', rarityId: 'diamond', fusion: 2, tier: 'must', guest: false },
+    // Stored levels: 1 = F0, 3 = F2, 11 = F10, 14 = A3 …
+    { id: 'c1', name: 'Klassic Sub-Zero', rarityId: 'diamond', fusion: 3, tier: 'must', guest: false },
     { id: 'c2', name: 'Guest Rambo', rarityId: 'diamond', fusion: 0, tier: 'want', guest: true },
-    { id: 'c3', name: 'Dark Raiden', rarityId: 'diamond', fusion: 6, tier: 'must', guest: false },
-    { id: 'c4', name: 'Shaolin Liu Kang', rarityId: 'diamond', fusion: 1, tier: 'nice', guest: false },
-    { id: 'c5', name: 'Kold War Scorpion', rarityId: 'gold', fusion: 13, maxLevel: 20, tier: 'want', guest: false },
-    { id: 'c6', name: 'Cryomancer Frost', rarityId: 'gold', fusion: 12, maxLevel: 15, tier: 'nice', guest: false },
-    { id: 'c7', name: 'Blood Ruby Talisman', rarityId: 'blood-ruby', fusion: 4, tier: 'want', guest: false },
-    { id: 'c8', name: 'Kombat Kunai', rarityId: 'epic', fusion: 1, tier: 'want', guest: false, source: 'krypt' },
-    { id: 'c9', name: 'Lin Kuei Gloves', rarityId: 'rare', fusion: 2, tier: 'nice', guest: false },
+    { id: 'c3', name: 'Dark Raiden', rarityId: 'diamond', fusion: 7, tier: 'must', guest: false },
+    { id: 'c4', name: 'Shaolin Liu Kang', rarityId: 'diamond', fusion: 2, tier: 'nice', guest: false },
+    { id: 'c5', name: 'Kold War Scorpion', rarityId: 'gold', fusion: 14, tier: 'want', guest: false },
+    { id: 'c6', name: 'Cryomancer Frost', rarityId: 'gold', fusion: 13, maxLevel: 16, tier: 'nice', guest: false },
+    { id: 'c7', name: 'Blood Ruby Talisman', rarityId: 'blood-ruby', fusion: 5, tier: 'want', guest: false },
+    { id: 'c8', name: 'Kombat Kunai', rarityId: 'epic', fusion: 2, tier: 'want', guest: false, source: 'krypt' },
+    { id: 'c9', name: 'Lin Kuei Gloves', rarityId: 'rare', fusion: 3, tier: 'nice', guest: false },
   ];
   s.packs = [
     {
