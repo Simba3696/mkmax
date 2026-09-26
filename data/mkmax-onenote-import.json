@@ -1,0 +1,991 @@
+{
+  "version": 1,
+  "rarities": [
+    {
+      "id": "diamond",
+      "label": "Diamond",
+      "kind": "character",
+      "color": "#7fd8ff",
+      "dupesPerLevel": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "fusionMax": 10,
+      "goal": "max",
+      "hasGuests": true,
+      "fusionUpThreshold": 3,
+      "fusionUpKards": 0
+    },
+    {
+      "id": "gold",
+      "label": "Gold",
+      "kind": "character",
+      "color": "#f2c14e",
+      "dupesPerLevel": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "fusionMax": 10,
+      "goal": "max",
+      "hasGuests": false,
+      "fusionUpThreshold": 3,
+      "fusionUpKards": 0
+    },
+    {
+      "id": "blood-ruby",
+      "label": "Blood Ruby Equip",
+      "kind": "equipment",
+      "color": "#ff4d6d",
+      "dupesPerLevel": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "fusionMax": 10,
+      "goal": "max",
+      "hasGuests": false,
+      "fusionUpThreshold": null,
+      "fusionUpKards": 0
+    },
+    {
+      "id": "epic",
+      "label": "Epic Equip",
+      "kind": "equipment",
+      "color": "#c38bff",
+      "dupesPerLevel": [
+        1,
+        2,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "fusionMax": 10,
+      "goal": "threshold",
+      "hasGuests": false,
+      "fusionUpThreshold": 3,
+      "fusionUpKards": 0
+    },
+    {
+      "id": "rare",
+      "label": "Rare Equip",
+      "kind": "equipment",
+      "color": "#6fcf97",
+      "dupesPerLevel": [
+        1,
+        2,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "fusionMax": 10,
+      "goal": "threshold",
+      "hasGuests": false,
+      "fusionUpThreshold": 3,
+      "fusionUpKards": 0
+    }
+  ],
+  "currencies": [
+    {
+      "id": "souls",
+      "name": "Souls",
+      "balance": 0
+    },
+    {
+      "id": "blood-rubies",
+      "name": "Blood Rubies",
+      "balance": 0
+    },
+    {
+      "id": "dragon-krystals",
+      "name": "Dragon Krystals",
+      "balance": 0
+    },
+    {
+      "id": "time-krystals",
+      "name": "Time Krystals",
+      "balance": 0
+    }
+  ],
+  "cards": [
+    {
+      "id": "c1",
+      "tier": "want",
+      "guest": false,
+      "name": "Scorpion, Strike Force",
+      "rarityId": "diamond",
+      "fusion": 8
+    },
+    {
+      "id": "c2",
+      "tier": "want",
+      "guest": false,
+      "name": "Scorpion, MK1",
+      "rarityId": "diamond",
+      "fusion": 7
+    },
+    {
+      "id": "c3",
+      "tier": "want",
+      "guest": false,
+      "name": "Takeda, Ronin",
+      "rarityId": "diamond",
+      "fusion": 7
+    },
+    {
+      "id": "c4",
+      "tier": "want",
+      "guest": false,
+      "name": "Geras, MK1",
+      "rarityId": "diamond",
+      "fusion": 7
+    },
+    {
+      "id": "c5",
+      "tier": "want",
+      "guest": false,
+      "name": "Shang Tsung, MK1",
+      "rarityId": "diamond",
+      "fusion": 7
+    },
+    {
+      "id": "c6",
+      "tier": "want",
+      "guest": false,
+      "name": "Kenshi, Ronin",
+      "rarityId": "diamond",
+      "fusion": 7
+    },
+    {
+      "id": "c7",
+      "tier": "want",
+      "guest": false,
+      "name": "Kitana, MKII Movie",
+      "rarityId": "diamond",
+      "fusion": 6
+    },
+    {
+      "id": "c8",
+      "tier": "want",
+      "guest": false,
+      "name": "Erron Black, Day of the Dead",
+      "rarityId": "diamond",
+      "fusion": 7
+    },
+    {
+      "id": "c9",
+      "tier": "want",
+      "guest": false,
+      "name": "Kitana, Assassin",
+      "rarityId": "diamond",
+      "fusion": 6
+    },
+    {
+      "id": "c10",
+      "tier": "want",
+      "guest": false,
+      "name": "Johnny Cage, Strike Force",
+      "rarityId": "diamond",
+      "fusion": 8
+    },
+    {
+      "id": "c11",
+      "tier": "want",
+      "guest": false,
+      "name": "Tremor, Black Dragon",
+      "rarityId": "diamond",
+      "fusion": 7
+    },
+    {
+      "id": "c12",
+      "tier": "want",
+      "guest": false,
+      "name": "Quan Chi, Circle of Shadow",
+      "rarityId": "diamond",
+      "fusion": 6
+    },
+    {
+      "id": "c13",
+      "tier": "want",
+      "guest": false,
+      "name": "Jade, Assassin",
+      "rarityId": "diamond",
+      "fusion": 6
+    },
+    {
+      "id": "c14",
+      "tier": "want",
+      "guest": false,
+      "name": "Sub-Zero, Kold",
+      "rarityId": "diamond",
+      "fusion": 7
+    },
+    {
+      "id": "c15",
+      "tier": "want",
+      "guest": false,
+      "name": "Scorpion, Kold",
+      "rarityId": "diamond",
+      "fusion": 7
+    },
+    {
+      "id": "c16",
+      "tier": "want",
+      "guest": false,
+      "name": "Sonya Blade, Klassic Movie",
+      "rarityId": "diamond",
+      "fusion": 5
+    },
+    {
+      "id": "c17",
+      "tier": "want",
+      "guest": false,
+      "name": "Sub-Zero, Circle of Shadow",
+      "rarityId": "diamond",
+      "fusion": 7
+    },
+    {
+      "id": "c18",
+      "tier": "want",
+      "guest": false,
+      "name": "Raiden, Injustice 2",
+      "rarityId": "diamond",
+      "fusion": 5
+    },
+    {
+      "id": "c19",
+      "tier": "want",
+      "guest": false,
+      "name": "Kitana, Ronin",
+      "rarityId": "diamond",
+      "fusion": 5
+    },
+    {
+      "id": "c20",
+      "tier": "want",
+      "guest": false,
+      "name": "Skarlet, Kold",
+      "rarityId": "diamond",
+      "fusion": 5
+    },
+    {
+      "id": "c21",
+      "tier": "want",
+      "guest": false,
+      "name": "Liu Kang, Fire God",
+      "rarityId": "diamond",
+      "fusion": 4
+    },
+    {
+      "id": "c22",
+      "tier": "want",
+      "guest": false,
+      "name": "D'Vorah, Wretch",
+      "rarityId": "diamond",
+      "fusion": 5
+    },
+    {
+      "id": "c23",
+      "tier": "want",
+      "guest": false,
+      "name": "Kitana, Circle of Shadow",
+      "rarityId": "diamond",
+      "fusion": 5
+    },
+    {
+      "id": "c24",
+      "tier": "want",
+      "guest": false,
+      "name": "Kano, Black Dragon",
+      "rarityId": "diamond",
+      "fusion": 5
+    },
+    {
+      "id": "c25",
+      "tier": "want",
+      "guest": false,
+      "name": "Kabal, Black Dragon",
+      "rarityId": "diamond",
+      "fusion": 4
+    },
+    {
+      "id": "c26",
+      "tier": "want",
+      "guest": false,
+      "name": "Skarlet, Assassin",
+      "rarityId": "diamond",
+      "fusion": 4
+    },
+    {
+      "id": "c27",
+      "tier": "want",
+      "guest": false,
+      "name": "Smoke, MK1",
+      "rarityId": "diamond",
+      "fusion": 3
+    },
+    {
+      "id": "c28",
+      "tier": "want",
+      "guest": false,
+      "name": "Jax Briggs, Circle of Shadow",
+      "rarityId": "diamond",
+      "fusion": 4
+    },
+    {
+      "id": "c29",
+      "tier": "want",
+      "guest": false,
+      "name": "Erron Black, Black Dragon",
+      "rarityId": "diamond",
+      "fusion": 4
+    },
+    {
+      "id": "c30",
+      "tier": "want",
+      "guest": false,
+      "name": "Jade, Day of the Dead",
+      "rarityId": "diamond",
+      "fusion": 4
+    },
+    {
+      "id": "c31",
+      "tier": "want",
+      "guest": false,
+      "name": "Johnny Cage, Klassic Movie",
+      "rarityId": "diamond",
+      "fusion": 3
+    },
+    {
+      "id": "c32",
+      "tier": "want",
+      "guest": true,
+      "name": "Leatherface, Nightmare",
+      "rarityId": "diamond",
+      "fusion": 3
+    },
+    {
+      "id": "c33",
+      "tier": "want",
+      "guest": false,
+      "name": "Scorpion, MKII Movie",
+      "rarityId": "diamond",
+      "fusion": 3
+    },
+    {
+      "id": "c34",
+      "tier": "want",
+      "guest": false,
+      "name": "Kung Lao, Circle of Shadow",
+      "rarityId": "diamond",
+      "fusion": 4
+    },
+    {
+      "id": "c35",
+      "tier": "want",
+      "guest": false,
+      "name": "Baraka, Klassic",
+      "rarityId": "diamond",
+      "fusion": 3
+    },
+    {
+      "id": "c36",
+      "tier": "want",
+      "guest": false,
+      "name": "Kitana, Day of the Dead",
+      "rarityId": "diamond",
+      "fusion": 3
+    },
+    {
+      "id": "c37",
+      "tier": "want",
+      "guest": false,
+      "name": "Shao Kahn, MKII Movie",
+      "rarityId": "diamond",
+      "fusion": 2
+    },
+    {
+      "id": "c38",
+      "tier": "want",
+      "guest": false,
+      "name": "Nightwolf, Circle of Shadow",
+      "rarityId": "diamond",
+      "fusion": 2
+    },
+    {
+      "id": "c39",
+      "tier": "want",
+      "guest": false,
+      "name": "Sub-Zero, MK1",
+      "rarityId": "diamond",
+      "fusion": 2
+    },
+    {
+      "id": "c40",
+      "tier": "want",
+      "guest": true,
+      "name": "Terminator, Dark Fate",
+      "rarityId": "diamond",
+      "fusion": 2
+    },
+    {
+      "id": "c41",
+      "tier": "want",
+      "guest": true,
+      "name": "Spawn, Tormented Soul",
+      "rarityId": "diamond",
+      "fusion": 2
+    },
+    {
+      "id": "c42",
+      "tier": "want",
+      "guest": false,
+      "name": "Noob Saibot, Darkest Knight",
+      "rarityId": "diamond",
+      "fusion": 1
+    },
+    {
+      "id": "c43",
+      "tier": "want",
+      "guest": true,
+      "name": "Ghostface, Nightmare",
+      "rarityId": "diamond",
+      "fusion": 1
+    },
+    {
+      "id": "c44",
+      "tier": "want",
+      "guest": true,
+      "name": "The Joker, Ace of Knaves",
+      "rarityId": "diamond",
+      "fusion": 1
+    },
+    {
+      "id": "c45",
+      "tier": "want",
+      "guest": true,
+      "name": "Terminator, Guardian",
+      "rarityId": "diamond",
+      "fusion": 1
+    },
+    {
+      "id": "c46",
+      "tier": "want",
+      "guest": true,
+      "name": "Freddy Krueger, Nightmare",
+      "rarityId": "diamond",
+      "fusion": 0
+    },
+    {
+      "id": "c47",
+      "tier": "want",
+      "guest": false,
+      "name": "Kenshi, MK1",
+      "rarityId": "diamond",
+      "fusion": 9
+    },
+    {
+      "id": "c48",
+      "tier": "want",
+      "guest": false,
+      "name": "Raiden, Klassic Movie",
+      "rarityId": "diamond",
+      "fusion": 9
+    },
+    {
+      "id": "c49",
+      "tier": "want",
+      "guest": false,
+      "name": "Liu Kang, Circle of Shadow",
+      "rarityId": "diamond",
+      "fusion": 9
+    },
+    {
+      "id": "c50",
+      "tier": "want",
+      "guest": true,
+      "name": "Jason Voorhees, Nightmare",
+      "rarityId": "diamond",
+      "fusion": 9
+    },
+    {
+      "id": "c51",
+      "tier": "want",
+      "guest": false,
+      "name": "Goro, Tigrar Fury",
+      "rarityId": "gold",
+      "fusion": 14,
+      "maxLevel": 15
+    },
+    {
+      "id": "c52",
+      "tier": "want",
+      "guest": false,
+      "name": "Jason Voorhees, Slasher",
+      "rarityId": "gold",
+      "fusion": 11,
+      "maxLevel": 15
+    },
+    {
+      "id": "c53",
+      "tier": "want",
+      "guest": false,
+      "name": "Sub-Zero, Klassic",
+      "rarityId": "gold",
+      "fusion": 16,
+      "maxLevel": null
+    },
+    {
+      "id": "c54",
+      "tier": "want",
+      "guest": false,
+      "name": "Bloody Tomahawk",
+      "rarityId": "blood-ruby",
+      "fusion": 0
+    },
+    {
+      "id": "c55",
+      "tier": "want",
+      "guest": false,
+      "name": "Datusha, Bane of Moroi",
+      "rarityId": "blood-ruby",
+      "fusion": 0
+    },
+    {
+      "id": "c56",
+      "tier": "want",
+      "guest": false,
+      "name": "Devastator",
+      "rarityId": "blood-ruby",
+      "fusion": 0
+    },
+    {
+      "id": "c57",
+      "tier": "want",
+      "guest": false,
+      "name": "Moloch's Ball and Chain",
+      "rarityId": "blood-ruby",
+      "fusion": 0
+    },
+    {
+      "id": "c58",
+      "tier": "want",
+      "guest": false,
+      "name": "Shadow Sash",
+      "rarityId": "blood-ruby",
+      "fusion": 7
+    },
+    {
+      "id": "c59",
+      "tier": "want",
+      "guest": false,
+      "name": "Rebirth Liquid",
+      "rarityId": "epic",
+      "fusion": 2,
+      "spare": 1,
+      "source": "krypt"
+    },
+    {
+      "id": "c60",
+      "tier": "want",
+      "guest": false,
+      "name": "Necromancer's Death Favor",
+      "rarityId": "epic",
+      "fusion": 2,
+      "spare": 1,
+      "source": "krypt"
+    },
+    {
+      "id": "c61",
+      "tier": "want",
+      "guest": false,
+      "name": "Midnight Stalker's Curse",
+      "rarityId": "epic",
+      "fusion": 2,
+      "spare": 1,
+      "source": "krypt"
+    },
+    {
+      "id": "c62",
+      "tier": "want",
+      "guest": false,
+      "name": "Hellborne Chains",
+      "rarityId": "epic",
+      "fusion": 2,
+      "spare": 1,
+      "source": "krypt"
+    },
+    {
+      "id": "c63",
+      "tier": "want",
+      "guest": false,
+      "name": "Augmentation: Neural Link",
+      "rarityId": "epic",
+      "fusion": 2,
+      "spare": 1,
+      "source": "krypt"
+    },
+    {
+      "id": "c64",
+      "tier": "want",
+      "guest": false,
+      "name": "Takahashi's Gauntlets",
+      "rarityId": "epic",
+      "fusion": 2,
+      "spare": 0,
+      "source": "krypt"
+    },
+    {
+      "id": "c65",
+      "tier": "want",
+      "guest": false,
+      "name": "Coldhearted Ninja's Dark Cryomancy",
+      "rarityId": "epic",
+      "fusion": 2,
+      "spare": 0,
+      "source": "krypt"
+    },
+    {
+      "id": "c66",
+      "tier": "want",
+      "guest": false,
+      "name": "Wind of Rebellion",
+      "rarityId": "epic",
+      "fusion": 1,
+      "spare": 0,
+      "source": "krypt"
+    },
+    {
+      "id": "c67",
+      "tier": "want",
+      "guest": false,
+      "name": "Taira's Clan 6th Sense",
+      "rarityId": "epic",
+      "fusion": 1,
+      "spare": 0,
+      "source": "krypt"
+    },
+    {
+      "id": "c68",
+      "tier": "want",
+      "guest": false,
+      "name": "Draconic Bloodline",
+      "rarityId": "epic",
+      "fusion": 1,
+      "spare": 0,
+      "source": "krypt"
+    },
+    {
+      "id": "c69",
+      "tier": "want",
+      "guest": false,
+      "name": "Man in the Sky",
+      "rarityId": "epic",
+      "fusion": 1,
+      "spare": 0,
+      "source": "krypt"
+    },
+    {
+      "id": "c70",
+      "tier": "want",
+      "guest": false,
+      "name": "Man in Control",
+      "rarityId": "epic",
+      "fusion": 0,
+      "spare": 0,
+      "source": "krypt"
+    },
+    {
+      "id": "c71",
+      "tier": "want",
+      "guest": false,
+      "name": "Horde Chief's Paraphernalia",
+      "rarityId": "epic",
+      "fusion": 0,
+      "spare": 0,
+      "source": "krypt"
+    },
+    {
+      "id": "c72",
+      "tier": "want",
+      "guest": false,
+      "name": "Flame Forged Will",
+      "rarityId": "epic",
+      "fusion": 0,
+      "spare": 0,
+      "source": "krypt"
+    },
+    {
+      "id": "c73",
+      "tier": "want",
+      "guest": false,
+      "name": "Flame Forged Ferocity",
+      "rarityId": "epic",
+      "fusion": 0,
+      "spare": 0,
+      "source": "krypt"
+    },
+    {
+      "id": "c74",
+      "tier": "want",
+      "guest": false,
+      "name": "Smuggler's Luck",
+      "rarityId": "epic",
+      "fusion": 0,
+      "source": "tower",
+      "sourceNote": "Black Dragon Tower"
+    },
+    {
+      "id": "c75",
+      "tier": "want",
+      "guest": false,
+      "name": "Soul Reaver's Servant",
+      "rarityId": "epic",
+      "fusion": 0,
+      "source": "tower",
+      "sourceNote": "Sorcerer's Tower"
+    },
+    {
+      "id": "c76",
+      "tier": "want",
+      "guest": false,
+      "name": "Wailing Spirit",
+      "rarityId": "epic",
+      "fusion": 0,
+      "source": "tower",
+      "sourceNote": "Tower of Horror"
+    },
+    {
+      "id": "c77",
+      "tier": "want",
+      "guest": false,
+      "name": "The Patriot Shield",
+      "rarityId": "epic",
+      "fusion": 0,
+      "source": "tower",
+      "sourceNote": "Vought Tower"
+    }
+  ],
+  "packs": [],
+  "towers": [
+    {
+      "id": "t78",
+      "tower": "Black Dragon Tower",
+      "grade": "Uncommon",
+      "goal": "max",
+      "itemsLeft": 1
+    },
+    {
+      "id": "t79",
+      "tower": "Twisted Tower",
+      "grade": "Uncommon",
+      "goal": "max",
+      "itemsLeft": 1
+    },
+    {
+      "id": "t80",
+      "tower": "Black Dragon Tower",
+      "grade": "Rare",
+      "goal": "F3",
+      "itemsLeft": null
+    },
+    {
+      "id": "t81",
+      "tower": "Kold Tower",
+      "grade": "Rare",
+      "goal": "F3",
+      "itemsLeft": null
+    },
+    {
+      "id": "t82",
+      "tower": "Lin Kuei Tower",
+      "grade": "Rare",
+      "goal": "F3",
+      "itemsLeft": null
+    },
+    {
+      "id": "t83",
+      "tower": "Nightmare Tower",
+      "grade": "Rare",
+      "goal": "F3",
+      "itemsLeft": null
+    },
+    {
+      "id": "t84",
+      "tower": "Sorcerer's Tower",
+      "grade": "Rare",
+      "goal": "F3",
+      "itemsLeft": null
+    },
+    {
+      "id": "t85",
+      "tower": "Action Movie Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 3
+    },
+    {
+      "id": "t86",
+      "tower": "Black Dragon Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 4
+    },
+    {
+      "id": "t87",
+      "tower": "Dark Queen's Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 3
+    },
+    {
+      "id": "t88",
+      "tower": "Earthrealm Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 4
+    },
+    {
+      "id": "t89",
+      "tower": "Edenian Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 4
+    },
+    {
+      "id": "t90",
+      "tower": "Elder Wind Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 4
+    },
+    {
+      "id": "t91",
+      "tower": "Hellspawn Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 2
+    },
+    {
+      "id": "t92",
+      "tower": "Klassic Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 3
+    },
+    {
+      "id": "t93",
+      "tower": "Kold Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 4
+    },
+    {
+      "id": "t94",
+      "tower": "Lin Kuei Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 4
+    },
+    {
+      "id": "t95",
+      "tower": "Nightmare Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 3
+    },
+    {
+      "id": "t96",
+      "tower": "Shirai Ryu Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 3
+    },
+    {
+      "id": "t97",
+      "tower": "Sorcerer's Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 3
+    },
+    {
+      "id": "t98",
+      "tower": "Tower of Horror",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 4
+    },
+    {
+      "id": "t99",
+      "tower": "Twisted Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 3
+    },
+    {
+      "id": "t100",
+      "tower": "Vought Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 3
+    },
+    {
+      "id": "t101",
+      "tower": "White Lotus Tower",
+      "grade": "Epic",
+      "goal": "F3",
+      "itemsLeft": 2
+    }
+  ],
+  "weights": {
+    "tier": {
+      "must": 3,
+      "want": 2,
+      "nice": 1,
+      "skip": 0
+    },
+    "unlock": 1.3,
+    "belowThreshold": 1.5,
+    "coveredByKards": 0.3,
+    "guest": 1.5,
+    "closenessBonus": 0.5,
+    "limitedBoost": 1.25
+  }
+}
