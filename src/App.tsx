@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchStarterData, useStore } from './store';
+import { syncLabel } from './views/SyncPanel';
 import PlanView from './views/PlanView';
 import PacksView from './views/PacksView';
 import CardsView from './views/CardsView';
@@ -15,7 +16,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id'];
 
 export default function App() {
-  const { state, replace } = useStore();
+  const { state, replace, sync } = useStore();
   const [tab, setTab] = useState<TabId>(() => (location.hash.slice(1) as TabId) || 'plan');
 
   // ?starter loads the OneNote starter data, but only into an empty app so it never overwrites real progress.
@@ -38,6 +39,11 @@ export default function App() {
       <header className="topbar">
         <span className="logo">MK<b>MAX</b></span>
         <span className="muted small">Pack planner</span>
+        {sync.status.kind !== 'off' && (
+          <button className={`sync-pill ghost small sync-${sync.status.kind}`} onClick={() => go('settings')} title="Sync settings">
+            {syncLabel(sync.status)}
+          </button>
+        )}
       </header>
       <main className="content">
         {tab === 'plan' && <PlanView goto={go} />}
