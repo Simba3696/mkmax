@@ -8,6 +8,20 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
+      workbox: {
+        // Card art is hotlinked from the MK Mobile wiki; keep a copy so thumbnails work offline.
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/static\.wikia\.nocookie\.net\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'card-art',
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'MK Max — Pack Planner',
         short_name: 'MK Max',

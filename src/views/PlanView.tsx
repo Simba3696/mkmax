@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
 import { buildCtx, buildPlan, levelLabel, rankPacks, rankTargets, thresholdLevel, type Phase } from '../engine';
-import { fmt, FusionLabel, NumInput, pct, RarityBadge, timeUntil, useNow } from '../ui';
+import { CardThumb, fmt, FusionLabel, NumInput, pct, RarityBadge, timeUntil, useNow } from '../ui';
 import type { Pack } from '../types';
 
 const PHASE_LABEL: Record<Phase, string> = {
@@ -162,6 +162,7 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
           const thrLevel = rule ? thresholdLevel(rule) : null;
           return (
             <div key={t.card.id} className="row">
+              <CardThumb card={t.card} rule={rule} size={40} />
               <div className="grow">
                 <div className="row-title">
                   {t.card.name} {t.card.guest && <span className="chip guest">guest</span>}
