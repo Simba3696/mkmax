@@ -61,7 +61,15 @@ export function normalize(input: unknown): AppState {
   };
 }
 
-type Update = (recipe: (draft: AppState) => void) => void;
+/** Pass an undo label to offer "Undo <label>" for this change. */
+type Update = (recipe: (draft: AppState) => void, undoLabel?: string) => void;
+
+/** The most recent undoable change: the state from just before it. */
+export interface UndoEntry {
+  label: string;
+  prev: AppState;
+  at: number;
+}
 
 export type SyncStatus =
   | { kind: 'off' }
@@ -80,7 +88,17 @@ export interface SyncApi {
   resolve: (keep: 'mine' | 'theirs') => Promise<void>;
 }
 
-const Ctx = createContext<{ state: AppState; update: Update; replace: (s: AppState) => void; sync: SyncApi } | null>(null);
+interface StoreApi {
+  state: AppState;
+  update: Update;
+  replace: (s: AppState) => void;
+  sync: SyncApi;
+  lastUndo: UndoEntry | null;
+  undo: () => void;
+  dismissUndo: () => void;
+}
+
+const Ctx = createContext<StoreApi | null>(null);
 
 const PUSH_DELAY_MS = 1500;
 const PULL_EVERY_MS = 2 * 60 * 1000;
@@ -95,6 +113,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SyncStatus>(cfgRef.current ? { kind: 'idle', at: null } : { kind: 'off' });
   const busy = useRef(false);
   const pushTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [lastUndo, setLastUndo] = useState<UndoEntry | null>(null);
 
   useEffect(() => {
     try {
@@ -114,6 +133,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const s = normalize(remote);
     stateRef.current = s;
     setState(s);
+    // The snapshot predates the other device's changes; restoring it would silently drop them.
+    setLastUndo(null);
   };
 
   /** Pull if the gist moved on, push if only this device did, or report a conflict if both did. */
@@ -172,7 +193,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const update: Update = (recipe) => {
+  const update: Update = (recipe, undoLabel) => {
+    if (undoLabel) setLastUndo({ label: undoLabel, prev: stateRef.current, at: Date.now() });
     setState((prev) => {
       const draft = structuredClone(prev);
       recipe(draft);
@@ -184,6 +206,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const replace = (s: AppState) => {
     setState({ ...s, updatedAt: Date.now() });
+    setLastUndo(null);
+    schedulePush();
+  };
+
+  const undo = () => {
+    if (!lastUndo) return;
+    // A fresh timestamp so sync treats the restored copy as this device's newest change.
+    setState({ ...lastUndo.prev, updatedAt: Date.now() });
+    setLastUndo(null);
     schedulePush();
   };
 
@@ -229,7 +260,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
   };
 
-  return <Ctx.Provider value={{ state, update, replace, sync }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: () => setLastUndo(null) }}>{children}</Ctx.Provider>;
 }
 
 export function useStore() {

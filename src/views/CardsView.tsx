@@ -272,7 +272,7 @@ function CardList() {
                   update((d) => {
                     d.cards = d.cards.filter((x) => x.id !== c.id);
                     for (const p of d.packs) p.drops = p.drops.filter((x) => x.cardId !== c.id);
-                  })
+                  }, `Deleted ${c.name}`)
                 }
               />
             </div>

@@ -37,7 +37,7 @@ export default function PacksView() {
       const cur = d.currencies.find((c) => c.id === pack.currencyId);
       if (cur) cur.balance = Math.max(0, cur.balance - delta * pack.cost);
       if (pack.store && pack.drops[0]) stepCard(d, pack.drops[0].cardId, delta);
-    });
+    }, delta > 0 ? `Bought ${p.name}` : undefined);
     if (!p.store) setPulling(delta > 0 ? p.id : null);
   };
 
@@ -76,12 +76,16 @@ export default function PacksView() {
             >
               I bought one
             </button>
-            {p.purchased > 0 && <button onClick={() => buy(p, -1)}>Undo</button>}
+            {p.purchased > 0 && (
+              <button onClick={() => buy(p, -1)} title="Remove one purchase and refund its cost" aria-label="Remove one purchase">
+                −1
+              </button>
+            )}
           </>
         )}
         <button onClick={() => setEditing(p)}>Edit</button>
         <button onClick={() => duplicate(p)}>Rerun</button>
-        <ConfirmButton label="Delete" onConfirm={() => update((d) => void (d.packs = d.packs.filter((x) => x.id !== p.id)))} />
+        <ConfirmButton label="Delete" onConfirm={() => update((d) => void (d.packs = d.packs.filter((x) => x.id !== p.id)), `Deleted ${p.name}`)} />
       </div>
       {pulling === p.id && (
         <div className="subpanel">
@@ -141,7 +145,9 @@ export default function PacksView() {
           </button>
           <ConfirmButton
             label="Clear expired"
-            onConfirm={() => update((d) => void (d.packs = d.packs.filter((p) => packStatus(p, now) !== 'expired')))}
+            onConfirm={() =>
+              update((d) => void (d.packs = d.packs.filter((p) => packStatus(p, now) !== 'expired')), `Cleared ${groups.expired.length} expired packs`)
+            }
           />
         </div>
       )}
