@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchStarterData, useStore, type UndoEntry } from './store';
 import PullToRefresh from './PullToRefresh';
 import { useSwipeTabs } from './useSwipeTabs';
+import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
 import PlanView from './views/PlanView';
 import PacksView from './views/PacksView';
@@ -9,10 +10,10 @@ import CardsView from './views/CardsView';
 import SettingsView from './views/SettingsView';
 
 const TABS = [
-  { id: 'plan', label: 'Plan', icon: '🎯' },
-  { id: 'packs', label: 'Packs', icon: '🎁' },
-  { id: 'cards', label: 'Cards', icon: '🃏' },
-  { id: 'settings', label: 'Settings', icon: '⚙️' },
+  { id: 'plan', label: 'Plan', Icon: PlanIcon },
+  { id: 'packs', label: 'Packs', Icon: PacksIcon },
+  { id: 'cards', label: 'Cards', Icon: CardsIcon },
+  { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -90,7 +91,9 @@ export default function App() {
       <nav className="tabbar">
         {TABS.map((t) => (
           <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => go(t.id)}>
-            <span className="tab-icon">{t.icon}</span>
+            <span className="tab-icon">
+              <t.Icon />
+            </span>
             <span>{t.label}</span>
           </button>
         ))}

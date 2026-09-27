@@ -19,6 +19,7 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 - **Undo:** after a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
 - **Switching tabs:** tap a tab, or swipe left or right on the page. Swipes that start on a text field, inside a pop-up, on something that scrolls sideways, or right at the screen edge (where iOS has its own back gesture) are ignored.
 - **Done cards are removed:** when a card reaches its goal, the app deletes it. It's also removed from any pack drop lists, and a store item that only sold that card is deleted too. The goal is max for Diamond, the card's own ascension cap for Gold, max for Blood Ruby, and F3 for Rare and Epic. Right after this happens you can use **Undo**. Any card that's already at its goal is removed when the app loads, when you import a backup, or when a sync brings one in.
+- **Which version you have:** the bottom of Settings shows the commit and build date, for example `Version 0ebc412 · 2026-09-27`. An installed iPhone app only picks up a new deploy after it's fully closed and reopened, so if the version is behind, swipe the app away in the app switcher and open it again.
 - **Pull to refresh:** pull down from the top of any page. With sync on, it syncs now. Without sync, it reloads the app, which also picks up updates. Your data is kept either way.
 
 ## Sync and hosting
@@ -63,3 +64,5 @@ The planner works on each currency's balance separately. It keeps buying the aff
 ## Icons
 
 The icon is a gold-ringed red medallion with a double up-chevron. `public/icon.svg` is the source. The PNGs next to it are rendered from it: `icon-192.png` and `icon-512.png` for the manifest, `icon-maskable-512.png` (the mark padded for Android's crop), and `apple-touch-icon.png` (180px). `public/logo-mark.svg` is the medallion without its background tile, used in the header. If you change the design, re-render all four PNGs. Phones cache home-screen icons, so remove the app and add it again to see a new one.
+
+The tab bar icons are inline SVGs in `src/icons.tsx`. They use the current text color, so the active tab's icon turns red.

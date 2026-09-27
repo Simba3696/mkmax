@@ -26,7 +26,8 @@ h2 { font-size: 1.1rem; margin: 0 0 0.6rem; }
 h3 { font-size: 0.95rem; margin: 0.9rem 0 0.4rem; color: var(--gold); }
 a { color: var(--gold); cursor: pointer; text-decoration: underline; }
 
-.app { max-width: 720px; margin: 0 auto; min-height: 100vh; padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+/* Vertical scrolling and pinch zoom stay native; horizontal drags are left to the tab swipe. */
+.app { touch-action: pan-y pinch-zoom; max-width: 720px; margin: 0 auto; min-height: 100vh; padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 
 .topbar {
   position: sticky; top: 0; z-index: 5;
@@ -56,7 +57,8 @@ a { color: var(--gold); cursor: pointer; text-decoration: underline; }
   color: var(--muted); padding: 0.5rem 0 0.6rem; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.75rem;
 }
 .tabbar button.active { color: var(--text); box-shadow: inset 0 2px 0 var(--red); }
-.tab-icon { font-size: 1.2rem; }
+.tab-icon { display: flex; }
+.tabbar button.active .tab-icon { color: var(--red); }
 
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem; margin-bottom: 0.8rem; }
 .subpanel { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem; margin: 0.6rem 0; }
@@ -184,3 +186,8 @@ input[type='color'] { padding: 2px; width: 48px; }
 }
 .toast .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toast-undo { color: var(--gold); font-weight: 700; }
+
+/* iOS zooms into any field under 16px when it's focused, and the page then pans sideways. */
+@media (pointer: coarse) {
+  input, select, textarea, .field > input, .field > select { font-size: 16px; }
+}
