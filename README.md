@@ -13,6 +13,12 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 
 `public/onenote-import.json` is starter data transcribed from the OneNote "MK Mobile" page. To load it, use Settings → Load OneNote data, or open the app with `?starter` (for example `http://localhost:5173/?starter`). The `?starter` link only loads the file when the app has no cards yet, so it never overwrites your progress.
 
+## Everyday use
+
+- **Recording purchases:** on Packs, tap **I bought one**. This deducts the cost, and a store item also levels up its card. For random packs, tap + on each card you pulled. **−1** removes one purchase and refunds its cost.
+- **Undo:** after a purchase, deleting a pack or card, or clearing expired packs, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
+- **Pull to refresh:** pull down from the top of any page. With sync on, it syncs now. Without sync, it reloads the app, which also picks up updates. Your data is kept either way.
+
 ## Sync and hosting
 
 - **Hosting:** pushing to `main` runs `.github/workflows/deploy.yml`, which tests and builds the app, then publishes it to GitHub Pages at `https://<user>.github.io/<repo>/`. In the repo settings, set **Pages → Source** to **GitHub Actions** first. On the free plan, Pages needs a public repo.
@@ -51,3 +57,7 @@ Fusion Up Kards go to your highest-priority cards at F3 or above first.
 A pack's value is the expected value of its drops (rolls × chance), added up across the drop table.
 
 The planner works on each currency's balance separately. It keeps buying the affordable pack with the best value per cost, and updates your expected progress after each buy so repeat buys are worth less. Limited-time packs get the `limitedBoost` urgency factor. Every weight and fusion table can be edited in Settings.
+
+## Icons
+
+The icon is a gold-ringed red medallion with a double up-chevron. `public/icon.svg` is the source. The PNGs next to it are rendered from it: `icon-192.png` and `icon-512.png` for the manifest, `icon-maskable-512.png` (the mark padded for Android's crop), and `apple-touch-icon.png` (180px). `public/logo-mark.svg` is the medallion without its background tile, used in the header. If you change the design, re-render all four PNGs. Phones cache home-screen icons, so remove the app and add it again to see a new one.
