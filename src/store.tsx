@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppState } from './types';
 import { defaultState, defaultWeights } from './defaults';
+import { pruneDone } from './engine';
 import { decideSync, findOrCreateGist, loadSyncConfig, readRemote, saveSyncConfig, stamp, writeRemote, type SyncConfig } from './sync';
 
 const KEY = 'mkmax:v1';
@@ -42,7 +43,7 @@ export function normalize(input: unknown): AppState {
   }
   if ((s.version as number) !== 2) s = migrateV1(s);
   const base = defaultState();
-  return {
+  const out: AppState = {
     version: 2,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
@@ -59,6 +60,8 @@ export function normalize(input: unknown): AppState {
     weights: { ...defaultWeights, ...s.weights, tier: { ...defaultWeights.tier, ...s.weights?.tier } },
     updatedAt: s.updatedAt,
   };
+  pruneDone(out);
+  return out;
 }
 
 /** Pass an undo label to offer "Undo <label>" for this change. */
@@ -194,18 +197,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const update: Update = (recipe, undoLabel) => {
-    if (undoLabel) setLastUndo({ label: undoLabel, prev: stateRef.current, at: Date.now() });
-    setState((prev) => {
-      const draft = structuredClone(prev);
-      recipe(draft);
-      draft.updatedAt = Date.now();
-      return draft;
-    });
+    // Built from the ref rather than a setState updater so the undo label can include what got pruned.
+    const prev = stateRef.current;
+    const draft = structuredClone(prev);
+    recipe(draft);
+    const removed = pruneDone(draft);
+    draft.updatedAt = Date.now();
+    stateRef.current = draft;
+    setState(draft);
+    const label = [undoLabel, removed.length > 0 && `${removed.join(', ')} ${removed.length > 1 ? 'are' : 'is'} maxed and removed`].filter(Boolean).join(' · ');
+    if (label) setLastUndo({ label, prev, at: Date.now() });
     schedulePush();
   };
 
   const replace = (s: AppState) => {
-    setState({ ...s, updatedAt: Date.now() });
+    const next = { ...structuredClone(s), updatedAt: Date.now() };
+    pruneDone(next);
+    stateRef.current = next;
+    setState(next);
     setLastUndo(null);
     schedulePush();
   };

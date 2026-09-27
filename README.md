@@ -16,7 +16,9 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 ## Everyday use
 
 - **Recording purchases:** on Packs, tap **I bought one**. This deducts the cost, and a store item also levels up its card. For random packs, tap + on each card you pulled. **−1** removes one purchase and refunds its cost.
-- **Undo:** after a purchase, deleting a pack or card, or clearing expired packs, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
+- **Undo:** after a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
+- **Switching tabs:** tap a tab, or swipe left or right on the page. Swipes that start on a text field, inside a pop-up, on something that scrolls sideways, or right at the screen edge (where iOS has its own back gesture) are ignored.
+- **Done cards are removed:** when a card reaches its goal, the app deletes it. It's also removed from any pack drop lists, and a store item that only sold that card is deleted too. The goal is max for Diamond, the card's own ascension cap for Gold, max for Blood Ruby, and F3 for Rare and Epic. Right after this happens you can use **Undo**. Any card that's already at its goal is removed when the app loads, when you import a backup, or when a sync brings one in.
 - **Pull to refresh:** pull down from the top of any page. With sync on, it syncs now. Without sync, it reloads the app, which also picks up updates. Your data is kept either way.
 
 ## Sync and hosting
@@ -50,7 +52,7 @@ The phase depends on which copy it is:
 - **To Kard threshold**: copies that get the card to F3, where Fusion Up Kards become usable.
 - **Fusion**: a normal copy.
 - **Kards cover it**: copies your Fusion Up Kards would supply anyway, so they're worth less.
-- **Maxed** or **Skip**: worth 0.
+- **Skip**: worth 0. Cards that reach their goal are removed, so they never get scored.
 
 Fusion Up Kards go to your highest-priority cards at F3 or above first.
 

@@ -47,6 +47,21 @@ export function copiesToThreshold(card: Card, rule: RarityRule) {
 
 export const isMaxed = (card: Card, rule: RarityRule) => card.fusion >= targetLevel(card, rule);
 
+/**
+ * Cards that reached their goal are done, so they leave the app: the card, its pack drops, and any store
+ * item that only sold done cards. Mutates the state and returns the removed cards' names.
+ */
+export function pruneDone(s: AppState): string[] {
+  const rules = new Map(s.rarities.map((r) => [r.id, r]));
+  const done = new Set(s.cards.filter((c) => rules.has(c.rarityId) && isMaxed(c, rules.get(c.rarityId)!)).map((c) => c.id));
+  if (done.size === 0) return [];
+  const names = s.cards.filter((c) => done.has(c.id)).map((c) => c.name);
+  s.cards = s.cards.filter((c) => !done.has(c.id));
+  s.packs = s.packs.filter((p) => !(p.store && p.drops.length > 0 && p.drops.every((d) => done.has(d.cardId))));
+  for (const p of s.packs) p.drops = p.drops.filter((d) => !done.has(d.cardId));
+  return names;
+}
+
 // ---------- Context ----------
 
 export interface KardAssignment {

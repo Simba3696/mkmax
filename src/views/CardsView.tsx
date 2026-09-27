@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
-import { buildCtx, cardPriority, copiesToMax, copiesToThreshold, fLevel, isMaxed, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
+import { buildCtx, cardPriority, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
 import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, TIER_LABEL } from '../ui';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
@@ -57,7 +57,6 @@ function CardList() {
   const ctx = useMemo(() => buildCtx(state), [state]);
   const [rarity, setRarity] = useState<string>('all');
   const [q, setQ] = useState('');
-  const [hideMaxed, setHideMaxed] = useState(true);
   const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [imageEditId, setImageEditId] = useState<string | null>(null);
@@ -103,13 +102,7 @@ function CardList() {
     .filter((c) => rarity === 'all' || c.rarityId === rarity)
     .filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()))
     .filter((c) => sourceFilter === 'all' || (c.source ?? '') === sourceFilter)
-    .filter((c) => {
-      const r = ctx.rules.get(c.rarityId);
-      return !hideMaxed || !r || !isMaxed(c, r);
-    })
     .sort((a, b) => cardPriority(state, b) - cardPriority(state, a) || a.name.localeCompare(b.name));
-
-  const hiddenMaxed = hideMaxed ? state.cards.filter((c) => ctx.rules.has(c.rarityId) && isMaxed(c, ctx.rules.get(c.rarityId)!)).length : 0;
 
   return (
     <>
@@ -186,10 +179,6 @@ function CardList() {
           <option value="krypt">Krypt gear</option>
           <option value="tower">Tower gear</option>
         </select>
-        <label className="check">
-          <input type="checkbox" checked={hideMaxed} onChange={(e) => setHideMaxed(e.target.checked)} />
-          Hide done{hiddenMaxed > 0 && ` (${hiddenMaxed})`}
-        </label>
         {missingImages.length > 0 && (
           <button onClick={findImages} disabled={imgStatus?.busy} title="Look up card art on the MK Mobile wiki">
             {imgStatus?.busy ? 'Finding…' : `Find images (${missingImages.length})`}
@@ -223,17 +212,12 @@ function CardList() {
                   <RarityBadge rule={rule} />
                   {c.guest && <span className="chip guest">guest</span>}
                   {c.source && <span className="chip krypt">{c.source}{c.sourceNote && `: ${c.sourceNote}`}</span>}
-                  {toMax === 0 ? (
-                    <span className="chip maxed">{rule.goal === 'threshold' ? `F${rule.fusionUpThreshold}, Kards can finish it` : 'maxed'}</span>
-                  ) : (
-                    <>
-                      {toThr > 0 && thresholdLevel(rule)! < target && <span className="chip phase-toThreshold">{toThr} to F{rule.fusionUpThreshold}</span>}
-                      <span className={`chip ${rule.goal === 'threshold' ? 'phase-toThreshold' : 'muted'}`}>
-                        {toMax} to {levelLabel(rule, target)}
-                      </span>
-                      {kards > 0 && <span className="chip phase-kardCovered">kards give {kards}</span>}
-                    </>
-                  )}
+                  {/* Cards that reach their goal are removed, so every card listed still has copies to go. */}
+                  {toThr > 0 && thresholdLevel(rule)! < target && <span className="chip phase-toThreshold">{toThr} to F{rule.fusionUpThreshold}</span>}
+                  <span className={`chip ${rule.goal === 'threshold' ? 'phase-toThreshold' : 'muted'}`}>
+                    {toMax} to {levelLabel(rule, target)}
+                  </span>
+                  {kards > 0 && <span className="chip phase-kardCovered">kards give {kards}</span>}
                 </div>
               </div>
               <div className="stepper">
