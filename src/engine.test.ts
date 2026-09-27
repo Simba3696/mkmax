@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
 import {
-  buildCtx, buildPlan, copiesAtFusion, copiesToMax, copiesToThreshold, copyPhase, fLevel as F, isMaxed, levelLabel, packEV, targetLevel,
+  buildCtx, buildPlan, copiesAtFusion, copiesToMax, copiesToThreshold, copyPhase, fLevel as F, isMaxed, levelLabel, packEV, pruneDone, targetLevel,
 } from './engine';
 import { normalize } from './store';
 import type { AppState, Card, Pack } from './types';
@@ -129,5 +129,27 @@ describe('planner', () => {
     const s = setup([card('a', F(9))], [pack('p', [{ cardId: 'a', chance: 100 }])], (s) => (s.currencies[0].balance = 1000));
     const souls = buildPlan(buildCtx(s), NOW).currencies[0];
     expect(souls.buys[0].count).toBe(1);
+  });
+});
+
+describe('removing done cards', () => {
+  it('drops cards at their goal, their pack drops, and store items that only sold them', () => {
+    const s = setup(
+      [card('maxed', F(10)), card('capped', A(5), { rarityId: 'gold', maxLevel: A(5) }), card('epic', F(3), { rarityId: 'epic' }), card('open', F(2))],
+      [
+        pack('store', [{ cardId: 'maxed', chance: 100 }], { store: true }),
+        pack('random', [{ cardId: 'maxed', chance: 20 }, { cardId: 'open', chance: 5 }]),
+      ],
+    );
+    expect(pruneDone(s).sort()).toEqual(['capped', 'epic', 'maxed']);
+    expect(s.cards.map((c) => c.id)).toEqual(['open']);
+    expect(s.packs.map((p) => p.id)).toEqual(['random']);
+    expect(s.packs[0].drops).toEqual([{ cardId: 'open', chance: 5 }]);
+  });
+
+  it('leaves everything alone when nothing is done', () => {
+    const s = setup([card('open', F(2))], [pack('p', [{ cardId: 'open', chance: 5 }])]);
+    expect(pruneDone(s)).toEqual([]);
+    expect(s.cards).toHaveLength(1);
   });
 });

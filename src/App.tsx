@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchStarterData, useStore, type UndoEntry } from './store';
 import PullToRefresh from './PullToRefresh';
+import { useSwipeTabs } from './useSwipeTabs';
 import { syncLabel } from './views/SyncPanel';
 import PlanView from './views/PlanView';
 import PacksView from './views/PacksView';
@@ -56,6 +57,11 @@ export default function App() {
     history.replaceState(null, '', `#${t}`);
     window.scrollTo(0, 0);
   };
+  // Swipe left for the next tab, right for the previous one; stops at the ends instead of wrapping.
+  useSwipeTabs((dir) => {
+    const next = TABS[TABS.findIndex((t) => t.id === tab) + dir];
+    if (next) go(next.id);
+  });
   // With sync on, a pull checks the gist. Without it there's nothing remote to fetch, so reload to pick up app updates.
   const refresh = () => (sync.connected ? sync.syncNow() : Promise.resolve(location.reload()));
 

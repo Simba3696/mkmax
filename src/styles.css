@@ -19,8 +19,8 @@
 }
 
 * { box-sizing: border-box; }
-/* Our own pull-to-refresh replaces the browser's, which would reload the page. */
-html, body { overscroll-behavior-y: contain; }
+/* Our own pull-to-refresh and tab swipes replace the browser's reload and back/forward overscroll gestures. */
+html, body { overscroll-behavior-x: none; overscroll-behavior-y: contain; }
 body { margin: 0; background: var(--bg); }
 h2 { font-size: 1.1rem; margin: 0 0 0.6rem; }
 h3 { font-size: 0.95rem; margin: 0.9rem 0 0.4rem; color: var(--gold); }
