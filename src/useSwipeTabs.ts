@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-const MIN_DX = 60;
-const MAX_MS = 600;
+const MIN_DX = 50;
+const MAX_MS = 800;
 /** Swipes starting this close to a screen edge belong to the OS (Safari's back/forward gesture). */
 const EDGE_PX = 24;
 
@@ -37,7 +37,7 @@ export function useSwipeTabs(onSwipe: (dir: 1 | -1) => void) {
       const quick = Date.now() - start.t < MAX_MS;
       start = null;
       // Mostly sideways, so vertical scrolling never flips tabs.
-      if (quick && Math.abs(dx) >= MIN_DX && Math.abs(dx) > 2 * Math.abs(dy)) cb.current(dx < 0 ? 1 : -1);
+      if (quick && Math.abs(dx) >= MIN_DX && Math.abs(dx) > 1.5 * Math.abs(dy)) cb.current(dx < 0 ? 1 : -1);
     };
     const onCancel = () => (start = null);
     window.addEventListener('touchstart', onStart, { passive: true });

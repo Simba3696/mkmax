@@ -199,6 +199,7 @@ export default function SettingsView() {
         </div>
         {msg && <p className="small">{msg}</p>}
       </section>
+      <p className="muted small">Version {__APP_VERSION__}</p>
     </>
   );
 }

@@ -1,10 +1,22 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { execSync } from 'node:child_process';
+
+/** Short commit id shown in Settings, so you can tell whether a device has picked up the latest deploy. */
+function appVersion() {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'dev';
+  }
+}
 
 export default defineConfig({
   // GitHub Pages serves the app from /<repo>/; the deploy workflow sets BASE_PATH.
   base: process.env.BASE_PATH ?? '/',
+  define: { __APP_VERSION__: JSON.stringify(`${appVersion()} · ${new Date().toISOString().slice(0, 10)}`) },
   plugins: [
     react(),
     VitePWA({
