@@ -31,13 +31,15 @@ export function defaultRarities(): RarityRule[] {
     { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
     { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#4da3ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
     // Kameos fuse to F10 in the game, but only owning one matters here: no duplicate steps, so the first copy (F0) is the goal.
-    { id: 'kameo', label: 'Kameo', kind: 'kameo', color: '#ff7ab8', dupesPerLevel: [], fusionMax: 0, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
+    // Kameos come in Diamond and Gold, like characters.
+    { id: 'kameo-diamond', label: 'Diamond Kameo', kind: 'kameo', color: '#ff7ab8', dupesPerLevel: [], fusionMax: 0, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
+    { id: 'kameo-gold', label: 'Gold Kameo', kind: 'kameo', color: '#ffb35c', dupesPerLevel: [], fusionMax: 0, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
   ];
 }
 
 export function defaultState(): AppState {
   return {
-    version: 3,
+    version: 4,
     rarities: defaultRarities(),
     currencies: [
       { id: 'souls', name: 'Souls', balance: 0 },

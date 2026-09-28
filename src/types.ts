@@ -111,8 +111,8 @@ export interface TowerEntry {
 }
 
 export interface AppState {
-  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = adds the Kameo rarity. */
-  version: 3;
+  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. */
+  version: 4;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];

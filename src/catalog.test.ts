@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findInCatalog, nameKey, type CatalogItem } from './catalog';
+import { appRarityId, findInCatalog, nameKey, type CatalogItem } from './catalog';
 import { defaultState } from './defaults';
 import type { Card } from './types';
 
@@ -13,6 +13,7 @@ const ITEMS = [
   item('equipment', 'Man in the Sky', 'rare'),
   item('equipment', "Takahashi's Gauntlets", 'epic'),
   item('kameo', 'Baraka - Klassic', 'diamond'),
+  item('kameo', 'Cassie Cage - Covert Ops', 'gold'),
 ];
 const card = (name: string, rarityId: string): Card => ({ id: name, name, rarityId, fusion: 1, guest: false });
 const find = (name: string, rarityId: string) => findInCatalog(card(name, rarityId), rules.get(rarityId), ITEMS)?.name;
@@ -33,8 +34,18 @@ describe('catalog matching', () => {
   });
 
   it('matches Kameos by name within the Kameo list only', () => {
-    expect(find('Baraka, Klassic', 'kameo')).toBe('Baraka - Klassic');
+    expect(find('Baraka, Klassic', 'kameo-diamond')).toBe('Baraka - Klassic');
+    // Found even when entered under the wrong tier, so the rarity check can move it.
+    expect(find('Cassie Cage, Covert Ops', 'kameo-diamond')).toBe('Cassie Cage - Covert Ops');
     expect(find('Baraka, Klassic', 'diamond')).toBeUndefined();
+  });
+
+  it("maps the site's rarity to the app's rarity of the same kind", () => {
+    const all = rules.values();
+    expect(appRarityId(item('equipment', 'x', 'rare'), rules.values())).toBe('rare');
+    expect(appRarityId(item('kameo', 'x', 'gold'), all)).toBe('kameo-gold');
+    expect(appRarityId(item('kameo', 'x', 'diamond'), rules.values())).toBe('kameo-diamond');
+    expect(appRarityId(item('equipment', 'x', 'uncommon'), rules.values())).toBeUndefined(); // not tracked
   });
 
   it('falls back to a no-variant entry only when the rarity matches', () => {

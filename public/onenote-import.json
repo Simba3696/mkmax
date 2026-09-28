@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "rarities": [
     {
       "id": "diamond",
@@ -152,10 +152,23 @@
       ]
     },
     {
-      "id": "kameo",
-      "label": "Kameo",
+      "id": "kameo-diamond",
+      "label": "Diamond Kameo",
       "kind": "kameo",
       "color": "#ff7ab8",
+      "dupesPerLevel": [],
+      "fusionMax": 0,
+      "goal": "max",
+      "hasGuests": false,
+      "fusionUpThreshold": null,
+      "fusionUpKards": 0,
+      "kardsPerLevel": []
+    },
+    {
+      "id": "kameo-gold",
+      "label": "Gold Kameo",
+      "kind": "kameo",
+      "color": "#ffb35c",
       "dupesPerLevel": [],
       "fusionMax": 0,
       "goal": "max",

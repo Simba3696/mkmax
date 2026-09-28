@@ -45,6 +45,17 @@ function migrateLegacyFields(s: Partial<AppState>): Partial<AppState> {
   return { ...s, rarities, cards, weights: weights as AppState['weights'] };
 }
 
+function migrateKameos(s: Partial<AppState>, version: number): Partial<AppState> {
+  const kameoRarities = defaultRarities().filter((r) => r.kind === 'kameo');
+  let rarities = s.rarities ?? [];
+  const hadSingle = rarities.some((r) => r.id === 'kameo');
+  if (!hadSingle && version >= 3) return s; // the user deleted the Kameo rarity; don't bring it back
+  rarities = rarities.filter((r) => r.id !== 'kameo');
+  for (const r of kameoRarities) if (!rarities.some((x) => x.id === r.id)) rarities = [...rarities, r];
+  const cards = (s.cards ?? []).map((c) => (c.rarityId === 'kameo' ? { ...c, rarityId: 'kameo-diamond' } : c));
+  return { ...s, rarities, cards };
+}
+
 /** Fill in fields missing from older saves or hand-edited imports, then drop cards that are already done. */
 export function normalize(input: unknown): AppState {
   let s = input as Partial<AppState>;
@@ -54,11 +65,12 @@ export function normalize(input: unknown): AppState {
   const version = (s.version as number | undefined) ?? 1;
   if (version < 2) s = migrateV1(s);
   s = migrateLegacyFields(s);
-  // Version 3 added the Kameo rarity; add it once, so deleting it later sticks.
-  if (version < 3 && !s.rarities?.some((r) => r.id === 'kameo')) s = { ...s, rarities: [...(s.rarities ?? []), defaultRarities().find((r) => r.id === 'kameo')!] };
+  // Kameos: version 3 added one Kameo rarity, version 4 splits it into Diamond and Gold. Both are added once, so
+  // deleting them later sticks. Cards from the single rarity start as Diamond; Find images offers the fix for Gold.
+  if (version < 4) s = migrateKameos(s, version);
   const base = defaultState();
   const out: AppState = {
-    version: 3,
+    version: 4,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,
