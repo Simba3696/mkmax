@@ -31,6 +31,16 @@ export function loadCatalog(): Promise<CatalogItem[]> {
   return loaded;
 }
 
+/**
+ * The app rarity a catalog item belongs to: same kind, and an id equal to the site's rarity ("rare") or to
+ * kind-rarity for Kameos ("kameo-gold"). Undefined when the app doesn't track that rarity.
+ */
+export function appRarityId(item: CatalogItem, rules: Iterable<RarityRule>): string | undefined {
+  if (!item.rarity) return undefined;
+  for (const r of rules) if (r.kind === item.kind && (r.id === item.rarity || r.id === `${item.kind}-${item.rarity}`)) return r.id;
+  return undefined;
+}
+
 /** Order-free word key: "Scorpion, MKII Movie" and "Scorpion MK2 Movie" match; "the"/"of" and possessive 's are ignored. */
 export function nameKey(name: string) {
   const s = name.toLowerCase().replace(/’/g, "'").replace(/'s\b/g, '').replace(/\bmkii\b/g, 'mk2');
@@ -50,5 +60,5 @@ export function findInCatalog(card: Card, rule: RarityRule | undefined, items: C
   if (exact) return exact;
   const base = card.name.split(',')[0].trim();
   if (base === card.name.trim()) return undefined;
-  return same.find((i) => nameKey(i.name) === nameKey(base) && i.rarity === card.rarityId);
+  return same.find((i) => nameKey(i.name) === nameKey(base) && (i.rarity === card.rarityId || `${i.kind}-${i.rarity}` === card.rarityId));
 }

@@ -90,7 +90,7 @@ export default function SettingsView() {
                 <select value={r.kind} onChange={(e) => update((d) => void (d.rarities[ri].kind = e.target.value as RarityRule['kind']))}>
                   <option value="character">Character</option>
                   <option value="equipment">Equipment</option>
-                  <option value="kameo">Kameo (only need one)</option>
+                  <option value="kameo">Kameo (only need one copy)</option>
                 </select>
               </label>
               <label className="check">

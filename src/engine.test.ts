@@ -65,10 +65,10 @@ describe('goals and caps', () => {
 });
 
 describe('kameos', () => {
-  const kameo = (name: string, fusion = 0) => card(name, fusion, { rarityId: 'kameo' });
+  const kameo = (name: string, fusion = 0) => card(name, fusion, { rarityId: 'kameo-gold' });
 
   it('only need one copy, and leave the app once owned', () => {
-    const rule = rules().get('kameo')!;
+    const rule = rules().get('kameo-gold')!;
     expect(levelLabel(rule, 1)).toBe('F0');
     expect(copiesToMax(kameo('k'), rule)).toBe(1);
     const s = setup([kameo('have', 1), kameo('want')]);
@@ -98,15 +98,25 @@ describe('save migration', () => {
   it('shifts version-1 levels (first copy = F1) to F0-based storage', () => {
     const v1 = { version: 1, rarities: [], currencies: [], packs: [], cards: [card('a', 2, { maxLevel: 15 }), card('b', 0)] };
     const s = normalize(v1);
-    expect(s.version).toBe(3);
+    expect(s.version).toBe(defaultState().version);
     expect(s.cards.map((c) => [c.fusion, c.maxLevel])).toEqual([[3, 16], [0, undefined]]);
   });
 
   it('adds the Kameo rarity to older saves once', () => {
-    const v2 = { ...defaultState(), version: 2, rarities: defaultState().rarities.filter((r) => r.id !== 'kameo') };
-    expect(normalize(v2).rarities.map((r) => r.id)).toContain('kameo');
-    // A version-3 save without Kameo means the user deleted it; don't bring it back.
-    expect(normalize({ ...v2, version: 3 }).rarities.map((r) => r.id)).not.toContain('kameo');
+    const noKameos = defaultState().rarities.filter((r) => r.kind !== 'kameo');
+    const v2 = { ...defaultState(), version: 2, rarities: noKameos };
+    expect(normalize(v2).rarities.map((r) => r.id)).toEqual(expect.arrayContaining(['kameo-diamond', 'kameo-gold']));
+    // A version-3 save without a Kameo rarity means the user deleted it; don't bring it back.
+    expect(normalize({ ...v2, version: 3 }).rarities.some((r) => r.kind === 'kameo')).toBe(false);
+  });
+
+  it('splits the single version-3 Kameo rarity into Diamond and Gold, keeping its cards as Diamond', () => {
+    const single = { id: 'kameo', label: 'Kameo', kind: 'kameo' as const, color: '#ff7ab8', dupesPerLevel: [], fusionMax: 0, goal: 'max' as const, hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] };
+    const v3 = { ...defaultState(), version: 3, rarities: [...defaultState().rarities.filter((r) => r.kind !== 'kameo'), single], cards: [card('baraka', 0, { rarityId: 'kameo' })] };
+    const s = normalize(v3);
+    expect(s.rarities.map((r) => r.id)).not.toContain('kameo');
+    expect(s.rarities.map((r) => r.id)).toEqual(expect.arrayContaining(['kameo-diamond', 'kameo-gold']));
+    expect(s.cards.map((c) => c.rarityId)).toEqual(['kameo-diamond']);
   });
 
   it('moves Blood Ruby gear to Epic with a max goal, and drops priority tiers', () => {

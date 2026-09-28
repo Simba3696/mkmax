@@ -4,7 +4,7 @@ import { buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel,
 import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, useBrokenImageUrls } from '../ui';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
-import { catalogPageUrl, findInCatalog, loadCatalog } from '../catalog';
+import { appRarityId, catalogPageUrl, findInCatalog, loadCatalog } from '../catalog';
 import type { Card, RarityRule } from '../types';
 
 type Source = NonNullable<Card['source']> | '';
@@ -117,9 +117,10 @@ function CardList() {
       setRarityFixes(
         state.cards.flatMap((c) => {
           const hit = findInCatalog(c, ctx.rules.get(c.rarityId), items);
-          // Only suggest rarities of the same kind: a "Diamond" Kameo on the site is still a Kameo here.
-          return hit?.rarity && hit.rarity !== c.rarityId && ctx.rules.get(hit.rarity)?.kind === ctx.rules.get(c.rarityId)?.kind
-            ? [{ cardId: c.id, name: c.name, from: ctx.rules.get(c.rarityId)?.label ?? c.rarityId, to: hit.rarity }]
+          // appRarityId stays within the card's kind: a "Diamond" Kameo on the site maps to Diamond Kameo, not Diamond.
+          const to = hit && appRarityId(hit, ctx.rules.values());
+          return to && to !== c.rarityId
+            ? [{ cardId: c.id, name: c.name, from: ctx.rules.get(c.rarityId)?.label ?? c.rarityId, to }]
             : [];
         }),
       );

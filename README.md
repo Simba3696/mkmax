@@ -48,7 +48,7 @@ Your first copy of any card is F0, and each level after that takes 1 duplicate. 
 - **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Each card has its own cap of A5 or A10.
 - **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase.
 - **Uncommon** (green) gear only appears in the tower checklist, since it's maxed through tower runs.
-- **Kameos** fuse to F10 in the game, but here you only track the ones you don't own yet. Add them under the **Kameo** rarity. When you get one, tap **+** and it's done, so it leaves the list (with Undo). Kameos sold in the Realm Klash store, or Kameo packs, go in as store items or packs like anything else.
+- **Kameos** (Diamond and Gold) fuse to F10 in the game, but here you only track the ones you don't own yet. Add them under **Diamond Kameo** or **Gold Kameo**. If you pick the wrong tier, **Find images** offers to switch it to MK Mobile Base's. When you get one, tap **+** and it's done, so it leaves the list (with Undo). Kameos sold in the Realm Klash store, or Kameo packs, go in as store items or packs like anything else.
 - **No priority tiers:** every card is being maxed, so all cards count the same. Guest cards get extra weight only because they're gone once their event ends.
 - **Krypt and tower gear** is tagged with its source. It's tracked but left out of pack planning.
 - **Tower gear** also has a per-tower checklist (Cards → Tower gear).
