@@ -39,8 +39,11 @@ export interface Card {
   goal?: 'max' | 'threshold';
   /** Guest / limited-event card — only obtainable for a short time. */
   guest: boolean;
-  /** Gear that comes from the Krypt or a tower: tracked, but not planned for unless a pack sells it. */
-  source?: 'krypt' | 'tower';
+  /**
+   * Where it comes from besides packs: Krypt or tower gear, or a Kameo from an Elder challenge. Tracked, but not
+   * planned for unless a pack sells it.
+   */
+  source?: 'krypt' | 'tower' | 'challenge';
   /** e.g. the tower it drops from. */
   sourceNote?: string;
   /** Card art URL (found on the MK Mobile wiki, or pasted by hand). */
@@ -98,6 +101,8 @@ export interface Weights {
   guest: number;
   /** Multiplier for Kameo copies; low by default so gear and characters come first, Kameos after. */
   kameo: number;
+  /** Extra multiplier for Kameos an Elder challenge gives for sure, so Kameo packs are valued for the others. */
+  challenge: number;
   /** Up to this much extra value as a card nears max (0.5 = +50% at max). */
   closenessBonus: number;
   /** Ranking boost for limited-time packs over permanent ones in the planner. */
@@ -117,8 +122,8 @@ export interface TowerEntry {
 }
 
 export interface AppState {
-  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. */
-  version: 4;
+  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. */
+  version: 6;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];

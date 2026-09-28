@@ -2,6 +2,7 @@
 import type { AppState, Card, RarityRule } from './types';
 import { ASCENSION_KARD_COST, DIAMOND_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
 import { pruneDone } from './engine';
+import { isChallengeKameo } from './challenges';
 
 /**
  * Version 1 saves counted the first copy as F1; version 2 starts at F0. Shift owned levels up one,
@@ -61,6 +62,7 @@ function migrateKameos(s: Partial<AppState>, version: number): Partial<AppState>
  * kards covered ascension are extended with the default ascension costs, keeping the user's fusion costs.
  */
 function kardTable(r: RarityRule): number[] {
+  if (r.fusionUpThreshold == null) return r.kardsPerLevel ?? []; // no kards (Kameos, Uncommon gear)
   const d = defaultRarities().find((x) => x.id === r.id)?.kardsPerLevel ?? [...DIAMOND_KARD_COSTS];
   const costs = r.kardsPerLevel?.length ? [...r.kardsPerLevel] : [...d];
   for (let i = costs.length; i < (r.dupesPerLevel?.length ?? 0); i++) costs.push(d[i] ?? ASCENSION_KARD_COST);
@@ -79,9 +81,16 @@ export function normalize(input: unknown): AppState {
   // Kameos: version 3 added one Kameo rarity, version 4 splits it into Diamond and Gold. Both are added once, so
   // deleting them later sticks. Cards from the single rarity start as Diamond; Find images offers the fix for Gold.
   if (version < 4) s = migrateKameos(s, version);
+  // Version 6 adds Uncommon gear, once, so deleting it later sticks.
+  if (version < 6 && s.rarities?.length && !s.rarities.some((r) => r.id === 'uncommon')) {
+    const rareAt = s.rarities.findIndex((r) => r.id === 'rare');
+    const rarities = [...s.rarities];
+    rarities.splice(rareAt < 0 ? rarities.length : rareAt + 1, 0, defaultRarities().find((r) => r.id === 'uncommon')!);
+    s = { ...s, rarities };
+  }
   const base = defaultState();
   const out: AppState = {
-    version: 4,
+    version: 6,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,
@@ -100,6 +109,9 @@ export function normalize(input: unknown): AppState {
     realmKlashSeasonEnd: s.realmKlashSeasonEnd ?? null,
     updatedAt: s.updatedAt,
   };
+  // Version 5 tags Gold Kameos of challenge characters (they come from Elder challenges). Done once, so a tag
+  // the user removes stays removed.
+  if (version < 5) for (const c of out.cards) if (!c.source && isChallengeKameo(c, out.rarities)) c.source = 'challenge';
   pruneDone(out);
   return out;
 }

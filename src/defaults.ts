@@ -17,6 +17,7 @@ export const defaultWeights: Weights = {
   coveredByKards: 0.3,
   guest: 1.5,
   kameo: 0.25,
+  challenge: 0.2,
   closenessBonus: 0.5,
   limitedBoost: 1.25,
 };
@@ -27,11 +28,13 @@ export function defaultRarities(): RarityRule[] {
     { id: 'diamond', label: 'Diamond', kind: 'character', color: '#7fd8ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
     // F0..F10 then A1..A10 (set each card's own cap to A5 or A10). Gold has guests too (Jason Voorhees, Slasher).
     { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(20), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: [...kardCosts(), ...Array(10).fill(ASCENSION_KARD_COST)] },
-    // Equipment colors match the game: Epic purple, Rare blue (Uncommon, green, only appears in the tower list).
+    // Equipment colors match the game: Epic purple, Rare blue, Uncommon green.
     // Only tracked until F3 (4 copies from scratch); Fusion Up Kards finish them. Realm Klash gear is Epic too,
     // but those cards override the goal to max because they're bought outright.
     { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
     { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#4da3ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
+    // Uncommon (green) gear is farmed from towers and taken to max; no Fusion Up Kards until checked in-game.
+    { id: 'uncommon', label: 'Uncommon Equip', kind: 'equipment', color: '#5fd068', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
     // Kameos fuse to F10 in the game, but only owning one matters here: no duplicate steps, so the first copy (F0) is the goal.
     // Kameos come in Diamond and Gold, like characters.
     { id: 'kameo-diamond', label: 'Diamond Kameo', kind: 'kameo', color: '#ff7ab8', dupesPerLevel: [], fusionMax: 0, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
@@ -41,7 +44,7 @@ export function defaultRarities(): RarityRule[] {
 
 export function defaultState(): AppState {
   return {
-    version: 4,
+    version: 6,
     rarities: defaultRarities(),
     currencies: [
       { id: 'souls', name: 'Souls', balance: 0 },

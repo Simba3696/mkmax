@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { newId, useStore } from '../store';
 import { LevelOptions, Modal, NumInput, useNow } from '../ui';
 import { REALM_KLASH_CURRENCY, levelLabel, moveSeasonEnd, seasonEnd, suggestSeason } from '../engine';
+import { initialSource } from '../challenges';
 import type { Card, Pack } from '../types';
 
 export default function PackEditor({ initial, onClose }: { initial: Pack | null; onClose: () => void }) {
@@ -53,6 +54,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   function addNewCard() {
     if (!newCard.name.trim()) return;
     const card: Card = { id: newId(), name: newCard.name.trim(), rarityId: newCard.rarityId, fusion: newCard.fusion, guest: false };
+    const source = initialSource(card, state.rarities);
+    if (source) card.source = source;
     update((d) => void d.cards.push(card));
     setP((x) => ({ ...x, drops: x.store ? [{ cardId: card.id, chance: 100 }] : [...x.drops, { cardId: card.id, chance: 0 }] }));
     setNewCard((n) => ({ ...n, name: '', fusion: 0 }));
