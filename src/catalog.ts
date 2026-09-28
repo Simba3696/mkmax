@@ -62,3 +62,17 @@ export function findInCatalog(card: Card, rule: RarityRule | undefined, items: C
   if (base === card.name.trim()) return undefined;
   return same.find((i) => nameKey(i.name) === nameKey(base) && (i.rarity === card.rarityId || `${i.kind}-${i.rarity}` === card.rarityId));
 }
+
+/** A card has no art yet, or art from an older wiki lookup that MK Mobile Base may have a proper card image for. */
+export const wantsCatalogImage = (card: Card) => !card.imageUrl || (!!card.wikiTitle && !card.imagePage);
+
+/** Catalog art for each card that wants it and is in the catalog; images pasted by hand are never touched. */
+export function catalogImageUpdates(cards: Card[], rules: Map<string, RarityRule>, items: CatalogItem[]) {
+  const out = new Map<string, Pick<Card, 'imageUrl' | 'imagePage' | 'wikiTitle'>>();
+  for (const c of cards) {
+    if (!wantsCatalogImage(c)) continue;
+    const hit = findInCatalog(c, rules.get(c.rarityId), items);
+    if (hit) out.set(c.id, { imageUrl: hit.image, imagePage: catalogPageUrl(hit), wikiTitle: undefined });
+  }
+  return out;
+}

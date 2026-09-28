@@ -19,20 +19,27 @@
 }
 
 * { box-sizing: border-box; }
-/* Our own pull-to-refresh and tab swipes replace the browser's reload and back/forward overscroll gestures. */
-html, body { overscroll-behavior-x: none; overscroll-behavior-y: contain; }
+/*
+ * The page itself never scrolls: the app is a fixed-height column (header, scrolling content, tab bar). iOS Safari
+ * can leave position:fixed bars stranded mid-screen when the page's scroll position jumps during momentum
+ * scrolling (as on every tab switch), so nothing here is fixed over a scrolling page. Our own pull-to-refresh and
+ * tab swipes replace the browser's reload and back/forward overscroll gestures.
+ */
+html, body, #root { height: 100%; overflow: hidden; overscroll-behavior: none; }
 body { margin: 0; background: var(--bg); }
 h2 { font-size: 1.1rem; margin: 0 0 0.6rem; }
 h3 { font-size: 0.95rem; margin: 0.9rem 0 0.4rem; color: var(--gold); }
 a { color: var(--gold); cursor: pointer; text-decoration: underline; }
 
 /* Vertical scrolling and pinch zoom stay native; horizontal drags are left to the tab swipe. */
-.app { touch-action: pan-y pinch-zoom; max-width: 720px; margin: 0 auto; min-height: 100vh; padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+.app { touch-action: pan-y pinch-zoom; height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+/* Page width is capped at 720px; the bars span the screen but keep their contents in the same column. */
+.column-gutter { padding-left: max(1rem, calc((100% - 720px) / 2 + 1rem)); padding-right: max(1rem, calc((100% - 720px) / 2 + 1rem)); }
 
 .topbar {
-  position: sticky; top: 0; z-index: 5;
+  flex: none; position: relative; z-index: 5;
   display: flex; align-items: center; gap: 0.6rem;
-  padding: calc(0.7rem + env(safe-area-inset-top)) 1rem 0.7rem;
+  padding-top: calc(0.7rem + env(safe-area-inset-top)); padding-bottom: 0.7rem;
   background: linear-gradient(180deg, #1c0d0c, var(--bg));
   border-bottom: 1px solid var(--line);
 }
@@ -40,14 +47,16 @@ a { color: var(--gold); cursor: pointer; text-decoration: underline; }
 .logo-mark { width: 26px; height: 26px; }
 .logo b { color: var(--red); }
 
-.content { padding: 1rem; }
+/* The only scrolling area. overflow-x is hidden explicitly so the swipe code doesn't mistake it for a sideways scroller. */
+.content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+.page { max-width: 720px; margin: 0 auto; padding: 1rem; }
 
 .sync-pill { margin-left: auto; min-height: 28px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); }
 .sync-pill.sync-error, .sync-pill.sync-conflict { border-color: var(--red); color: #ff6b61; }
 .sync-pill.sync-idle { color: var(--ok); }
 
 .tabbar {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 5;
+  flex: none; position: relative; z-index: 5;
   display: flex; justify-content: center;
   background: #120d0d; border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);

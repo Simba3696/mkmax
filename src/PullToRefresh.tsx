@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
+import { scrollTop } from './scrollRoot';
 
 const TRIGGER_PX = 70;
 const MAX_PX = 110;
 
 /**
  * Pull down from the top of the page to refresh. Installed PWAs don't get the browser's own gesture,
- * so this listens for touches that start at scroll position 0 and calls onRefresh past the trigger distance.
+ * so this listens for touches that start with the content scrolled to the top and calls onRefresh past the trigger distance.
  */
 export default function PullToRefresh({ onRefresh }: { onRefresh: () => Promise<unknown> }) {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const start = useRef<number | null>(null);
+  const startX = useRef(0);
   const pullRef = useRef(0);
   const refreshRef = useRef(onRefresh);
   refreshRef.current = onRefresh;
@@ -24,16 +26,23 @@ export default function PullToRefresh({ onRefresh }: { onRefresh: () => Promise<
     const onStart = (e: TouchEvent) => {
       // Modals scroll on their own, so a pull inside one isn't a page pull.
       const inModal = (e.target as Element | null)?.closest?.('.modal-backdrop');
-      start.current = !busy.current && window.scrollY <= 0 && !inModal && e.touches.length === 1 ? e.touches[0].clientY : null;
+      start.current = !busy.current && scrollTop() <= 0 && !inModal && e.touches.length === 1 ? e.touches[0].clientY : null;
+      startX.current = e.touches[0]?.clientX ?? 0;
     };
     const onMove = (e: TouchEvent) => {
       if (start.current == null) return;
-      if (window.scrollY > 0) {
+      if (scrollTop() > 0) {
         start.current = null;
         set(0);
         return;
       }
       const dy = e.touches[0].clientY - start.current;
+      // A mostly sideways drag is a tab swipe, not a pull.
+      if (Math.abs(e.touches[0].clientX - startX.current) > Math.abs(dy)) {
+        start.current = null;
+        set(0);
+        return;
+      }
       // Resistance: the indicator moves at half the finger's speed.
       set(dy > 0 ? Math.min(dy * 0.5, MAX_PX) : 0);
     };

@@ -4,7 +4,7 @@ import { buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel,
 import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, useBrokenImageUrls } from '../ui';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
-import { appRarityId, catalogPageUrl, findInCatalog, loadCatalog } from '../catalog';
+import { appRarityId, catalogPageUrl, findInCatalog, loadCatalog, wantsCatalogImage } from '../catalog';
 import type { Card, RarityRule } from '../types';
 
 type Source = NonNullable<Card['source']> | '';
@@ -87,7 +87,7 @@ function CardList() {
   // Cards to look up: no art yet, art that stopped loading, or art from an older wiki lookup (some of those are
   // stat screenshots rather than card art), which mkmobilebase usually has a proper card image for.
   const brokenUrls = useBrokenImageUrls();
-  const needsImage = (c: Card) => !c.imageUrl || brokenUrls.has(c.imageUrl) || (!!c.wikiTitle && !c.imagePage);
+  const needsImage = (c: Card) => wantsCatalogImage(c) || brokenUrls.has(c.imageUrl!);
   const missingImages = state.cards.filter(needsImage);
 
   async function findImages() {
