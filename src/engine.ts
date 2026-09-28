@@ -90,9 +90,13 @@ export interface Ctx {
   kardPlan: Map<string, KardPlan>;
 }
 
-/** Every card is worth maxing; guest cards count extra because they're only around during their event. */
+/**
+ * Every card is worth maxing; guest cards count extra because they're only around during their event. Kameos
+ * count less, so shared currencies (Blood Rubies) go to gear first and Kameos once the gear is done.
+ */
 export function cardWeight(state: AppState, card: Card) {
-  return card.guest ? state.weights.guest : 1;
+  const kind = state.rarities.find((r) => r.id === card.rarityId)?.kind;
+  return (card.guest ? state.weights.guest : 1) * (kind === 'kameo' ? state.weights.kameo : 1);
 }
 
 /** Fusion Up Kards needed to go from stored level `level` to the next one, or null if kards can't do that step. */

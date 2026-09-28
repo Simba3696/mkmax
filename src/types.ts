@@ -1,4 +1,5 @@
-export type Kind = 'character' | 'equipment';
+/** Kameos only need one copy: owning it is the goal. */
+export type Kind = 'character' | 'equipment' | 'kameo';
 
 /** Fusion rules for one rarity (e.g. Diamond characters, Legendary equipment). */
 export interface RarityRule {
@@ -89,6 +90,8 @@ export interface Weights {
   /** Multiplier for copies your Fusion Up Kards would already cover. */
   coveredByKards: number;
   guest: number;
+  /** Multiplier for Kameo copies; low by default so gear and characters come first, Kameos after. */
+  kameo: number;
   /** Up to this much extra value as a card nears max (0.5 = +50% at max). */
   closenessBonus: number;
   /** Ranking boost for limited-time packs over permanent ones in the planner. */
@@ -108,8 +111,8 @@ export interface TowerEntry {
 }
 
 export interface AppState {
-  /** 2 = levels stored from F0 (first copy = 1). Version 1 stored the first copy as F1. */
-  version: 2;
+  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = adds the Kameo rarity. */
+  version: 3;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];

@@ -177,7 +177,9 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
                   {t.card.source && <span className="chip krypt">{t.card.source}</span>}
                 </div>
                 <div className="muted small">
-                  <RarityBadge rule={rule} /> <FusionLabel card={t.card} rule={rule} /> · {t.copiesToMax} to {levelLabel(rule, t.target)}
+                  <RarityBadge rule={rule} /> <FusionLabel card={t.card} rule={rule} />
+                  {/* A Kameo's only goal is owning it, which "Not owned" already says. */}
+                  {t.target > 1 && ` · ${t.copiesToMax} to ${levelLabel(rule, t.target)}`}
                   {t.copiesToThreshold > 0 && thrLevel != null && thrLevel < t.target &&` · ${t.copiesToThreshold} to F${thr}`}
                   {t.inPacks === 0 && ' · not in any current pack'}
                 </div>

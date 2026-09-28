@@ -32,7 +32,7 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 
 Cards → **Find images** looks up card art in two places:
 
-1. **[MK Mobile Base](https://mkmobilebase.com/)** first. It has proper card art and the rarity of every character and piece of equipment. Its API doesn't allow requests from other sites, so `npm run catalog` (`scripts/fetch-catalog.mjs`) downloads the whole catalog into `public/catalog.json`, and the deploy workflow refreshes it on every push. If the site is down during a deploy, the committed copy is used. Names match regardless of word order, commas, "MKII" vs "MK2", and "Kold" vs "Kold War".
+1. **[MK Mobile Base](https://mkmobilebase.com/)** first. It has proper card art and the rarity of every character, Kameo and piece of equipment. Its API doesn't allow requests from other sites, so `npm run catalog` (`scripts/fetch-catalog.mjs`) downloads the whole catalog into `public/catalog.json`, and the deploy workflow refreshes it on every push. If the site is down during a deploy, the committed copy is used. Names match regardless of word order, commas, "MKII" vs "MK2", and "Kold" vs "Kold War".
 2. **The [MK Mobile wiki](https://mortalkombat-mobile.fandom.com/)** for anything the catalog doesn't have, through its public API. It tries the card's page image, a wiki search, the equipment list pages, and art files uploaded to a character's page or before the page exists (for example `MK1 Sub-Zero.png`), skipping ability icons and pack banners.
 
 The button covers cards with no image, images that have stopped loading, and images from older wiki lookups, since some of those were stat screenshots rather than card art. Images you pasted yourself are left alone. It also lists any card whose rarity disagrees with MK Mobile Base, with a button to switch them to the site's rarity. That's how Man in the Sky and Flame Forged Ferocity were found to be Rare, not Epic.
@@ -48,13 +48,16 @@ Your first copy of any card is F0, and each level after that takes 1 duplicate. 
 - **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Each card has its own cap of A5 or A10.
 - **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase.
 - **Uncommon** (green) gear only appears in the tower checklist, since it's maxed through tower runs.
+- **Kameos** fuse to F10 in the game, but here you only track the ones you don't own yet. Add them under the **Kameo** rarity. When you get one, tap **+** and it's done, so it leaves the list (with Undo). Kameos sold in the Realm Klash store, or Kameo packs, go in as store items or packs like anything else.
 - **No priority tiers:** every card is being maxed, so all cards count the same. Guest cards get extra weight only because they're gone once their event ends.
 - **Krypt and tower gear** is tagged with its source. It's tracked but left out of pack planning.
 - **Tower gear** also has a per-tower checklist (Cards → Tower gear).
 
 ## How it scores
 
-Each copy of a card is worth: `phase multiplier × guest multiplier × (1 + closeness bonus × progress)`.
+Each copy of a card is worth: `phase multiplier × guest multiplier × Kameo multiplier × (1 + closeness bonus × progress)`.
+
+The Kameo multiplier (0.25 by default, set in Settings → Priority weights) keeps Kameos behind gear and characters. For example, Blood Rubies go to the Realm Klash gear first, and to Kameos once that gear is maxed.
 
 The phase depends on which copy it is:
 

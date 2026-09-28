@@ -14,6 +14,7 @@ export const defaultWeights: Weights = {
   belowThreshold: 1.5,
   coveredByKards: 0.3,
   guest: 1.5,
+  kameo: 0.25,
   closenessBonus: 0.5,
   limitedBoost: 1.25,
 };
@@ -29,12 +30,14 @@ export function defaultRarities(): RarityRule[] {
     // but those cards override the goal to max because they're bought outright.
     { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
     { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#4da3ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
+    // Kameos fuse to F10 in the game, but only owning one matters here: no duplicate steps, so the first copy (F0) is the goal.
+    { id: 'kameo', label: 'Kameo', kind: 'kameo', color: '#ff7ab8', dupesPerLevel: [], fusionMax: 0, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
   ];
 }
 
 export function defaultState(): AppState {
   return {
-    version: 2,
+    version: 3,
     rarities: defaultRarities(),
     currencies: [
       { id: 'souls', name: 'Souls', balance: 0 },

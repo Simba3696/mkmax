@@ -51,11 +51,14 @@ export function normalize(input: unknown): AppState {
   if (!s || typeof s !== 'object' || !Array.isArray(s.cards) || !Array.isArray(s.packs)) {
     throw new Error('Not an MK Max save file');
   }
-  if ((s.version as number) !== 2) s = migrateV1(s);
+  const version = (s.version as number | undefined) ?? 1;
+  if (version < 2) s = migrateV1(s);
   s = migrateLegacyFields(s);
+  // Version 3 added the Kameo rarity; add it once, so deleting it later sticks.
+  if (version < 3 && !s.rarities?.some((r) => r.id === 'kameo')) s = { ...s, rarities: [...(s.rarities ?? []), defaultRarities().find((r) => r.id === 'kameo')!] };
   const base = defaultState();
   const out: AppState = {
-    version: 2,
+    version: 3,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,

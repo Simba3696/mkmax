@@ -1,10 +1,10 @@
-// Card catalog from MK Mobile Base (mkmobilebase.com): names, rarities and card art for every character and
+// Card catalog from MK Mobile Base (mkmobilebase.com): names, rarities and card art for every character, Kameo and
 // piece of equipment. scripts/fetch-catalog.mjs downloads it into public/catalog.json at deploy time, because
 // the site's API doesn't allow requests from other sites.
 import type { Card, RarityRule } from './types';
 
 export interface CatalogItem {
-  kind: 'character' | 'equipment';
+  kind: 'character' | 'equipment' | 'kameo';
   name: string;
   /** e.g. "diamond", "gold", "epic", "rare", "uncommon". */
   rarity: string | null;
@@ -13,7 +13,7 @@ export interface CatalogItem {
 }
 
 export const catalogPageUrl = (item: CatalogItem) =>
-  `https://mkmobilebase.com/en/category/${item.kind === 'character' ? 'characters' : 'equipment'}/${item.slug}`;
+  `https://mkmobilebase.com/en/category/${{ character: 'characters', equipment: 'equipment', kameo: 'kameos' }[item.kind]}/${item.slug}`;
 
 let loaded: Promise<CatalogItem[]> | null = null;
 

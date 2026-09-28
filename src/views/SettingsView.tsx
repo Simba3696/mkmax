@@ -10,6 +10,7 @@ const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'belowThreshold', label: 'Reaching the Kard threshold', help: 'Multiplier for copies that get a card to the level where Fusion Up Kards can be used.' },
   { key: 'unlock', label: 'Unlocking a new card', help: "Multiplier for the first copy of a card you don't own." },
   { key: 'guest', label: 'Guest / limited card', help: 'Multiplier for guest cards, since they only show up during limited events.' },
+  { key: 'kameo', label: 'Kameos', help: 'Multiplier for Kameo copies. Kept low so your currency goes to gear and characters first, and to Kameos once those are done.' },
   { key: 'coveredByKards', label: 'Already covered by Kards', help: 'Multiplier for copies your Fusion Up Kards would cover anyway. Keep it low.' },
   { key: 'closenessBonus', label: 'Close-to-max bonus', help: 'Extra value as a card nears max. 0.5 means +50% at max.' },
   { key: 'limitedBoost', label: 'Limited-time pack urgency', help: 'The planner prefers limited-time packs by this factor over permanent packs, which you can buy later.' },
@@ -86,9 +87,10 @@ export default function SettingsView() {
               </label>
               <label className="field">
                 <span>Kind</span>
-                <select value={r.kind} onChange={(e) => update((d) => void (d.rarities[ri].kind = e.target.value as 'character' | 'equipment'))}>
+                <select value={r.kind} onChange={(e) => update((d) => void (d.rarities[ri].kind = e.target.value as RarityRule['kind']))}>
                   <option value="character">Character</option>
                   <option value="equipment">Equipment</option>
+                  <option value="kameo">Kameo (only need one)</option>
                 </select>
               </label>
               <label className="check">
