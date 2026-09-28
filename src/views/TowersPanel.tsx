@@ -4,7 +4,7 @@ import { ConfirmButton } from '../ui';
 import type { TowerEntry } from '../types';
 
 const GRADES = ['Uncommon', 'Rare', 'Epic'];
-/** Uncommon gear is green in the game; it isn't a tracked rarity, so its color lives here. */
+/** Uncommon gear is green in the game; used if the Uncommon rarity was deleted. */
 const UNCOMMON_COLOR = '#5fd068';
 
 /** Per-tower focus list: how many items each tower still has short of F3 (or max). */
@@ -25,7 +25,7 @@ export default function TowersPanel() {
   }
 
   // Rare and Epic use their rarity colors (blue and purple), so the list matches the rest of the app.
-  const gradeColor = (g: string) => (g === 'Uncommon' ? UNCOMMON_COLOR : state.rarities.find((r) => r.id === g.toLowerCase())?.color);
+  const gradeColor = (g: string) => state.rarities.find((r) => r.id === g.toLowerCase())?.color ?? (g === 'Uncommon' ? UNCOMMON_COLOR : undefined);
   const grades = [...new Set([...GRADES, ...state.towers.map((t) => t.grade)])];
   const total = state.towers.reduce((a, t) => a + (t.itemsLeft ?? 0), 0);
 

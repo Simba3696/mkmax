@@ -45,7 +45,8 @@ describe('catalog matching', () => {
     expect(appRarityId(item('equipment', 'x', 'rare'), rules.values())).toBe('rare');
     expect(appRarityId(item('kameo', 'x', 'gold'), all)).toBe('kameo-gold');
     expect(appRarityId(item('kameo', 'x', 'diamond'), rules.values())).toBe('kameo-diamond');
-    expect(appRarityId(item('equipment', 'x', 'uncommon'), rules.values())).toBeUndefined(); // not tracked
+    expect(appRarityId(item('equipment', 'x', 'uncommon'), rules.values())).toBe('uncommon');
+    expect(appRarityId(item('equipment', 'x', 'common'), rules.values())).toBeUndefined(); // not tracked
   });
 
   it('falls back to a no-variant entry only when the rarity matches', () => {

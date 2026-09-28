@@ -176,3 +176,6 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
     </button>
   );
 }
+
+/** Chip text for where a card comes from besides packs. */
+export const SOURCE_LABELS: Record<NonNullable<Card['source']>, string> = { krypt: 'krypt', tower: 'tower', challenge: 'Elder challenge' };

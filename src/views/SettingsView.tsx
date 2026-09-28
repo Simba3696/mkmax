@@ -12,6 +12,7 @@ const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'guest', label: 'Guest / limited card', help: 'Multiplier for guest cards, since they only show up during limited events.' },
   { key: 'kameo', label: 'Kameos', help: 'Multiplier for Kameo copies. Kept low so your currency goes to gear and characters first, and to Kameos once those are done.' },
   { key: 'coveredByKards', label: 'Already covered by Kards', help: 'Multiplier for copies your Fusion Up Kards would cover anyway. Keep it low.' },
+  { key: 'challenge', label: 'Challenge Kameo', help: 'Extra multiplier for Kameos you get for sure by finishing their Elder challenge, so Kameo packs are valued for the other Kameos.' },
   { key: 'closenessBonus', label: 'Close-to-max bonus', help: 'Extra value as a card nears max. 0.5 means +50% at max.' },
   { key: 'limitedBoost', label: 'Limited-time pack urgency', help: 'The planner prefers limited-time packs by this factor over permanent packs, which you can buy later.' },
 ];

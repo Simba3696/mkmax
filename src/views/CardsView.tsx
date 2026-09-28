@@ -1,21 +1,29 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
-import { buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
-import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, useBrokenImageUrls } from '../ui';
+import { ascensionCaps, buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
+import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls } from '../ui';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
 import { appRarityId, catalogPageUrl, findInCatalog, loadCatalog, wantsCatalogImage } from '../catalog';
 import { parseCardList } from '../cardList';
+import { initialSource } from '../challenges';
 import type { Card, RarityRule } from '../types';
 
 type Source = NonNullable<Card['source']> | '';
 
-function SourceSelect({ value, onChange }: { value: Card['source']; onChange: (v: Card['source']) => void }) {
+/** Gear can come from the Krypt or a tower; Kameos from an Elder challenge. */
+function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; value: Card['source']; onChange: (v: Card['source']) => void }) {
   return (
     <select value={value ?? ''} onChange={(e) => onChange((e.target.value as Source) || undefined)} aria-label="Source">
       <option value="">From packs/store</option>
-      <option value="krypt">Krypt gear</option>
-      <option value="tower">Tower gear</option>
+      {kind === 'equipment' ? (
+        <>
+          <option value="krypt">Krypt gear</option>
+          <option value="tower">Tower gear</option>
+        </>
+      ) : (
+        <option value="challenge">Elder challenge</option>
+      )}
     </select>
   );
 }
@@ -39,16 +47,25 @@ function GoalSelect({ rule, value, onChange }: { rule: RarityRule; value: Card['
   );
 }
 
-/** Ascension cap choices for rarities that ascend past their fusion levels (e.g. gold: A5 or A10). */
+/**
+ * Cap choices for rarities that ascend past their fusion levels. Gold cards stop at F10 (no ascension), A5 or
+ * A10, depending on the card and which updates gave it ascension. Any other saved cap is still shown, flagged.
+ */
 function CapSelect({ rule, value, onChange }: { rule: RarityRule; value: number | null | undefined; onChange: (v: number | null) => void }) {
   const max = maxFusion(rule);
-  const fusionTop = fLevel(rule.fusionMax);
-  if (max <= fusionTop) return null;
+  const caps = ascensionCaps(rule);
+  if (caps.length < 2) return null;
+  const current = value ?? max;
   return (
     <label className="check">
       Max
-      <select value={value ?? max} onChange={(e) => onChange(Number(e.target.value) === max ? null : Number(e.target.value))}>
-        <LevelOptions rule={rule} from={fusionTop} />
+      <select value={current} onChange={(e) => onChange(Number(e.target.value) === max ? null : Number(e.target.value))}>
+        {!caps.includes(current) && <option value={current}>{levelLabel(rule, current)} (not a real cap)</option>}
+        {caps.map((l) => (
+          <option key={l} value={l}>
+            {l === fLevel(rule.fusionMax) ? `${levelLabel(rule, l)} (no ascension)` : levelLabel(rule, l)}
+          </option>
+        ))}
       </select>
     </label>
   );
@@ -72,8 +89,25 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
     );
   }
 
+  const total = parsed.cards.length + parsed.updates.length;
   function addAll() {
-    update((d) => void d.cards.push(...parsed.cards.map((c): Card => ({ id: newId(), name: c.name, rarityId: c.rarityId, fusion: 0, guest: false }))), `Added ${parsed.cards.length} cards`);
+    const label = [parsed.cards.length && `Added ${parsed.cards.length} cards`, parsed.updates.length && `updated ${parsed.updates.length}`].filter(Boolean).join(', ');
+    update((d) => {
+      d.cards.push(
+        ...parsed.cards.map(
+          (c): Card => ({
+            id: newId(),
+            name: c.name,
+            rarityId: c.rarityId,
+            fusion: c.fusion ?? 0,
+            guest: false,
+            source: c.source ?? initialSource(c, d.rarities),
+            ...(c.sourceNote && { sourceNote: c.sourceNote }),
+          }),
+        ),
+      );
+      for (const u of parsed.updates) Object.assign(d.cards.find((c) => c.id === u.cardId) ?? {}, u.patch);
+    }, label);
     setText('');
     setOpen(false);
   }
@@ -82,18 +116,32 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
   return (
     <div className="subpanel">
       <p className="muted small">
-        One card per line, like "Jade, Lizard". They're added as not owned. Lines go in as {startLabel} (the rarity picked above) until a line that's just a
-        rarity name, like "Gold Kameo", switches it. Cards already in your list are skipped.
+        One card per line. A line can be just a name, like "Jade, Lizard", which goes in as not owned. Those use {startLabel} (the rarity picked above) until a
+        line that's just a rarity name, like "Gold Kameo", switches it. A line can also add details after " - ": rarity, where it comes from and level, like
+        "Kori Blade - Epic - Lin Kuei Tower - F2" or "Man in Control - Epic - Krypt Gear - Unowned". Cards already in your list get the new level and source.
       </p>
-      <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKabal, Klassic'} autoFocus />
+      <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
       <div className="small muted">
-        {counts.length ? counts.map((x) => `${x.n} ${x.label}`).join(' · ') : 'Nothing to add yet.'}
+        {counts.length ? `New: ${counts.map((x) => `${x.n} ${x.label}`).join(' · ')}` : parsed.updates.length ? '' : 'Nothing to add yet.'}
+        {parsed.updates.length > 0 && ` · updating ${parsed.updates.length} already listed (${parsed.updates.map((u) => u.name).join('; ')})`}
         {parsed.duplicates.length > 0 && ` · skipping ${parsed.duplicates.length} already listed (${parsed.duplicates.join('; ')})`}
       </div>
+      {parsed.problems.length > 0 && (
+        <ul className="error small">
+          {parsed.problems.map((p) => (
+            <li key={p.line}>
+              Skipped "{p.line}": {p.reason}.
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="actions">
         <button onClick={() => setOpen(false)}>Cancel</button>
-        <button className="primary" disabled={!parsed.cards.length} onClick={addAll}>
-          Add {parsed.cards.length || ''} card{parsed.cards.length === 1 ? '' : 's'}
+        <button className="primary" disabled={!total} onClick={addAll}>
+          {parsed.cards.length > 0 && `Add ${parsed.cards.length}`}
+          {parsed.cards.length > 0 && parsed.updates.length > 0 && ', '}
+          {parsed.updates.length > 0 && `update ${parsed.updates.length}`}
+          {!total && 'Add cards'}
         </button>
       </div>
     </div>
@@ -198,7 +246,13 @@ function CardList() {
     if (!draft.name.trim()) return;
     const isEquip = draftRule?.kind === 'equipment';
     update((d) =>
-      void d.cards.push({ id: newId(), ...draft, name: draft.name.trim(), guest: !!draftRule?.hasGuests && draft.guest, source: isEquip ? draft.source : undefined }),
+      void d.cards.push({
+        id: newId(),
+        ...draft,
+        name: draft.name.trim(),
+        guest: !!draftRule?.hasGuests && draft.guest,
+        source: isEquip ? draft.source : initialSource(draft, d.rarities),
+      }),
     );
     setDraft({ ...draft, name: '', fusion: 0, guest: false });
   }
@@ -250,7 +304,7 @@ function CardList() {
           {draftRule?.kind === 'equipment' && (
             <label className="field">
               <span>Source</span>
-              <SourceSelect value={draft.source} onChange={(v) => setDraft({ ...draft, source: v })} />
+              <SourceSelect kind="equipment" value={draft.source} onChange={(v) => setDraft({ ...draft, source: v })} />
             </label>
           )}
           <button className="primary" onClick={add} disabled={!draft.name.trim()}>
@@ -280,6 +334,7 @@ function CardList() {
           <option value="">Packs/store</option>
           <option value="krypt">Krypt gear</option>
           <option value="tower">Tower gear</option>
+          <option value="challenge">Elder challenge</option>
         </select>
         {missingImages.length > 0 && (
           <button onClick={findImages} disabled={imgStatus?.busy} title="Look up card art on MK Mobile Base, then the MK Mobile wiki">
@@ -333,7 +388,7 @@ function CardList() {
                 <div className="small">
                   <RarityBadge rule={rule} />
                   {c.guest && <span className="chip guest">guest</span>}
-                  {c.source && <span className="chip krypt">{c.source}{c.sourceNote && `: ${c.sourceNote}`}</span>}
+                  {c.source && <span className="chip krypt">{SOURCE_LABELS[c.source]}{c.sourceNote && `: ${c.sourceNote}`}</span>}
                   {/* Cards that reach their goal are removed, so every card listed still has copies to go. */}
                   {toThr > 0 && thresholdLevel(rule)! < target && <span className="chip phase-toThreshold">{toThr} to F{rule.fusionUpThreshold}</span>}
                   <span className={`chip ${cardGoal(c, rule) === 'threshold' ? 'phase-toThreshold' : 'muted'}`}>
@@ -361,7 +416,7 @@ function CardList() {
                   Guest
                 </label>
               )}
-              {rule.kind === 'equipment' && <SourceSelect value={c.source} onChange={(v) => patch(c.id, { source: v })} />}
+              {rule.kind !== 'character' && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v })} />}
               <button className="ghost" onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
                 Image
               </button>

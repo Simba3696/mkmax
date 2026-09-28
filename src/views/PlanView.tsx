@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
 import { buildCtx, buildPlan, cardGoal, levelLabel, rankPacks, rankTargets, thresholdLevel, type Phase } from '../engine';
-import { CardThumb, fmt, FusionLabel, NumInput, pct, RarityBadge, timeUntil, useNow } from '../ui';
+import { CardThumb, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
 import type { Pack } from '../types';
 
 const PHASE_LABEL: Record<Phase, string> = {
@@ -174,7 +174,7 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
               <div className="grow">
                 <div className="row-title">
                   {t.card.name} {t.card.guest && <span className="chip guest">guest</span>}
-                  {t.card.source && <span className="chip krypt">{t.card.source}</span>}
+                  {t.card.source && <span className="chip krypt">{SOURCE_LABELS[t.card.source]}</span>}
                 </div>
                 <div className="muted small">
                   <RarityBadge rule={rule} /> <FusionLabel card={t.card} rule={rule} />

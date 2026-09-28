@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
 import {
-  buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, seasonEnd, suggestSeason, targetLevel,
+  ascensionCaps, buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, seasonEnd, suggestSeason, targetLevel,
 } from './engine';
 import { normalize } from './store';
 import type { AppState, Card, Pack } from './types';
@@ -38,6 +38,11 @@ describe('fusion math', () => {
 });
 
 describe('goals and caps', () => {
+  it('offers F10, A5 and A10 as Gold caps, and nothing for Diamond', () => {
+    expect(ascensionCaps(rules().get('gold')!)).toEqual([F(10), A(5), A(10)]);
+    expect(ascensionCaps(rules().get('diamond')!)).toEqual([F(10)]);
+  });
+
   it('caps gold at the per-card ascension level', () => {
     const gold = rules().get('gold')!;
     const a5 = card('g', A(1), { rarityId: 'gold', maxLevel: A(5) });
@@ -164,6 +169,15 @@ describe('phases', () => {
     // 25 kards on a card capped at A2: F9→F10 (10), F10→A1 (10); A1→A2 (10) doesn't fit. 5 left over.
     const s = setup([card('g', F(9), { rarityId: 'gold', maxLevel: A(2) })], [], (s) => (s.rarities[1].fusionUpKards = 25));
     expect(buildCtx(s).kardPlan.get('gold')).toEqual({ assignments: [{ cardId: 'g', from: F(9), to: A(1), kards: 20 }], left: 5 });
+  });
+
+  it('adds Uncommon gear to older saves once, after Rare', () => {
+    const v5 = { ...defaultState(), version: 5, rarities: defaultState().rarities.filter((r) => r.id !== 'uncommon') };
+    const out = normalize(v5);
+    expect(out.rarities.map((r) => r.id).slice(2, 5)).toEqual(['epic', 'rare', 'uncommon']);
+    expect(out.rarities.find((r) => r.id === 'uncommon')).toMatchObject({ goal: 'max', fusionUpThreshold: null, kardsPerLevel: [] });
+    const deleted = { ...out, rarities: out.rarities.filter((r) => r.id !== 'uncommon') };
+    expect(normalize(deleted).rarities.some((r) => r.id === 'uncommon')).toBe(false);
   });
 
   it('extends older Gold kard tables through ascension, keeping edited fusion costs', () => {

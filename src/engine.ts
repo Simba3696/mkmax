@@ -24,6 +24,13 @@ export function copiesAtFusion(rule: RarityRule, level: number) {
   return level <= 0 ? 0 : 1 + sum(rule.dupesPerLevel.slice(0, level - 1));
 }
 
+/** The caps a card can have (stored levels): its top fusion (no ascension), A5 and the rarity's max, when it ascends. */
+export function ascensionCaps(rule: RarityRule) {
+  const top = fLevel(rule.fusionMax);
+  const max = maxFusion(rule);
+  return max <= top ? [max] : [...new Set([top, Math.min(top + 5, max), max])];
+}
+
 /** Stored level where Fusion Up Kards become usable, or null. */
 export const thresholdLevel = (rule: RarityRule) => (rule.fusionUpThreshold == null ? null : fLevel(rule.fusionUpThreshold));
 
@@ -92,11 +99,13 @@ export interface Ctx {
 
 /**
  * Every card is worth maxing; guest cards count extra because they're only around during their event. Kameos
- * count less, so shared currencies (Blood Rubies) go to gear first and Kameos once the gear is done.
+ * count less, so shared currencies (Blood Rubies) go to gear first and Kameos once the gear is done. Challenge
+ * Kameos count less again: finishing their Elder challenge gives one for sure.
  */
 export function cardWeight(state: AppState, card: Card) {
+  const w = state.weights;
   const kind = state.rarities.find((r) => r.id === card.rarityId)?.kind;
-  return (card.guest ? state.weights.guest : 1) * (kind === 'kameo' ? state.weights.kameo : 1);
+  return (card.guest ? w.guest : 1) * (kind === 'kameo' ? w.kameo : 1) * (card.source === 'challenge' ? w.challenge : 1);
 }
 
 /** Fusion Up Kards needed to go from stored level `level` to the next one, or null if kards can't do that step. */
