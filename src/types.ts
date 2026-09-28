@@ -21,7 +21,8 @@ export interface RarityRule {
   fusionUpKards: number;
   /**
    * Fusion Up Kards needed per step, indexed by the fusion number you start from: kardsPerLevel[3] is F3 → F4.
-   * 0 means kards can't be used for that step (below the threshold). Kards only raise fusion, not ascension.
+   * Past fusionMax the steps are ascension: kardsPerLevel[10] is F10 → A1, [11] is A1 → A2.
+   * 0 means kards can't be used for that step (below the threshold).
    */
   kardsPerLevel: number[];
 }
@@ -79,6 +80,11 @@ export interface Pack {
   drops: DropEntry[];
   /** Store item: one guaranteed copy of a single card per purchase. */
   store?: boolean;
+  /**
+   * Blood Ruby store item or pack that rotates out when the Realm Klash season ends (characters, Kameos, Kameo
+   * packs). Its endsAt is set to that season's end when saved. Realm Klash gear doesn't rotate, so it's false.
+   */
+  season?: boolean;
   notes?: string;
 }
 
@@ -119,6 +125,8 @@ export interface AppState {
   packs: Pack[];
   towers: TowerEntry[];
   weights: Weights;
+  /** End of a Realm Klash season (datetime-local). Seasons run back to back for 2 weeks; see engine seasonEnd. */
+  realmKlashSeasonEnd?: string | null;
   /** When this data was last changed (ms since epoch); drives cross-device sync. */
   updatedAt?: number;
 }

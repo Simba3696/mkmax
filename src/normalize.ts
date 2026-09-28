@@ -1,6 +1,6 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
 import type { AppState, Card, RarityRule } from './types';
-import { DIAMOND_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
+import { ASCENSION_KARD_COST, DIAMOND_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
 import { pruneDone } from './engine';
 
 /**
@@ -56,6 +56,17 @@ function migrateKameos(s: Partial<AppState>, version: number): Partial<AppState>
   return { ...s, rarities, cards };
 }
 
+/**
+ * Saves from before kard costs existed get the rarity's default table (the Diamond curve). Tables from before
+ * kards covered ascension are extended with the default ascension costs, keeping the user's fusion costs.
+ */
+function kardTable(r: RarityRule): number[] {
+  const d = defaultRarities().find((x) => x.id === r.id)?.kardsPerLevel ?? [...DIAMOND_KARD_COSTS];
+  const costs = r.kardsPerLevel?.length ? [...r.kardsPerLevel] : [...d];
+  for (let i = costs.length; i < (r.dupesPerLevel?.length ?? 0); i++) costs.push(d[i] ?? ASCENSION_KARD_COST);
+  return costs;
+}
+
 /** Fill in fields missing from older saves or hand-edited imports, then drop cards that are already done. */
 export function normalize(input: unknown): AppState {
   let s = input as Partial<AppState>;
@@ -78,8 +89,7 @@ export function normalize(input: unknown): AppState {
           goal: r.goal ?? 'max',
           // A rarity with a guest-flagged card has guests, whatever an older save said (Gold used to default to none).
           hasGuests: (r.hasGuests ?? r.id === 'diamond') || (s.cards ?? []).some((c) => c.rarityId === r.id && c.guest),
-          // Saves from before kard costs existed get the rarity's default table (the Diamond curve).
-          kardsPerLevel: r.kardsPerLevel?.length ? r.kardsPerLevel : (defaultRarities().find((d) => d.id === r.id)?.kardsPerLevel ?? [...DIAMOND_KARD_COSTS]),
+          kardsPerLevel: kardTable(r),
         }))
       : base.rarities,
     currencies: s.currencies?.length ? s.currencies : base.currencies,
@@ -87,6 +97,7 @@ export function normalize(input: unknown): AppState {
     packs: s.packs!,
     towers: s.towers ?? [],
     weights: { ...defaultWeights, ...s.weights },
+    realmKlashSeasonEnd: s.realmKlashSeasonEnd ?? null,
     updatedAt: s.updatedAt,
   };
   pruneDone(out);

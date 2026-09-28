@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { fetchStarterData, newId, normalize, useStore } from '../store';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, NumInput } from '../ui';
-import { copiesTotal, levelLabel } from '../engine';
+import { copiesTotal, fLevel, levelLabel, maxFusion } from '../engine';
 import SyncPanel from './SyncPanel';
 import type { RarityRule, Weights } from '../types';
 
@@ -16,8 +16,11 @@ const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'limitedBoost', label: 'Limited-time pack urgency', help: 'The planner prefers limited-time packs by this factor over permanent packs, which you can buy later.' },
 ];
 
-/** Kards needed to take a card of this rarity from the threshold to its top fusion level. */
-const kardTotal = (r: RarityRule) => r.kardsPerLevel.slice(r.fusionUpThreshold ?? 0, r.fusionMax).reduce((a, b) => a + (b || 0), 0);
+/** Kard steps from the threshold to the rarity's top level (through ascension), as fusion-number indexes. */
+const kardSteps = (r: RarityRule) => Array.from({ length: Math.max(0, r.dupesPerLevel.length - (r.fusionUpThreshold ?? 0)) }, (_, k) => (r.fusionUpThreshold ?? 0) + k);
+
+/** Kards needed to take a card of this rarity from the threshold to its top level. */
+const kardTotal = (r: RarityRule) => kardSteps(r).reduce((a, f) => a + (r.kardsPerLevel[f] || 0), 0);
 
 export default function SettingsView() {
   const { state, update, replace } = useStore();
@@ -134,13 +137,13 @@ export default function SettingsView() {
             {r.fusionUpThreshold != null && (
               <>
                 <div className="small muted level-caption">
-                  Fusion Up Kards per step · {kardTotal(r)} kards from F{r.fusionUpThreshold} to F{r.fusionMax}
+                  Fusion Up Kards per step · {kardTotal(r)} kards from F{r.fusionUpThreshold} to {levelLabel(r, maxFusion(r))}
                 </div>
                 <div className="levels">
-                  {Array.from({ length: Math.max(0, r.fusionMax - r.fusionUpThreshold) }, (_, k) => r.fusionUpThreshold! + k).map((f) => (
+                  {kardSteps(r).map((f) => (
                     <label key={f} className="level">
                       <span className="small muted">
-                        F{f}→F{f + 1}
+                        {levelLabel(r, fLevel(f))}→{levelLabel(r, fLevel(f + 1))}
                       </span>
                       <NumInput
                         value={r.kardsPerLevel[f] ?? 0}
