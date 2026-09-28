@@ -21,6 +21,7 @@ const find = (name: string, rarityId: string) => findInCatalog(card(name, rarity
 describe('catalog matching', () => {
   it('ignores word order, commas, possessives and MKII vs MK2', () => {
     expect(nameKey('Scorpion, MKII Movie')).toBe(nameKey('Scorpion MK2 Movie'));
+    expect(nameKey('Weather Warfare')).toBe(nameKey('Weather Warface')); // the site's spelling
     expect(find('Scorpion, MKII Movie', 'diamond')).toBe('Scorpion MK2 Movie');
     expect(find("Takahashi's Gauntlets", 'epic')).toBe("Takahashi's Gauntlets");
   });
