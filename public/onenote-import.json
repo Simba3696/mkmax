@@ -22,7 +22,19 @@
       "goal": "max",
       "hasGuests": true,
       "fusionUpThreshold": 3,
-      "fusionUpKards": 0
+      "fusionUpKards": 0,
+      "kardsPerLevel": [
+        0,
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        10
+      ]
     },
     {
       "id": "gold",
@@ -55,7 +67,19 @@
       "goal": "max",
       "hasGuests": false,
       "fusionUpThreshold": 3,
-      "fusionUpKards": 0
+      "fusionUpKards": 0,
+      "kardsPerLevel": [
+        0,
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        10
+      ]
     },
     {
       "id": "epic",
@@ -78,7 +102,19 @@
       "goal": "threshold",
       "hasGuests": false,
       "fusionUpThreshold": 3,
-      "fusionUpKards": 0
+      "fusionUpKards": 0,
+      "kardsPerLevel": [
+        0,
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        10
+      ]
     },
     {
       "id": "rare",
@@ -101,7 +137,19 @@
       "goal": "threshold",
       "hasGuests": false,
       "fusionUpThreshold": 3,
-      "fusionUpKards": 0
+      "fusionUpKards": 0,
+      "kardsPerLevel": [
+        0,
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        10
+      ]
     }
   ],
   "currencies": [

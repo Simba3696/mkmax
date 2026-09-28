@@ -16,8 +16,13 @@ export interface RarityRule {
   hasGuests: boolean;
   /** Fusion number (F3 → 3) at which Fusion Up Kards can be used; null if this rarity has none. */
   fusionUpThreshold: number | null;
-  /** Fusion Up Kards currently held for this rarity (1 kard = +1 fusion level). */
+  /** Fusion Up Kards currently held for this rarity. */
   fusionUpKards: number;
+  /**
+   * Fusion Up Kards needed per step, indexed by the fusion number you start from: kardsPerLevel[3] is F3 → F4.
+   * 0 means kards can't be used for that step (below the threshold). Kards only raise fusion, not ascension.
+   */
+  kardsPerLevel: number[];
 }
 
 export interface Card {

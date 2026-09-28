@@ -56,7 +56,13 @@ The phase depends on which copy it is:
 - **Kards cover it**: copies your Fusion Up Kards would supply anyway, so they're worth less.
 - **Done**: worth 0. Cards that reach their goal are removed, so they never get scored.
 
-Fusion Up Kards go to cards at F3 or above: guest cards first, then the ones closest to max. The Wallet shows a Kard count for each rarity that has cards past F3 still to go, so Epic Kards show up once any Epic card has a max goal.
+Fusion Up Kards aren't one per level. Each step costs more, and each rarity (Diamond, Gold, Epic, Rare) has its own kards and its own cost table, editable in Settings → Fusion rules. The Diamond costs come from the game; the others start as a copy of them until checked in-game.
+
+| Step | F3→F4 | F4→F5 | F5→F6 | F6→F7 | F7→F8 | F8→F9 | F9→F10 | Total |
+|---|---|---|---|---|---|---|---|---|
+| Diamond kards | 1 | 2 | 3 | 4 | 5 | 7 | 10 | 32 |
+
+Kards only work from F3 up and only raise fusion, not Gold ascension. The Kard plan spends your kards one step at a time on the cheapest step available, because every step saves one pack copy no matter how much it costs. Guest cards count 1.5× and ties go to the card closest to max. It shows how many kards each card gets and how many are left over. The Wallet shows a kard count for each rarity that has cards past F3 still to go, so Epic kards show up once any Epic card has a max goal.
 
 A pack's value is the expected value of its drops (rolls × chance), added up across the drop table.
 

@@ -71,6 +71,14 @@ export interface KardAssignment {
   cardId: string;
   from: number;
   to: number;
+  /** Fusion Up Kards this assignment spends. */
+  kards: number;
+}
+
+export interface KardPlan {
+  assignments: KardAssignment[];
+  /** Kards the plan couldn't use (not enough for any remaining step). */
+  left: number;
 }
 
 export interface Ctx {
@@ -79,7 +87,7 @@ export interface Ctx {
   cards: Map<string, Card>;
   /** Copies that allocated Fusion Up Kards will supply, per card. */
   kardCopies: Map<string, number>;
-  kardPlan: Map<string, KardAssignment[]>;
+  kardPlan: Map<string, KardPlan>;
 }
 
 /** Every card is worth maxing; guest cards count extra because they're only around during their event. */
@@ -87,31 +95,55 @@ export function cardWeight(state: AppState, card: Card) {
   return card.guest ? state.weights.guest : 1;
 }
 
+/** Fusion Up Kards needed to go from stored level `level` to the next one, or null if kards can't do that step. */
+export function kardCost(rule: RarityRule, level: number): number | null {
+  const f = level - 1; // displayed fusion number (stored level 1 = F0)
+  if (rule.fusionUpThreshold == null || f < rule.fusionUpThreshold || f >= rule.fusionMax) return null;
+  const cost = rule.kardsPerLevel?.[f];
+  return cost && cost > 0 ? cost : null;
+}
+
 /**
- * Hand out Fusion Up Kards per rarity: eligible cards (at/above the threshold, below their fusion cap),
- * guest cards first, then the ones closest to max.
- * Kards only raise fusion levels, not ascension.
+ * Spend each rarity's Fusion Up Kards one fusion step at a time. Costs rise steeply (a Diamond's F9→F10 costs
+ * 10 kards, F3→F4 costs 1), and every step saves one pack copy, so the next kard always goes to the cheapest
+ * step available, weighted up for guest cards. Ties go to the card closest to max. Kards only raise fusion
+ * levels (not ascension) and only from the threshold (F3) up.
  */
 function allocateKards(state: AppState) {
   const kardCopies = new Map<string, number>();
-  const kardPlan = new Map<string, KardAssignment[]>();
+  const kardPlan = new Map<string, KardPlan>();
   for (const rule of state.rarities) {
     const thr = thresholdLevel(rule);
     if (thr == null || rule.fusionUpKards <= 0) continue;
     const cap = (c: Card) => Math.min(targetLevel(c, rule), fLevel(rule.fusionMax));
-    const eligible = state.cards
-      .filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c))
-      .sort((a, b) => cardWeight(state, b) - cardWeight(state, a) || b.fusion - a.fusion);
+    const cards = state.cards.filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c));
+    const level = new Map(cards.map((c) => [c.id, c.fusion]));
+    const spent = new Map<string, number>();
     let left = rule.fusionUpKards;
-    const plan: KardAssignment[] = [];
-    for (const c of eligible) {
-      if (left <= 0) break;
-      const use = Math.min(left, cap(c) - c.fusion);
-      plan.push({ cardId: c.id, from: c.fusion, to: c.fusion + use });
-      kardCopies.set(c.id, copiesAtFusion(rule, c.fusion + use) - copiesAtFusion(rule, c.fusion));
-      left -= use;
+    for (;;) {
+      let best: { card: Card; cost: number; score: number } | null = null;
+      for (const c of cards) {
+        const lvl = level.get(c.id)!;
+        if (lvl >= cap(c)) continue;
+        const cost = kardCost(rule, lvl);
+        if (cost == null || cost > left) continue;
+        const score = cardWeight(state, c) / cost;
+        if (!best || score > best.score + 1e-9 || (Math.abs(score - best.score) <= 1e-9 && lvl > level.get(best.card.id)!)) best = { card: c, cost, score };
+      }
+      if (!best) break;
+      level.set(best.card.id, level.get(best.card.id)! + 1);
+      spent.set(best.card.id, (spent.get(best.card.id) ?? 0) + best.cost);
+      left -= best.cost;
     }
-    kardPlan.set(rule.id, plan);
+    const assignments: KardAssignment[] = [];
+    for (const c of cards) {
+      const to = level.get(c.id)!;
+      if (to === c.fusion) continue;
+      assignments.push({ cardId: c.id, from: c.fusion, to, kards: spent.get(c.id)! });
+      kardCopies.set(c.id, copiesAtFusion(rule, to) - copiesAtFusion(rule, c.fusion));
+    }
+    assignments.sort((a, b) => b.to - a.to || b.kards - a.kards);
+    kardPlan.set(rule.id, { assignments, left });
   }
   return { kardCopies, kardPlan };
 }
