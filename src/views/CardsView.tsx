@@ -259,7 +259,8 @@ function CardList() {
 
   const rarityOrder = (c: Card) => state.rarities.findIndex((r) => r.id === c.rarityId);
   const cards = state.cards
-    .filter((c) => rarity === 'all' || c.rarityId === rarity)
+    // "kind:equipment" etc. groups every rarity of that kind (Diamond + Gold characters, all gear, both Kameo tiers).
+    .filter((c) => rarity === 'all' || c.rarityId === rarity || rarity === `kind:${state.rarities.find((r) => r.id === c.rarityId)?.kind}`)
     .filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()))
     .filter((c) => sourceFilter === 'all' || (c.source ?? '') === sourceFilter)
     // Stable order (rarity, then name) so a card doesn't jump around while you edit it.
@@ -323,11 +324,16 @@ function CardList() {
         <input className="grow" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={rarity} onChange={(e) => setRarity(e.target.value)}>
           <option value="all">All rarities</option>
-          {state.rarities.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.label}
-            </option>
-          ))}
+          <option value="kind:character">All characters</option>
+          <option value="kind:equipment">All equipment</option>
+          <option value="kind:kameo">All Kameos</option>
+          <optgroup label="One rarity">
+            {state.rarities.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </optgroup>
         </select>
         <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as Source | 'all')} aria-label="Filter by source">
           <option value="all">Any source</option>

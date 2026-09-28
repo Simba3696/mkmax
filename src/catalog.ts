@@ -41,10 +41,14 @@ export function appRarityId(item: CatalogItem, rules: Iterable<RarityRule>): str
   return undefined;
 }
 
+/** Words MK Mobile Base misspells, mapped to the game's spelling ("Weather Warface" is the game's Weather Warfare). */
+const SITE_TYPOS: Record<string, string> = { warface: 'warfare' };
+
 /** Order-free word key: "Scorpion, MKII Movie" and "Scorpion MK2 Movie" match; "the"/"of" and possessive 's are ignored. */
 export function nameKey(name: string) {
   const s = name.toLowerCase().replace(/’/g, "'").replace(/'s\b/g, '').replace(/\bmkii\b/g, 'mk2');
-  return [...new Set(s.split(/[^a-z0-9]+/).filter((w) => w && w !== 'the' && w !== 'of'))].sort().join(' ');
+  const words = s.split(/[^a-z0-9]+/).filter((w) => w && w !== 'the' && w !== 'of').map((w) => SITE_TYPOS[w] ?? w);
+  return [...new Set(words)].sort().join(' ');
 }
 
 /**
