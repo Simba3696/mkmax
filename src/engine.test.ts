@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
 import {
-  buildCtx, buildPlan, copiesAtFusion, copiesToMax, copiesToThreshold, copyPhase, fLevel as F, isMaxed, levelLabel, packEV, pruneDone, targetLevel,
+  buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, fLevel as F, isMaxed, levelLabel, packEV, pruneDone, targetLevel,
 } from './engine';
 import { normalize } from './store';
 import type { AppState, Card, Pack } from './types';
@@ -89,23 +89,37 @@ describe('save migration', () => {
 
 describe('phases', () => {
   it('classifies unlock, threshold, normal, kard-covered and maxed copies', () => {
-    const s = setup([card('new', 0), card('low', F(1)), card('mid', F(5)), card('max', F(10))], [], (s) => (s.rarities[0].fusionUpKards = 2));
+    const s = setup([card('new', 0), card('low', F(1)), card('mid', F(5)), card('max', F(10))], [], (s) => (s.rarities[0].fusionUpKards = 7));
     const ctx = buildCtx(s);
     const c = (id: string) => ctx.cards.get(id)!;
     expect(copyPhase(ctx, c('new'))).toBe('unlock');
     expect(copyPhase(ctx, c('low'))).toBe('toThreshold');
-    expect(copyPhase(ctx, c('mid'))).toBe('normal'); // 5 to max, kards cover last 2
+    expect(copyPhase(ctx, c('mid'))).toBe('normal'); // 5 to max; 7 kards buy F5→F6 (3) + F6→F7 (4), covering 2
     expect(copyPhase(ctx, c('mid'), 3)).toBe('kardCovered');
     expect(copyPhase(ctx, c('max'))).toBe('maxed');
   });
 
-  it('gives kards to guest cards first, then the ones closest to max', () => {
+  it('charges the Diamond kard curve per step', () => {
+    const diamond = rules().get('diamond')!;
+    expect([3, 4, 5, 6, 7, 8, 9].map((f) => kardCost(diamond, F(f)))).toEqual([1, 2, 3, 4, 5, 7, 10]);
+    expect(kardCost(diamond, F(2))).toBeNull(); // below the F3 threshold
+    expect(kardCost(diamond, F(10))).toBeNull(); // already F10
+    // 10 kards: exactly F9 → F10 when that's the only card.
+    const s = setup([card('near', F(9))], [], (s) => (s.rarities[0].fusionUpKards = 10));
+    expect(buildCtx(s).kardPlan.get('diamond')).toEqual({ assignments: [{ cardId: 'near', from: F(9), to: F(10), kards: 10 }], left: 0 });
+  });
+
+  it('spends kards on the cheapest steps first, weighting guest cards', () => {
+    // Costs: F4→F5 2, F5→F6 3, F6→F7 4, F8→F9 7. Guest steps count 1.5×, so guest F4→F6 (5 kards), then
+    // the plain F4→F5 (2) beats the guest's F6→F7 (4); the near-max card's 7-kard step never wins. 1 left over.
     const s = setup([card('far', F(4)), card('near', F(8)), card('guest', F(4), { guest: true })], [], (s) => (s.rarities[0].fusionUpKards = 8));
-    const plan = buildCtx(s).kardPlan.get('diamond')!;
-    expect(plan).toEqual([
-      { cardId: 'guest', from: F(4), to: F(10) },
-      { cardId: 'near', from: F(8), to: F(10) },
-    ]);
+    expect(buildCtx(s).kardPlan.get('diamond')).toEqual({
+      assignments: [
+        { cardId: 'guest', from: F(4), to: F(6), kards: 5 },
+        { cardId: 'far', from: F(4), to: F(5), kards: 2 },
+      ],
+      left: 1,
+    });
   });
 });
 

@@ -1,6 +1,6 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
 import type { AppState, Card, RarityRule } from './types';
-import { defaultRarities, defaultState, defaultWeights } from './defaults';
+import { DIAMOND_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
 import { pruneDone } from './engine';
 
 /**
@@ -62,6 +62,8 @@ export function normalize(input: unknown): AppState {
           fusionMax: r.fusionMax ?? 10,
           goal: r.goal ?? 'max',
           hasGuests: r.hasGuests ?? r.id === 'diamond',
+          // Saves from before kard costs existed get the rarity's default table (the Diamond curve).
+          kardsPerLevel: r.kardsPerLevel?.length ? r.kardsPerLevel : (defaultRarities().find((d) => d.id === r.id)?.kardsPerLevel ?? [...DIAMOND_KARD_COSTS]),
         }))
       : base.rarities,
     currencies: s.currencies?.length ? s.currencies : base.currencies,

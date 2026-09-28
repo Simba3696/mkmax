@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
 import { fetchStarterData, newId, normalize, useStore } from '../store';
-import { defaultState, defaultWeights, sampleState } from '../defaults';
+import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, NumInput } from '../ui';
 import { copiesTotal, levelLabel } from '../engine';
 import SyncPanel from './SyncPanel';
-import type { Weights } from '../types';
+import type { RarityRule, Weights } from '../types';
 
 const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'belowThreshold', label: 'Reaching the Kard threshold', help: 'Multiplier for copies that get a card to the level where Fusion Up Kards can be used.' },
@@ -14,6 +14,9 @@ const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'closenessBonus', label: 'Close-to-max bonus', help: 'Extra value as a card nears max. 0.5 means +50% at max.' },
   { key: 'limitedBoost', label: 'Limited-time pack urgency', help: 'The planner prefers limited-time packs by this factor over permanent packs, which you can buy later.' },
 ];
+
+/** Kards needed to take a card of this rarity from the threshold to its top fusion level. */
+const kardTotal = (r: RarityRule) => r.kardsPerLevel.slice(r.fusionUpThreshold ?? 0, r.fusionMax).reduce((a, b) => a + (b || 0), 0);
 
 export default function SettingsView() {
   const { state, update, replace } = useStore();
@@ -97,6 +100,7 @@ export default function SettingsView() {
                 <input type="color" value={r.color} onChange={(e) => update((d) => void (d.rarities[ri].color = e.target.value))} />
               </label>
             </div>
+            <div className="small muted level-caption">Duplicates per step</div>
             <div className="levels">
               {r.dupesPerLevel.map((n, li) => (
                 <label key={li} className="level">
@@ -125,13 +129,41 @@ export default function SettingsView() {
                 Remove
               </button>
             </div>
+            {r.fusionUpThreshold != null && (
+              <>
+                <div className="small muted level-caption">
+                  Fusion Up Kards per step · {kardTotal(r)} kards from F{r.fusionUpThreshold} to F{r.fusionMax}
+                </div>
+                <div className="levels">
+                  {Array.from({ length: Math.max(0, r.fusionMax - r.fusionUpThreshold) }, (_, k) => r.fusionUpThreshold! + k).map((f) => (
+                    <label key={f} className="level">
+                      <span className="small muted">
+                        F{f}→F{f + 1}
+                      </span>
+                      <NumInput
+                        value={r.kardsPerLevel[f] ?? 0}
+                        min={0}
+                        step={1}
+                        onChange={(v) =>
+                          update((d) => {
+                            const costs = d.rarities[ri].kardsPerLevel;
+                            while (costs.length <= f) costs.push(0);
+                            costs[f] = v ?? 0;
+                          })
+                        }
+                      />
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ))}
         <button
           onClick={() =>
             update(
               (d) =>
-                void d.rarities.push({ id: newId(), label: 'New rarity', kind: 'equipment', color: '#cccccc', dupesPerLevel: Array(10).fill(1), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0 }),
+                void d.rarities.push({ id: newId(), label: 'New rarity', kind: 'equipment', color: '#cccccc', dupesPerLevel: Array(10).fill(1), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [...DIAMOND_KARD_COSTS] }),
             )
           }
         >

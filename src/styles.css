@@ -153,6 +153,7 @@ input[type='color'] { padding: 2px; width: 48px; }
 .card-row .actions { margin-top: 0.3rem; }
 
 .levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 0.4rem; margin-top: 0.6rem; }
+.level-caption { margin-top: 0.8rem; }
 .level { display: flex; flex-direction: column; gap: 2px; }
 .level input { width: 100%; }
 

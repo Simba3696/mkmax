@@ -130,21 +130,26 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
         <section className="card">
           <h2>Fusion Up Kard plan</h2>
           {kardRarities.map((r) => {
-            const assigns = ctx.kardPlan.get(r.id) ?? [];
-            if (r.fusionUpKards <= 0) return null;
+            const plan = ctx.kardPlan.get(r.id);
+            if (r.fusionUpKards <= 0 || !plan) return null;
+            const used = r.fusionUpKards - plan.left;
             return (
               <div key={r.id}>
                 <h3>
                   <RarityBadge rule={r} /> {r.fusionUpKards} kard{r.fusionUpKards === 1 ? '' : 's'}
+                  {plan.assignments.length > 0 && <span className="muted small"> · uses {used}, {plan.left} left over</span>}
                 </h3>
-                {assigns.length === 0 ? (
-                  <p className="muted small">No eligible cards yet. Get a card to F{r.fusionUpThreshold} first.</p>
+                {plan.assignments.length === 0 ? (
+                  <p className="muted small">
+                    Not enough kards for any step yet. Kards start at F{r.fusionUpThreshold}, and the cheapest step there costs{' '}
+                    {r.kardsPerLevel[r.fusionUpThreshold ?? 0] || '?'}.
+                  </p>
                 ) : (
-                  assigns.map((a) => (
+                  plan.assignments.map((a) => (
                     <div key={a.cardId} className="row">
                       <span className="grow">{ctx.cards.get(a.cardId)?.name}</span>
                       <span>
-                        {levelLabel(r, a.from)} → <b>{levelLabel(r, a.to)}</b>
+                        {levelLabel(r, a.from)} → <b>{levelLabel(r, a.to)}</b> <span className="muted small">({a.kards} kard{a.kards === 1 ? '' : 's'})</span>
                       </span>
                     </div>
                   ))
@@ -152,6 +157,7 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
               </div>
             );
           })}
+          <p className="muted small">Kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra.</p>
         </section>
       )}
 

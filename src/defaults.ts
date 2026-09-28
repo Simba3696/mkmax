@@ -2,6 +2,13 @@ import type { AppState, RarityRule, Weights } from './types';
 
 const ones = (n: number) => Array(n).fill(1);
 
+/**
+ * Fusion Up Kards per step from F3, for Diamond cards (from the game): F3→F4 1, F4→F5 2, F5→F6 3, F6→F7 4,
+ * F7→F8 5, F8→F9 7, F9→F10 10. Other rarities start from the same table until checked in-game.
+ */
+export const DIAMOND_KARD_COSTS = [0, 0, 0, 1, 2, 3, 4, 5, 7, 10];
+const kardCosts = () => [...DIAMOND_KARD_COSTS];
+
 export const defaultWeights: Weights = {
   unlock: 1.3,
   belowThreshold: 1.5,
@@ -14,14 +21,14 @@ export const defaultWeights: Weights = {
 export function defaultRarities(): RarityRule[] {
   return [
     // First copy is F0, then 1 dupe per level to F10 (11 copies).
-    { id: 'diamond', label: 'Diamond', kind: 'character', color: '#7fd8ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0 },
+    { id: 'diamond', label: 'Diamond', kind: 'character', color: '#7fd8ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
     // F0..F10 then A1..A10 (set each card's own cap to A5 or A10).
-    { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(20), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
+    { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(20), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
     // Equipment colors match the game: Epic purple, Rare blue (Uncommon, green, only appears in the tower list).
     // Only tracked until F3 (4 copies from scratch); Fusion Up Kards finish them. Realm Klash gear is Epic too,
     // but those cards override the goal to max because they're bought outright.
-    { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
-    { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#4da3ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
+    { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
+    { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#4da3ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
   ];
 }
 
