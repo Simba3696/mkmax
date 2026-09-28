@@ -122,8 +122,8 @@ export interface TowerEntry {
 }
 
 export interface AppState {
-  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. */
-  version: 6;
+  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. */
+  version: 7;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];
@@ -132,6 +132,8 @@ export interface AppState {
   weights: Weights;
   /** End of a Realm Klash season (datetime-local). Seasons run back to back for 2 weeks; see engine seasonEnd. */
   realmKlashSeasonEnd?: string | null;
+  /** Shop packs from MK Mobile Base's schedule the user marked as not needed, by name, so they aren't suggested. */
+  dismissedShopPacks?: string[];
   /** When this data was last changed (ms since epoch); drives cross-device sync. */
   updatedAt?: number;
 }

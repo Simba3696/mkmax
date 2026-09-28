@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "catalog": "node scripts/fetch-catalog.mjs"
+    "catalog": "node scripts/fetch-catalog.mjs",
+    "events": "node scripts/fetch-events.mjs"
   },
   "dependencies": {
     "react": "^19.3.0",

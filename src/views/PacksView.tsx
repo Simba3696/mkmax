@@ -4,6 +4,7 @@ import { REALM_KLASH_CURRENCY, levelLabel, maxFusion, moveSeasonEnd, packStatus,
 import { CardThumb, ConfirmButton, fmt, useNow } from '../ui';
 import { PackTiming } from './PlanView';
 import PackEditor from './PackEditor';
+import { packFromShop, scheduledSeasonEnd, shopSuggestions, titleCase, useEvents } from '../events';
 import type { AppState, Pack } from '../types';
 
 export default function PacksView() {
@@ -135,6 +136,7 @@ export default function PacksView() {
       </p>
 
       <SeasonBar />
+      <ShopSuggestions onAdd={setEditing} />
 
       {groups.active.length > 0 && <h3>Available now</h3>}
       {groups.active.map(renderPack)}
@@ -162,15 +164,31 @@ export default function PacksView() {
 }
 
 /**
- * The current Realm Klash season, shown once there's a season date or a Blood Ruby pack. Seasons normally run
- * 2 weeks, but one can end early (an interim season while an app update is delayed), so it can be ended now.
+ * The current Realm Klash season, shown once there's a season date or a Blood Ruby pack. When MK Mobile Base's
+ * schedule covers today, its date is used (App keeps the saved date in step) and can't be edited here.
+ * Otherwise seasons are assumed to run 2 weeks; one can end early (an interim season while an app update is
+ * delayed), so it can be ended now or corrected.
  */
 function SeasonBar() {
   const { state, update } = useStore();
   const now = useNow();
+  const events = useEvents();
   const end = seasonEnd(state.realmKlashSeasonEnd, now);
-  if (!end && !state.packs.some((p) => p.currencyId === REALM_KLASH_CURRENCY)) return null;
+  const scheduled = scheduledSeasonEnd(events, now);
+  if (!end && !scheduled && !state.packs.some((p) => p.currencyId === REALM_KLASH_CURRENCY)) return null;
   const seasonalNow = state.packs.filter((p) => p.season && p.endsAt === end).length;
+  const leaving = `${seasonalNow} seasonal item${seasonalNow === 1 ? '' : 's'} leave${seasonalNow === 1 ? 's' : ''} then.`;
+  if (scheduled) {
+    return (
+      <div className="card">
+        <div className="row">
+          <span className="grow">Realm Klash season ends</span>
+          <b>{new Date(scheduled).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</b>
+        </div>
+        <p className="muted small">{leaving} Date from MK Mobile Base's event schedule, refreshed daily.</p>
+      </div>
+    );
+  }
   return (
     <div className="card">
       <div className="row wrap">
@@ -187,9 +205,64 @@ function SeasonBar() {
       </div>
       <p className="muted small">
         {end
-          ? `${seasonalNow} seasonal item${seasonalNow === 1 ? '' : 's'} leave${seasonalNow === 1 ? 's' : ''} then. Each season after is assumed to end 2 weeks later. If a season ends early, tap Ended early; if the new one's timer is different, change the date.`
+          ? `${leaving} Each season after is assumed to end 2 weeks later. If a season ends early, tap Ended early; if the new one's timer is different, change the date.`
           : 'Enter when the current season ends (from the in-game timer) so seasonal Blood Ruby items know when they leave.'}
       </p>
     </div>
+  );
+}
+
+/**
+ * Shop packs from MK Mobile Base's schedule that aren't in the app yet. Add opens the pack editor with everything
+ * but the drop rates filled in; Not needed hides a pack for good (for packs with no cards you still need).
+ */
+function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
+  const { state, update } = useStore();
+  const now = useNow();
+  const events = useEvents();
+  const [open, setOpen] = useState(true);
+  if (!events) return null;
+  const packs = shopSuggestions(events, state, now);
+  if (!packs.length) return null;
+  const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null);
+  return (
+    <section className="card">
+      <div className="toolbar">
+        <button className="ghost" onClick={() => setOpen(!open)}>
+          {open ? '▾' : '▸'} In the shop ({packs.length})
+        </button>
+      </div>
+      {open && (
+        <>
+          <p className="muted small">
+            From MK Mobile Base's event schedule. It doesn't have drop rates, so <b>Add</b> fills in the rest and you enter the odds for cards you need.
+            Packs with nothing you need: <b>Not needed</b> hides them for good.
+          </p>
+          {packs.map((sp) => {
+            const upcoming = sp.start && new Date(sp.start) > now;
+            return (
+              <div key={sp.name} className="row">
+                {sp.image && <img className="thumb" src={sp.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 44, height: 44 }} />}
+                <div className="grow">
+                  <div className="row-title">{titleCase(sp.name)}</div>
+                  <div className="muted small">
+                    {sp.cost != null && `${fmt(sp.cost)} ${sp.currency} · `}
+                    {sp.limit != null ? `limit ${sp.limit}` : 'no limit'}
+                    {upcoming ? ` · starts ${when(sp.start)}` : sp.end ? ` · ends ${when(sp.end)}` : ' · permanent'}
+                  </div>
+                </div>
+                <button onClick={() => onAdd(packFromShop(sp, state, newId()))}>Add</button>
+                <button
+                  className="ghost"
+                  onClick={() => update((d) => void (d.dismissedShopPacks = [...(d.dismissedShopPacks ?? []), sp.name]), `Hid ${titleCase(sp.name)}`)}
+                >
+                  Not needed
+                </button>
+              </div>
+            );
+          })}
+        </>
+      )}
+    </section>
   );
 }

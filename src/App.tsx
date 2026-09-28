@@ -4,6 +4,9 @@ import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
+import { moveSeasonEnd, seasonEnd } from './engine';
+import { scheduledSeasonEnd, useEvents } from './events';
+import { useNow } from './ui';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
 import PlanView from './views/PlanView';
@@ -72,6 +75,17 @@ export default function App() {
     return () => void (cancelled = true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsArt]);
+
+  // MK Mobile Base's schedule knows when the Realm Klash season ends, so it replaces the saved date (and the
+  // 2-week guess) whenever it covers today, moving that season's items with it.
+  const events = useEvents();
+  const now = useNow();
+  const scheduledEnd = scheduledSeasonEnd(events, now);
+  const savedEnd = seasonEnd(state.realmKlashSeasonEnd, now);
+  useEffect(() => {
+    if (scheduledEnd && scheduledEnd !== savedEnd) update((d) => moveSeasonEnd(d, scheduledEnd, now));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduledEnd, savedEnd]);
 
   const pageRef = useRef<HTMLDivElement>(null);
   /** Direction the next tab change should slide in from, set by go() and used once the new tab has rendered. */

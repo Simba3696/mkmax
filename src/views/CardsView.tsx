@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
 import { ascensionCaps, buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
-import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls } from '../ui';
+import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useNow } from '../ui';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
 import { appRarityId, catalogPageUrl, findInCatalog, loadCatalog, wantsCatalogImage } from '../catalog';
 import { parseCardList } from '../cardList';
 import { initialSource } from '../challenges';
+import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Card, RarityRule } from '../types';
 
 type Source = NonNullable<Card['source']> | '';
@@ -168,6 +169,8 @@ export default function CardsView() {
 function CardList() {
   const { state, update } = useStore();
   const ctx = useMemo(() => buildCtx(state), [state]);
+  const events = useEvents();
+  const now = useNow();
   const [rarity, setRarity] = useState<string>('all');
   const [q, setQ] = useState('');
   const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all');
@@ -395,6 +398,10 @@ function CardList() {
                   <RarityBadge rule={rule} />
                   {c.guest && <span className="chip guest">guest</span>}
                   {c.source && <span className="chip krypt">{SOURCE_LABELS[c.source]}{c.sourceNote && `: ${c.sourceNote}`}</span>}
+                  {c.source === 'challenge' && (() => {
+                    const ch = challengeFor(c, events, now);
+                    return ch && <span className="chip limited">challenge {challengeWhen(ch, now)}</span>;
+                  })()}
                   {/* Cards that reach their goal are removed, so every card listed still has copies to go. */}
                   {toThr > 0 && thresholdLevel(rule)! < target && <span className="chip phase-toThreshold">{toThr} to F{rule.fusionUpThreshold}</span>}
                   <span className={`chip ${cardGoal(c, rule) === 'threshold' ? 'phase-toThreshold' : 'muted'}`}>

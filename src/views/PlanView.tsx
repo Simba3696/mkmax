@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useStore } from '../store';
 import { buildCtx, buildPlan, cardGoal, levelLabel, rankPacks, rankTargets, thresholdLevel, type Phase } from '../engine';
 import { CardThumb, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
+import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
 
 const PHASE_LABEL: Record<Phase, string> = {
@@ -30,6 +31,15 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
   const plan = useMemo(() => buildPlan(ctx, now), [ctx, now]);
   const ranks = useMemo(() => rankPacks(ctx, now), [ctx, now]);
   const targets = useMemo(() => rankTargets(ctx, now).slice(0, 10), [ctx, now]);
+  const events = useEvents();
+  // Challenge Kameos you still need whose Elder challenge is on now or coming up, soonest first.
+  const challengeKameos = state.cards
+    .filter((c) => c.source === 'challenge')
+    .flatMap((card) => {
+      const ch = challengeFor(card, events, now);
+      return ch ? [{ card, ch }] : [];
+    })
+    .sort((a, b) => (a.ch.start ?? '').localeCompare(b.ch.start ?? ''));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
   // Kard counts only matter where some card is bought past the threshold (e.g. Realm Klash epics to max).
   const kardRarities = state.rarities.filter(
@@ -158,6 +168,20 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
             );
           })}
           <p className="muted small">Kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra.</p>
+        </section>
+      )}
+
+      {challengeKameos.length > 0 && (
+        <section className="card">
+          <h2>Elder challenges</h2>
+          <p className="muted small">Kameos you still need that an Elder challenge on MK Mobile Base's schedule gives for sure.</p>
+          {challengeKameos.map(({ card, ch }) => (
+            <div key={card.id} className="row">
+              <CardThumb card={card} rule={state.rarities.find((r) => r.id === card.rarityId)} />
+              <span className="grow">{card.name}</span>
+              <span className={`chip ${ch.start && new Date(ch.start) > now ? 'limited' : 'urgent'}`}>{challengeWhen(ch, now)}</span>
+            </div>
+          ))}
         </section>
       )}
 

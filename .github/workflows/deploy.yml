@@ -3,6 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # Daily, after the in-game rotations (16:00 UTC), so the shop, challenge and season schedule stays current.
+  schedule:
+    - cron: '30 17 * * *'
   workflow_dispatch:
 
 permissions:
@@ -27,6 +30,8 @@ jobs:
       - run: npm test
       # Refresh the MK Mobile Base catalog (names, rarities, card art). If the site is down, the committed copy is used.
       - run: npm run catalog || echo "::warning::Catalog refresh failed; deploying the committed public/catalog.json"
+      # Same for MK Mobile Base's event schedule (shop packs, challenges, Realm Klash seasons).
+      - run: npm run events || echo "::warning::Event schedule refresh failed; deploying the committed public/events.json"
       - run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
