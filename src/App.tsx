@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { fetchStarterData, useStore, type UndoEntry } from './store';
 import PullToRefresh from './PullToRefresh';
-import { useSwipeTabs } from './useSwipeTabs';
+import { slideIn, useSwipeTabs } from './useSwipeTabs';
+import { scrollRoot } from './scrollRoot';
+import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
 import PlanView from './views/PlanView';
@@ -41,7 +43,7 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: () 
 }
 
 export default function App() {
-  const { state, replace, sync, lastUndo, undo, dismissUndo } = useStore();
+  const { state, update, replace, sync, lastUndo, undo, dismissUndo } = useStore();
   const [tab, setTab] = useState<TabId>(() => (location.hash.slice(1) as TabId) || 'plan');
 
   // ?starter loads the OneNote starter data, but only into an empty app so it never overwrites real progress.
@@ -53,15 +55,50 @@ export default function App() {
     if (state.cards.length === 0) fetchStarterData().then(replace, (e) => console.error(e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Give cards MK Mobile Base art automatically: new cards, cards synced in from another device, and cards still
+  // carrying art from the old wiki lookup. Runs again only when that set of cards changes.
+  const needsArt = state.cards.filter(wantsCatalogImage).map((c) => c.id).join(',');
+  useEffect(() => {
+    if (!needsArt) return;
+    let cancelled = false;
+    loadCatalog().then(
+      (items) => {
+        if (cancelled) return;
+        const updates = catalogImageUpdates(state.cards, new Map(state.rarities.map((r) => [r.id, r])), items);
+        if (updates.size) update((d) => d.cards.forEach((c) => Object.assign(c, updates.get(c.id) ?? {})));
+      },
+      () => {}, // offline or no catalog: Find images still works later
+    );
+    return () => void (cancelled = true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsArt]);
+
+  const pageRef = useRef<HTMLDivElement>(null);
+  /** Direction the next tab change should slide in from, set by go() and used once the new tab has rendered. */
+  const enterDir = useRef<1 | -1 | 0>(0);
+  const tabIndex = (t: TabId) => TABS.findIndex((x) => x.id === t);
   const go = (t: TabId) => {
+    if (t === tab) return;
+    enterDir.current = tabIndex(t) > tabIndex(tab) ? 1 : -1;
     setTab(t);
     history.replaceState(null, '', `#${t}`);
-    window.scrollTo(0, 0);
   };
+  // After the new tab renders (before paint): start it at the top and slide it in.
+  useLayoutEffect(() => {
+    const root = scrollRoot();
+    if (root) root.scrollTop = 0;
+    const dir = enterDir.current;
+    enterDir.current = 0;
+    if (dir && pageRef.current) slideIn(pageRef.current, dir);
+  }, [tab]);
   // Swipe left for the next tab, right for the previous one; stops at the ends instead of wrapping.
-  useSwipeTabs((dir) => {
-    const next = TABS[TABS.findIndex((t) => t.id === tab) + dir];
-    if (next) go(next.id);
+  useSwipeTabs({
+    page: () => pageRef.current,
+    canGo: (dir) => !!TABS[tabIndex(tab) + dir],
+    onSwipe: (dir) => {
+      const next = TABS[tabIndex(tab) + dir];
+      if (next) go(next.id);
+    },
   });
   // With sync on, a pull checks the gist. Without it there's nothing remote to fetch, so reload to pick up app updates.
   const refresh = () => (sync.connected ? sync.syncNow() : Promise.resolve(location.reload()));
@@ -69,7 +106,7 @@ export default function App() {
   return (
     <div className="app">
       <PullToRefresh onRefresh={refresh} />
-      <header className="topbar">
+      <header className="topbar column-gutter">
         <span className="logo">
           <img className="logo-mark" src={`${import.meta.env.BASE_URL}logo-mark.svg`} alt="" />
           MK<b>MAX</b>
@@ -82,10 +119,12 @@ export default function App() {
         )}
       </header>
       <main className="content">
-        {tab === 'plan' && <PlanView goto={go} />}
-        {tab === 'packs' && <PacksView />}
-        {tab === 'cards' && <CardsView />}
-        {tab === 'settings' && <SettingsView />}
+        <div className="page" ref={pageRef}>
+          {tab === 'plan' && <PlanView goto={go} />}
+          {tab === 'packs' && <PacksView />}
+          {tab === 'cards' && <CardsView />}
+          {tab === 'settings' && <SettingsView />}
+        </div>
       </main>
       {lastUndo && <UndoToast entry={lastUndo} onUndo={undo} onDismiss={dismissUndo} />}
       <nav className="tabbar">

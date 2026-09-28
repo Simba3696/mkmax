@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appRarityId, findInCatalog, nameKey, type CatalogItem } from './catalog';
+import { appRarityId, catalogImageUpdates, findInCatalog, nameKey, type CatalogItem } from './catalog';
 import { defaultState } from './defaults';
 import type { Card } from './types';
 
@@ -54,3 +54,18 @@ describe('catalog matching', () => {
     expect(find('Jason Voorhees, Slasher', 'gold')).toBe('Jason Voorhees Slasher');
   });
 });
+
+describe('automatic catalog art', () => {
+  it('replaces missing and old wiki images, but never a pasted one', () => {
+    const cards: Card[] = [
+      card('Man in the Sky', 'rare'), // no image
+      { ...card('Scorpion, MKII Movie', 'diamond'), imageUrl: 'https://static.wikia.nocookie.net/old.png', wikiTitle: 'Scorpion/MK2 Movie' }, // old wiki art
+      { ...card('Sub-Zero, Kold', 'diamond'), imageUrl: 'https://example.com/mine.png' }, // pasted by hand
+      { ...card('Unknown Card', 'diamond') }, // not in the catalog
+    ];
+    const updates = catalogImageUpdates(cards, rules, ITEMS);
+    expect([...updates.keys()]).toEqual(['Man in the Sky', 'Scorpion, MKII Movie']);
+    expect(updates.get('Scorpion, MKII Movie')).toEqual({ imageUrl: 'Scorpion MK2 Movie.webp', imagePage: expect.stringContaining('mkmobilebase.com'), wikiTitle: undefined });
+  });
+});
+
