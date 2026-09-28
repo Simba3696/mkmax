@@ -54,7 +54,6 @@ export function defaultState(): AppState {
     ],
     cards: [],
     packs: [],
-    towers: [],
     weights: structuredClone(defaultWeights),
   };
 }
@@ -82,6 +81,7 @@ export function sampleState(): AppState {
     { id: 'c7', name: 'Blood Ruby Talisman', rarityId: 'epic', fusion: 5, goal: 'max', guest: false },
     { id: 'c8', name: 'Kombat Kunai', rarityId: 'epic', fusion: 2, guest: false, source: 'krypt' },
     { id: 'c9', name: 'Lin Kuei Gloves', rarityId: 'rare', fusion: 3, guest: false },
+    { id: 'c10', name: 'Kori Blade', rarityId: 'epic', fusion: 2, guest: false, source: 'tower', sourceNote: 'Lin Kuei Tower' },
   ];
   s.packs = [
     {
@@ -104,10 +104,6 @@ export function sampleState(): AppState {
       startsAt: null, endsAt: inDays(2), store: true,
       drops: [{ cardId: 'c7', chance: 100 }],
     },
-  ];
-  s.towers = [
-    { id: 't1', tower: 'Kold Tower', grade: 'Epic', goal: 'F3', itemsLeft: 4 },
-    { id: 't2', tower: 'Twisted Tower', grade: 'Uncommon', goal: 'max', itemsLeft: 1 },
   ];
   return s;
 }

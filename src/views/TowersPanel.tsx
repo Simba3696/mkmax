@@ -1,96 +1,81 @@
-import { useState } from 'react';
-import { newId, useStore } from '../store';
-import { ConfirmButton } from '../ui';
-import type { TowerEntry } from '../types';
+import { useMemo } from 'react';
+import { useStore } from '../store';
+import { buildCtx, copiesToMax, levelLabel, maxFusion, targetLevel } from '../engine';
+import { CardThumb, RarityBadge } from '../ui';
+import type { Card } from '../types';
 
-const GRADES = ['Uncommon', 'Rare', 'Epic'];
-/** Uncommon gear is green in the game; used if the Uncommon rarity was deleted. */
-const UNCOMMON_COLOR = '#5fd068';
+/** Tower gear with no tower name (tagged by hand without one). */
+const NO_TOWER = 'Tower not named';
 
-/** Per-tower focus list: how many items each tower still has short of F3 (or max). */
+/**
+ * Cards tagged as tower gear, grouped by the tower they drop from. Maxed cards are pruned, so everything listed
+ * still has copies to go.
+ */
 export default function TowersPanel() {
   const { state, update } = useStore();
-  const [draft, setDraft] = useState<Omit<TowerEntry, 'id'>>({ tower: '', grade: 'Epic', goal: 'F3', itemsLeft: 1 });
+  const ctx = useMemo(() => buildCtx(state), [state]);
 
-  const patch = (id: string, p: Partial<TowerEntry>) =>
+  const patch = (id: string, p: Partial<Card>) =>
     update((d) => {
-      const t = d.towers.find((x) => x.id === id);
-      if (t) Object.assign(t, p);
+      const c = d.cards.find((x) => x.id === id);
+      if (c) Object.assign(c, p);
     });
 
-  function add() {
-    if (!draft.tower.trim()) return;
-    update((d) => void d.towers.push({ id: newId(), ...draft, tower: draft.tower.trim() }));
-    setDraft({ ...draft, tower: '' });
+  const byTower = new Map<string, Card[]>();
+  for (const c of state.cards) {
+    if (c.source !== 'tower' || !ctx.rules.has(c.rarityId)) continue;
+    const t = c.sourceNote?.trim() || NO_TOWER;
+    byTower.set(t, [...(byTower.get(t) ?? []), c]);
   }
-
-  // Rare and Epic use their rarity colors (blue and purple), so the list matches the rest of the app.
-  const gradeColor = (g: string) => state.rarities.find((r) => r.id === g.toLowerCase())?.color ?? (g === 'Uncommon' ? UNCOMMON_COLOR : undefined);
-  const grades = [...new Set([...GRADES, ...state.towers.map((t) => t.grade)])];
-  const total = state.towers.reduce((a, t) => a + (t.itemsLeft ?? 0), 0);
+  const rarityOrder = (c: Card) => state.rarities.findIndex((r) => r.id === c.rarityId);
+  const towers = [...byTower]
+    .map(([tower, cards]) => ({ tower, cards: cards.sort((a, b) => rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name)) }))
+    // Towers with the most gear left first; the unnamed group last.
+    .sort((a, b) => Number(a.tower === NO_TOWER) - Number(b.tower === NO_TOWER) || b.cards.length - a.cards.length || a.tower.localeCompare(b.tower));
+  const total = towers.reduce((a, t) => a + t.cards.length, 0);
 
   return (
     <>
       <p className="muted small">
-        Tower gear is farmed, not bought, so it isn't part of the plan. This is a focus list of which towers still have gear to finish. {total > 0 && `${total} items left in total.`}
+        Tower gear is farmed, not bought, so it isn't part of the plan. These are the cards you've tagged as tower gear, grouped by tower. {total > 0 && `${total} items left in total.`}
       </p>
-      {grades.map((g) => {
-        const rows = state.towers.filter((t) => t.grade === g).sort((a, b) => (b.itemsLeft ?? 0) - (a.itemsLeft ?? 0) || a.tower.localeCompare(b.tower));
-        if (!rows.length) return null;
-        return (
-          <section key={g} className="card">
-            <h2 style={{ color: gradeColor(g) }}>{g}</h2>
-            {rows.map((t) => (
-              <div key={t.id} className="row">
+      {total === 0 && <p className="muted">No tower gear left. Set a card's source to "Tower gear" on Cards, or paste a list with the tower name (like "Kori Blade - Epic - Lin Kuei Tower - F2").</p>}
+      {towers.map(({ tower, cards }) => (
+        <section key={tower} className="card">
+          <h2>
+            {tower} <span className="muted small">{cards.length} left</span>
+          </h2>
+          {cards.map((c) => {
+            const rule = ctx.rules.get(c.rarityId)!;
+            const max = maxFusion(rule);
+            const toGo = copiesToMax(c, rule);
+            return (
+              <div key={c.id} className="row">
+                <CardThumb card={c} rule={rule} size={36} />
                 <div className="grow">
-                  <div className={`row-title ${t.itemsLeft === 0 ? 'done-text' : ''}`}>{t.tower}</div>
-                  <div className="muted small">
-                    {t.itemsLeft === 0 ? 'Done' : t.itemsLeft == null ? 'Not counted' : `${t.itemsLeft} item${t.itemsLeft === 1 ? '' : 's'} to ${t.goal}`}
+                  <div className="row-title">{c.name}</div>
+                  <div className="small">
+                    <RarityBadge rule={rule} />
+                    <span className="muted">
+                      {' '}
+                      {toGo} {toGo === 1 ? 'copy' : 'copies'} to {levelLabel(rule, targetLevel(c, rule))}
+                    </span>
                   </div>
                 </div>
                 <div className="stepper">
-                  <button onClick={() => patch(t.id, { itemsLeft: Math.max(0, (t.itemsLeft ?? 1) - 1) })} disabled={t.itemsLeft === 0} aria-label="One fewer">
+                  <button onClick={() => patch(c.id, { fusion: Math.max(0, c.fusion - 1) })} disabled={c.fusion <= 0} aria-label="Lower level">
                     −
                   </button>
-                  <span className="stepper-val">{t.itemsLeft ?? '—'}</span>
-                  <button onClick={() => patch(t.id, { itemsLeft: (t.itemsLeft ?? 0) + 1 })} aria-label="One more">
+                  <span className="stepper-val">{c.fusion === 0 ? '—' : levelLabel(rule, c.fusion)}</span>
+                  <button onClick={() => patch(c.id, { fusion: Math.min(max, c.fusion + 1) })} disabled={c.fusion >= max} aria-label="Raise level">
                     +
                   </button>
                 </div>
-                <ConfirmButton label="✕" className="ghost" onConfirm={() => update((d) => void (d.towers = d.towers.filter((x) => x.id !== t.id)))} />
               </div>
-            ))}
-          </section>
-        );
-      })}
-
-      <section className="card">
-        <h2>Add tower</h2>
-        <div className="form">
-          <label className="field wide">
-            <span>Tower</span>
-            <input value={draft.tower} placeholder="e.g. Kold Tower" onChange={(e) => setDraft({ ...draft, tower: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
-          </label>
-          <label className="field">
-            <span>Gear grade</span>
-            <select value={draft.grade} onChange={(e) => setDraft({ ...draft, grade: e.target.value, goal: e.target.value === 'Uncommon' ? 'max' : 'F3' })}>
-              {grades.map((g) => (
-                <option key={g}>{g}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Goal</span>
-            <select value={draft.goal} onChange={(e) => setDraft({ ...draft, goal: e.target.value as TowerEntry['goal'] })}>
-              <option value="F3">F3</option>
-              <option value="max">Max</option>
-            </select>
-          </label>
-          <button className="primary" onClick={add} disabled={!draft.tower.trim()}>
-            Add
-          </button>
-        </div>
-      </section>
+            );
+          })}
+        </section>
+      ))}
     </>
   );
 }
