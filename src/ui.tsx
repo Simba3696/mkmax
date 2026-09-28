@@ -32,12 +32,32 @@ export function useNow() {
 }
 
 /** Card art thumbnail; falls back to initials in the rarity color when there's no image or it fails to load. */
+// Image URLs that failed to load this session, so "Find images" can retry those cards.
+const brokenUrls = new Set<string>();
+const brokenListeners = new Set<() => void>();
+function markBroken(url: string) {
+  if (brokenUrls.has(url)) return;
+  brokenUrls.add(url);
+  brokenListeners.forEach((l) => l());
+}
+
+/** Card image URLs that failed to load this session (re-renders when one more fails). */
+export function useBrokenImageUrls(): ReadonlySet<string> {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const l = () => bump((n) => n + 1);
+    brokenListeners.add(l);
+    return () => void brokenListeners.delete(l);
+  }, []);
+  return brokenUrls;
+}
+
 export function CardThumb({ card, rule, size = 44 }: { card: Card; rule?: RarityRule; size?: number }) {
   const [broken, setBroken] = useState(false);
   useEffect(() => setBroken(false), [card.imageUrl]);
   const style = { width: size, height: size, borderColor: rule?.color };
   if (card.imageUrl && !broken) {
-    return <img className="thumb" style={style} src={card.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
+    return <img className="thumb" style={style} src={card.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => (setBroken(true), markBroken(card.imageUrl!))} />;
   }
   const initials = card.name
     .split(/[\s,/]+/)

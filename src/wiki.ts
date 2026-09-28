@@ -131,5 +131,46 @@ export async function findCardImages(cards: Card[], rules: Map<string, RarityRul
       }
     }
   }
+  // 4. Characters still without art: their page may exist without a main image (Raiden/Injustice 2 only has
+  //    "Injustice 2 Raiden.png" on it), or the art may be uploaded before the page exists ("MK1 Sub-Zero.png").
+  //    Take a file from the card's page if there is one, else search the files, accepting only card-art names.
+  const chars = cards.filter((c) => isChar(c) && !found.has(c.id));
+  if (chars.length) {
+    onProgress?.('Checking character art files…');
+    const withPage = chars.filter((c) => { const p = pages.get(titleOf(c)); return p && p.missing === undefined; });
+    const pageImages = await queryTitles([...new Set(withPage.map(titleOf))], { prop: 'images', imlimit: 'max' });
+    const picks = new Map<string, string>(); // card id → file
+    for (const c of chars) {
+      const onPage = ((pageImages.get(titleOf(c)) as (Page & { images?: { title: string }[] }) | undefined)?.images ?? []).map((i) => i.title);
+      let file = onPage.find((f) => characterFileMatches(c.name, f));
+      if (!file) {
+        onProgress?.(`Searching files for ${c.name}…`);
+        const r = await api({ action: 'query', list: 'search', srnamespace: '6', srlimit: '10', srsearch: c.name.replace(',', ' ') });
+        file = (r.query?.search ?? []).map((x: { title: string }) => x.title).find((f: string) => characterFileMatches(c.name, f));
+      }
+      if (file) picks.set(c.id, file);
+    }
+    if (picks.size) {
+      const info = await queryTitles([...new Set(picks.values())], { prop: 'imageinfo', iiprop: 'url', iiurlwidth: String(THUMB) });
+      for (const [id, file] of picks) {
+        const ii = info.get(file)?.imageinfo?.[0];
+        const card = chars.find((c) => c.id === id)!;
+        const page = pages.get(titleOf(card));
+        if (ii) found.set(id, { imageUrl: ii.thumburl ?? ii.url, wikiTitle: page && page.missing === undefined ? page.title : file });
+      }
+    }
+  }
   return found;
+}
+
+/** Words in a file name that mean it isn't the card art itself (ability icons, pack banners, …). */
+const NOT_CARD_ART = new Set(['passive', 'pack', 'icon', 'special', 'sp1', 'sp2', 'xray', 'fatality', 'brutality', 'talent', 'animality', 'friendship', 'recolor']);
+
+/** A file is a character's art if it has every word of the name and the variant, and none of NOT_CARD_ART. */
+export function characterFileMatches(name: string, file: string) {
+  const [base, ...rest] = name.split(',');
+  const got = words(file.replace(/^File:/i, '').replace(/\.[a-z]+$/i, '').replace(/['’]s\b/g, ''));
+  if (got.some((w) => NOT_CARD_ART.has(w))) return false;
+  const want = [...words(base), ...words(rest.join(' ').replace(/\bMKII\b/g, 'MK2'))];
+  return want.length > 0 && want.every((w) => got.includes(w));
 }

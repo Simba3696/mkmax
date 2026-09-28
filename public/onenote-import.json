@@ -333,7 +333,9 @@
       "guest": false,
       "name": "Raiden, Injustice 2",
       "rarityId": "diamond",
-      "fusion": 6
+      "fusion": 6,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/d/de/Injustice_2_Raiden.png/revision/latest/scale-to-width-down/240?cb=20180403121142",
+      "wikiTitle": "Raiden/Injustice 2"
     },
     {
       "id": "c19",
@@ -520,7 +522,9 @@
       "guest": false,
       "name": "Sub-Zero, MK1",
       "rarityId": "diamond",
-      "fusion": 3
+      "fusion": 3,
+      "imageUrl": "https://static.wikia.nocookie.net/mortalkombatx-mobile/images/0/09/MK1_Sub-Zero.png/revision/latest/scale-to-width-down/240?cb=20260919124221",
+      "wikiTitle": "File:MK1 Sub-Zero.png"
     },
     {
       "id": "c40",
