@@ -1,8 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import type { Card, RarityRule, Tier } from './types';
+import type { Card, RarityRule } from './types';
 import { levelLabel } from './engine';
-
-export const TIER_LABEL: Record<Tier, string> = { must: 'Must-have', want: 'Want', nice: 'Nice-to-have', skip: 'Skip' };
 
 export function fmt(n: number) {
   if (!isFinite(n)) return '∞';

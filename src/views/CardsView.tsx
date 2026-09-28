@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
-import { buildCtx, cardPriority, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
-import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, TIER_LABEL } from '../ui';
+import { buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
+import { CardThumb, ConfirmButton, LevelOptions, RarityBadge } from '../ui';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
-import type { Card, RarityRule, Tier } from '../types';
+import type { Card, RarityRule } from '../types';
 
 type Source = NonNullable<Card['source']> | '';
 
@@ -18,7 +18,24 @@ function SourceSelect({ value, onChange }: { value: Card['source']; onChange: (v
   );
 }
 
-const TIERS: Tier[] = ['must', 'want', 'nice', 'skip'];
+/**
+ * Goal for rarities with a Fusion Up Kard threshold: stop at the threshold (kards finish it) or buy all the way
+ * to max (e.g. Realm Klash epics). Stored only when it differs from the rarity's goal.
+ */
+function GoalSelect({ rule, value, onChange }: { rule: RarityRule; value: Card['goal']; onChange: (v: Card['goal']) => void }) {
+  // Only equipment switches between "F3, Kards finish it" and buying to max; characters are always maxed.
+  if (rule.kind !== 'equipment' || rule.fusionUpThreshold == null) return null;
+  const current = value ?? rule.goal;
+  return (
+    <label className="check">
+      Goal
+      <select value={current} onChange={(e) => onChange(e.target.value === rule.goal ? undefined : (e.target.value as Card['goal']))}>
+        <option value="threshold">F{rule.fusionUpThreshold} (Kards finish it)</option>
+        <option value="max">Max ({levelLabel(rule, maxFusion(rule))})</option>
+      </select>
+    </label>
+  );
+}
 
 /** Ascension cap choices for rarities that ascend past their fusion levels (e.g. gold: A5 or A10). */
 function CapSelect({ rule, value, onChange }: { rule: RarityRule; value: number | null | undefined; onChange: (v: number | null) => void }) {
@@ -61,7 +78,7 @@ function CardList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [imageEditId, setImageEditId] = useState<string | null>(null);
   const [imgStatus, setImgStatus] = useState<{ busy: boolean; msg: string } | null>(null);
-  const [draft, setDraft] = useState<Omit<Card, 'id'>>({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0, maxLevel: null, tier: 'want', guest: false });
+  const [draft, setDraft] = useState<Omit<Card, 'id'>>({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0, maxLevel: null, guest: false });
 
   const draftRule = ctx.rules.get(draft.rarityId) ?? state.rarities[0];
   const missingImages = state.cards.filter((c) => !c.imageUrl);
@@ -98,11 +115,13 @@ function CardList() {
     setDraft({ ...draft, name: '', fusion: 0, guest: false });
   }
 
+  const rarityOrder = (c: Card) => state.rarities.findIndex((r) => r.id === c.rarityId);
   const cards = state.cards
     .filter((c) => rarity === 'all' || c.rarityId === rarity)
     .filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()))
     .filter((c) => sourceFilter === 'all' || (c.source ?? '') === sourceFilter)
-    .sort((a, b) => cardPriority(state, b) - cardPriority(state, a) || a.name.localeCompare(b.name));
+    // Stable order (rarity, then name) so a card doesn't jump around while you edit it.
+    .sort((a, b) => rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name));
 
   return (
     <>
@@ -129,16 +148,7 @@ function CardList() {
               <LevelOptions rule={draftRule} />
             </select>
           </label>
-          <label className="field">
-            <span>Priority</span>
-            <select value={draft.tier} onChange={(e) => setDraft({ ...draft, tier: e.target.value as Tier })}>
-              {TIERS.map((t) => (
-                <option key={t} value={t}>
-                  {TIER_LABEL[t]}
-                </option>
-              ))}
-            </select>
-          </label>
+          {draftRule && <GoalSelect rule={draftRule} value={draft.goal} onChange={(v) => setDraft({ ...draft, goal: v })} />}
           {draftRule && <CapSelect rule={draftRule} value={draft.maxLevel} onChange={(v) => setDraft({ ...draft, maxLevel: v })} />}
           {draftRule?.hasGuests && (
             <label className="check">
@@ -156,7 +166,7 @@ function CardList() {
             Add
           </button>
         </div>
-        {draftRule?.goal === 'threshold' && (
+        {draftRule && cardGoal(draft as Card, draftRule) === 'threshold' && (
           <p className="muted small">
             {draftRule.label} is tracked only until F{draftRule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.
           </p>
@@ -214,7 +224,7 @@ function CardList() {
                   {c.source && <span className="chip krypt">{c.source}{c.sourceNote && `: ${c.sourceNote}`}</span>}
                   {/* Cards that reach their goal are removed, so every card listed still has copies to go. */}
                   {toThr > 0 && thresholdLevel(rule)! < target && <span className="chip phase-toThreshold">{toThr} to F{rule.fusionUpThreshold}</span>}
-                  <span className={`chip ${rule.goal === 'threshold' ? 'phase-toThreshold' : 'muted'}`}>
+                  <span className={`chip ${cardGoal(c, rule) === 'threshold' ? 'phase-toThreshold' : 'muted'}`}>
                     {toMax} to {levelLabel(rule, target)}
                   </span>
                   {kards > 0 && <span className="chip phase-kardCovered">kards give {kards}</span>}
@@ -231,13 +241,7 @@ function CardList() {
               </div>
             </div>
             <div className="actions">
-              <select value={c.tier} onChange={(e) => patch(c.id, { tier: e.target.value as Tier })}>
-                {TIERS.map((t) => (
-                  <option key={t} value={t}>
-                    {TIER_LABEL[t]}
-                  </option>
-                ))}
-              </select>
+              <GoalSelect rule={rule} value={c.goal} onChange={(v) => patch(c.id, { goal: v })} />
               <CapSelect rule={rule} value={c.maxLevel} onChange={(v) => patch(c.id, { maxLevel: v })} />
               {rule.hasGuests && (
                 <label className="check">

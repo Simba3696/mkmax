@@ -44,7 +44,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
 
   function addNewCard() {
     if (!newCard.name.trim()) return;
-    const card: Card = { id: newId(), name: newCard.name.trim(), rarityId: newCard.rarityId, fusion: newCard.fusion, tier: 'want', guest: false };
+    const card: Card = { id: newId(), name: newCard.name.trim(), rarityId: newCard.rarityId, fusion: newCard.fusion, guest: false };
     update((d) => void d.cards.push(card));
     setP((x) => ({ ...x, drops: x.store ? [{ cardId: card.id, chance: 100 }] : [...x.drops, { cardId: card.id, chance: 0 }] }));
     setNewCard((n) => ({ ...n, name: '', fusion: 0 }));

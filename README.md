@@ -18,7 +18,7 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 - **Recording purchases:** on Packs, tap **I bought one**. This deducts the cost, and a store item also levels up its card. For random packs, tap + on each card you pulled. **−1** removes one purchase and refunds its cost.
 - **Undo:** after a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
 - **Switching tabs:** tap a tab, or swipe left or right on the page. Swipes that start on a text field, inside a pop-up, on something that scrolls sideways, or right at the screen edge (where iOS has its own back gesture) are ignored.
-- **Done cards are removed:** when a card reaches its goal, the app deletes it. It's also removed from any pack drop lists, and a store item that only sold that card is deleted too. The goal is max for Diamond, the card's own ascension cap for Gold, max for Blood Ruby, and F3 for Rare and Epic. Right after this happens you can use **Undo**. Any card that's already at its goal is removed when the app loads, when you import a backup, or when a sync brings one in.
+- **Done cards are removed:** when a card reaches its goal, the app deletes it. It's also removed from any pack drop lists, and a store item that only sold that card is deleted too. The goal is max for Diamond, the card's own ascension cap for Gold, and F3 for Rare and Epic, except Epic cards set to a max goal (like the Realm Klash gear). Right after this happens you can use **Undo**. Any card that's already at its goal is removed when the app loads, when you import a backup, or when a sync brings one in.
 - **Which version you have:** the bottom of Settings shows the commit and build date, for example `Version 0ebc412 · 2026-09-27`. An installed iPhone app only picks up a new deploy after it's fully closed and reopened, so if the version is behind, swipe the app away in the app switcher and open it again.
 - **Pull to refresh:** pull down from the top of any page. With sync on, it syncs now. Without sync, it reloads the app, which also picks up updates. Your data is kept either way.
 
@@ -38,14 +38,15 @@ Your first copy of any card is F0, and each level after that takes 1 duplicate. 
 
 - **Diamond** characters to F10. Guest cards are Diamond cards flagged as limited-time.
 - **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Each card has its own cap of A5 or A10.
-- **Blood Ruby** equipment from the Realm Klash store, to max. Store items give one guaranteed copy per purchase.
-- **Rare and Epic** equipment only until F3 (4 copies). Fusion Up Kards finish them.
+- **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase.
+- **Uncommon** (green) gear only appears in the tower checklist, since it's maxed through tower runs.
+- **No priority tiers:** every card is being maxed, so all cards count the same. Guest cards get extra weight only because they're gone once their event ends.
 - **Krypt and tower gear** is tagged with its source. It's tracked but left out of pack planning.
 - **Tower gear** also has a per-tower checklist (Cards → Tower gear).
 
 ## How it scores
 
-Each copy of a card is worth: `tier weight × phase multiplier × guest multiplier × (1 + closeness bonus × progress)`.
+Each copy of a card is worth: `phase multiplier × guest multiplier × (1 + closeness bonus × progress)`.
 
 The phase depends on which copy it is:
 
@@ -53,9 +54,9 @@ The phase depends on which copy it is:
 - **To Kard threshold**: copies that get the card to F3, where Fusion Up Kards become usable.
 - **Fusion**: a normal copy.
 - **Kards cover it**: copies your Fusion Up Kards would supply anyway, so they're worth less.
-- **Skip**: worth 0. Cards that reach their goal are removed, so they never get scored.
+- **Done**: worth 0. Cards that reach their goal are removed, so they never get scored.
 
-Fusion Up Kards go to your highest-priority cards at F3 or above first.
+Fusion Up Kards go to cards at F3 or above: guest cards first, then the ones closest to max. The Wallet shows a Kard count for each rarity that has cards past F3 still to go, so Epic Kards show up once any Epic card has a max goal.
 
 A pack's value is the expected value of its drops (rolls × chance), added up across the drop table.
 

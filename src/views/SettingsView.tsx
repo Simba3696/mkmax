@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 import { fetchStarterData, newId, normalize, useStore } from '../store';
 import { defaultState, defaultWeights, sampleState } from '../defaults';
-import { ConfirmButton, NumInput, TIER_LABEL } from '../ui';
+import { ConfirmButton, NumInput } from '../ui';
 import { copiesTotal, levelLabel } from '../engine';
 import SyncPanel from './SyncPanel';
-import type { Tier, Weights } from '../types';
+import type { Weights } from '../types';
 
-const WEIGHT_HELP: { key: Exclude<keyof Weights, 'tier'>; label: string; help: string }[] = [
+const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'belowThreshold', label: 'Reaching the Kard threshold', help: 'Multiplier for copies that get a card to the level where Fusion Up Kards can be used.' },
   { key: 'unlock', label: 'Unlocking a new card', help: "Multiplier for the first copy of a card you don't own." },
   { key: 'guest', label: 'Guest / limited card', help: 'Multiplier for guest cards, since they only show up during limited events.' },
@@ -157,14 +157,7 @@ export default function SettingsView() {
 
       <section className="card">
         <h2>Priority weights</h2>
-        <div className="form">
-          {(Object.keys(TIER_LABEL) as Tier[]).map((t) => (
-            <label key={t} className="field">
-              <span>{TIER_LABEL[t]} weight</span>
-              <NumInput value={state.weights.tier[t]} min={0} onChange={(v) => update((d) => void (d.weights.tier[t] = v ?? 0))} />
-            </label>
-          ))}
-        </div>
+        <p className="muted small">Every card is being maxed. These only decide which copies the planner goes after first.</p>
         {WEIGHT_HELP.map((w) => (
           <label key={w.key} className="field weight">
             <span>

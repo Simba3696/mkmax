@@ -1,5 +1,4 @@
 export type Kind = 'character' | 'equipment';
-export type Tier = 'must' | 'want' | 'nice' | 'skip';
 
 /** Fusion rules for one rarity (e.g. Diamond characters, Legendary equipment). */
 export interface RarityRule {
@@ -29,7 +28,8 @@ export interface Card {
   fusion: number;
   /** Per-card cap below the rarity max, as a stored level (e.g. a gold card that only ascends to A5). */
   maxLevel?: number | null;
-  tier: Tier;
+  /** Overrides the rarity's goal, e.g. Realm Klash epics are bought all the way to max while other epics stop at F3. */
+  goal?: 'max' | 'threshold';
   /** Guest / limited-event card — only obtainable for a short time. */
   guest: boolean;
   /** Gear that comes from the Krypt or a tower: tracked, but not planned for unless a pack sells it. */
@@ -75,7 +75,6 @@ export interface Pack {
 }
 
 export interface Weights {
-  tier: Record<Tier, number>;
   /** Multiplier for the copy that unlocks a card you don't own. */
   unlock: number;
   /** Multiplier for copies that get a card up to the Fusion Up Kard threshold. */
