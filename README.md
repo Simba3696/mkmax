@@ -43,7 +43,8 @@ Only image URLs are saved; the art stays on those sites, and the service worker 
 
 Your first copy of any card is F0, and each level after that takes 1 duplicate. So F10 from nothing is 11 copies, and F3 is 4.
 
-- **Diamond** characters to F10. Guest cards are Diamond cards flagged as limited-time.
+- **Diamond** characters to F10.
+- **Guest** characters are Diamond or Gold cards that only show up in packs during their event (Jason Voorhees only around Friday the 13th, for example), so they get extra weight. Tick **Guest** on the card; a rarity's Guest checkbox is controlled by **Has guest cards** in Settings.
 - **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Each card has its own cap of A5 or A10.
 - **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase.
 - **Uncommon** (green) gear only appears in the tower checklist, since it's maxed through tower runs.
