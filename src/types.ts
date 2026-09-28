@@ -109,18 +109,6 @@ export interface Weights {
   limitedBoost: number;
 }
 
-/** Per-tower count of gear still short of its goal — a focus list, not per-item tracking. */
-export interface TowerEntry {
-  id: string;
-  tower: string;
-  /** Gear grade label, e.g. "Uncommon", "Rare", "Epic". */
-  grade: string;
-  /** What "done" means for this tower's gear. */
-  goal: 'F3' | 'max';
-  /** Items from this tower still short of the goal; null = not counted. */
-  itemsLeft: number | null;
-}
-
 export interface AppState {
   /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. */
   version: 7;
@@ -128,7 +116,6 @@ export interface AppState {
   currencies: Currency[];
   cards: Card[];
   packs: Pack[];
-  towers: TowerEntry[];
   weights: Weights;
   /** End of a Realm Klash season (datetime-local). Seasons run back to back for 2 weeks; see engine seasonEnd. */
   realmKlashSeasonEnd?: string | null;

@@ -104,7 +104,6 @@ export function normalize(input: unknown): AppState {
     currencies: s.currencies?.length ? s.currencies : base.currencies,
     cards: s.cards!,
     packs: s.packs!,
-    towers: s.towers ?? [],
     weights: { ...defaultWeights, ...s.weights },
     realmKlashSeasonEnd: s.realmKlashSeasonEnd ?? null,
     dismissedShopPacks: s.dismissedShopPacks ?? [],
