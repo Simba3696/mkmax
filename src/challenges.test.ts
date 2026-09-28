@@ -12,7 +12,7 @@ describe('challenge Kameos', () => {
     const rules = defaultState().rarities;
     expect(isChallengeKameo(kameo('Kotal Kahn, Dark Lord'), rules)).toBe(true);
     expect(isChallengeKameo(kameo('Triborg, Sub-Zero (LK-52O)'), rules)).toBe(true);
-    expect(isChallengeKameo(kameo('Ermac Klassic'), rules)).toBe(true);
+    expect(isChallengeKameo(kameo('Ermac Klassic'), rules)).toBe(false); // retired: its Kameo comes from packs now
     expect(isChallengeKameo(kameo('Jade, Lizard'), rules)).toBe(false); // Jade Klassic is the challenge one
     expect(isChallengeKameo(kameo('Kotal Kahn, Dark Lord', 'kameo-diamond'), rules)).toBe(false);
     expect(isChallengeKameo(kameo('Kotal Kahn, Dark Lord', 'gold'), rules)).toBe(false); // the character, not the Kameo
@@ -34,5 +34,10 @@ describe('challenge Kameos', () => {
     const challenge = packEV(ctx, pack('Kotal Kahn, Dark Lord'), new Map());
     const other = packEV(ctx, pack('Jade, Lizard'), new Map());
     expect(challenge / other).toBeCloseTo(0.2);
+  });
+
+  it('untags a retired challenge Kameo once, when the save is upgraded', () => {
+    const v6 = { ...defaultState(), version: 6, cards: [kameo('Ermac, Klassic', 'kameo-gold', { source: 'challenge' }), kameo('Kotal Kahn, Dark Lord', 'kameo-gold', { source: 'challenge' })] };
+    expect(normalize(v6).cards.map((c) => c.source)).toEqual([undefined, 'challenge']);
   });
 });

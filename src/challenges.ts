@@ -1,11 +1,12 @@
 // Gold challenge characters. Their Kameos come from the Elder challenge whenever that challenge rotates in as an
 // event, so a Gold Kameo of one of these is tagged as challenge-sourced. From the MK Mobile wiki's Challenge Mode
-// page (2026-09-28); MK Mobile Base doesn't say which cards are challenge cards.
+// page (2026-09-28), minus challenges that no longer run (see RETIRED_CHALLENGES). MK Mobile Base's event schedule
+// shows when each challenge is on (events.ts).
 import { nameKey } from './catalog';
 import type { Card, RarityRule } from './types';
 
 export const CHALLENGE_CHARACTERS = [
-  "Baraka, Scourge", "Bo' Rai Cho, Dragon Breath", "D'Vorah, Venomous", 'Ermac, Klassic', 'Ermac, Pharaoh',
+  "Baraka, Scourge", "Bo' Rai Cho, Dragon Breath", "D'Vorah, Venomous", 'Ermac, Pharaoh',
   'Erron Black, Gunslinger', 'Goro, Tigrar Fury', 'Jacqui Briggs, High Tech', 'Jacqui Briggs, Kosplay', 'Jade, Klassic',
   'Jason Voorhees, Unstoppable', 'Jax Briggs, Heavy Weapons', 'Johnny Cage, Kombat Cup', 'Kano, Klassic',
   'Kenshi, Elder God', 'Kintaro, Shokan Warrior', 'Kitana, Mournful', 'Kotal Kahn, Dark Lord', 'Kung Jin, Marksman',
@@ -16,7 +17,14 @@ export const CHALLENGE_CHARACTERS = [
   'Triborg, Smoke (LK-7T2)', 'Triborg, Sub-Zero (LK-52O)',
 ];
 
+/** Challenges taken out of rotation long ago (per the user), so their Kameos come from packs now. */
+export const RETIRED_CHALLENGES = ['Ermac, Klassic'];
+
 const KEYS = new Set(CHALLENGE_CHARACTERS.map(nameKey));
+const RETIRED = new Set(RETIRED_CHALLENGES.map(nameKey));
+
+/** Whether this card was tagged as a challenge Kameo but its challenge has been retired. */
+export const isRetiredChallenge = (card: Pick<Card, 'name' | 'source'>) => card.source === 'challenge' && RETIRED.has(nameKey(card.name));
 
 /** Whether this card is the Gold Kameo of a challenge character. */
 export function isChallengeKameo(card: Pick<Card, 'name' | 'rarityId'>, rules: RarityRule[]) {

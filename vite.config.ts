@@ -25,6 +25,12 @@ export default defineConfig({
       workbox: {
         // Card art is hotlinked from MK Mobile Base and the MK Mobile wiki; keep a copy so thumbnails work offline.
         runtimeCaching: [
+          // The event schedule changes daily: always try the network, fall back to the last copy offline.
+          {
+            urlPattern: /\/events\.json$/,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'events', expiration: { maxEntries: 1 } },
+          },
           {
             urlPattern: /^https:\/\/(static\.wikia\.nocookie\.net|mkmobilebase\.com\/storage)\//,
             handler: 'CacheFirst',

@@ -2,7 +2,7 @@
 import type { AppState, Card, RarityRule } from './types';
 import { ASCENSION_KARD_COST, DIAMOND_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
 import { pruneDone } from './engine';
-import { isChallengeKameo } from './challenges';
+import { isChallengeKameo, isRetiredChallenge } from './challenges';
 
 /**
  * Version 1 saves counted the first copy as F1; version 2 starts at F0. Shift owned levels up one,
@@ -90,7 +90,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 6,
+    version: 7,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,
@@ -107,11 +107,14 @@ export function normalize(input: unknown): AppState {
     towers: s.towers ?? [],
     weights: { ...defaultWeights, ...s.weights },
     realmKlashSeasonEnd: s.realmKlashSeasonEnd ?? null,
+    dismissedShopPacks: s.dismissedShopPacks ?? [],
     updatedAt: s.updatedAt,
   };
   // Version 5 tags Gold Kameos of challenge characters (they come from Elder challenges). Done once, so a tag
   // the user removes stays removed.
   if (version < 5) for (const c of out.cards) if (!c.source && isChallengeKameo(c, out.rarities)) c.source = 'challenge';
+  // Version 7 untags Kameos whose challenge was retired (Klassic Ermac), since they come from packs now.
+  if (version < 7) for (const c of out.cards) if (isRetiredChallenge(c)) delete c.source;
   pruneDone(out);
   return out;
 }
