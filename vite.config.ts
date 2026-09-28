@@ -23,10 +23,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'logo-mark.svg', 'apple-touch-icon.png'],
       workbox: {
-        // Card art is hotlinked from the MK Mobile wiki; keep a copy so thumbnails work offline.
+        // Card art is hotlinked from MK Mobile Base and the MK Mobile wiki; keep a copy so thumbnails work offline.
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/static\.wikia\.nocookie\.net\//,
+            urlPattern: /^https:\/\/(static\.wikia\.nocookie\.net|mkmobilebase\.com\/storage)\//,
             handler: 'CacheFirst',
             options: {
               cacheName: 'card-art',

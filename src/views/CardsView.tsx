@@ -4,6 +4,7 @@ import { buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel,
 import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, useBrokenImageUrls } from '../ui';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
+import { catalogPageUrl, findInCatalog, loadCatalog } from '../catalog';
 import type { Card, RarityRule } from '../types';
 
 type Source = NonNullable<Card['source']> | '';
@@ -78,28 +79,64 @@ function CardList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [imageEditId, setImageEditId] = useState<string | null>(null);
   const [imgStatus, setImgStatus] = useState<{ busy: boolean; msg: string } | null>(null);
+  /** Cards whose rarity disagrees with mkmobilebase, from the last Find images run. */
+  const [rarityFixes, setRarityFixes] = useState<{ cardId: string; name: string; from: string; to: string }[]>([]);
   const [draft, setDraft] = useState<Omit<Card, 'id'>>({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0, maxLevel: null, guest: false });
 
   const draftRule = ctx.rules.get(draft.rarityId) ?? state.rarities[0];
-  // Cards with no art yet, plus any whose saved image stopped loading (the wiki moved or re-uploaded it).
+  // Cards to look up: no art yet, art that stopped loading, or art from an older wiki lookup (some of those are
+  // stat screenshots rather than card art), which mkmobilebase usually has a proper card image for.
   const brokenUrls = useBrokenImageUrls();
-  const missingImages = state.cards.filter((c) => !c.imageUrl || brokenUrls.has(c.imageUrl));
+  const needsImage = (c: Card) => !c.imageUrl || brokenUrls.has(c.imageUrl) || (!!c.wikiTitle && !c.imagePage);
+  const missingImages = state.cards.filter(needsImage);
 
   async function findImages() {
-    setImgStatus({ busy: true, msg: 'Starting…' });
+    setImgStatus({ busy: true, msg: 'Checking the MK Mobile Base catalog…' });
     try {
-      const found = await findCardImages(missingImages, ctx.rules, (msg) => setImgStatus({ busy: true, msg }));
+      const items = await loadCatalog();
+      const found = new Map<string, Pick<Card, 'imageUrl' | 'wikiTitle' | 'imagePage'>>();
+      for (const c of missingImages) {
+        const hit = findInCatalog(c, ctx.rules.get(c.rarityId), items);
+        if (hit) found.set(c.id, { imageUrl: hit.image, wikiTitle: undefined, imagePage: catalogPageUrl(hit) });
+      }
+      // Anything the catalog doesn't have: fall back to the wiki (only for cards with no working image).
+      const rest = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl)));
+      if (rest.length) {
+        const fromWiki = await findCardImages(rest, ctx.rules, (msg) => setImgStatus({ busy: true, msg }));
+        for (const [id, m] of fromWiki) found.set(id, { ...m, imagePage: wikiUrl(m.wikiTitle) });
+      }
+      // Older wiki images the catalog couldn't improve on: remember they were checked so they stop counting.
+      const keep = missingImages.filter((c) => !found.has(c.id) && c.imageUrl && !brokenUrls.has(c.imageUrl) && c.wikiTitle);
       update((d) => {
         for (const c of d.cards) {
           const m = found.get(c.id);
           if (m) Object.assign(c, m);
+          else if (keep.some((k) => k.id === c.id)) c.imagePage = wikiUrl(c.wikiTitle!);
         }
       });
-      const left = missingImages.length - found.size;
-      setImgStatus({ busy: false, msg: `Found ${found.size} of ${missingImages.length}.${left ? ` ${left} not on the wiki: open "Image" on those cards to paste a URL.` : ''}` });
+      setRarityFixes(
+        state.cards.flatMap((c) => {
+          const hit = findInCatalog(c, ctx.rules.get(c.rarityId), items);
+          return hit?.rarity && hit.rarity !== c.rarityId && ctx.rules.has(hit.rarity)
+            ? [{ cardId: c.id, name: c.name, from: ctx.rules.get(c.rarityId)?.label ?? c.rarityId, to: hit.rarity }]
+            : [];
+        }),
+      );
+      const left = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl))).length;
+      setImgStatus({ busy: false, msg: `Updated ${found.size} of ${missingImages.length}.${left ? ` ${left} not found online: open "Image" on those cards to paste a URL.` : ''}` });
     } catch (e) {
-      setImgStatus({ busy: false, msg: `Couldn't reach the wiki: ${(e as Error).message}` });
+      setImgStatus({ busy: false, msg: `Couldn't look up images: ${(e as Error).message}` });
     }
+  }
+
+  function applyRarityFixes() {
+    update((d) => {
+      for (const f of rarityFixes) {
+        const c = d.cards.find((x) => x.id === f.cardId);
+        if (c) c.rarityId = f.to;
+      }
+    }, `rarity change for ${rarityFixes.length} card${rarityFixes.length === 1 ? '' : 's'}`);
+    setRarityFixes([]);
   }
 
   const patch = (id: string, p: Partial<Card>) =>
@@ -192,12 +229,32 @@ function CardList() {
           <option value="tower">Tower gear</option>
         </select>
         {missingImages.length > 0 && (
-          <button onClick={findImages} disabled={imgStatus?.busy} title="Look up card art on the MK Mobile wiki">
+          <button onClick={findImages} disabled={imgStatus?.busy} title="Look up card art on MK Mobile Base, then the MK Mobile wiki">
             {imgStatus?.busy ? 'Finding…' : `Find images (${missingImages.length})`}
           </button>
         )}
       </div>
       {imgStatus && <p className="small muted">{imgStatus.msg}</p>}
+      {rarityFixes.length > 0 && (
+        <div className="hint">
+          <p>MK Mobile Base lists a different rarity for {rarityFixes.length === 1 ? 'this card' : 'these cards'}:</p>
+          <ul className="small">
+            {rarityFixes.map((f) => (
+              <li key={f.cardId}>
+                {f.name}: {f.from} here, <b>{ctx.rules.get(f.to)?.label ?? f.to}</b> on the site
+              </li>
+            ))}
+          </ul>
+          <div className="actions">
+            <button className="primary" onClick={applyRarityFixes}>
+              Use the site's rarity
+            </button>
+            <button className="ghost" onClick={() => setRarityFixes([])}>
+              Keep mine
+            </button>
+          </div>
+        </div>
+      )}
 
       {cards.length === 0 && <p className="muted">No cards match.</p>}
       {cards.map((c) => {
@@ -272,11 +329,11 @@ function CardList() {
                   className="grow"
                   value={c.imageUrl ?? ''}
                   placeholder="Paste an image URL"
-                  onChange={(e) => patch(c.id, { imageUrl: e.target.value.trim() || undefined, wikiTitle: undefined })}
+                  onChange={(e) => patch(c.id, { imageUrl: e.target.value.trim() || undefined, wikiTitle: undefined, imagePage: undefined })}
                 />
-                {c.wikiTitle && (
-                  <a className="small" href={wikiUrl(c.wikiTitle)} target="_blank" rel="noreferrer">
-                    Wiki page
+                {(c.imagePage || c.wikiTitle) && (
+                  <a className="small" href={c.imagePage ?? wikiUrl(c.wikiTitle!)} target="_blank" rel="noreferrer">
+                    {(c.imagePage ?? '').includes('mkmobilebase') ? 'MK Mobile Base page' : 'Wiki page'}
                   </a>
                 )}
               </div>
