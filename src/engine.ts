@@ -27,12 +27,15 @@ export function copiesAtFusion(rule: RarityRule, level: number) {
 /** Stored level where Fusion Up Kards become usable, or null. */
 export const thresholdLevel = (rule: RarityRule) => (rule.fusionUpThreshold == null ? null : fLevel(rule.fusionUpThreshold));
 
+/** The card's goal: its own override (e.g. a Realm Klash epic bought to max), else the rarity's. */
+export const cardGoal = (card: Card, rule: RarityRule) => card.goal ?? rule.goal;
+
 /** The level this card is being worked toward: rarity max, per-card cap, or the kard threshold. */
 export function targetLevel(card: Card, rule: RarityRule) {
   let t = maxFusion(rule);
   if (card.maxLevel != null) t = Math.min(t, card.maxLevel);
   const thr = thresholdLevel(rule);
-  if (rule.goal === 'threshold' && thr != null) t = Math.min(t, thr);
+  if (cardGoal(card, rule) === 'threshold' && thr != null) t = Math.min(t, thr);
   return t;
 }
 
@@ -79,13 +82,14 @@ export interface Ctx {
   kardPlan: Map<string, KardAssignment[]>;
 }
 
-export function cardPriority(state: AppState, card: Card) {
-  return state.weights.tier[card.tier] * (card.guest ? state.weights.guest : 1);
+/** Every card is worth maxing; guest cards count extra because they're only around during their event. */
+export function cardWeight(state: AppState, card: Card) {
+  return card.guest ? state.weights.guest : 1;
 }
 
 /**
- * Hand out Fusion Up Kards per rarity: highest-priority eligible cards (at/above the
- * threshold, below their fusion cap) first, ties broken by highest fusion.
+ * Hand out Fusion Up Kards per rarity: eligible cards (at/above the threshold, below their fusion cap),
+ * guest cards first, then the ones closest to max.
  * Kards only raise fusion levels, not ascension.
  */
 function allocateKards(state: AppState) {
@@ -93,11 +97,11 @@ function allocateKards(state: AppState) {
   const kardPlan = new Map<string, KardAssignment[]>();
   for (const rule of state.rarities) {
     const thr = thresholdLevel(rule);
-    if (thr == null || rule.fusionUpKards <= 0 || rule.goal === 'threshold') continue;
+    if (thr == null || rule.fusionUpKards <= 0) continue;
     const cap = (c: Card) => Math.min(targetLevel(c, rule), fLevel(rule.fusionMax));
     const eligible = state.cards
-      .filter((c) => c.rarityId === rule.id && c.tier !== 'skip' && c.fusion >= thr && c.fusion < cap(c))
-      .sort((a, b) => cardPriority(state, b) - cardPriority(state, a) || b.fusion - a.fusion);
+      .filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c))
+      .sort((a, b) => cardWeight(state, b) - cardWeight(state, a) || b.fusion - a.fusion);
     let left = rule.fusionUpKards;
     const plan: KardAssignment[] = [];
     for (const c of eligible) {
@@ -126,7 +130,6 @@ export type Phase = 'unlock' | 'toThreshold' | 'normal' | 'kardCovered' | 'maxed
 export function copyPhase(ctx: Ctx, card: Card, g = 0): Phase {
   const rule = ctx.rules.get(card.rarityId);
   if (!rule) return 'skip';
-  if (ctx.state.weights.tier[card.tier] <= 0) return 'skip';
   const remaining = copiesToMax(card, rule);
   if (g >= remaining) return 'maxed';
   const pos = copiesAtFusion(rule, card.fusion) + g;
@@ -144,7 +147,7 @@ export function copyValue(ctx: Ctx, card: Card, g = 0): number {
   const rule = ctx.rules.get(card.rarityId)!;
   const mult = { unlock: w.unlock, toThreshold: w.belowThreshold, kardCovered: w.coveredByKards, normal: 1 }[phase];
   const progress = (copiesAtFusion(rule, card.fusion) + g) / copiesAtFusion(rule, targetLevel(card, rule));
-  return cardPriority(ctx.state, card) * mult * (1 + w.closenessBonus * progress);
+  return cardWeight(ctx.state, card) * mult * (1 + w.closenessBonus * progress);
 }
 
 /** Value of receiving `e` expected copies starting from `g` already gained (integrated across phase boundaries). */

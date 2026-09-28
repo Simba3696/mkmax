@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
-import { buildCtx, buildPlan, levelLabel, rankPacks, rankTargets, thresholdLevel, type Phase } from '../engine';
+import { buildCtx, buildPlan, cardGoal, levelLabel, rankPacks, rankTargets, thresholdLevel, type Phase } from '../engine';
 import { CardThumb, fmt, FusionLabel, NumInput, pct, RarityBadge, timeUntil, useNow } from '../ui';
 import type { Pack } from '../types';
 
@@ -31,8 +31,10 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
   const ranks = useMemo(() => rankPacks(ctx, now), [ctx, now]);
   const targets = useMemo(() => rankTargets(ctx, now).slice(0, 10), [ctx, now]);
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
-  // Rarities tracked only to the threshold don't need a kard count: kards finish them outside the plan.
-  const kardRarities = state.rarities.filter((r) => r.fusionUpThreshold != null && r.goal === 'max');
+  // Kard counts only matter where some card is bought past the threshold (e.g. Realm Klash epics to max).
+  const kardRarities = state.rarities.filter(
+    (r) => r.fusionUpThreshold != null && (r.goal === 'max' || state.cards.some((c) => c.rarityId === r.id && cardGoal(c, r) === 'max')),
+  );
 
   const wallet = (
     <div className="wallet">

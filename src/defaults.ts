@@ -3,7 +3,6 @@ import type { AppState, RarityRule, Weights } from './types';
 const ones = (n: number) => Array(n).fill(1);
 
 export const defaultWeights: Weights = {
-  tier: { must: 3, want: 2, nice: 1, skip: 0 },
   unlock: 1.3,
   belowThreshold: 1.5,
   coveredByKards: 0.3,
@@ -18,10 +17,11 @@ export function defaultRarities(): RarityRule[] {
     { id: 'diamond', label: 'Diamond', kind: 'character', color: '#7fd8ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0 },
     // F0..F10 then A1..A10 (set each card's own cap to A5 or A10).
     { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(20), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
-    { id: 'blood-ruby', label: 'Blood Ruby Equip', kind: 'equipment', color: '#ff4d6d', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0 },
-    // Only tracked until F3 (4 copies from scratch); Fusion Up Kards finish them.
+    // Equipment colors match the game: Epic purple, Rare blue (Uncommon, green, only appears in the tower list).
+    // Only tracked until F3 (4 copies from scratch); Fusion Up Kards finish them. Realm Klash gear is Epic too,
+    // but those cards override the goal to max because they're bought outright.
     { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
-    { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#6fcf97', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
+    { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#4da3ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0 },
   ];
 }
 
@@ -56,15 +56,15 @@ export function sampleState(): AppState {
   s.rarities[0].fusionUpKards = 3;
   s.cards = [
     // Stored levels: 1 = F0, 3 = F2, 11 = F10, 14 = A3 …
-    { id: 'c1', name: 'Klassic Sub-Zero', rarityId: 'diamond', fusion: 3, tier: 'must', guest: false },
-    { id: 'c2', name: 'Guest Rambo', rarityId: 'diamond', fusion: 0, tier: 'want', guest: true },
-    { id: 'c3', name: 'Dark Raiden', rarityId: 'diamond', fusion: 7, tier: 'must', guest: false },
-    { id: 'c4', name: 'Shaolin Liu Kang', rarityId: 'diamond', fusion: 2, tier: 'nice', guest: false },
-    { id: 'c5', name: 'Kold War Scorpion', rarityId: 'gold', fusion: 14, tier: 'want', guest: false },
-    { id: 'c6', name: 'Cryomancer Frost', rarityId: 'gold', fusion: 13, maxLevel: 16, tier: 'nice', guest: false },
-    { id: 'c7', name: 'Blood Ruby Talisman', rarityId: 'blood-ruby', fusion: 5, tier: 'want', guest: false },
-    { id: 'c8', name: 'Kombat Kunai', rarityId: 'epic', fusion: 2, tier: 'want', guest: false, source: 'krypt' },
-    { id: 'c9', name: 'Lin Kuei Gloves', rarityId: 'rare', fusion: 3, tier: 'nice', guest: false },
+    { id: 'c1', name: 'Klassic Sub-Zero', rarityId: 'diamond', fusion: 3, guest: false },
+    { id: 'c2', name: 'Guest Rambo', rarityId: 'diamond', fusion: 0, guest: true },
+    { id: 'c3', name: 'Dark Raiden', rarityId: 'diamond', fusion: 7, guest: false },
+    { id: 'c4', name: 'Shaolin Liu Kang', rarityId: 'diamond', fusion: 2, guest: false },
+    { id: 'c5', name: 'Kold War Scorpion', rarityId: 'gold', fusion: 14, guest: false },
+    { id: 'c6', name: 'Cryomancer Frost', rarityId: 'gold', fusion: 13, maxLevel: 16, guest: false },
+    { id: 'c7', name: 'Blood Ruby Talisman', rarityId: 'epic', fusion: 5, goal: 'max', guest: false },
+    { id: 'c8', name: 'Kombat Kunai', rarityId: 'epic', fusion: 2, guest: false, source: 'krypt' },
+    { id: 'c9', name: 'Lin Kuei Gloves', rarityId: 'rare', fusion: 3, guest: false },
   ];
   s.packs = [
     {

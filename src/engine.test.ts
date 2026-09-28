@@ -18,7 +18,7 @@ function setup(cards: Card[], packs: Pack[] = [], tweak?: (s: AppState) => void)
   return s;
 }
 
-const card = (id: string, fusion: number, extra: Partial<Card> = {}): Card => ({ id, name: id, rarityId: 'diamond', fusion, tier: 'want', guest: false, ...extra });
+const card = (id: string, fusion: number, extra: Partial<Card> = {}): Card => ({ id, name: id, rarityId: 'diamond', fusion, guest: false, ...extra });
 const pack = (id: string, drops: Pack['drops'], extra: Partial<Pack> = {}): Pack => ({
   id, name: id, currencyId: 'souls', cost: 100, rolls: 1, maxPurchases: null, purchased: 0, startsAt: null, endsAt: null, drops, ...extra,
 });
@@ -54,6 +54,14 @@ describe('goals and caps', () => {
     expect(copiesToMax(card('e', F(2), { rarityId: 'epic' }), epic)).toBe(1);
     expect(isMaxed(card('e', F(3), { rarityId: 'epic' }), epic)).toBe(true);
   });
+
+  it('lets a card override its rarity goal (Realm Klash epics go to max)', () => {
+    const epic = rules().get('epic')!;
+    const rk = card('rk', F(7), { rarityId: 'epic', goal: 'max' });
+    expect(targetLevel(rk, epic)).toBe(F(10));
+    expect(copiesToMax(rk, epic)).toBe(3);
+    expect(isMaxed(rk, epic)).toBe(false);
+  });
 });
 
 describe('save migration', () => {
@@ -62,6 +70,20 @@ describe('save migration', () => {
     const s = normalize(v1);
     expect(s.version).toBe(2);
     expect(s.cards.map((c) => [c.fusion, c.maxLevel])).toEqual([[3, 16], [0, undefined]]);
+  });
+
+  it('moves Blood Ruby gear to Epic with a max goal, and drops priority tiers', () => {
+    const old = {
+      ...defaultState(),
+      rarities: [...defaultState().rarities, { ...defaultState().rarities[2], id: 'blood-ruby', label: 'Blood Ruby Equip', goal: 'max' }],
+      weights: { ...defaultState().weights, tier: { must: 3, want: 2, nice: 1, skip: 0 } },
+      cards: [{ ...card('sash', F(7), { rarityId: 'blood-ruby' }), tier: 'want' }],
+    };
+    const s = normalize(old);
+    expect(s.rarities.map((r) => r.id)).not.toContain('blood-ruby');
+    expect(s.cards).toEqual([expect.objectContaining({ id: 'sash', rarityId: 'epic', goal: 'max', fusion: F(7) })]);
+    expect(s.cards[0]).not.toHaveProperty('tier');
+    expect(s.weights).not.toHaveProperty('tier');
   });
 });
 
@@ -77,10 +99,13 @@ describe('phases', () => {
     expect(copyPhase(ctx, c('max'))).toBe('maxed');
   });
 
-  it('gives kards to higher-priority cards first', () => {
-    const s = setup([card('nice', F(8), { tier: 'nice' }), card('must', F(4), { tier: 'must' })], [], (s) => (s.rarities[0].fusionUpKards = 3));
+  it('gives kards to guest cards first, then the ones closest to max', () => {
+    const s = setup([card('far', F(4)), card('near', F(8)), card('guest', F(4), { guest: true })], [], (s) => (s.rarities[0].fusionUpKards = 8));
     const plan = buildCtx(s).kardPlan.get('diamond')!;
-    expect(plan).toEqual([{ cardId: 'must', from: F(4), to: F(7) }]);
+    expect(plan).toEqual([
+      { cardId: 'guest', from: F(4), to: F(10) },
+      { cardId: 'near', from: F(8), to: F(10) },
+    ]);
   });
 });
 
@@ -97,8 +122,8 @@ describe('scoring', () => {
     expect(packEV(ctx, s.packs[0])).toBeCloseTo(packEV(ctx, s.packs[1]) * 1.5);
   });
 
-  it('ignores skipped and maxed cards', () => {
-    const s = setup([card('s', F(3), { tier: 'skip' }), card('m', F(10))], [pack('a', [{ cardId: 's', chance: 50 }, { cardId: 'm', chance: 50 }])]);
+  it('ignores maxed cards', () => {
+    const s = setup([card('m', F(10))], [pack('a', [{ cardId: 'm', chance: 50 }])]);
     expect(packEV(buildCtx(s), s.packs[0])).toBe(0);
   });
 });
