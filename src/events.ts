@@ -34,12 +34,22 @@ export interface EventSchedule {
 }
 
 let loaded: Promise<EventSchedule> | null = null;
+let current: EventSchedule | null = null;
+let fetchedAt = 0;
+const listeners = new Set<(e: EventSchedule) => void>();
 
+/** The schedule, fetched once and shared; refreshEvents() fetches it again. */
 export function loadEvents(): Promise<EventSchedule> {
-  loaded ??= fetch(`${import.meta.env.BASE_URL}events.json`)
+  loaded ??= fetch(`${import.meta.env.BASE_URL}events.json`, { cache: 'no-cache' })
     .then((r) => {
       if (!r.ok) throw new Error(`events.json: HTTP ${r.status}`);
       return r.json() as Promise<EventSchedule>;
+    })
+    .then((e) => {
+      current = e;
+      fetchedAt = Date.now();
+      listeners.forEach((l) => l(e));
+      return e;
     })
     .catch((e) => {
       loaded = null;
@@ -48,13 +58,29 @@ export function loadEvents(): Promise<EventSchedule> {
   return loaded;
 }
 
-/** The bundled schedule, or null until it loads (or if it isn't there). */
+/**
+ * Fetch the schedule again (pull to refresh), keeping the current copy if that fails. The deploy refreshes it
+ * daily, so an app left open for days would otherwise keep an old copy.
+ */
+export function refreshEvents(): Promise<unknown> {
+  loaded = null;
+  return loadEvents().catch(() => {});
+}
+
+// Coming back to the app after an hour or more also picks up a newer schedule.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && fetchedAt && Date.now() - fetchedAt > 60 * 60 * 1000) void refreshEvents();
+  });
+}
+
+/** The bundled schedule, or null until it loads (or if it isn't there). Updates when it's fetched again. */
 export function useEvents() {
-  const [events, setEvents] = useState<EventSchedule | null>(null);
+  const [events, setEvents] = useState<EventSchedule | null>(current);
   useEffect(() => {
-    let live = true;
-    loadEvents().then((e) => live && setEvents(e), () => {});
-    return () => void (live = false);
+    listeners.add(setEvents);
+    loadEvents().then(setEvents, () => {});
+    return () => void listeners.delete(setEvents);
   }, []);
   return events;
 }

@@ -5,7 +5,7 @@ import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
 import { moveSeasonEnd, seasonEnd } from './engine';
-import { scheduledSeasonEnd, useEvents } from './events';
+import { refreshEvents, scheduledSeasonEnd, useEvents } from './events';
 import { useNow } from './ui';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
@@ -114,8 +114,9 @@ export default function App() {
       if (next) go(next.id);
     },
   });
-  // With sync on, a pull checks the gist. Without it there's nothing remote to fetch, so reload to pick up app updates.
-  const refresh = () => (sync.connected ? sync.syncNow() : Promise.resolve(location.reload()));
+  // With sync on, a pull checks the gist and re-reads the event schedule. Without sync there's nothing remote to
+  // fetch, so reload, which picks up app updates and the schedule too.
+  const refresh = () => (sync.connected ? Promise.all([sync.syncNow(), refreshEvents()]) : Promise.resolve(location.reload()));
 
   return (
     <div className="app">
