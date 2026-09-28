@@ -22,8 +22,8 @@ export function defaultRarities(): RarityRule[] {
   return [
     // First copy is F0, then 1 dupe per level to F10 (11 copies).
     { id: 'diamond', label: 'Diamond', kind: 'character', color: '#7fd8ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
-    // F0..F10 then A1..A10 (set each card's own cap to A5 or A10).
-    { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(20), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
+    // F0..F10 then A1..A10 (set each card's own cap to A5 or A10). Gold has guests too (Jason Voorhees, Slasher).
+    { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(20), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
     // Equipment colors match the game: Epic purple, Rare blue (Uncommon, green, only appears in the tower list).
     // Only tracked until F3 (4 copies from scratch); Fusion Up Kards finish them. Realm Klash gear is Epic too,
     // but those cards override the goal to max because they're bought outright.

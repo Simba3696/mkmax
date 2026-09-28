@@ -22,7 +22,7 @@
       "goal": "max",
       "hasGuests": true,
       "fusionUpThreshold": 3,
-      "fusionUpKards": 0,
+      "fusionUpKards": 2,
       "kardsPerLevel": [
         0,
         0,
@@ -65,9 +65,9 @@
       ],
       "fusionMax": 10,
       "goal": "max",
-      "hasGuests": false,
+      "hasGuests": true,
       "fusionUpThreshold": 3,
-      "fusionUpKards": 0,
+      "fusionUpKards": 171,
       "kardsPerLevel": [
         0,
         0,
@@ -156,22 +156,17 @@
     {
       "id": "souls",
       "name": "Souls",
-      "balance": 0
+      "balance": 102
     },
     {
       "id": "blood-rubies",
       "name": "Blood Rubies",
-      "balance": 0
+      "balance": 635
     },
     {
       "id": "dragon-krystals",
       "name": "Dragon Krystals",
-      "balance": 0
-    },
-    {
-      "id": "time-krystals",
-      "name": "Time Krystals",
-      "balance": 0
+      "balance": 3
     }
   ],
   "cards": [
@@ -225,7 +220,7 @@
       "guest": false,
       "name": "Kenshi, Ronin",
       "rarityId": "diamond",
-      "fusion": 8,
+      "fusion": 9,
       "imageUrl": "https://mkmobilebase.com/storage/articles/variants/9uqsN1DoIrnM24tqAveyOgmeLUBzXSwVzyflKIrd-300.webp",
       "imagePage": "https://mkmobilebase.com/en/category/characters/kenshi-ronin"
     },
@@ -297,7 +292,7 @@
       "guest": false,
       "name": "Sub-Zero, Kold",
       "rarityId": "diamond",
-      "fusion": 8,
+      "fusion": 10,
       "imageUrl": "https://mkmobilebase.com/storage/articles/variants/QwpJjJ2gsQd5CIzQJa2WGRxxvGL06wxBA7JjcudO-300.webp",
       "imagePage": "https://mkmobilebase.com/en/category/characters/sub-zero-kold-war"
     },
@@ -608,15 +603,6 @@
       "imagePage": "https://mkmobilebase.com/en/category/characters/raiden-klassic-movie"
     },
     {
-      "id": "c49",
-      "guest": false,
-      "name": "Liu Kang, Circle of Shadow",
-      "rarityId": "diamond",
-      "fusion": 10,
-      "imageUrl": "https://mkmobilebase.com/storage/articles/variants/inO0OqgkRVMl2Kmcrp2LB9QUxLuNIgN1uXJd7Jxk-300.webp",
-      "imagePage": "https://mkmobilebase.com/en/category/characters/liu-kang-circle-of-shadow"
-    },
-    {
       "id": "c50",
       "guest": true,
       "name": "Jason Voorhees, Nightmare",
@@ -626,18 +612,8 @@
       "imagePage": "https://mkmobilebase.com/en/category/characters/jason-voorhees-nightmare"
     },
     {
-      "id": "c51",
-      "guest": false,
-      "name": "Goro, Tigrar Fury",
-      "rarityId": "gold",
-      "fusion": 15,
-      "maxLevel": 16,
-      "imageUrl": "https://mkmobilebase.com/storage/articles/variants/ZBHvgyipMSgQ5LN722w190CUNUF93zGZtfe3arGs-300.webp",
-      "imagePage": "https://mkmobilebase.com/en/category/characters/goro-tigrar-fury"
-    },
-    {
       "id": "c52",
-      "guest": false,
+      "guest": true,
       "name": "Jason Voorhees, Slasher",
       "rarityId": "gold",
       "fusion": 12,
@@ -700,7 +676,7 @@
       "guest": false,
       "name": "Shadow Sash",
       "rarityId": "epic",
-      "fusion": 8,
+      "fusion": 9,
       "imageUrl": "https://mkmobilebase.com/storage/articles/variants/zJTlqJFpGFgzmOAOJVJOd9fWSSev5uWVN06X4hdG-300.webp",
       "goal": "max",
       "imagePage": "https://mkmobilebase.com/en/category/equipment/shadow_sash"
@@ -800,20 +776,10 @@
       "guest": false,
       "name": "Draconic Bloodline",
       "rarityId": "epic",
-      "fusion": 1,
+      "fusion": 2,
       "source": "krypt",
       "imageUrl": "https://mkmobilebase.com/storage/articles/variants/yCV2cKwmCwqJXcJgwvxgaiSbjsDSGkGlLCXL49Pr-300.webp",
       "imagePage": "https://mkmobilebase.com/en/category/equipment/draconic_bloodline"
-    },
-    {
-      "id": "c74",
-      "guest": false,
-      "name": "Man in the Sky",
-      "rarityId": "rare",
-      "fusion": 1,
-      "source": "krypt",
-      "imageUrl": "https://mkmobilebase.com/storage/articles/variants/M9wvS72nvtKQ5Cy5fC40FJkHxrM2NhAIndJujLiX-300.webp",
-      "imagePage": "https://mkmobilebase.com/en/category/equipment/man_in_the_sky"
     },
     {
       "id": "c75",
@@ -844,16 +810,6 @@
       "source": "krypt",
       "imageUrl": "https://mkmobilebase.com/storage/articles/variants/oCZx73YxIwmoYlSso73E0KrPeW2mnV18EnBT3Kp3-300.webp",
       "imagePage": "https://mkmobilebase.com/en/category/equipment/flame_forged_will"
-    },
-    {
-      "id": "c78",
-      "guest": false,
-      "name": "Flame Forged Ferocity",
-      "rarityId": "rare",
-      "fusion": 0,
-      "source": "krypt",
-      "imageUrl": "https://mkmobilebase.com/storage/articles/variants/27vMCyAfwV4J2DEvEfhQA4yFzH2pKDz3AOlxf0ey-300.webp",
-      "imagePage": "https://mkmobilebase.com/en/category/equipment/flame_forged_ferocity"
     },
     {
       "id": "c79",
@@ -898,6 +854,28 @@
       "sourceNote": "Vought Tower",
       "imageUrl": "https://mkmobilebase.com/storage/articles/variants/KeE5ZPRvJI5NtyLCzFXlOZr9DTtT8sInYqWKthZ4-300.webp",
       "imagePage": "https://mkmobilebase.com/en/category/equipment/the_patriot_shield"
+    },
+    {
+      "id": "9cc82c72",
+      "name": "Flame Forged Ferocity",
+      "rarityId": "rare",
+      "fusion": 0,
+      "maxLevel": null,
+      "guest": false,
+      "source": "krypt",
+      "imageUrl": "https://mkmobilebase.com/storage/articles/variants/27vMCyAfwV4J2DEvEfhQA4yFzH2pKDz3AOlxf0ey-300.webp",
+      "imagePage": "https://mkmobilebase.com/en/category/equipment/flame_forged_ferocity"
+    },
+    {
+      "id": "eedd9789",
+      "name": "Man in the Sky",
+      "rarityId": "rare",
+      "fusion": 1,
+      "maxLevel": null,
+      "guest": false,
+      "source": "krypt",
+      "imageUrl": "https://mkmobilebase.com/storage/articles/variants/M9wvS72nvtKQ5Cy5fC40FJkHxrM2NhAIndJujLiX-300.webp",
+      "imagePage": "https://mkmobilebase.com/en/category/equipment/man_in_the_sky"
     }
   ],
   "packs": [
@@ -995,6 +973,129 @@
         }
       ],
       "notes": "Realm Klash store"
+    },
+    {
+      "id": "58df1e22",
+      "name": "RK Klassic Sub-Zero",
+      "currencyId": "blood-rubies",
+      "cost": 2000,
+      "rolls": 1,
+      "maxPurchases": null,
+      "purchased": 0,
+      "startsAt": null,
+      "endsAt": "2026-09-30T21:00",
+      "drops": [
+        {
+          "cardId": "c53",
+          "chance": 100
+        }
+      ],
+      "store": true
+    },
+    {
+      "id": "8a65be38",
+      "name": "RK CoS Kung Lao",
+      "currencyId": "blood-rubies",
+      "cost": 7500,
+      "rolls": 1,
+      "maxPurchases": null,
+      "purchased": 0,
+      "startsAt": null,
+      "endsAt": "2026-09-30T21:00",
+      "drops": [
+        {
+          "cardId": "c34",
+          "chance": 100
+        }
+      ],
+      "store": true
+    },
+    {
+      "id": "a7b18d07",
+      "name": "Martial Artist Kombat Pack",
+      "currencyId": "souls",
+      "cost": 400,
+      "rolls": 1,
+      "maxPurchases": 20,
+      "purchased": 14,
+      "startsAt": null,
+      "endsAt": "2026-09-30T21:00",
+      "drops": [
+        {
+          "cardId": "c13",
+          "chance": 2.06
+        },
+        {
+          "cardId": "c6",
+          "chance": 2.06
+        },
+        {
+          "cardId": "c19",
+          "chance": 2.06
+        },
+        {
+          "cardId": "c1",
+          "chance": 2.06
+        },
+        {
+          "cardId": "c14",
+          "chance": 2.06
+        },
+        {
+          "cardId": "c11",
+          "chance": 2.06
+        }
+      ]
+    },
+    {
+      "id": "025e2b4e",
+      "name": "Black Dragon Diamond Pack",
+      "currencyId": "souls",
+      "cost": 400,
+      "rolls": 1,
+      "maxPurchases": 20,
+      "purchased": 0,
+      "startsAt": null,
+      "endsAt": "2026-09-30T21:00",
+      "drops": [
+        {
+          "cardId": "c29",
+          "chance": 2.5
+        },
+        {
+          "cardId": "c25",
+          "chance": 2.5
+        },
+        {
+          "cardId": "c24",
+          "chance": 2.5
+        },
+        {
+          "cardId": "c11",
+          "chance": 2.5
+        }
+      ]
+    },
+    {
+      "id": "a022deb6",
+      "name": "Strike Force Summon Pack",
+      "currencyId": "dragon-krystals",
+      "cost": 15,
+      "rolls": 1,
+      "maxPurchases": null,
+      "purchased": 2,
+      "startsAt": null,
+      "endsAt": "2026-10-14T18:30",
+      "drops": [
+        {
+          "cardId": "c10",
+          "chance": 1.5
+        },
+        {
+          "cardId": "c1",
+          "chance": 1.5
+        }
+      ]
     }
   ],
   "towers": [
@@ -1017,35 +1118,35 @@
       "tower": "Black Dragon Tower",
       "grade": "Rare",
       "goal": "F3",
-      "itemsLeft": null
+      "itemsLeft": 1
     },
     {
       "id": "t86",
       "tower": "Kold Tower",
       "grade": "Rare",
       "goal": "F3",
-      "itemsLeft": null
+      "itemsLeft": 1
     },
     {
       "id": "t87",
       "tower": "Lin Kuei Tower",
       "grade": "Rare",
       "goal": "F3",
-      "itemsLeft": null
+      "itemsLeft": 1
     },
     {
       "id": "t88",
       "tower": "Nightmare Tower",
       "grade": "Rare",
       "goal": "F3",
-      "itemsLeft": null
+      "itemsLeft": 1
     },
     {
       "id": "t89",
       "tower": "Sorcerer's Tower",
       "grade": "Rare",
       "goal": "F3",
-      "itemsLeft": null
+      "itemsLeft": 1
     },
     {
       "id": "t90",

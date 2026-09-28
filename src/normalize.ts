@@ -61,7 +61,8 @@ export function normalize(input: unknown): AppState {
           ...r,
           fusionMax: r.fusionMax ?? 10,
           goal: r.goal ?? 'max',
-          hasGuests: r.hasGuests ?? r.id === 'diamond',
+          // A rarity with a guest-flagged card has guests, whatever an older save said (Gold used to default to none).
+          hasGuests: (r.hasGuests ?? r.id === 'diamond') || (s.cards ?? []).some((c) => c.rarityId === r.id && c.guest),
           // Saves from before kard costs existed get the rarity's default table (the Diamond curve).
           kardsPerLevel: r.kardsPerLevel?.length ? r.kardsPerLevel : (defaultRarities().find((d) => d.id === r.id)?.kardsPerLevel ?? [...DIAMOND_KARD_COSTS]),
         }))
