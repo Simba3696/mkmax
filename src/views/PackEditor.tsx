@@ -3,7 +3,95 @@ import { newId, useStore } from '../store';
 import { LevelOptions, Modal, NumInput, useNow } from '../ui';
 import { REALM_KLASH_CURRENCY, levelLabel, moveSeasonEnd, seasonEnd, suggestSeason } from '../engine';
 import { initialSource } from '../challenges';
-import type { Card, Pack } from '../types';
+import type { Card, Pack, RarityRule } from '../types';
+
+const cardLabel = (c: Card, rule: RarityRule | undefined) => `${c.name} ${c.fusion ? `(${levelLabel(rule, c.fusion)})` : '(new)'}`;
+
+/**
+ * Type-to-search card chooser. Every word typed has to appear in the name, in any order ("man sky" finds Man in
+ * the Sky). Cards already in the pack are left out.
+ */
+function CardPicker({ value, exclude, onChange }: { value: string; exclude: Set<string>; onChange: (id: string) => void }) {
+  const { state } = useStore();
+  const [q, setQ] = useState<string | null>(null); // null = not searching: the input shows the chosen card
+  const [hi, setHi] = useState(0);
+  const rules = new Map(state.rarities.map((r) => [r.id, r]));
+  const rarityOrder = (c: Card) => state.rarities.findIndex((r) => r.id === c.rarityId);
+  const chosen = state.cards.find((c) => c.id === value);
+  const words = (q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+  const matches =
+    q == null
+      ? []
+      : state.cards
+          .filter((c) => c.id !== value && !exclude.has(c.id) && words.every((w) => c.name.toLowerCase().includes(w)))
+          .sort((a, b) => rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name))
+          .slice(0, 40);
+
+  function pick(c: Card) {
+    onChange(c.id);
+    setQ(null);
+  }
+
+  return (
+    <div className="picker">
+      <input
+        value={q ?? (chosen ? cardLabel(chosen, rules.get(chosen.rarityId)) : '')}
+        placeholder="Search cards…"
+        onFocus={(e) => {
+          setQ('');
+          setHi(0);
+          // Keep the field in view above the keyboard.
+          e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }}
+        onBlur={() => setQ(null)}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setHi(0);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') setHi((h) => Math.min(h + 1, matches.length - 1));
+          else if (e.key === 'ArrowUp') setHi((h) => Math.max(h - 1, 0));
+          else if (e.key === 'Enter' && matches[hi]) {
+            pick(matches[hi]);
+            e.currentTarget.blur();
+          } else if (e.key === 'Escape') {
+            e.stopPropagation();
+            e.currentTarget.blur();
+          } else return;
+          e.preventDefault();
+        }}
+        aria-label="Card"
+      />
+      {q != null && (
+        <ul className="picker-list" role="listbox">
+          {matches.length === 0 && <li className="muted small">No cards match.</li>}
+          {matches.map((c, i) => {
+            const rule = rules.get(c.rarityId);
+            return (
+              // mousedown, not click: picking has to happen before the input's blur closes the list.
+              <li
+                key={c.id}
+                role="option"
+                aria-selected={i === hi}
+                className={i === hi ? 'active' : ''}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(c);
+                  (document.activeElement as HTMLElement | null)?.blur();
+                }}
+              >
+                <span>{c.name}</span>
+                <span className="small" style={{ color: rule?.color }}>
+                  {rule?.label} · {c.fusion ? levelLabel(rule, c.fusion) : 'new'}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export default function PackEditor({ initial, onClose }: { initial: Pack | null; onClose: () => void }) {
   const { state, update } = useStore();
@@ -48,8 +136,6 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     p.drops.some((d) => !d.cardId) && (p.store ? 'Choose the item being sold.' : 'Every drop row needs a card.'),
     p.startsAt && endsAt && p.startsAt >= endsAt && 'The end time must be after the start time.',
   ].filter(Boolean) as string[];
-
-  const byRarity = state.rarities.map((r) => ({ rule: r, cards: state.cards.filter((c) => c.rarityId === r.id) }));
 
   function addNewCard() {
     if (!newCard.name.trim()) return;
@@ -171,20 +257,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       )}
       {(p.store ? p.drops.slice(0, 1) : p.drops).map((d, i) => (
         <div key={i} className="drop-row">
-          <select value={d.cardId} onChange={(e) => setDrop(i, { cardId: e.target.value })}>
-            <option value="">Choose card…</option>
-            {byRarity.map(({ rule, cards }) =>
-              cards.length ? (
-                <optgroup key={rule.id} label={rule.label}>
-                  {cards.map((c) => (
-                    <option key={c.id} value={c.id} disabled={c.id !== d.cardId && inPack.has(c.id)}>
-                      {c.name} {c.fusion ? `(${levelLabel(rule, c.fusion)})` : '(new)'}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null,
-            )}
-          </select>
+          <CardPicker value={d.cardId} exclude={inPack} onChange={(cardId) => setDrop(i, { cardId })} />
           {!p.store && (
             <>
               <NumInput className="pct-input" value={d.chance} min={0} max={100} onChange={(v) => setDrop(i, { chance: v ?? 0 })} />
