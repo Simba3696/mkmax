@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "rarities": [
     {
       "id": "diamond",
@@ -150,6 +150,19 @@
         7,
         10
       ]
+    },
+    {
+      "id": "kameo",
+      "label": "Kameo",
+      "kind": "kameo",
+      "color": "#ff7ab8",
+      "dupesPerLevel": [],
+      "fusionMax": 0,
+      "goal": "max",
+      "hasGuests": false,
+      "fusionUpThreshold": null,
+      "fusionUpKards": 0,
+      "kardsPerLevel": []
     }
   ],
   "currencies": [
@@ -1273,6 +1286,7 @@
     "belowThreshold": 1.5,
     "coveredByKards": 0.3,
     "guest": 1.5,
+    "kameo": 0.25,
     "closenessBonus": 0.5,
     "limitedBoost": 1.25
   }

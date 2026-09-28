@@ -1,4 +1,4 @@
-// Downloads the MK Mobile Base (mkmobilebase.com) character and equipment catalog into public/catalog.json:
+// Downloads the MK Mobile Base (mkmobilebase.com) character, equipment and Kameo catalog into public/catalog.json:
 // each item's name, kind, rarity and thumbnail URLs. The site's API doesn't allow cross-site requests, so the
 // app can't call it directly; it reads this file instead. Run by the deploy workflow, or: npm run catalog
 import { writeFileSync } from 'node:fs';
@@ -27,12 +27,14 @@ function rarityOf(item) {
 }
 
 const catalog = [];
-for (const [category, kind] of [['characters', 'character'], ['equipment', 'equipment']]) {
+for (const [category, kind] of [['characters', 'character'], ['equipment', 'equipment'], ['kameos', 'kameo']]) {
   for (const item of await fetchAll(category)) {
-    catalog.push({ kind, name: item.title, rarity: rarityOf(item), slug: item.slug, image: item.image_thumb_2x_url ?? item.image_url });
+    // Kameo titles read "Baraka - Klassic Kameo"; drop the suffix so names match cards like "Baraka, Klassic".
+    const name = kind === 'kameo' ? item.title.replace(/\s*Kameo$/i, '') : item.title;
+    catalog.push({ kind, name, rarity: rarityOf(item), slug: item.slug, image: item.image_thumb_2x_url ?? item.image_url });
   }
 }
 catalog.sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
 writeFileSync(new URL('../public/catalog.json', import.meta.url), JSON.stringify({ source: 'https://mkmobilebase.com', fetchedAt: new Date().toISOString(), items: catalog }) + '\n');
 const count = (k) => catalog.filter((c) => c.kind === k).length;
-console.log(`catalog: ${count('character')} characters, ${count('equipment')} equipment, ${catalog.filter((c) => !c.rarity).length} without a rarity`);
+console.log(`catalog: ${count('character')} characters, ${count('equipment')} equipment, ${count('kameo')} kameos, ${catalog.filter((c) => !c.rarity).length} without a rarity`);

@@ -117,7 +117,8 @@ function CardList() {
       setRarityFixes(
         state.cards.flatMap((c) => {
           const hit = findInCatalog(c, ctx.rules.get(c.rarityId), items);
-          return hit?.rarity && hit.rarity !== c.rarityId && ctx.rules.has(hit.rarity)
+          // Only suggest rarities of the same kind: a "Diamond" Kameo on the site is still a Kameo here.
+          return hit?.rarity && hit.rarity !== c.rarityId && ctx.rules.get(hit.rarity)?.kind === ctx.rules.get(c.rarityId)?.kind
             ? [{ cardId: c.id, name: c.name, from: ctx.rules.get(c.rarityId)?.label ?? c.rarityId, to: hit.rarity }]
             : [];
         }),
@@ -181,12 +182,15 @@ function CardList() {
               ))}
             </select>
           </label>
-          <label className="field">
-            <span>Current level</span>
-            <select value={draft.fusion} onChange={(e) => setDraft({ ...draft, fusion: Number(e.target.value) })}>
-              <LevelOptions rule={draftRule} />
-            </select>
-          </label>
+          {/* Kameos are only tracked until you own one, so a new one is always "not owned": no level to pick. */}
+          {draftRule && maxFusion(draftRule) > 1 && (
+            <label className="field">
+              <span>Current level</span>
+              <select value={draft.fusion} onChange={(e) => setDraft({ ...draft, fusion: Number(e.target.value) })}>
+                <LevelOptions rule={draftRule} />
+              </select>
+            </label>
+          )}
           {draftRule && <GoalSelect rule={draftRule} value={draft.goal} onChange={(v) => setDraft({ ...draft, goal: v })} />}
           {draftRule && <CapSelect rule={draftRule} value={draft.maxLevel} onChange={(v) => setDraft({ ...draft, maxLevel: v })} />}
           {draftRule?.hasGuests && (
@@ -284,7 +288,7 @@ function CardList() {
                   {/* Cards that reach their goal are removed, so every card listed still has copies to go. */}
                   {toThr > 0 && thresholdLevel(rule)! < target && <span className="chip phase-toThreshold">{toThr} to F{rule.fusionUpThreshold}</span>}
                   <span className={`chip ${cardGoal(c, rule) === 'threshold' ? 'phase-toThreshold' : 'muted'}`}>
-                    {toMax} to {levelLabel(rule, target)}
+                    {maxFusion(rule) === 1 ? 'Not owned yet' : `${toMax} to ${levelLabel(rule, target)}`}
                   </span>
                   {kards > 0 && <span className="chip phase-kardCovered">kards give {kards}</span>}
                 </div>

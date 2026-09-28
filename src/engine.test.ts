@@ -64,12 +64,49 @@ describe('goals and caps', () => {
   });
 });
 
+describe('kameos', () => {
+  const kameo = (name: string, fusion = 0) => card(name, fusion, { rarityId: 'kameo' });
+
+  it('only need one copy, and leave the app once owned', () => {
+    const rule = rules().get('kameo')!;
+    expect(levelLabel(rule, 1)).toBe('F0');
+    expect(copiesToMax(kameo('k'), rule)).toBe(1);
+    const s = setup([kameo('have', 1), kameo('want')]);
+    expect(pruneDone(s)).toEqual(['have']);
+    expect(s.cards.map((c) => c.id)).toEqual(['want']);
+  });
+
+  it('get Blood Rubies only after the Realm Klash gear', () => {
+    const s = setup(
+      [card('gear', F(8), { rarityId: 'epic', goal: 'max' }), kameo('k')],
+      [
+        pack('gear-item', [{ cardId: 'gear', chance: 100 }], { currencyId: 'blood-rubies', cost: 800, store: true }),
+        pack('kameo-item', [{ cardId: 'k', chance: 100 }], { currencyId: 'blood-rubies', cost: 800, store: true }),
+      ],
+      (s) => (s.currencies.find((c) => c.id === 'blood-rubies')!.balance = 1600),
+    );
+    const rubies = buildPlan(buildCtx(s), NOW).currencies.find((c) => c.currencyId === 'blood-rubies')!;
+    expect(rubies.buys.map((b) => [b.pack.id, b.count])).toEqual([['gear-item', 2]]);
+    // With more rubies than the gear needs, the rest goes to the Kameo.
+    s.currencies.find((c) => c.id === 'blood-rubies')!.balance = 3200;
+    const more = buildPlan(buildCtx(s), NOW).currencies.find((c) => c.currencyId === 'blood-rubies')!;
+    expect(Object.fromEntries(more.buys.map((b) => [b.pack.id, b.count]))).toEqual({ 'gear-item': 2, 'kameo-item': 1 });
+  });
+});
+
 describe('save migration', () => {
   it('shifts version-1 levels (first copy = F1) to F0-based storage', () => {
     const v1 = { version: 1, rarities: [], currencies: [], packs: [], cards: [card('a', 2, { maxLevel: 15 }), card('b', 0)] };
     const s = normalize(v1);
-    expect(s.version).toBe(2);
+    expect(s.version).toBe(3);
     expect(s.cards.map((c) => [c.fusion, c.maxLevel])).toEqual([[3, 16], [0, undefined]]);
+  });
+
+  it('adds the Kameo rarity to older saves once', () => {
+    const v2 = { ...defaultState(), version: 2, rarities: defaultState().rarities.filter((r) => r.id !== 'kameo') };
+    expect(normalize(v2).rarities.map((r) => r.id)).toContain('kameo');
+    // A version-3 save without Kameo means the user deleted it; don't bring it back.
+    expect(normalize({ ...v2, version: 3 }).rarities.map((r) => r.id)).not.toContain('kameo');
   });
 
   it('moves Blood Ruby gear to Epic with a max goal, and drops priority tiers', () => {
