@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
 import { buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
-import { CardThumb, ConfirmButton, LevelOptions, RarityBadge } from '../ui';
+import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, useBrokenImageUrls } from '../ui';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
 import type { Card, RarityRule } from '../types';
@@ -81,7 +81,9 @@ function CardList() {
   const [draft, setDraft] = useState<Omit<Card, 'id'>>({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0, maxLevel: null, guest: false });
 
   const draftRule = ctx.rules.get(draft.rarityId) ?? state.rarities[0];
-  const missingImages = state.cards.filter((c) => !c.imageUrl);
+  // Cards with no art yet, plus any whose saved image stopped loading (the wiki moved or re-uploaded it).
+  const brokenUrls = useBrokenImageUrls();
+  const missingImages = state.cards.filter((c) => !c.imageUrl || brokenUrls.has(c.imageUrl));
 
   async function findImages() {
     setImgStatus({ busy: true, msg: 'Starting…' });
