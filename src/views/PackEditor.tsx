@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { newId, useStore } from '../store';
-import { LevelOptions, Modal, NumInput } from '../ui';
-import { levelLabel } from '../engine';
+import { LevelOptions, Modal, NumInput, useNow } from '../ui';
+import { REALM_KLASH_CURRENCY, levelLabel, moveSeasonEnd, seasonEnd, suggestSeason } from '../engine';
 import type { Card, Pack } from '../types';
 
 export default function PackEditor({ initial, onClose }: { initial: Pack | null; onClose: () => void }) {
@@ -26,6 +26,14 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   const [poolPicked, setPoolPicked] = useState<Set<string>>(new Set());
   const [poolTotal, setPoolTotal] = useState<number | null>(null);
   const [newCard, setNewCard] = useState({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0 });
+  const now = useNow();
+  const currentSeasonEnd = seasonEnd(state.realmKlashSeasonEnd, now);
+  const [seasonDraft, setSeasonDraft] = useState(currentSeasonEnd);
+  // Blood Ruby characters, Kameos and Kameo packs leave with the season; unless the user said otherwise, guess from the item.
+  const seasonal = p.currencyId === REALM_KLASH_CURRENCY && (p.season ?? suggestSeason(p, state));
+  // A seasonal pack gets the season's end, unless it's from an earlier season that has already ended.
+  const pastSeason = !!p.endsAt && p.endsAt !== currentSeasonEnd && new Date(p.endsAt) <= now;
+  const endsAt = seasonal && seasonDraft && !pastSeason ? seasonDraft : p.endsAt;
 
   const set = <K extends keyof Pack>(k: K, v: Pack[K]) => setP((x) => ({ ...x, [k]: v }));
   const setDrop = (i: number, patch: Partial<Pack['drops'][number]>) =>
@@ -37,7 +45,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     !(p.cost > 0) && 'Cost must be more than 0.',
     !(p.rolls >= 1) && 'Cards per purchase must be at least 1.',
     p.drops.some((d) => !d.cardId) && (p.store ? 'Choose the item being sold.' : 'Every drop row needs a card.'),
-    p.startsAt && p.endsAt && p.startsAt >= p.endsAt && 'The end time must be after the start time.',
+    p.startsAt && endsAt && p.startsAt >= endsAt && 'The end time must be after the start time.',
   ].filter(Boolean) as string[];
 
   const byRarity = state.rarities.map((r) => ({ rule: r, cards: state.cards.filter((c) => c.rarityId === r.id) }));
@@ -62,9 +70,13 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     if (errors.length) return;
     update((d) => {
       const i = d.packs.findIndex((x) => x.id === p.id);
-      const clean = { ...p, name: p.name.trim() };
+      const clean: Pack = { ...p, name: p.name.trim(), endsAt };
+      if (p.currencyId === REALM_KLASH_CURRENCY) clean.season = seasonal;
+      else delete clean.season;
       if (i >= 0) d.packs[i] = clean;
       else d.packs.push(clean);
+      // A corrected season end moves every pack that was ending with the old one.
+      if (seasonal && seasonDraft && seasonDraft !== currentSeasonEnd) moveSeasonEnd(d, seasonDraft, now);
     });
     onClose();
   }
@@ -122,11 +134,31 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
           <span>Starts (blank = now)</span>
           <input type="datetime-local" value={p.startsAt ?? ''} onChange={(e) => set('startsAt', e.target.value || null)} />
         </label>
-        <label className="field">
-          <span>Ends (blank = permanent)</span>
-          <input type="datetime-local" value={p.endsAt ?? ''} onChange={(e) => set('endsAt', e.target.value || null)} />
-        </label>
+        {p.currencyId === REALM_KLASH_CURRENCY && (
+          <label className="check wide">
+            <input type="checkbox" checked={seasonal} onChange={(e) => set('season', e.target.checked)} />
+            Leaves when the Realm Klash season ends (characters, Kameos and Kameo packs rotate every 2 weeks; the gear stays)
+          </label>
+        )}
+        {seasonal && !pastSeason ? (
+          <label className="field">
+            <span>Season ends</span>
+            <input type="datetime-local" value={seasonDraft ?? ''} onChange={(e) => setSeasonDraft(e.target.value || null)} />
+          </label>
+        ) : (
+          <label className="field">
+            <span>Ends (blank = permanent)</span>
+            <input type="datetime-local" value={p.endsAt ?? ''} onChange={(e) => set('endsAt', e.target.value || null)} />
+          </label>
+        )}
       </div>
+      {seasonal && !pastSeason && (
+        <p className="muted small">
+          {seasonDraft
+            ? 'Shared by every seasonal Blood Ruby item. After it passes, the next season is assumed to end 2 weeks later.'
+            : 'Enter when this season ends (from the in-game timer). You only need to do this once; later seasons follow every 2 weeks.'}
+        </p>
+      )}
 
       <h3>{p.store ? 'Item' : 'Drop chances'}</h3>
       {!p.store && (

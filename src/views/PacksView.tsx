@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { newId, useStore } from '../store';
-import { levelLabel, maxFusion, packStatus, urgency } from '../engine';
+import { REALM_KLASH_CURRENCY, levelLabel, maxFusion, moveSeasonEnd, packStatus, seasonEnd, toLocalInput, urgency } from '../engine';
 import { CardThumb, ConfirmButton, fmt, useNow } from '../ui';
 import { PackTiming } from './PlanView';
 import PackEditor from './PackEditor';
@@ -134,6 +134,8 @@ export default function PacksView() {
         When a pack rotates in, copy its cost and odds from the in-game info screen. When you buy one, tap <b>I bought one</b>. Store items level up their card automatically; for random packs, tap + on whatever you pulled.
       </p>
 
+      <SeasonBar />
+
       {groups.active.length > 0 && <h3>Available now</h3>}
       {groups.active.map(renderPack)}
       {groups.upcoming.length > 0 && <h3>Coming up</h3>}
@@ -156,5 +158,38 @@ export default function PacksView() {
 
       {editing && <PackEditor initial={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </>
+  );
+}
+
+/**
+ * The current Realm Klash season, shown once there's a season date or a Blood Ruby pack. Seasons normally run
+ * 2 weeks, but one can end early (an interim season while an app update is delayed), so it can be ended now.
+ */
+function SeasonBar() {
+  const { state, update } = useStore();
+  const now = useNow();
+  const end = seasonEnd(state.realmKlashSeasonEnd, now);
+  if (!end && !state.packs.some((p) => p.currencyId === REALM_KLASH_CURRENCY)) return null;
+  const seasonalNow = state.packs.filter((p) => p.season && p.endsAt === end).length;
+  return (
+    <div className="card">
+      <div className="row wrap">
+        <label className="field grow">
+          <span>Realm Klash season ends</span>
+          <input type="datetime-local" value={end ?? ''} onChange={(e) => e.target.value && update((d) => moveSeasonEnd(d, e.target.value, now))} />
+        </label>
+        {end && (
+          <ConfirmButton
+            label="Ended early"
+            onConfirm={() => update((d) => moveSeasonEnd(d, toLocalInput(now), now), 'Ended the Realm Klash season early')}
+          />
+        )}
+      </div>
+      <p className="muted small">
+        {end
+          ? `${seasonalNow} seasonal item${seasonalNow === 1 ? '' : 's'} leave${seasonalNow === 1 ? 's' : ''} then. Each season after is assumed to end 2 weeks later. If a season ends early, tap Ended early; if the new one's timer is different, change the date.`
+          : 'Enter when the current season ends (from the in-game timer) so seasonal Blood Ruby items know when they leave.'}
+      </p>
+    </div>
   );
 }

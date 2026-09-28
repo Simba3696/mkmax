@@ -5,6 +5,7 @@ import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, useBrokenImageUrls
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
 import { appRarityId, catalogPageUrl, findInCatalog, loadCatalog, wantsCatalogImage } from '../catalog';
+import { parseCardList } from '../cardList';
 import type { Card, RarityRule } from '../types';
 
 type Source = NonNullable<Card['source']> | '';
@@ -50,6 +51,52 @@ function CapSelect({ rule, value, onChange }: { rule: RarityRule; value: number 
         <LevelOptions rule={rule} from={fusionTop} />
       </select>
     </label>
+  );
+}
+
+/** Add many cards at once from a pasted list, one name per line; rarity headings in the list switch the rarity. */
+function PasteList({ startRarityId }: { startRarityId: string }) {
+  const { state, update } = useStore();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const parsed = useMemo(() => parseCardList(text, state.rarities, startRarityId, state.cards), [text, state.rarities, startRarityId, state.cards]);
+  const counts = state.rarities
+    .map((r) => ({ label: r.label, n: parsed.cards.filter((c) => c.rarityId === r.id).length }))
+    .filter((x) => x.n > 0);
+
+  if (!open) {
+    return (
+      <div className="actions">
+        <button onClick={() => setOpen(true)}>Paste a list…</button>
+      </div>
+    );
+  }
+
+  function addAll() {
+    update((d) => void d.cards.push(...parsed.cards.map((c): Card => ({ id: newId(), name: c.name, rarityId: c.rarityId, fusion: 0, guest: false }))), `Added ${parsed.cards.length} cards`);
+    setText('');
+    setOpen(false);
+  }
+
+  const startLabel = state.rarities.find((r) => r.id === startRarityId)?.label ?? '';
+  return (
+    <div className="subpanel">
+      <p className="muted small">
+        One card per line, like "Jade, Lizard". They're added as not owned. Lines go in as {startLabel} (the rarity picked above) until a line that's just a
+        rarity name, like "Gold Kameo", switches it. Cards already in your list are skipped.
+      </p>
+      <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKabal, Klassic'} autoFocus />
+      <div className="small muted">
+        {counts.length ? counts.map((x) => `${x.n} ${x.label}`).join(' · ') : 'Nothing to add yet.'}
+        {parsed.duplicates.length > 0 && ` · skipping ${parsed.duplicates.length} already listed (${parsed.duplicates.join('; ')})`}
+      </div>
+      <div className="actions">
+        <button onClick={() => setOpen(false)}>Cancel</button>
+        <button className="primary" disabled={!parsed.cards.length} onClick={addAll}>
+          Add {parsed.cards.length || ''} card{parsed.cards.length === 1 ? '' : 's'}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -215,6 +262,7 @@ function CardList() {
             {draftRule.label} is tracked only until F{draftRule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.
           </p>
         )}
+        <PasteList startRarityId={draft.rarityId} />
       </section>
 
       <div className="filters">

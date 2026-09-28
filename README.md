@@ -15,6 +15,7 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 
 ## Everyday use
 
+- **Adding many cards at once:** on Cards, tap **Paste a list…** and paste one card per line (for example `Jade, Lizard`). They're added as not owned. Lines use the rarity picked in Add card until a line that's just a rarity name (`Gold Kameo`, `Diamond Kameo`) switches it, so a list copied from notes with headings and `-----` underlines works as-is. Cards already in the app are skipped, and Undo takes the whole batch back out.
 - **Recording purchases:** on Packs, tap **I bought one**. This deducts the cost, and a store item also levels up its card. For random packs, tap + on each card you pulled. **−1** removes one purchase and refunds its cost.
 - **Undo:** after a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
 - **Switching tabs:** tap a tab, or swipe left or right on the page. The page follows your finger; let go past about a quarter of the screen (or flick) and it slides to the next tab, otherwise it springs back. Tapping a tab slides the same way. With Reduce Motion on, tabs switch without the slide. Swipes that start on a text field, inside a pop-up, on something that scrolls sideways, or right at the screen edge (where iOS has its own back gesture) are ignored.
@@ -47,11 +48,12 @@ Your first copy of any card is F0, and each level after that takes 1 duplicate. 
 
 - **Diamond** characters to F10.
 - **Guest** characters are Diamond or Gold cards that only show up in packs during their event (Jason Voorhees only around Friday the 13th, for example), so they get extra weight. Tick **Guest** on the card; a rarity's Guest checkbox is controlled by **Has guest cards** in Settings.
-- **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Each card has its own cap of A5 or A10.
+- **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Each card has its own cap of A5 or A10. Fusion Up Kards work on ascension steps too.
 - **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase.
 - **Uncommon** (green) gear only appears in the tower checklist, since it's maxed through tower runs.
 - **Kameos** (Diamond and Gold) fuse to F10 in the game, but here you only track the ones you don't own yet. Add them under **Diamond Kameo** or **Gold Kameo**. If you pick the wrong tier, **Find images** offers to switch it to MK Mobile Base's. When you get one, tap **+** and it's done, so it leaves the list (with Undo). Kameos sold in the Realm Klash store, or Kameo packs, go in as store items or packs like anything else.
 - **No priority tiers:** every card is being maxed, so all cards count the same. Guest cards get extra weight only because they're gone once their event ends.
+- **Realm Klash seasons** last 2 weeks. Each season the Blood Ruby store swaps its characters, Kameos and Kameo packs, but the Realm Klash gear stays. When you add a Blood Ruby item or pack, **Leaves when the Realm Klash season ends** is ticked for everything except gear. Enter the season's end from the in-game timer once. After that the app assumes each new season ends 2 weeks after the last one, so seasonal items get that end date, count as limited-time in the planner, and show up as expired when the season is over. The season's end date also shows at the top of Packs. If the timer turns out to be different, change it there (or on any seasonal item) and every item from that season moves with it. Seasons sometimes end early, for example a short in-between season while an app update is delayed. When that happens, tap **Ended early**: that season's items expire now, and the next season is assumed to end 2 weeks later until you enter its real end date. Tap **Rerun** on an item that comes back to add it to the new season.
 - **Krypt and tower gear** is tagged with its source. It's tracked but left out of pack planning.
 - **Tower gear** also has a per-tower checklist (Cards → Tower gear).
 
@@ -75,7 +77,9 @@ Fusion Up Kards aren't one per level. Each step costs more, and each rarity (Dia
 |---|---|---|---|---|---|---|---|---|
 | Diamond kards | 1 | 2 | 3 | 4 | 5 | 7 | 10 | 32 |
 
-Kards only work from F3 up and only raise fusion, not Gold ascension. The Kard plan spends your kards one step at a time on the cheapest step available, because every step saves one pack copy no matter how much it costs. Guest cards count 1.5× and ties go to the card closest to max. It shows how many kards each card gets and how many are left over. The Wallet shows a kard count for each rarity that has cards past F3 still to go, so Epic kards show up once any Epic card has a max goal.
+Gold kards also cover ascension (F10→A1 up to A9→A10), up to each card's own A5 or A10 cap. The ascension costs haven't been checked in-game yet, so each step starts at 10 kards (the same as F9→F10). You can edit them in Settings → Fusion rules.
+
+Kards only work from F3 up. The Kard plan spends your kards one step at a time on the cheapest step available, because every step saves one pack copy no matter how much it costs. Guest cards count 1.5× and ties go to the card closest to max. It shows how many kards each card gets and how many are left over. The Wallet shows a kard count for each rarity that has cards past F3 still to go, so Epic kards show up once any Epic card has a max goal.
 
 A pack's value is the expected value of its drops (rolls × chance), added up across the drop table.
 

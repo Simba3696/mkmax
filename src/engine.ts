@@ -101,8 +101,8 @@ export function cardWeight(state: AppState, card: Card) {
 
 /** Fusion Up Kards needed to go from stored level `level` to the next one, or null if kards can't do that step. */
 export function kardCost(rule: RarityRule, level: number): number | null {
-  const f = level - 1; // displayed fusion number (stored level 1 = F0)
-  if (rule.fusionUpThreshold == null || f < rule.fusionUpThreshold || f >= rule.fusionMax) return null;
+  const f = level - 1; // step index: F3→F4 is 3, and past fusionMax it's ascension (F10→A1 is 10)
+  if (rule.fusionUpThreshold == null || f < rule.fusionUpThreshold || level >= maxFusion(rule)) return null;
   const cost = rule.kardsPerLevel?.[f];
   return cost && cost > 0 ? cost : null;
 }
@@ -110,8 +110,8 @@ export function kardCost(rule: RarityRule, level: number): number | null {
 /**
  * Spend each rarity's Fusion Up Kards one fusion step at a time. Costs rise steeply (a Diamond's F9→F10 costs
  * 10 kards, F3→F4 costs 1), and every step saves one pack copy, so the next kard always goes to the cheapest
- * step available, weighted up for guest cards. Ties go to the card closest to max. Kards only raise fusion
- * levels (not ascension) and only from the threshold (F3) up.
+ * step available, weighted up for guest cards. Ties go to the card closest to max. Kards work from the
+ * threshold (F3) up, through fusion and on into Gold ascension.
  */
 function allocateKards(state: AppState) {
   const kardCopies = new Map<string, number>();
@@ -119,7 +119,7 @@ function allocateKards(state: AppState) {
   for (const rule of state.rarities) {
     const thr = thresholdLevel(rule);
     if (thr == null || rule.fusionUpKards <= 0) continue;
-    const cap = (c: Card) => Math.min(targetLevel(c, rule), fLevel(rule.fusionMax));
+    const cap = (c: Card) => targetLevel(c, rule);
     const cards = state.cards.filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c));
     const level = new Map(cards.map((c) => [c.id, c.fusion]));
     const spent = new Map<string, number>();
@@ -335,6 +335,47 @@ export function buildPlan(ctx: Ctx, now: Date): Plan {
   });
 
   return { currencies, expectedGains: gained };
+}
+
+// ---------- Realm Klash seasons ----------
+
+/** The Blood Ruby store's currency; its characters, Kameos and Kameo packs change every season. */
+export const REALM_KLASH_CURRENCY = 'blood-rubies';
+export const SEASON_DAYS = 14;
+
+/** A Date as a datetime-local string (local time, minutes). */
+export function toLocalInput(t: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
+}
+
+/**
+ * The current season's end: the saved end, moved forward 2 weeks at a time until it's in the future, since
+ * seasons run back to back. Null if no season end was ever entered.
+ */
+export function seasonEnd(saved: string | null | undefined, now: Date): string | null {
+  if (!saved) return null;
+  const t = new Date(saved);
+  if (isNaN(t.getTime())) return null;
+  while (t <= now) t.setDate(t.getDate() + SEASON_DAYS); // setDate keeps the local time across DST changes
+  return toLocalInput(t);
+}
+
+/**
+ * Change the current season's end (a corrected timer, or a season that ended early). Every seasonal pack that
+ * was ending with it moves too; packs from earlier seasons keep their dates. Mutates the state.
+ */
+export function moveSeasonEnd(s: AppState, to: string, now: Date) {
+  const from = seasonEnd(s.realmKlashSeasonEnd, now);
+  if (from) for (const p of s.packs) if (p.season && p.endsAt === from) p.endsAt = to;
+  s.realmKlashSeasonEnd = to;
+}
+
+/** Whether a pack rotates with the season when the user hasn't said: Blood Ruby items that aren't gear. */
+export function suggestSeason(pack: Pack, state: AppState) {
+  if (pack.currencyId !== REALM_KLASH_CURRENCY) return false;
+  const card = pack.store && state.cards.find((c) => c.id === pack.drops[0]?.cardId);
+  return !(card && state.rarities.find((r) => r.id === card.rarityId)?.kind === 'equipment');
 }
 
 /** Sort key: soonest-ending first, permanent packs last. */

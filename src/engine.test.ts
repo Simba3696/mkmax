@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
 import {
-  buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, fLevel as F, isMaxed, levelLabel, packEV, pruneDone, targetLevel,
+  buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, seasonEnd, suggestSeason, targetLevel,
 } from './engine';
 import { normalize } from './store';
 import type { AppState, Card, Pack } from './types';
@@ -156,6 +156,25 @@ describe('phases', () => {
     expect(buildCtx(s).kardPlan.get('diamond')).toEqual({ assignments: [{ cardId: 'near', from: F(9), to: F(10), kards: 10 }], left: 0 });
   });
 
+  it("spends Gold kards on ascension too, up to the card's own cap", () => {
+    const gold = rules().get('gold')!;
+    expect(kardCost(gold, F(10))).toBe(10); // F10 → A1
+    expect(kardCost(gold, A(9))).toBe(10); // A9 → A10
+    expect(kardCost(gold, A(10))).toBeNull(); // already A10
+    // 25 kards on a card capped at A2: F9→F10 (10), F10→A1 (10); A1→A2 (10) doesn't fit. 5 left over.
+    const s = setup([card('g', F(9), { rarityId: 'gold', maxLevel: A(2) })], [], (s) => (s.rarities[1].fusionUpKards = 25));
+    expect(buildCtx(s).kardPlan.get('gold')).toEqual({ assignments: [{ cardId: 'g', from: F(9), to: A(1), kards: 20 }], left: 5 });
+  });
+
+  it('extends older Gold kard tables through ascension, keeping edited fusion costs', () => {
+    const s = defaultState();
+    const gold = s.rarities.find((r) => r.id === 'gold')!;
+    gold.kardsPerLevel = [0, 0, 0, 2, 2, 3, 4, 5, 7, 10];
+    const out = normalize(s).rarities.find((r) => r.id === 'gold')!;
+    expect(out.kardsPerLevel.slice(0, 4)).toEqual([0, 0, 0, 2]);
+    expect(out.kardsPerLevel).toHaveLength(20);
+  });
+
   it('spends kards on the cheapest steps first, weighting guest cards', () => {
     // Costs: F4→F5 2, F5→F6 3, F6→F7 4, F8→F9 7. Guest steps count 1.5×, so guest F4→F6 (5 kards), then
     // the plain F4→F5 (2) beats the guest's F6→F7 (4); the near-max card's 7-kard step never wins. 1 left over.
@@ -237,5 +256,36 @@ describe('removing done cards', () => {
     const s = setup([card('open', F(2))], [pack('p', [{ cardId: 'open', chance: 5 }])]);
     expect(pruneDone(s)).toEqual([]);
     expect(s.cards).toHaveLength(1);
+  });
+});
+
+describe('Realm Klash seasons', () => {
+  it('rolls the season end forward 2 weeks at a time', () => {
+    expect(seasonEnd(null, NOW)).toBeNull();
+    expect(seasonEnd('2026-01-12T20:00', NOW)).toBe('2026-01-12T20:00'); // still running
+    expect(seasonEnd('2026-01-10T11:00', NOW)).toBe('2026-01-24T11:00'); // ended an hour ago
+    expect(seasonEnd('2025-12-01T20:00', NOW)).toBe('2026-01-12T20:00'); // three seasons later
+  });
+
+  it('ends a season early: its items expire, older seasons keep their dates, and the next season runs 2 weeks', () => {
+    const s = setup([], [
+      pack('now', [], { season: true, endsAt: '2026-01-12T20:00' }),
+      pack('last', [], { season: true, endsAt: '2025-12-29T20:00' }),
+      pack('gear', [], { season: false, endsAt: null }),
+    ], (s) => (s.realmKlashSeasonEnd = '2025-12-29T20:00'));
+    moveSeasonEnd(s, '2026-01-10T11:59', NOW);
+    expect(s.packs.map((p) => p.endsAt)).toEqual(['2026-01-10T11:59', '2025-12-29T20:00', null]);
+    expect(packStatus(s.packs[0], NOW)).toBe('expired');
+    expect(seasonEnd(s.realmKlashSeasonEnd, NOW)).toBe('2026-01-24T11:59');
+  });
+
+  it('assumes Blood Ruby characters, Kameos and Kameo packs rotate, but not the gear', () => {
+    const s = setup([card('hero', F(2)), card('gear', F(5), { rarityId: 'epic', goal: 'max' }), card('kameo', 0, { rarityId: 'kameo-gold' })]);
+    const item = (cardId: string) => pack(cardId, [{ cardId, chance: 100 }], { currencyId: 'blood-rubies', store: true });
+    expect(suggestSeason(item('hero'), s)).toBe(true);
+    expect(suggestSeason(item('kameo'), s)).toBe(true);
+    expect(suggestSeason(item('gear'), s)).toBe(false);
+    expect(suggestSeason(pack('kameo pack', [], { currencyId: 'blood-rubies' }), s)).toBe(true);
+    expect(suggestSeason(pack('souls pack', []), s)).toBe(false);
   });
 });
