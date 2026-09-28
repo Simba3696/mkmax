@@ -30,7 +30,14 @@ Data lives in the browser's localStorage. Use Settings → Export backup to save
 
 ## Card images
 
-Cards → **Find images** looks up art on the [MK Mobile wiki](https://mortalkombat-mobile.fandom.com/) through its public API. It works best with names written like "Sub-Zero, Klassic" (name, variant). It tries, in order: the card's wiki page image; a wiki search for the card; the equipment list pages, for gear without its own page; and for characters, any art file on the card's page, or uploaded before the page exists (for example `MK1 Sub-Zero.png`). Files for ability icons and pack banners are skipped. The button also retries any card whose saved image has stopped loading, so art the wiki moves or re-uploads gets picked up again. Only the image URLs are saved; the art stays on the wiki's CDN and the service worker caches it for offline use. For anything the wiki doesn't have, paste a URL with the card's **Image** button.
+Cards → **Find images** looks up card art in two places:
+
+1. **[MK Mobile Base](https://mkmobilebase.com/)** first. It has proper card art and the rarity of every character and piece of equipment. Its API doesn't allow requests from other sites, so `npm run catalog` (`scripts/fetch-catalog.mjs`) downloads the whole catalog into `public/catalog.json`, and the deploy workflow refreshes it on every push. If the site is down during a deploy, the committed copy is used. Names match regardless of word order, commas, "MKII" vs "MK2", and "Kold" vs "Kold War".
+2. **The [MK Mobile wiki](https://mortalkombat-mobile.fandom.com/)** for anything the catalog doesn't have, through its public API. It tries the card's page image, a wiki search, the equipment list pages, and art files uploaded to a character's page or before the page exists (for example `MK1 Sub-Zero.png`), skipping ability icons and pack banners.
+
+The button covers cards with no image, images that have stopped loading, and images from older wiki lookups, since some of those were stat screenshots rather than card art. Images you pasted yourself are left alone. It also lists any card whose rarity disagrees with MK Mobile Base, with a button to switch them to the site's rarity. That's how Man in the Sky and Flame Forged Ferocity were found to be Rare, not Epic.
+
+Only image URLs are saved; the art stays on those sites, and the service worker caches it for offline use. For anything neither site has, paste a URL with the card's **Image** button.
 
 ## What's tracked
 

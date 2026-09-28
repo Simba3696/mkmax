@@ -43,8 +43,10 @@ export interface Card {
   sourceNote?: string;
   /** Card art URL (found on the MK Mobile wiki, or pasted by hand). */
   imageUrl?: string;
-  /** Wiki page the image came from. */
+  /** Wiki page the image came from (older lookups and wiki fallbacks). */
   wikiTitle?: string;
+  /** Page the image was found on (mkmobilebase.com or the wiki); unset for a pasted URL. */
+  imagePage?: string;
   notes?: string;
 }
 
