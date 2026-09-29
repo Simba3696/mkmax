@@ -111,6 +111,7 @@ export function normalize(input: unknown): AppState {
     weights: { ...defaultWeights, ...s.weights },
     realmKlashSeasonEnd: s.realmKlashSeasonEnd ?? null,
     dismissedShopPacks: s.dismissedShopPacks ?? [],
+    gearOrder: s.gearOrder ?? [],
     updatedAt: s.updatedAt,
   };
   // Version 5 tags Gold Kameos of challenge characters (they come from Elder challenges). Done once, so a tag

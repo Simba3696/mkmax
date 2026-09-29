@@ -97,6 +97,55 @@ describe('kameos', () => {
     const more = buildPlan(buildCtx(s), NOW).currencies.find((c) => c.currencyId === 'blood-rubies')!;
     expect(Object.fromEntries(more.buys.map((b) => [b.pack.id, b.count]))).toEqual({ 'gear-item': 2, 'kameo-item': 1 });
   });
+
+  describe('Blood Ruby gear order', () => {
+    const gear = (name: string, fusion: number) => card(name, fusion, { rarityId: 'epic', goal: 'max' });
+    const item = (cardId: string, extra: Partial<Pack> = {}) =>
+      pack(`${cardId} item`, [{ cardId, chance: 100 }], { currencyId: 'blood-rubies', cost: 500, store: true, ...extra });
+    const rubies = (s: AppState) => buildPlan(buildCtx(s), NOW).currencies.find((c) => c.currencyId === 'blood-rubies')!;
+    const cards = () => [gear('Bloody Tomahawk', F(8)), gear('Shadow Sash', F(8)), gear("Moloch's Ball and Chain", F(9)), kameo('k')];
+    const packs = () => [item('Bloody Tomahawk'), item('Shadow Sash'), item("Moloch's Ball and Chain"), pack('kameo pack', [{ cardId: 'k', chance: 50 }], { currencyId: 'blood-rubies', cost: 100 })];
+    const withRubies = (n: number) => (s: AppState) => void (s.currencies.find((c) => c.id === 'blood-rubies')!.balance = n);
+
+    it('maxes one piece at a time, Shadow Sash first by default', () => {
+      const plan = rubies(setup(cards(), packs(), withRubies(1500)));
+      expect(plan.buys.map((b) => [b.pack.id, b.count])).toEqual([['Shadow Sash item', 2], ["Moloch's Ball and Chain item", 1]]);
+      expect(plan.saveFor).toMatchObject({ pack: { id: 'Bloody Tomahawk item' }, shortBy: 500, gear: true });
+    });
+
+    it('buys no packs until every piece is maxed', () => {
+      expect(rubies(setup(cards(), packs(), withRubies(2400))).buys.map((b) => b.pack.id)).toEqual([
+        'Shadow Sash item', "Moloch's Ball and Chain item", 'Bloody Tomahawk item',
+      ]); // 100 short of the Tomahawk's last copy, so the Kameo pack waits
+      expect(rubies(setup(cards(), packs(), withRubies(2600))).buys.map((b) => b.pack.id)).toContain('kameo pack');
+    });
+
+    it('follows the saved order', () => {
+      const plan = rubies(setup(cards(), packs(), (s) => {
+        withRubies(1000)(s);
+        s.gearOrder = ['Bloody Tomahawk'];
+      }));
+      expect(plan.buys.map((b) => [b.pack.id, b.count])).toEqual([['Bloody Tomahawk item', 2]]);
+      expect(plan.saveFor?.pack.id).toBe('Shadow Sash item');
+    });
+
+    it('never spends Epic Fusion Up Kards on the gear', () => {
+      const s = setup(cards(), packs(), (s) => {
+        withRubies(1500)(s);
+        s.rarities.find((r) => r.id === 'epic')!.fusionUpKards = 50;
+      });
+      const ctx = buildCtx(s);
+      expect(ctx.kardPlan.get('epic')?.assignments).toEqual([]);
+      expect(rubies(s).buys.map((b) => [b.pack.id, b.count])).toEqual([['Shadow Sash item', 2], ["Moloch's Ball and Chain item", 1]]);
+    });
+
+    it('moves on when a piece is out of purchases', () => {
+      const ps = packs();
+      ps[1].maxPurchases = 1;
+      const plan = rubies(setup(cards(), ps, withRubies(1000)));
+      expect(plan.buys.map((b) => [b.pack.id, b.count])).toEqual([['Shadow Sash item', 1], ["Moloch's Ball and Chain item", 1]]);
+    });
+  });
 });
 
 describe('save migration', () => {

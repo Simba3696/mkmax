@@ -52,7 +52,7 @@ Your first copy of any card is F0, and each level after that takes 1 duplicate. 
 - **Diamond** characters to F10.
 - **Guest** characters are Diamond or Gold cards that only show up in packs during their event (Jason Voorhees only around Friday the 13th, for example), so they get extra weight. Tick **Guest** on the card; a rarity's Guest checkbox is controlled by **Has guest cards** in Settings.
 - **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Not every Gold card ascends. Ascension came to some Gold cards in one update (up to A5) and to others in a later one (up to A10), so each card's **Max** is F10 (no ascension), A5 or A10. Neither MK Mobile Base nor the wiki records which cap a card has, so set it on the card; new Gold cards start at A10. Any other saved cap shows as "not a real cap" so it's easy to spot and fix. Fusion Up Kards work on ascension steps too.
-- **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase.
+- **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase, and no Fusion Up Kards are planned for it.
 - **Uncommon** (green) gear is tracked to max (F10), since it's farmed and maxed through tower runs. It has no Fusion Up Kards unless you turn them on in Settings → Fusion rules. Older saves got the Uncommon rarity added once; if you delete it, it stays deleted. Tag it as tower gear and it shows under its tower on Cards → Tower gear.
 - **Kameos** (Diamond and Gold) fuse to F10 in the game, but here you only track the ones you don't own yet. Add them under **Diamond Kameo** or **Gold Kameo**. If you pick the wrong tier, **Find images** offers to switch it to MK Mobile Base's. When you get one, tap **+** and it's done, so it leaves the list (with Undo). Kameos sold in the Realm Klash store, or Kameo packs, go in as store items or packs like anything else.
 - **No priority tiers:** every card is being maxed, so all cards count the same. Guest cards get extra weight only because they're gone once their event ends.
@@ -76,7 +76,7 @@ The app uses it for three things:
 
 Each copy of a card is worth: `phase multiplier × guest multiplier × Kameo multiplier × challenge multiplier × (1 + closeness bonus × progress)`.
 
-The Kameo multiplier (0.25 by default, set in Settings → Priority weights) keeps Kameos behind gear and characters. For example, Blood Rubies go to the Realm Klash gear first, and to Kameos once that gear is maxed.
+The Kameo multiplier (0.25 by default, set in Settings → Priority weights) keeps Kameos behind gear and characters. (Blood Rubies don't need it to put the Realm Klash gear first; see the gear order below.)
 
 The challenge multiplier (0.2 by default, also in Priority weights) only applies to Kameos tagged **Elder challenge**. Finishing that Elder challenge gives you the Kameo for sure, so a Kameo pack is ranked mostly on the Kameos you can only get from packs. A challenge Kameo still counts a little, since the challenge might not come back for a while.
 
@@ -96,9 +96,11 @@ Fusion Up Kards aren't one per level. Each step costs more, and each rarity (Dia
 
 Gold kards also cover ascension (F10→A1 up to A9→A10), up to each card's own A5 or A10 cap. The ascension costs haven't been checked in-game yet, so each step starts at 10 kards (the same as F9→F10). You can edit them in Settings → Fusion rules.
 
-Kards only work from F3 up. The Kard plan spends your kards one step at a time on the cheapest step available, because every step saves one pack copy no matter how much it costs. Guest cards count 1.5× and ties go to the card closest to max. It shows how many kards each card gets and how many are left over. The Wallet shows a kard count for each rarity that has cards past F3 still to go, so Epic kards show up once any Epic card has a max goal.
+Kards only work from F3 up. The Kard plan spends your kards one step at a time on the cheapest step available, because every step saves one pack copy no matter how much it costs. Guest cards count 1.5× and ties go to the card closest to max. It shows how many kards each card gets and how many are left over. The Wallet shows a kard count for each rarity that has cards past F3 still to go, so Epic kards show up once an Epic card other than Realm Klash gear has a max goal.
 
 A pack's value is the expected value of its drops (rolls × chance), added up across the drop table.
+
+**Blood Ruby gear comes first.** Before Blood Rubies go to any pack, character or Kameo, the plan maxes the Realm Klash gear (equipment you've added as a Blood Ruby store item), one piece at a time: all of the first piece's copies, then the next. Fusion Up Kards never go to this gear: Blood Rubies come in every day (65 or more), while kards are much harder to get, so the gear is bought all the way to max and the Kard plan leaves it out. The default order is Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, then Bloody Tomahawk, and any other gear goes after them by name. Change it with the arrows in Plan → **Blood Ruby gear order**; the order syncs. If you're short for the next copy, the plan says how many more rubies you need and buys nothing else. A piece whose store item has hit its purchase limit is skipped until it has purchases again. When every piece is done, the leftover rubies are planned like any other currency.
 
 The planner works on each currency's balance separately. It keeps buying the affordable pack with the best value per cost, and updates your expected progress after each buy so repeat buys are worth less. Limited-time packs get the `limitedBoost` urgency factor. Every weight and fusion table can be edited in Settings.
 

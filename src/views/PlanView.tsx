@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
-import { buildCtx, buildPlan, cardGoal, levelLabel, rankPacks, rankTargets, thresholdLevel, type Phase } from '../engine';
+import { buildCtx, buildPlan, cardGoal, gearQueue, isRealmKlashGear, levelLabel, rankPacks, rankTargets, targetLevel, thresholdLevel, type Phase } from '../engine';
 import { CardThumb, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
@@ -31,6 +31,14 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
   const plan = useMemo(() => buildPlan(ctx, now), [ctx, now]);
   const ranks = useMemo(() => rankPacks(ctx, now), [ctx, now]);
   const targets = useMemo(() => rankTargets(ctx, now).slice(0, 10), [ctx, now]);
+  const gear = useMemo(() => gearQueue(ctx, now), [ctx, now]);
+  // Swap a gear piece with its neighbour and save the whole order, so the list stays as shown.
+  const moveGear = (i: number, by: number) =>
+    update((d) => {
+      const ids = gear.map((g) => g.card.id);
+      [ids[i], ids[i + by]] = [ids[i + by], ids[i]];
+      d.gearOrder = [...ids, ...(d.gearOrder ?? []).filter((id) => !ids.includes(id))];
+    });
   const events = useEvents();
   // Challenge Kameos you still need whose Elder challenge is on now or coming up, soonest first.
   const challengeKameos = state.cards
@@ -41,9 +49,12 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
     })
     .sort((a, b) => (a.ch.start ?? '').localeCompare(b.ch.start ?? ''));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
-  // Kard counts only matter where some card is bought past the threshold (e.g. Realm Klash epics to max).
+  // Kard counts only matter where some card is taken past the threshold with kards. Realm Klash gear doesn't
+  // count: it's maxed with Blood Rubies.
   const kardRarities = state.rarities.filter(
-    (r) => r.fusionUpThreshold != null && (r.goal === 'max' || state.cards.some((c) => c.rarityId === r.id && cardGoal(c, r) === 'max')),
+    (r) =>
+      r.fusionUpThreshold != null &&
+      (r.goal === 'max' || state.cards.some((c) => c.rarityId === r.id && cardGoal(c, r) === 'max' && !isRealmKlashGear(state, c))),
   );
 
   const wallet = (
@@ -124,17 +135,58 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
                   <PackTiming pack={b.pack} now={now} />
                 </div>
               ))}
-              {c.saveFor && (
+              {c.saveFor?.gear ? (
                 <p className="hint">
-                  Next best: <b>{c.saveFor.pack.name}</b>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another purchase.
+                  Next: <b>{c.saveFor.pack.name}</b>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another copy. Packs
+                  wait until the gear is maxed.
                 </p>
+              ) : (
+                c.saveFor && (
+                  <p className="hint">
+                    Next best: <b>{c.saveFor.pack.name}</b>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another purchase.
+                  </p>
+                )
               )}
             </div>
           ))}
         <p className="muted small">
-          Limited-time packs are listed first, soonest-ending at the top. "Save for" means the pack hasn't started yet, so hold the currency for it.
+          Blood Ruby gear comes first, in the order below. Then limited-time packs are listed first, soonest-ending at the top. "Save for" means the pack hasn't started yet, so hold the currency for it.
         </p>
       </section>
+
+      {gear.length > 0 && (
+        <section className="card">
+          <h2>Blood Ruby gear order</h2>
+          <p className="muted small">
+            Blood Rubies max these one at a time, top first, before buying any pack. A piece whose store item is out of purchases is skipped
+            for now.
+          </p>
+          {gear.map((g, i) => {
+            const rule = ctx.rules.get(g.card.rarityId);
+            const cost = Math.min(...g.items.map((p) => p.cost));
+            return (
+              <div key={g.card.id} className="row">
+                <CardThumb card={g.card} rule={rule} />
+                <div className="grow">
+                  <div className="row-title">
+                    {i + 1}. {g.card.name}
+                  </div>
+                  <div className="muted small">
+                    <FusionLabel card={g.card} rule={rule} /> · {fmt(g.need)} to {rule && levelLabel(rule, targetLevel(g.card, rule))} ·{' '}
+                    {fmt(g.need * cost)} {curName('blood-rubies')}
+                  </div>
+                </div>
+                <button onClick={() => moveGear(i, -1)} disabled={i === 0} aria-label="Move up">
+                  ↑
+                </button>
+                <button onClick={() => moveGear(i, 1)} disabled={i === gear.length - 1} aria-label="Move down">
+                  ↓
+                </button>
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       {kardRarities.some((r) => r.fusionUpKards > 0) && (
         <section className="card">

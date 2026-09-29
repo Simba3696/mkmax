@@ -121,6 +121,8 @@ export interface AppState {
   realmKlashSeasonEnd?: string | null;
   /** Shop packs from MK Mobile Base's schedule the user marked as not needed, by name, so they aren't suggested. */
   dismissedShopPacks?: string[];
+  /** Realm Klash gear card ids in the order Blood Rubies max them, one at a time, before any other purchase. */
+  gearOrder?: string[];
   /** When this data was last changed (ms since epoch); drives cross-device sync. */
   updatedAt?: number;
 }
