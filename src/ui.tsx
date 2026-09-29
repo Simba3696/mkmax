@@ -151,8 +151,9 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
   // Rendered on <body>, outside the scrolling content, so the tab bar can't end up on top of it (iOS keeps
   // fixed elements inside a touch-scrolling container in that container's layer).
   return createPortal(
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
+    // Tapping outside doesn't close it: a stray tap would throw away everything entered. Use ✕ or Cancel.
+    <div className="modal-backdrop">
+      <div className="modal" role="dialog" aria-label={title}>
         <div className="modal-head">
           <h2>{title}</h2>
           <button className="ghost" onClick={onClose} aria-label="Close">

@@ -114,6 +114,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   const [poolRarity, setPoolRarity] = useState(state.rarities[0]?.id ?? '');
   const [poolPicked, setPoolPicked] = useState<Set<string>>(new Set());
   const [poolTotal, setPoolTotal] = useState<number | null>(null);
+  const [poolSize, setPoolSize] = useState<number | null>(null);
   const [newCard, setNewCard] = useState({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0 });
   const now = useNow();
   const currentSeasonEnd = seasonEnd(state.realmKlashSeasonEnd, now);
@@ -147,11 +148,23 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     setNewCard((n) => ({ ...n, name: '', fusion: 0 }));
   }
 
+  // The pool's total is shared by every item in it, not only the ones picked, so each card gets total ÷ pool size.
+  const poolCount = Math.max(poolSize ?? 0, poolPicked.size);
+  const poolEach = poolPicked.size && poolTotal ? +(poolTotal / poolCount).toFixed(4) : 0;
+  // A card already listed (e.g. its own 1.5% line) can also be in the pool: the chances add up.
+  const poolUpdates = p.drops.filter((d) => poolPicked.has(d.cardId));
+
   function addPool() {
-    if (!poolPicked.size || !poolTotal) return;
-    const each = +(poolTotal / poolPicked.size).toFixed(4);
-    setP((x) => ({ ...x, drops: [...x.drops.filter((d) => !poolPicked.has(d.cardId)), ...[...poolPicked].map((cardId) => ({ cardId, chance: each }))] }));
+    if (!poolEach) return;
+    setP((x) => ({
+      ...x,
+      drops: [
+        ...x.drops.map((d) => (poolPicked.has(d.cardId) ? { ...d, chance: +(d.chance + poolEach).toFixed(4) } : d)),
+        ...[...poolPicked].filter((id) => !x.drops.some((d) => d.cardId === id)).map((cardId) => ({ cardId, chance: poolEach })),
+      ],
+    }));
     setPoolPicked(new Set());
+    setPoolSize(null);
     setPoolOpen(false);
   }
 
@@ -282,7 +295,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       {poolOpen && !p.store && (
         <div className="subpanel">
           <p className="muted small">
-            For odds shown as "X% for one of these cards": pick the cards and enter X. Each card gets an equal share.
+            For odds shown as "X% for one of these cards": pick the cards you want, enter X, and count every item in the pool, the ones you picked
+            included. Each card gets X ÷ that count. A card that's already listed gets its share added to its chance.
           </p>
           <select value={poolRarity} onChange={(e) => setPoolRarity(e.target.value)}>
             {state.rarities.map((r) => (
@@ -311,13 +325,22 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
                 </label>
               ))}
           </div>
-          <div className="drop-row">
+          <div className="drop-row wrap">
             <NumInput className="pct-input" value={poolTotal} min={0} max={100} placeholder="total" onChange={setPoolTotal} />
-            <span className="muted">% total</span>
-            <button className="primary" disabled={!poolPicked.size || !poolTotal} onClick={addPool}>
-              Add {poolPicked.size || ''} at {poolPicked.size && poolTotal ? +(poolTotal / poolPicked.size).toFixed(3) : '–'}% each
+            <span className="muted">% for</span>
+            <NumInput className="pct-input" value={poolSize} min={1} step={1} placeholder={String(poolPicked.size || 'items')} onChange={setPoolSize} />
+            <span className="muted">items in the whole pool</span>
+            <button className="primary" disabled={!poolEach} onClick={addPool}>
+              Add {poolPicked.size || ''} at {poolEach ? +poolEach.toFixed(3) : '–'}% each
             </button>
           </div>
+          {poolSize != null && poolSize < poolPicked.size && <div className="small error">You picked more cards than the pool has; using {poolPicked.size}.</div>}
+          {poolEach > 0 && poolUpdates.length > 0 && (
+            <div className="small muted">
+              Already listed, share added:{' '}
+              {poolUpdates.map((d) => `${state.cards.find((c) => c.id === d.cardId)?.name} ${+d.chance.toFixed(3)}% → ${+(d.chance + poolEach).toFixed(3)}%`).join('; ')}
+            </div>
+          )}
         </div>
       )}
 
