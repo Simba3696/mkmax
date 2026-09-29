@@ -173,6 +173,16 @@ describe('save migration', () => {
     expect(s.cards.map((c) => c.rarityId)).toEqual(['kameo-diamond']);
   });
 
+  it('takes the extra fusion step an outdated app added back off the Kameo rarities', () => {
+    const s = normalize({
+      ...defaultState(),
+      rarities: defaultState().rarities.map((r) => (r.kind === 'kameo' ? { ...r, dupesPerLevel: [1] } : r)),
+      cards: [card('k', 1, { rarityId: 'kameo-gold' }), card('want', 0, { rarityId: 'kameo-gold' })],
+    });
+    expect(s.rarities.filter((r) => r.kind === 'kameo').map((r) => r.dupesPerLevel)).toEqual([[], []]);
+    expect(s.cards.map((c) => c.id)).toEqual(['want']); // owning one is done again
+  });
+
   it('moves Blood Ruby gear to Epic with a max goal, and drops priority tiers', () => {
     const old = {
       ...defaultState(),
