@@ -44,7 +44,7 @@ export function defaultRarities(): RarityRule[] {
 
 export function defaultState(): AppState {
   return {
-    version: 8,
+    version: 9,
     rarities: defaultRarities(),
     currencies: [
       { id: 'souls', name: 'Souls', balance: 0 },

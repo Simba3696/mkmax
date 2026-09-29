@@ -112,23 +112,37 @@ const SITE_PACK_NAMES: Record<string, string> = {
   'POWERPLAY KAMEO SUMMON PACK': 'Power Play Kameo Pack',
 };
 
-/** The site calls Kameo packs "… Kameo Summon Pack"; the game calls them "… Kameo Pack". */
 const KAMEO_SUMMON = /\bkameo summon pack\b/i;
+const KAMEO_PACK = /\bkameo pack\b/i;
 
-/** A site pack name as the game writes it: the known fixes above, otherwise title case without "Summon" for Kameo packs. */
-export function packName(site: string) {
-  return SITE_PACK_NAMES[site.toUpperCase()] ?? titleCase(site).replace(KAMEO_SUMMON, 'Kameo Pack');
+/**
+ * A site pack name as the game writes it: the known fixes above, otherwise title case. The site calls every
+ * Kameo pack "… Kameo Summon Pack", but in the game only the Dragon Krystal ones are Summon Packs; the Blood
+ * Ruby ones are "… Kameo Pack".
+ */
+export function packName(shop: Pick<ShopPack, 'name' | 'currency'>) {
+  const name = SITE_PACK_NAMES[shop.name.toUpperCase()] ?? titleCase(shop.name);
+  return shop.currency === 'Blood Ruby' ? name.replace(KAMEO_SUMMON, 'Kameo Pack') : name;
 }
 
-/** Saved packs named the site's way (added before the fix), renamed to the game's name. */
+/**
+ * Saved packs named the site's way, renamed to the game's name: the misspellings, "Summon" dropped from Blood
+ * Ruby Kameo packs, and put back on Dragon Krystal ones (an earlier version dropped it from every Kameo pack).
+ */
 export function fixPackNames(packs: Pack[]) {
-  return packs.map((p) => (SITE_PACK_NAMES[p.name.toUpperCase()] || KAMEO_SUMMON.test(p.name) ? { ...p, name: packName(p.name) } : p));
+  const fixes = new Set(Object.values(SITE_PACK_NAMES));
+  return packs.map((p) => {
+    let name = SITE_PACK_NAMES[p.name.toUpperCase()] ?? p.name;
+    if (p.currencyId === REALM_KLASH_CURRENCY) name = name.replace(KAMEO_SUMMON, 'Kameo Pack');
+    else if (!fixes.has(name)) name = name.replace(KAMEO_PACK, 'Kameo Summon Pack');
+    return name === p.name ? p : { ...p, name };
+  });
 }
 
 /** Shop packs still on sale or coming up that aren't already in the app (by name) or dismissed. */
 export function shopSuggestions(events: EventSchedule, state: AppState, now: Date) {
   const have = new Set([...state.packs.map((p) => p.name), ...(state.dismissedShopPacks ?? [])].map(nameKey));
-  return events.packs.filter((p) => endsAfter(p, now) && !have.has(nameKey(p.name)) && !have.has(nameKey(packName(p.name))));
+  return events.packs.filter((p) => endsAfter(p, now) && !have.has(nameKey(p.name)) && !have.has(nameKey(packName(p))));
 }
 
 /**
@@ -139,7 +153,7 @@ export function packFromShop(shop: ShopPack, state: AppState, id: string): Pack 
   const currencyId = currencyFor(shop.currency, state.currencies) ?? state.currencies[0]?.id ?? '';
   return {
     id,
-    name: packName(shop.name),
+    name: packName(shop),
     currencyId,
     ...(currencyId === REALM_KLASH_CURRENCY && !shop.end && { season: false }),
     cost: shop.cost ?? 0,

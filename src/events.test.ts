@@ -31,11 +31,17 @@ describe('event schedule', () => {
     expect(['Dragon Krystals', 'Blood Ruby', 'Soul'].map((c) => currencyFor(c, cur))).toEqual(['dragon-krystals', 'blood-rubies', 'souls']);
     expect(titleCase("MK11 FROST SUMMON PACK")).toBe('MK11 Frost Summon Pack');
     expect(titleCase("BEGINNER'S SUMMON PACK")).toBe("Beginner's Summon Pack");
-    expect(packName('BLOODFIRE KAMEO SUMMON PACK')).toBe('Blood & Fire Kameo Pack'); // the site's spelling
-    expect(packName('POWERPLAY KAMEO SUMMON PACK')).toBe('Power Play Kameo Pack');
-    expect(packName('MK1 SUB-ZERO KAMEO SUMMON PACK')).toBe('MK1 Sub-Zero Kameo Pack');
-    expect(fixPackNames([{ ...packFromShop(events.packs[0], defaultState(), 'x'), name: 'Stunning Kameo Summon Pack' }])[0].name).toBe('Stunning Kameo Pack');
-    expect(fixPackNames([{ ...packFromShop(events.packs[0], defaultState(), 'x'), name: 'Bloodfire Kameo Summon Pack' }])[0].name).toBe('Blood & Fire Kameo Pack');
+    const pack = (name: string, currency = 'Blood Ruby') => packName({ name, currency });
+    expect(pack('BLOODFIRE KAMEO SUMMON PACK')).toBe('Blood & Fire Kameo Pack'); // the site's spelling
+    expect(pack('POWERPLAY KAMEO SUMMON PACK')).toBe('Power Play Kameo Pack');
+    expect(pack('STUNNING KAMEO SUMMON PACK')).toBe('Stunning Kameo Pack');
+    expect(pack('MK1 SUB-ZERO KAMEO SUMMON PACK', 'Dragon Krystals')).toBe('MK1 Sub-Zero Kameo Summon Pack');
+    const saved = (name: string, currencyId: string) => ({ ...packFromShop(events.packs[0], defaultState(), 'x'), name, currencyId });
+    expect(fixPackNames([saved('Bloodfire Kameo Summon Pack', 'blood-rubies'), saved('Stunning Kameo Summon Pack', 'blood-rubies'), saved('Kameo Pack', 'dragon-krystals')]).map((p) => p.name)).toEqual([
+      'Blood & Fire Kameo Pack',
+      'Stunning Kameo Pack',
+      'Kameo Summon Pack',
+    ]);
   });
 
   it('suggests shop packs that are on or coming up, minus ones already added or not needed', () => {

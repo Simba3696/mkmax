@@ -111,7 +111,7 @@ export interface Weights {
 
 export interface AppState {
   /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. */
-  version: 8;
+  version: 9;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];
