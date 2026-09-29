@@ -84,11 +84,23 @@ export async function writeRemote(cfg: SyncConfig, state: AppState) {
 export const stamp = (s: AppState | null | undefined) => s?.updatedAt ?? 0;
 
 /**
- * What a sync should do, given the gist's copy, this device's copy, and the version both last agreed on.
- * Only one side changed → that side wins; both changed → the user decides.
+ * Builds up to 19ef952 (2026-09-28) wrote version 2 and treated any other version as the old F1-based format,
+ * so a copy of one still open on another device raised every level by one when it pulled newer data, then
+ * synced that back as version 2. Data saved as version 2 or lower is from one of those builds and never pulled.
  */
-export function decideSync(remote: AppState | null, local: AppState, base: number): 'pull' | 'push' | 'conflict' | 'none' {
+export const fromOutdatedApp = (s: AppState) => ((s.version as number | undefined) ?? 1) <= 2;
+
+export const OUTDATED_MESSAGE =
+  'Another device synced data from an old version of MK Max, which raises every level by one. This device’s copy was kept and uploaded over it. Close MK Max on your other devices and open it again to update them.';
+
+/**
+ * What a sync should do, given the gist's copy, this device's copy, and the version both last agreed on.
+ * Only one side changed → that side wins; both changed → the user decides. Data from an outdated app is
+ * replaced with this device's copy.
+ */
+export function decideSync(remote: AppState | null, local: AppState, base: number): 'pull' | 'push' | 'conflict' | 'none' | 'outdated' {
   if (!remote) return 'push';
+  if (fromOutdatedApp(remote)) return 'outdated';
   const remoteMoved = stamp(remote) > base;
   const localMoved = stamp(local) > base;
   if (remoteMoved && localMoved) return stamp(remote) === stamp(local) ? 'none' : 'conflict';

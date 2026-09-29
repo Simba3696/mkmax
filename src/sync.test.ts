@@ -27,4 +27,10 @@ describe('decideSync', () => {
     expect(decideSync(at(10), at(10), 10)).toBe('none');
     expect(decideSync(at(20), at(20), 10)).toBe('none');
   });
+
+  it('never pulls data from a build that shifted levels (version 2 or lower), even if it is newer', () => {
+    const old = { ...at(30), version: 2 } as unknown as ReturnType<typeof at>;
+    expect(decideSync(old, at(20), 10)).toBe('outdated');
+    expect(decideSync(old, at(10), 10)).toBe('outdated');
+  });
 });

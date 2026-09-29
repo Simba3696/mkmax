@@ -3,7 +3,7 @@ import type { AppState } from './types';
 import { defaultState } from './defaults';
 import { normalize } from './normalize';
 import { pruneDone } from './engine';
-import { decideSync, findOrCreateGist, loadSyncConfig, readRemote, saveSyncConfig, stamp, writeRemote, type SyncConfig } from './sync';
+import { OUTDATED_MESSAGE, decideSync, findOrCreateGist, loadSyncConfig, readRemote, saveSyncConfig, stamp, writeRemote, type SyncConfig } from './sync';
 
 export { normalize };
 
@@ -107,6 +107,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const action = decideSync(remote, local, cfg.baseUpdatedAt);
       if (action === 'conflict') {
         setStatus({ kind: 'conflict', remote: remote! });
+        return;
+      }
+      if (action === 'outdated') {
+        await writeRemote(cfg, local);
+        setConfig({ ...cfg, baseUpdatedAt: stamp(local) });
+        setStatus({ kind: 'error', message: OUTDATED_MESSAGE });
         return;
       }
       if (action === 'pull') {

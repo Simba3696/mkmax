@@ -98,6 +98,9 @@ export function normalize(input: unknown): AppState {
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,
+          // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
+          // app on newer data, gave them a step, so owning a Kameo stopped counting as done.
+          ...(r.kind === 'kameo' && { dupesPerLevel: [] }),
           fusionMax: r.fusionMax ?? 10,
           goal: r.goal ?? 'max',
           // A rarity with a guest-flagged card has guests, whatever an older save said (Gold used to default to none).
