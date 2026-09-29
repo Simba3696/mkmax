@@ -108,6 +108,15 @@ export function cardWeight(state: AppState, card: Card) {
   return (card.guest ? w.guest : 1) * (kind === 'kameo' ? w.kameo : 1) * (card.source === 'challenge' ? w.challenge : 1);
 }
 
+/**
+ * Realm Klash gear: equipment bought to max (its goal override) or sold as a Blood Ruby store item. It's maxed
+ * with Blood Rubies, which come in daily, so Fusion Up Kards (much harder to get) are never spent on it.
+ */
+export function isRealmKlashGear(state: AppState, card: Card) {
+  if (state.rarities.find((r) => r.id === card.rarityId)?.kind !== 'equipment') return false;
+  return card.goal === 'max' || state.packs.some((p) => p.store && p.currencyId === REALM_KLASH_CURRENCY && p.drops.some((d) => d.cardId === card.id));
+}
+
 /** Fusion Up Kards needed to go from stored level `level` to the next one, or null if kards can't do that step. */
 export function kardCost(rule: RarityRule, level: number): number | null {
   const f = level - 1; // step index: F3→F4 is 3, and past fusionMax it's ascension (F10→A1 is 10)
@@ -120,7 +129,7 @@ export function kardCost(rule: RarityRule, level: number): number | null {
  * Spend each rarity's Fusion Up Kards one fusion step at a time. Costs rise steeply (a Diamond's F9→F10 costs
  * 10 kards, F3→F4 costs 1), and every step saves one pack copy, so the next kard always goes to the cheapest
  * step available, weighted up for guest cards. Ties go to the card closest to max. Kards work from the
- * threshold (F3) up, through fusion and on into Gold ascension.
+ * threshold (F3) up, through fusion and on into Gold ascension. Realm Klash gear gets none.
  */
 function allocateKards(state: AppState) {
   const kardCopies = new Map<string, number>();
@@ -129,7 +138,7 @@ function allocateKards(state: AppState) {
     const thr = thresholdLevel(rule);
     if (thr == null || rule.fusionUpKards <= 0) continue;
     const cap = (c: Card) => targetLevel(c, rule);
-    const cards = state.cards.filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c));
+    const cards = state.cards.filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c) && !isRealmKlashGear(state, c));
     const level = new Map(cards.map((c) => [c.id, c.fusion]));
     const spent = new Map<string, number>();
     let left = rule.fusionUpKards;
@@ -270,6 +279,8 @@ export interface PlannedBuy {
   count: number;
   totalCost: number;
   ev: number;
+  /** Bought in the gear-first step (Realm Klash gear, maxed one piece at a time before anything else). */
+  gear?: boolean;
 }
 
 export interface CurrencyPlan {
@@ -277,8 +288,8 @@ export interface CurrencyPlan {
   startBalance: number;
   spent: number;
   buys: PlannedBuy[];
-  /** Best pack you couldn't afford another purchase of. */
-  saveFor?: { pack: Pack; shortBy: number };
+  /** Best pack you couldn't afford another purchase of; `gear` when it's the next Realm Klash gear, which blocks packs. */
+  saveFor?: { pack: Pack; shortBy: number; gear?: boolean };
 }
 
 export interface Plan {
@@ -287,10 +298,49 @@ export interface Plan {
   expectedGains: Map<string, number>;
 }
 
+/** Blood Ruby gear order, by name, for gear that isn't in the saved order yet. */
+export const DEFAULT_GEAR_ORDER = ['Shadow Sash', "Moloch's Ball and Chain", 'Devastator', 'Datusha, Bane of the Moroi', 'Bloody Tomahawk'];
+
+export interface GearStep {
+  card: Card;
+  /** Its Blood Ruby store items that haven't expired. */
+  items: Pack[];
+  /** Copies still to buy to its goal; no Fusion Up Kards go to this gear. */
+  need: number;
+}
+
 /**
- * Greedy: repeatedly buy the affordable pack with the best (marginal EV / cost), updating
- * expected card progress after each buy so later buys see diminishing returns.
- * Currencies are budgeted independently but share card progress.
+ * Realm Klash gear (equipment sold as a Blood Ruby store item) in buying order: the saved order first, then
+ * DEFAULT_GEAR_ORDER, then by name.
+ */
+export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
+  const items = ctx.state.packs.filter((p) => p.store && p.currencyId === REALM_KLASH_CURRENCY && p.cost > 0 && packStatus(p, now) !== 'expired');
+  const saved = ctx.state.gearOrder ?? [];
+  const rank = (c: Card) => {
+    const i = saved.indexOf(c.id);
+    if (i >= 0) return i;
+    const d = DEFAULT_GEAR_ORDER.indexOf(c.name);
+    return d >= 0 ? saved.length + d : Infinity;
+  };
+  return ctx.state.cards
+    .filter((c) => ctx.rules.get(c.rarityId)?.kind === 'equipment')
+    .map((card) => {
+      const rule = ctx.rules.get(card.rarityId)!;
+      return {
+        card,
+        items: items.filter((p) => p.drops.some((d) => d.cardId === card.id)),
+        need: copiesToMax(card, rule),
+      };
+    })
+    .filter((g) => g.items.length > 0 && g.need > 0)
+    .sort((a, b) => rank(a.card) - rank(b.card) || a.card.name.localeCompare(b.card.name));
+}
+
+/**
+ * Blood Rubies max the Realm Klash gear first, one piece at a time in gearQueue order; nothing else is bought
+ * until every piece is done or out of purchases. Then, for every currency, greedy: repeatedly buy the
+ * affordable pack with the best (marginal EV / cost), updating expected card progress after each buy so later
+ * buys see diminishing returns. Currencies are budgeted independently but share card progress.
  */
 export function buildPlan(ctx: Ctx, now: Date): Plan {
   const gained = new Map<string, number>();
@@ -305,40 +355,68 @@ export function buildPlan(ctx: Ctx, now: Date): Plan {
     const buyEv = new Map<string, number>();
     let budget = cur.balance;
     const score = (p: Pack) => (packEV(ctx, p, gained) / p.cost) * (p.endsAt ? boost : 1);
-
-    for (let guard = 0; guard < 1000; guard++) {
-      let best: Pack | null = null;
-      let bestScore = 0;
-      for (const { pack } of packs) {
-        if (pack.cost > budget || (bought.get(pack.id) ?? 0) >= purchasesLeft(pack)) continue;
-        const s = score(pack);
-        if (s > bestScore + 1e-12) {
-          best = pack;
-          bestScore = s;
-        }
-      }
-      if (!best) break;
-      buyEv.set(best.id, (buyEv.get(best.id) ?? 0) + packEV(ctx, best, gained));
-      for (const d of best.drops) gained.set(d.cardId, (gained.get(d.cardId) ?? 0) + expectedCopies(best, d.chance));
-      bought.set(best.id, (bought.get(best.id) ?? 0) + 1);
-      budget -= best.cost;
-    }
+    const buy = (p: Pack) => {
+      buyEv.set(p.id, (buyEv.get(p.id) ?? 0) + packEV(ctx, p, gained));
+      for (const d of p.drops) gained.set(d.cardId, (gained.get(d.cardId) ?? 0) + expectedCopies(p, d.chance));
+      bought.set(p.id, (bought.get(p.id) ?? 0) + 1);
+      budget -= p.cost;
+    };
+    const canBuyMore = (p: Pack) => (bought.get(p.id) ?? 0) < purchasesLeft(p);
 
     let saveFor: CurrencyPlan['saveFor'];
-    let saveScore = 0;
-    for (const { pack } of packs) {
-      if (pack.cost <= budget || (bought.get(pack.id) ?? 0) >= purchasesLeft(pack)) continue;
-      const s = score(pack);
-      if (s > saveScore) {
-        saveScore = s;
-        saveFor = { pack, shortBy: pack.cost - budget };
+    const gearOrder: string[] = [];
+    if (cur.id === REALM_KLASH_CURRENCY) {
+      gear: for (const step of gearQueue(ctx, now)) {
+        const copies = (p: Pack) => expectedCopies(p, p.drops.find((d) => d.cardId === step.card.id)!.chance);
+        while ((gained.get(step.card.id) ?? 0) < step.need - 1e-9) {
+          // Cheapest copy among its store items that still have purchases left; none left → on to the next piece.
+          const item = step.items.filter(canBuyMore).sort((a, b) => a.cost / copies(a) - b.cost / copies(b))[0];
+          if (!item) break;
+          if (item.cost > budget) {
+            saveFor = { pack: item, shortBy: item.cost - budget, gear: true };
+            break gear;
+          }
+          if (!gearOrder.includes(item.id)) gearOrder.push(item.id);
+          buy(item);
+        }
       }
     }
 
+    if (!saveFor) {
+      for (let guard = 0; guard < 1000; guard++) {
+        let best: Pack | null = null;
+        let bestScore = 0;
+        for (const { pack } of packs) {
+          if (pack.cost > budget || !canBuyMore(pack)) continue;
+          const s = score(pack);
+          if (s > bestScore + 1e-12) {
+            best = pack;
+            bestScore = s;
+          }
+        }
+        if (!best) break;
+        buy(best);
+      }
+
+      let saveScore = 0;
+      for (const { pack } of packs) {
+        if (pack.cost <= budget || !canBuyMore(pack)) continue;
+        const s = score(pack);
+        if (s > saveScore) {
+          saveScore = s;
+          saveFor = { pack, shortBy: pack.cost - budget };
+        }
+      }
+    }
+
+    // Gear in the order it's bought, then limited-time packs soonest-ending first.
+    const gearRank = (p: Pack) => (gearOrder.includes(p.id) ? gearOrder.indexOf(p.id) : Infinity);
     const buys = packs
       .filter(({ pack }) => bought.has(pack.id))
-      .map(({ pack, status }) => ({ pack, status, count: bought.get(pack.id)!, totalCost: bought.get(pack.id)! * pack.cost, ev: buyEv.get(pack.id)! }))
-      .sort((a, b) => urgency(a.pack) - urgency(b.pack));
+      .map(({ pack, status }) => ({
+        pack, status, count: bought.get(pack.id)!, totalCost: bought.get(pack.id)! * pack.cost, ev: buyEv.get(pack.id)!, gear: gearOrder.includes(pack.id),
+      }))
+      .sort((a, b) => gearRank(a.pack) - gearRank(b.pack) || urgency(a.pack) - urgency(b.pack));
 
     return { currencyId: cur.id, startBalance: cur.balance, spent: cur.balance - budget, buys, saveFor };
   });
