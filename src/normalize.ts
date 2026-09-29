@@ -3,6 +3,7 @@ import type { AppState, Card, RarityRule } from './types';
 import { ASCENSION_KARD_COST, DIAMOND_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
 import { pruneDone } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
+import { fixPackNames } from './events';
 
 /**
  * Version 1 saves counted the first copy as F1; version 2 starts at F0. Shift owned levels up one,
@@ -90,7 +91,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 7,
+    version: 8,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,
@@ -114,6 +115,8 @@ export function normalize(input: unknown): AppState {
   if (version < 5) for (const c of out.cards) if (!c.source && isChallengeKameo(c, out.rarities)) c.source = 'challenge';
   // Version 7 untags Kameos whose challenge was retired (Klassic Ermac), since they come from packs now.
   if (version < 7) for (const c of out.cards) if (isRetiredChallenge(c)) delete c.source;
+  // Version 8 renames packs added under MK Mobile Base's names ("Bloodfire Kameo Summon Pack" is the Blood & Fire Kameo Pack).
+  if (version < 8) out.packs = fixPackNames(out.packs);
   pruneDone(out);
   return out;
 }
