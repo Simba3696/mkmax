@@ -70,6 +70,9 @@ function kardTable(r: RarityRule): number[] {
   return costs;
 }
 
+/** Card (and same-named pack) names from older saves, mapped to the game's spelling. */
+const RENAMED: Record<string, string> = { 'Datusha, Bane of Moroi': 'Datusha, Bane of the Moroi' };
+
 /** Fill in fields missing from older saves or hand-edited imports, then drop cards that are already done. */
 export function normalize(input: unknown): AppState {
   let s = input as Partial<AppState>;
@@ -91,7 +94,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 8,
+    version: 9,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,
@@ -115,8 +118,12 @@ export function normalize(input: unknown): AppState {
   if (version < 5) for (const c of out.cards) if (!c.source && isChallengeKameo(c, out.rarities)) c.source = 'challenge';
   // Version 7 untags Kameos whose challenge was retired (Klassic Ermac), since they come from packs now.
   if (version < 7) for (const c of out.cards) if (isRetiredChallenge(c)) delete c.source;
-  // Version 8 renames packs added under MK Mobile Base's names ("Bloodfire Kameo Summon Pack" is the Blood & Fire Kameo Pack).
-  if (version < 8) out.packs = fixPackNames(out.packs);
+  // Version 9 renames packs added under MK Mobile Base's names ("Bloodfire Kameo Summon Pack" is the Blood & Fire
+  // Kameo Pack) and fixes misspelled card names from the OneNote starter data.
+  if (version < 9) {
+    out.packs = fixPackNames(out.packs).map((p) => (RENAMED[p.name] ? { ...p, name: RENAMED[p.name] } : p));
+    for (const c of out.cards) if (RENAMED[c.name]) c.name = RENAMED[c.name];
+  }
   pruneDone(out);
   return out;
 }

@@ -670,7 +670,7 @@
     {
       "id": "c56",
       "guest": false,
-      "name": "Datusha, Bane of Moroi",
+      "name": "Datusha, Bane of the Moroi",
       "rarityId": "epic",
       "fusion": 1,
       "imageUrl": "https://mkmobilebase.com/storage/articles/variants/qIiQD34UvE6AdJiHSqosn1GoVJOItXI6h9ESdJGh-300.webp",
@@ -926,7 +926,7 @@
     },
     {
       "id": "p57",
-      "name": "Datusha, Bane of Moroi",
+      "name": "Datusha, Bane of the Moroi",
       "currencyId": "blood-rubies",
       "cost": 800,
       "rolls": 1,
