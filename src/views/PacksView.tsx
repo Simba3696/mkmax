@@ -4,7 +4,7 @@ import { REALM_KLASH_CURRENCY, levelLabel, maxFusion, moveSeasonEnd, packStatus,
 import { CardThumb, ConfirmButton, fmt, useNow } from '../ui';
 import { PackTiming } from './PlanView';
 import PackEditor from './PackEditor';
-import { packFromShop, scheduledSeasonEnd, shopSuggestions, titleCase, useEvents } from '../events';
+import { packFromShop, packName, scheduledSeasonEnd, shopSuggestions, useEvents } from '../events';
 import type { AppState, Pack } from '../types';
 
 export default function PacksView() {
@@ -244,7 +244,7 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
               <div key={sp.name} className="row">
                 {sp.image && <img className="thumb" src={sp.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 44, height: 44 }} />}
                 <div className="grow">
-                  <div className="row-title">{titleCase(sp.name)}</div>
+                  <div className="row-title">{packName(sp.name)}</div>
                   <div className="muted small">
                     {sp.cost != null && `${fmt(sp.cost)} ${sp.currency} · `}
                     {sp.limit != null ? `limit ${sp.limit}` : 'no limit'}
@@ -254,7 +254,7 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
                 <button onClick={() => onAdd(packFromShop(sp, state, newId()))}>Add</button>
                 <button
                   className="ghost"
-                  onClick={() => update((d) => void (d.dismissedShopPacks = [...(d.dismissedShopPacks ?? []), sp.name]), `Hid ${titleCase(sp.name)}`)}
+                  onClick={() => update((d) => void (d.dismissedShopPacks = [...(d.dismissedShopPacks ?? []), sp.name]), `Hid ${packName(sp.name)}`)}
                 >
                   Not needed
                 </button>

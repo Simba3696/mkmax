@@ -106,10 +106,29 @@ export function titleCase(name: string) {
   return name.toLowerCase().replace(/[a-z0-9']+/g, (w) => (/\d/.test(w) ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)));
 }
 
+/** Packs MK Mobile Base misspells, keyed by the site's name, mapped to the game's name. */
+const SITE_PACK_NAMES: Record<string, string> = {
+  'BLOODFIRE KAMEO SUMMON PACK': 'Blood & Fire Kameo Pack',
+  'POWERPLAY KAMEO SUMMON PACK': 'Power Play Kameo Pack',
+};
+
+/** The site calls Kameo packs "… Kameo Summon Pack"; the game calls them "… Kameo Pack". */
+const KAMEO_SUMMON = /\bkameo summon pack\b/i;
+
+/** A site pack name as the game writes it: the known fixes above, otherwise title case without "Summon" for Kameo packs. */
+export function packName(site: string) {
+  return SITE_PACK_NAMES[site.toUpperCase()] ?? titleCase(site).replace(KAMEO_SUMMON, 'Kameo Pack');
+}
+
+/** Saved packs named the site's way (added before the fix), renamed to the game's name. */
+export function fixPackNames(packs: Pack[]) {
+  return packs.map((p) => (SITE_PACK_NAMES[p.name.toUpperCase()] || KAMEO_SUMMON.test(p.name) ? { ...p, name: packName(p.name) } : p));
+}
+
 /** Shop packs still on sale or coming up that aren't already in the app (by name) or dismissed. */
 export function shopSuggestions(events: EventSchedule, state: AppState, now: Date) {
   const have = new Set([...state.packs.map((p) => p.name), ...(state.dismissedShopPacks ?? [])].map(nameKey));
-  return events.packs.filter((p) => endsAfter(p, now) && !have.has(nameKey(p.name)) && !have.has(nameKey(titleCase(p.name))));
+  return events.packs.filter((p) => endsAfter(p, now) && !have.has(nameKey(p.name)) && !have.has(nameKey(packName(p.name))));
 }
 
 /**
@@ -120,7 +139,7 @@ export function packFromShop(shop: ShopPack, state: AppState, id: string): Pack 
   const currencyId = currencyFor(shop.currency, state.currencies) ?? state.currencies[0]?.id ?? '';
   return {
     id,
-    name: titleCase(shop.name),
+    name: packName(shop.name),
     currencyId,
     ...(currencyId === REALM_KLASH_CURRENCY && !shop.end && { season: false }),
     cost: shop.cost ?? 0,

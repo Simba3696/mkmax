@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
-import { challengeFor, currencyFor, packFromShop, scheduledSeasonEnd, shopSuggestions, titleCase, type EventSchedule } from './events';
+import { challengeFor, currencyFor, packFromShop, scheduledSeasonEnd, shopSuggestions, titleCase, packName, fixPackNames, type EventSchedule } from './events';
 import { toLocalInput } from './engine';
 
 const NOW = new Date('2026-09-28T17:00:00Z');
@@ -31,6 +31,11 @@ describe('event schedule', () => {
     expect(['Dragon Krystals', 'Blood Ruby', 'Soul'].map((c) => currencyFor(c, cur))).toEqual(['dragon-krystals', 'blood-rubies', 'souls']);
     expect(titleCase("MK11 FROST SUMMON PACK")).toBe('MK11 Frost Summon Pack');
     expect(titleCase("BEGINNER'S SUMMON PACK")).toBe("Beginner's Summon Pack");
+    expect(packName('BLOODFIRE KAMEO SUMMON PACK')).toBe('Blood & Fire Kameo Pack'); // the site's spelling
+    expect(packName('POWERPLAY KAMEO SUMMON PACK')).toBe('Power Play Kameo Pack');
+    expect(packName('MK1 SUB-ZERO KAMEO SUMMON PACK')).toBe('MK1 Sub-Zero Kameo Pack');
+    expect(fixPackNames([{ ...packFromShop(events.packs[0], defaultState(), 'x'), name: 'Stunning Kameo Summon Pack' }])[0].name).toBe('Stunning Kameo Pack');
+    expect(fixPackNames([{ ...packFromShop(events.packs[0], defaultState(), 'x'), name: 'Bloodfire Kameo Summon Pack' }])[0].name).toBe('Blood & Fire Kameo Pack');
   });
 
   it('suggests shop packs that are on or coming up, minus ones already added or not needed', () => {
