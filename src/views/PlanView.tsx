@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
-import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, cardGoal, daysToAfford, gearForecast, gearQueue, isRealmKlashGear, levelLabel, rankPacks, rankTargets, recordPurchase, targetLevel, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
-import { CardThumb, FoldCard, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
+import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, cardGoal, daysToAfford, isRealmKlashGear, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
+import { CardThumb, daysFromNow, FoldCard, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
+import { GearSummary } from './GearOrder';
 
 const PHASE_LABEL: Record<Phase, string> = {
   unlock: 'Unlock',
@@ -31,19 +32,6 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
   const plan = useMemo(() => buildPlan(ctx, now), [ctx, now]);
   const ranks = useMemo(() => rankPacks(ctx, now), [ctx, now]);
   const targets = useMemo(() => rankTargets(ctx, now).slice(0, 10), [ctx, now]);
-  const gear = useMemo(() => gearQueue(ctx, now), [ctx, now]);
-  // Swap a gear piece with its neighbour and save the whole order, so the list stays as shown.
-  const moveGear = (i: number, by: number) =>
-    update((d) => {
-      const ids = gear.map((g) => g.card.id);
-      [ids[i], ids[i + by]] = [ids[i + by], ids[i]];
-      d.gearOrder = [...ids, ...(d.gearOrder ?? []).filter((id) => !ids.includes(id))];
-    });
-  const rubies = state.currencies.find((c) => c.id === REALM_KLASH_CURRENCY);
-  const gearDone = useMemo(() => gearForecast(gear, rubies?.balance ?? 0, rubies?.perDay), [gear, rubies?.balance, rubies?.perDay]);
-  const allGear = gearDone.at(-1);
-  const onDay = (days: number) =>
-    days === 0 ? 'now' : `around ${new Date(now.getTime() + days * 86400000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
   const events = useEvents();
   // Challenge Kameos you still need whose Elder challenge is on now or coming up, soonest first.
   const challengeKameos = state.cards
@@ -64,12 +52,11 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
     const perDay = state.currencies.find((c) => c.id === currencyId)?.perDay;
     const days = saveFor && daysToAfford(saveFor.shortBy, perDay);
     if (!saveFor || !days) return null;
-    const by = new Date(now.getTime() + days * 86400000);
-    const endsFirst = saveFor.pack.endsAt && new Date(saveFor.pack.endsAt) < by;
+    const endsFirst = saveFor.pack.endsAt && new Date(saveFor.pack.endsAt).getTime() < now.getTime() + days * 86400000;
     return (
       <>
         {' '}
-        At {fmt(perDay!)} a day that's about {days} day{days === 1 ? '' : 's'}, around {by.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}.
+        At {fmt(perDay!)} a day that's about {days} day{days === 1 ? '' : 's'}, around {daysFromNow(days, now)}.
         {endsFirst && <b> It ends before then.</b>}
       </>
     );
@@ -167,6 +154,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                   )}
                 </div>
               ))}
+              {c.currencyId === REALM_KLASH_CURRENCY && <GearSummary />}
               {c.saveFor?.gear ? (
                 <p className="hint">
                   Next: <a onClick={() => openPack(c.saveFor!.pack.id)}>{c.saveFor.pack.name}</a>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another copy.
@@ -183,59 +171,9 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
             </div>
           ))}
         <p className="muted small">
-          Tap a pack to jump to it in Packs, or <b>Bought one</b> to log a purchase here. Blood Ruby gear comes first, in the order below. Then limited-time packs are listed first, soonest-ending at the top. "Save for" means the pack hasn't started yet, so hold the currency for it.
+          Tap a pack to jump to it in Packs, or <b>Bought one</b> to log a purchase here. Blood Ruby gear comes first, in the order set in Settings. Then limited-time packs are listed first, soonest-ending at the top. "Save for" means the pack hasn't started yet, so hold the currency for it.
         </p>
       </FoldCard>
-
-      {gear.length > 0 && (
-        <FoldCard id="gear" title="Blood Ruby gear order">
-          <p className="muted small">
-            Blood Rubies max these one at a time, top first, before buying any pack. A piece whose store item is out of purchases is skipped
-            for now.
-          </p>
-          {allGear && (
-            <p className="hint">
-              {allGear.days == null ? (
-                <>
-                  Maxing all of it takes {fmt(allGear.total)} {curName(REALM_KLASH_CURRENCY)}. Set how many you get a day in Settings → Currencies to see
-                  when it's done.
-                </>
-              ) : (
-                <>
-                  All maxed <b>{onDay(allGear.days)}</b>
-                  {allGear.days > 0 && ` (${allGear.days} days at ${fmt(rubies?.perDay ?? 0)} a day)`}, for {fmt(allGear.total)}{' '}
-                  {curName(REALM_KLASH_CURRENCY)} in all. Season rewards and other rubies bring it closer.
-                </>
-              )}
-            </p>
-          )}
-          {gear.map((g, i) => {
-            const rule = ctx.rules.get(g.card.rarityId);
-            const cost = Math.min(...g.items.map((p) => p.cost));
-            return (
-              <div key={g.card.id} className="row">
-                <CardThumb card={g.card} rule={rule} />
-                <div className="grow">
-                  <div className="row-title">
-                    {i + 1}. {g.card.name}
-                  </div>
-                  <div className="muted small">
-                    <FusionLabel card={g.card} rule={rule} /> · {fmt(g.need)} to {rule && levelLabel(rule, targetLevel(g.card, rule))} ·{' '}
-                    {fmt(g.need * cost)} {curName('blood-rubies')}
-                    {gearDone[i]?.days != null && ` · maxed ${onDay(gearDone[i].days)}`}
-                  </div>
-                </div>
-                <button onClick={() => moveGear(i, -1)} disabled={i === 0} aria-label="Move up">
-                  ↑
-                </button>
-                <button onClick={() => moveGear(i, 1)} disabled={i === gear.length - 1} aria-label="Move down">
-                  ↓
-                </button>
-              </div>
-            );
-          })}
-        </FoldCard>
-      )}
 
       {kardRarities.some((r) => r.fusionUpKards > 0) && (
         <FoldCard id="kards" title="Fusion Up Kard plan">
