@@ -4,6 +4,7 @@ import {
   ascensionCaps, buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, recordPurchase, seasonEnd, suggestSeason, targetLevel,
 } from './engine';
 import { normalize } from './store';
+import { daysFromNow } from './ui';
 import type { AppState, Card, Pack } from './types';
 
 const NOW = new Date('2026-01-10T12:00:00');
@@ -354,6 +355,12 @@ describe('buying from the plan', () => {
       { cardId: 'ball', total: 1500, days: 14 },
     ]);
     expect(gearForecast(gear, 0, undefined).map((g) => g.days)).toEqual([null, null]);
+  });
+
+  it('adds the year to forecast dates outside this year', () => {
+    const now = new Date('2026-10-02T12:00:00');
+    expect(daysFromNow(14, now)).not.toMatch(/2026/);
+    expect(daysFromNow(127, now)).toMatch(/2027/);
   });
 
   it('flags planned packs ending within a day', () => {

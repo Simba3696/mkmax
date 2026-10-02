@@ -4,6 +4,7 @@ import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '.
 import { ConfirmButton, NumInput } from '../ui';
 import { copiesTotal, fLevel, levelLabel, maxFusion } from '../engine';
 import SyncPanel from './SyncPanel';
+import GearOrder from './GearOrder';
 import type { RarityRule, Weights } from '../types';
 
 const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
@@ -202,6 +203,8 @@ export default function SettingsView() {
         </p>
         <button onClick={() => update((d) => void d.currencies.push({ id: newId(), name: 'New currency', balance: 0 }))}>+ Currency</button>
       </section>
+
+      <GearOrder />
 
       <section className="card">
         <h2>Priority weights</h2>

@@ -168,6 +168,12 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 }
 
 /** Two-step delete button (no native confirm dialogs). */
+/** The date `days` from now, as "Oct 16", with the year when it isn't this year ("Feb 6, 2027"). */
+export function daysFromNow(days: number, now: Date) {
+  const d = new Date(now.getTime() + days * 86400000);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== now.getFullYear() && { year: 'numeric' }) });
+}
+
 /**
  * A display choice remembered on this device (a list's sort order), not synced. Falls back to the first option
  * when nothing valid is saved or storage is blocked.
