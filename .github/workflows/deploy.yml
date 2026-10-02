@@ -27,6 +27,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run lint
       - run: npm test
       # Refresh the MK Mobile Base catalog (names, rarities, card art). If the site is down, the committed copy is used.
       - run: npm run catalog || echo "::warning::Catalog refresh failed; deploying the committed public/catalog.json"

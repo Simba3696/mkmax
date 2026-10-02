@@ -44,11 +44,11 @@ export function defaultRarities(): RarityRule[] {
 
 export function defaultState(): AppState {
   return {
-    version: 9,
+    version: 10,
     rarities: defaultRarities(),
     currencies: [
       { id: 'souls', name: 'Souls', balance: 0 },
-      { id: 'blood-rubies', name: 'Blood Rubies', balance: 0 },
+      { id: 'blood-rubies', name: 'Blood Rubies', balance: 0, perDay: 65 },
       { id: 'dragon-krystals', name: 'Dragon Krystals', balance: 0 },
       { id: 'time-krystals', name: 'Time Krystals', balance: 0 },
     ],

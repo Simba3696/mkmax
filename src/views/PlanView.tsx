@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
-import { buildCtx, buildPlan, cardGoal, gearQueue, isRealmKlashGear, levelLabel, rankPacks, rankTargets, targetLevel, thresholdLevel, type Phase } from '../engine';
-import { CardThumb, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
+import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, cardGoal, daysToAfford, gearForecast, gearQueue, isRealmKlashGear, levelLabel, rankPacks, rankTargets, recordPurchase, targetLevel, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
+import { CardThumb, FoldCard, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
 
@@ -24,7 +24,7 @@ export function PackTiming({ pack, now }: { pack: Pack; now: Date }) {
   return <span className="chip muted">permanent</span>;
 }
 
-export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'settings') => void }) {
+export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'cards' | 'settings') => void; openPack: (id: string, pull?: boolean) => void }) {
   const { state, update } = useStore();
   const now = useNow();
   const ctx = useMemo(() => buildCtx(state), [state]);
@@ -39,6 +39,11 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
       [ids[i], ids[i + by]] = [ids[i + by], ids[i]];
       d.gearOrder = [...ids, ...(d.gearOrder ?? []).filter((id) => !ids.includes(id))];
     });
+  const rubies = state.currencies.find((c) => c.id === REALM_KLASH_CURRENCY);
+  const gearDone = useMemo(() => gearForecast(gear, rubies?.balance ?? 0, rubies?.perDay), [gear, rubies?.balance, rubies?.perDay]);
+  const allGear = gearDone.at(-1);
+  const onDay = (days: number) =>
+    days === 0 ? 'now' : `around ${new Date(now.getTime() + days * 86400000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
   const events = useEvents();
   // Challenge Kameos you still need whose Elder challenge is on now or coming up, soonest first.
   const challengeKameos = state.cards
@@ -49,6 +54,26 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
     })
     .sort((a, b) => (a.ch.start ?? '').localeCompare(b.ch.start ?? ''));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
+  // A store item levels its card straight away. A random pack opens in Packs with "What did you pull?" showing.
+  const buyNow = (pack: Pack) => {
+    update((d) => void recordPurchase(d, pack.id, 1), `Bought ${pack.name}`);
+    if (!pack.store) openPack(pack.id, true);
+  };
+  /** When the currency's daily income covers what "Save for" is short by, and whether the pack ends first. */
+  const forecast = ({ currencyId, saveFor }: CurrencyPlan) => {
+    const perDay = state.currencies.find((c) => c.id === currencyId)?.perDay;
+    const days = saveFor && daysToAfford(saveFor.shortBy, perDay);
+    if (!saveFor || !days) return null;
+    const by = new Date(now.getTime() + days * 86400000);
+    const endsFirst = saveFor.pack.endsAt && new Date(saveFor.pack.endsAt) < by;
+    return (
+      <>
+        {' '}
+        At {fmt(perDay!)} a day that's about {days} day{days === 1 ? '' : 's'}, around {by.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}.
+        {endsFirst && <b> It ends before then.</b>}
+      </>
+    );
+  };
   // Kard counts only matter where some card is taken past the threshold with kards. Realm Klash gear doesn't
   // count: it's maxed with Blood Rubies.
   const kardRarities = state.rarities.filter(
@@ -102,13 +127,11 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
 
   return (
     <>
-      <section className="card">
-        <h2>Wallet</h2>
+      <FoldCard id="wallet" title="Wallet">
         {wallet}
-      </section>
+      </FoldCard>
 
-      <section className="card">
-        <h2>What to buy</h2>
+      <FoldCard id="buy" title="What to buy">
         {plan.currencies.every((c) => c.buys.length === 0 && !c.saveFor) && (
           <p className="muted">No worthwhile purchases. Add packs that drop cards you haven't maxed, or top up your balances.</p>
         )}
@@ -124,43 +147,68 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
               </div>
               {c.buys.map((b) => (
                 <div key={b.pack.id} className="row plan-row">
-                  <div className="grow">
-                    <div className="row-title">
+                  <button className="row-link grow" onClick={() => openPack(b.pack.id)} title="Show in Packs">
+                    <span className="row-title">
                       {b.status === 'upcoming' ? 'Save for' : 'Buy'} <b>{b.count}×</b> {b.pack.name}
-                    </div>
-                    <div className="muted small">
+                    </span>
+                    <span className="muted small">
                       {fmt(b.totalCost)} {curName(c.currencyId)} · value {fmt(b.ev)}
-                    </div>
-                  </div>
+                    </span>
+                  </button>
                   <PackTiming pack={b.pack} now={now} />
+                  {b.status === 'active' && (
+                    <button
+                      className="small"
+                      onClick={() => buyNow(b.pack)}
+                      title={b.pack.store ? 'Adds a purchase, deducts the cost and levels up the card' : 'Adds a purchase, deducts the cost and opens the pack to log what you pulled'}
+                    >
+                      Bought one
+                    </button>
+                  )}
                 </div>
               ))}
               {c.saveFor?.gear ? (
                 <p className="hint">
-                  Next: <b>{c.saveFor.pack.name}</b>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another copy. Packs
-                  wait until the gear is maxed.
+                  Next: <a onClick={() => openPack(c.saveFor!.pack.id)}>{c.saveFor.pack.name}</a>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another copy.
+                  {forecast(c)} Packs wait until the gear is maxed.
                 </p>
               ) : (
                 c.saveFor && (
                   <p className="hint">
-                    Next best: <b>{c.saveFor.pack.name}</b>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another purchase.
+                    Next best: <a onClick={() => openPack(c.saveFor!.pack.id)}>{c.saveFor.pack.name}</a>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another purchase.
+                    {forecast(c)}
                   </p>
                 )
               )}
             </div>
           ))}
         <p className="muted small">
-          Blood Ruby gear comes first, in the order below. Then limited-time packs are listed first, soonest-ending at the top. "Save for" means the pack hasn't started yet, so hold the currency for it.
+          Tap a pack to jump to it in Packs, or <b>Bought one</b> to log a purchase here. Blood Ruby gear comes first, in the order below. Then limited-time packs are listed first, soonest-ending at the top. "Save for" means the pack hasn't started yet, so hold the currency for it.
         </p>
-      </section>
+      </FoldCard>
 
       {gear.length > 0 && (
-        <section className="card">
-          <h2>Blood Ruby gear order</h2>
+        <FoldCard id="gear" title="Blood Ruby gear order">
           <p className="muted small">
             Blood Rubies max these one at a time, top first, before buying any pack. A piece whose store item is out of purchases is skipped
             for now.
           </p>
+          {allGear && (
+            <p className="hint">
+              {allGear.days == null ? (
+                <>
+                  Maxing all of it takes {fmt(allGear.total)} {curName(REALM_KLASH_CURRENCY)}. Set how many you get a day in Settings → Currencies to see
+                  when it's done.
+                </>
+              ) : (
+                <>
+                  All maxed <b>{onDay(allGear.days)}</b>
+                  {allGear.days > 0 && ` (${allGear.days} days at ${fmt(rubies?.perDay ?? 0)} a day)`}, for {fmt(allGear.total)}{' '}
+                  {curName(REALM_KLASH_CURRENCY)} in all. Season rewards and other rubies bring it closer.
+                </>
+              )}
+            </p>
+          )}
           {gear.map((g, i) => {
             const rule = ctx.rules.get(g.card.rarityId);
             const cost = Math.min(...g.items.map((p) => p.cost));
@@ -174,6 +222,7 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
                   <div className="muted small">
                     <FusionLabel card={g.card} rule={rule} /> · {fmt(g.need)} to {rule && levelLabel(rule, targetLevel(g.card, rule))} ·{' '}
                     {fmt(g.need * cost)} {curName('blood-rubies')}
+                    {gearDone[i]?.days != null && ` · maxed ${onDay(gearDone[i].days)}`}
                   </div>
                 </div>
                 <button onClick={() => moveGear(i, -1)} disabled={i === 0} aria-label="Move up">
@@ -185,12 +234,11 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
               </div>
             );
           })}
-        </section>
+        </FoldCard>
       )}
 
       {kardRarities.some((r) => r.fusionUpKards > 0) && (
-        <section className="card">
-          <h2>Fusion Up Kard plan</h2>
+        <FoldCard id="kards" title="Fusion Up Kard plan">
           {kardRarities.map((r) => {
             const plan = ctx.kardPlan.get(r.id);
             if (r.fusionUpKards <= 0 || !plan) return null;
@@ -220,12 +268,11 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
             );
           })}
           <p className="muted small">Kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra.</p>
-        </section>
+        </FoldCard>
       )}
 
       {challengeKameos.length > 0 && (
-        <section className="card">
-          <h2>Elder challenges</h2>
+        <FoldCard id="challenges" title="Elder challenges">
           <p className="muted small">Kameos you still need that an Elder challenge on MK Mobile Base's schedule gives for sure.</p>
           {challengeKameos.map(({ card, ch }) => (
             <div key={card.id} className="row">
@@ -234,11 +281,10 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
               <span className={`chip ${ch.start && new Date(ch.start) > now ? 'limited' : 'urgent'}`}>{challengeWhen(ch, now)}</span>
             </div>
           ))}
-        </section>
+        </FoldCard>
       )}
 
-      <section className="card">
-        <h2>Priority targets</h2>
+      <FoldCard id="targets" title="Priority targets">
         <p className="muted small">Ranked by how much the next copy is worth to you.</p>
         {targets.map((t) => {
           const rule = ctx.rules.get(t.card.rarityId);
@@ -264,10 +310,9 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
             </div>
           );
         })}
-      </section>
+      </FoldCard>
 
-      <section className="card">
-        <h2>Pack ranking</h2>
+      <FoldCard id="ranking" title="Pack ranking">
         <p className="muted small">
           Efficiency is value per cost, relative to the best pack in the same currency. It uses your cards as they are now.
         </p>
@@ -283,15 +328,15 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
                 return (
                   <div key={r.pack.id} className="rank">
                     <div className="row">
-                      <div className="grow">
-                        <div className="row-title">{r.pack.name}</div>
-                        <div className="muted small">
+                      <button className="row-link grow" onClick={() => openPack(r.pack.id)} title="Show in Packs">
+                        <span className="row-title">{r.pack.name}</span>
+                        <span className="muted small">
                           {fmt(r.pack.cost)} {cur.name} · value {fmt(r.ev)} per buy
-                        </div>
-                        <div className="effbar" title={`${Math.round(eff * 100)}% efficiency`}>
+                        </span>
+                        <span className="effbar" title={`${Math.round(eff * 100)}% efficiency`}>
                           <span style={{ width: `${eff * 100}%` }} />
-                        </div>
-                      </div>
+                        </span>
+                      </button>
                       <div className="rank-side">
                         <PackTiming pack={r.pack} now={now} />
                         <span className="small">{Math.round(eff * 100)}%</span>
@@ -309,7 +354,7 @@ export default function PlanView({ goto }: { goto: (t: 'packs' | 'cards' | 'sett
             </div>
           );
         })}
-      </section>
+      </FoldCard>
     </>
   );
 }

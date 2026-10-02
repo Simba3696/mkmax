@@ -1,112 +1,60 @@
 # MK Max
 
-A PWA that helps decide which Mortal Kombat Mobile packs to buy to max out your cards.
+**A pack planner for Mortal Kombat Mobile.** Tell it which cards you're maxing, what's in the store and how much currency you have, and it works out which packs to buy, in what order, and where your Fusion Up Kards should go.
+
+**[Open the app →](https://simba3696.github.io/mkmax/)** It runs in any modern browser. Add it to your home screen to use it like a native app, offline included.
+
+[![Deploy](https://github.com/Simba3696/mkmax/actions/workflows/deploy.yml/badge.svg)](https://github.com/Simba3696/mkmax/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+<p align="center">
+  <img src="docs/screenshots/plan.png" width="260" alt="Plan: what to buy with each currency">
+  <img src="docs/screenshots/packs.png" width="260" alt="Packs: the store, with one-tap purchase logging">
+  <img src="docs/screenshots/cards.png" width="260" alt="Cards: tracked cards sorted by fusion level">
+</p>
+
+## Features
+
+- **Purchase plan.** For each currency (Souls, Blood Rubies, Dragon Krystals, Time Krystals, or any you add) it recommends what to buy, putting limited-time packs first, and tells you when to save for a pack that hasn't started yet. Tap a pack to jump to it, or log a purchase without leaving the plan. With a daily income set, it says when you'll afford what it's saving for.
+- **Pack ranking.** Compares packs by expected value per cost, showing your chance of each card you need per buy and about how many buys a copy takes.
+- **Fusion Up Kard plan.** Spends kards on the cheapest steps first, by rarity, through ascension for Gold cards.
+- **Blood Ruby gear order.** Maxes the Realm Klash gear one piece at a time, in an order you choose, before any other Blood Ruby buy, and forecasts the date each piece and the whole set will be maxed.
+- **Ending-soon badge.** The Packs tab, and the home-screen icon where the phone supports it, counts planned packs that end within a day.
+- **Live shop schedule.** Packs on sale or coming up, Elder challenge dates and Realm Klash season ends come from [MK Mobile Base](https://mkmobilebase.com/) and are refreshed daily.
+- **Card art and rarities.** Looked up automatically from MK Mobile Base and the [MK Mobile wiki](https://mortalkombat-mobile.fandom.com/).
+- **Quick entry.** Paste a whole card list, split even-pool odds across cards in one go, and log a purchase with one tap. Undo works on all of these. Sort packs by end time or currency and cards by rarity, fusion level or name, and fold away Plan cards you don't need.
+- **Private by default.** Your data stays in your browser. Optional sync between devices uses a secret GitHub Gist that you own.
+
+## How it decides
+
+Every copy of a card gets a value based on where it takes the card: unlocking it, reaching F3 (where Fusion Up Kards start to work), normal fusion, or steps your kards would cover anyway. Guest cards get extra weight, and Kameos and Elder challenge Kameos get less. A pack's value is the expected value of its drops. The planner keeps buying the affordable pack with the best value per cost, updating your expected progress after each buy so repeat buys count for less. Every weight and fusion cost can be edited in Settings.
+
+The full model is in [How it works](docs/how-it-works.md).
+
+## Documentation
+
+- [User guide](docs/user-guide.md): getting started, everyday use, sync, and what's tracked for each rarity
+- [How it works](docs/how-it-works.md): scoring, the event schedule, and where card images come from
+- [Development](docs/development.md): setup, project layout, migrations, hosting
+
+## Quick start
 
 ```sh
 npm install
-npm run dev       # http://localhost:5173 (also reachable from your phone on the same Wi-Fi)
-npm test          # scoring/planner tests
-npm run build     # production build in dist/ (installable PWA)
+npm run dev     # http://localhost:5173
+npm test
+npm run lint
+npm run build   # installable PWA in dist/
 ```
 
-Data lives in the browser's localStorage. Use Settings → Export backup to save it or move it to another device.
+Built with React 19, TypeScript, Vite and `vite-plugin-pwa`, linted with oxlint and tested with Vitest. Pushes to `main` deploy to GitHub Pages through GitHub Actions.
 
-`public/onenote-import.json` is starter data transcribed from the OneNote "MK Mobile" page. To load it, use Settings → Load OneNote data, or open the app with `?starter` (for example `http://localhost:5173/?starter`). The `?starter` link only loads the file when the app has no cards yet, so it never overwrites your progress.
+## License
 
-## Everyday use
+[MIT](LICENSE).
 
-- **Adding many cards at once:** on Cards, tap **Paste a list…** and paste one card per line. A line can be just a name (for example `Jade, Lizard`), which goes in as not owned. Plain names use the rarity picked in Add card until a line that's just a rarity name (`Gold Kameo`, `Diamond Kameo`) switches it, so a list copied from notes with headings and `-----` underlines works as-is. A line can also have details after ` - `, in any order: rarity (`Epic`, `Rare`), where it comes from (`Krypt Gear`, or a tower name like `Lin Kuei Tower`, which tags it as tower gear and remembers the tower), and level (`F2`, or `Unowned`). For example: `Kori Blade - Epic - Lin Kuei Tower - F2`. Cards already in the app get the new level and source instead of being added twice. Lines it can't use are listed with the reason and left out: Common gear, a level past the max, a line with details but no rarity, or a part it doesn't recognise. Undo takes the whole batch back out.
-- **Recording purchases:** on Packs, tap **I bought one**. This deducts the cost, and a store item also levels up its card. For random packs, tap + on each card you pulled. **−1** removes one purchase and refunds its cost.
-- **Undo:** after a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
-- **Switching tabs:** tap a tab, or swipe left or right on the page. The page follows your finger; let go past about a quarter of the screen (or flick) and it slides to the next tab, otherwise it springs back. Tapping a tab slides the same way. With Reduce Motion on, tabs switch without the slide. Swipes that start on a text field, inside a pop-up, on something that scrolls sideways, or right at the screen edge (where iOS has its own back gesture) are ignored.
-- **Done cards are removed:** when a card reaches its goal, the app deletes it. It's also removed from any pack drop lists, and a store item that only sold that card is deleted too. The goal is max for Diamond, the card's own ascension cap for Gold, and F3 for Rare and Epic, except Epic cards set to a max goal (like the Realm Klash gear). Right after this happens you can use **Undo**. Any card that's already at its goal is removed when the app loads, when you import a backup, or when a sync brings one in.
-- **Which version you have:** the bottom of Settings shows the commit and build date, for example `Version 0ebc412 · 2026-09-27`. An app left open only looks for a new deploy when you pull to refresh (or when it's fully closed and reopened). If a new build is out, the app reloads into it.
-- **Pull to refresh:** pull down from the top of any page. With sync on, it syncs now, re-reads the event schedule and checks for a new version of the app. Without sync, it reloads the app, which also picks up updates. Your data is kept either way. It doesn't work inside a pop-up, so an unsaved pack editor is never reloaded away.
-- **Pop-ups** (like the pack editor) sit above the header and tab bar and scroll on their own, so the buttons at the bottom can always be reached. Tapping outside one doesn't close it, so a stray tap can't throw away a half-entered pack; use ✕ or Cancel.
-- **Even pools:** for odds like "9% for one random Rare tower item", tap **+ Even pool…**, tick the cards you want, and enter the 9% and how many items the whole pool has (every item, the ticked ones included; nothing is added to or taken off that count). Each ticked card gets 9% ÷ that number (leave it blank if you want every item in the pool). A card that's already listed, like one with its own 1.5% line, gets its pool share added to that chance, and the editor shows the before and after first.
-- **Choosing a card for a pack drop:** type part of the name and pick from the list. Every word has to be in the name, in any order (`man sky` finds Man in the Sky). Each result shows its rarity and level, and cards already in the pack are left out.
+## Credits
 
-- **Layout:** only the content area scrolls; the header and tab bar are fixed rows around it, not bars floating over a scrolling page. iPhone Safari can strand floating bars mid-screen when the scroll position jumps during a scroll (as on a tab switch), and this layout avoids that.
+Card art, rarities and the event schedule come from [MK Mobile Base](https://mkmobilebase.com/), which mirrors [mkmobileevent.com](https://mkmobileevent.com). The wiki fallback uses the [MK Mobile wiki](https://mortalkombat-mobile.fandom.com/). Images aren't copied into this repo; they're loaded from those sites.
 
-## Sync and hosting
-
-- **Hosting:** pushing to `main` runs `.github/workflows/deploy.yml`, which tests and builds the app, then publishes it to GitHub Pages at `https://<user>.github.io/<repo>/`. In the repo settings, set **Pages → Source** to **GitHub Actions** first. On the free plan, Pages needs a public repo.
-- **Sync:** go to Settings → Sync between devices and paste a classic GitHub token that has only the `gist` scope ([create one](https://github.com/settings/tokens/new?scopes=gist&description=MK%20Max%20sync)). Do this once on each device. Your data is saved as `mkmax-data.json` in a secret gist named "MK Max sync data". It uploads a moment after each change and downloads when the app opens or comes back to the foreground. If both devices changed data since they last synced, the app asks which copy to keep.
-- **Old copies of the app:** builds from before 2026-09-28 12:30 (commit `19ef952`) treated newer saved data as the old F1-based format and raised every level by one when they synced. A card at F9 then reached F10 and was removed. Current builds never pull data from one of those builds (it's saved as version 2); they upload their own copy over it and show a sync error telling you to reopen MK Max on your other devices so they update. The same bug gave the Kameo rarities a fusion step, so owning a Kameo no longer counted as done; loading the app now takes that step back off.
-- **Token storage:** the token stays in each device's localStorage. It's never part of the synced data or of exported backups.
-
-## Card images
-
-Cards → **Find images** looks up card art in two places:
-
-1. **[MK Mobile Base](https://mkmobilebase.com/)** first. It has proper card art and the rarity of every character, Kameo and piece of equipment. Its API doesn't allow requests from other sites, so `npm run catalog` (`scripts/fetch-catalog.mjs`) downloads the whole catalog into `public/catalog.json`, and the deploy workflow refreshes it on every push. If the site is down during a deploy, the committed copy is used. Names match regardless of word order, commas, "MKII" vs "MK2", and "Kold" vs "Kold War". Known misspellings on the site are mapped to the game's spelling in `src/catalog.ts` (so far only "Weather Warface", which is Weather Warfare).
-2. **The [MK Mobile wiki](https://mortalkombat-mobile.fandom.com/)** for anything the catalog doesn't have, through its public API. It tries the card's page image, a wiki search, the equipment list pages, and art files uploaded to a character's page or before the page exists (for example `MK1 Sub-Zero.png`), skipping ability icons and pack banners.
-
-The app also does this by itself when it opens: cards with no image, and cards with images from older wiki lookups, get MK Mobile Base art without tapping anything, including cards that arrive through sync. The button covers the same cards plus images that have stopped loading, and images from older wiki lookups, since some of those were stat screenshots rather than card art. Images you pasted yourself are left alone. It also lists any card whose rarity disagrees with MK Mobile Base, with a button to switch them to the site's rarity. That's how Man in the Sky and Flame Forged Ferocity were found to be Rare, not Epic.
-
-Only image URLs are saved; the art stays on those sites, and the service worker caches it for offline use. For anything neither site has, paste a URL with the card's **Image** button.
-
-## What's tracked
-
-Your first copy of any card is F0, and each level after that takes 1 duplicate. So F10 from nothing is 11 copies, and F3 is 4.
-
-- **Diamond** characters to F10.
-- **Guest** characters are Diamond or Gold cards that only show up in packs during their event (Jason Voorhees only around Friday the 13th, for example), so they get extra weight. Tick **Guest** on the card; a rarity's Guest checkbox is controlled by **Has guest cards** in Settings.
-- **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Not every Gold card ascends. Ascension came to some Gold cards in one update (up to A5) and to others in a later one (up to A10), so each card's **Max** is F10 (no ascension), A5 or A10. Neither MK Mobile Base nor the wiki records which cap a card has, so set it on the card; new Gold cards start at A10. Any other saved cap shows as "not a real cap" so it's easy to spot and fix. Fusion Up Kards work on ascension steps too.
-- **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase, and no Fusion Up Kards are planned for it.
-- **Uncommon** (green) gear is tracked to max (F10), since it's farmed and maxed through tower runs. It has no Fusion Up Kards unless you turn them on in Settings → Fusion rules. Older saves got the Uncommon rarity added once; if you delete it, it stays deleted. Tag it as tower gear and it shows under its tower on Cards → Tower gear.
-- **Kameos** (Diamond and Gold) fuse to F10 in the game, but here you only track the ones you don't own yet. Add them under **Diamond Kameo** or **Gold Kameo**. If you pick the wrong tier, **Find images** offers to switch it to MK Mobile Base's. When you get one, tap **+** and it's done, so it leaves the list (with Undo). Kameos sold in the Realm Klash store, or Kameo packs, go in as store items or packs like anything else.
-- **No priority tiers:** every card is being maxed, so all cards count the same. Guest cards get extra weight only because they're gone once their event ends.
-- **Realm Klash seasons** last 2 weeks. Each season the Blood Ruby store swaps its characters, Kameos and Kameo packs, but the Realm Klash gear stays. When you add a Blood Ruby item or pack, **Leaves when the Realm Klash season ends** is ticked for everything except gear. Enter the season's end from the in-game timer once. After that the app assumes each new season ends 2 weeks after the last one, so seasonal items get that end date, count as limited-time in the planner, and show up as expired when the season is over. The season's end date also shows at the top of Packs. If the timer turns out to be different, change it there (or on any seasonal item) and every item from that season moves with it. Seasons sometimes end early, for example a short in-between season while an app update is delayed. When that happens, tap **Ended early**: that season's items expire now, and the next season is assumed to end 2 weeks later until you enter its real end date. Tap **Rerun** on an item that comes back to add it to the new season. When MK Mobile Base's event schedule covers the current season (see Event schedule below), its end date is used instead of your date and the 2-week guess, and seasonal items move to it by themselves. The box on Packs then shows that date and can't be edited.
-- **Challenge Kameos:** the Gold Kameo of a challenge character (for example Kotal Kahn, Dark Lord) is earned by finishing that character's Elder challenge when it comes around as an event. These Kameos are tagged **Elder challenge**. The app has a list of the Gold challenge characters (from the MK Mobile wiki's Challenge Mode page, in `src/challenges.ts`), and any Gold Kameo you add that matches it is tagged automatically. Kameos already in the app were tagged once when this came in. You can change a card's source on the card itself, and removing the tag sticks. Challenges that no longer run are kept out of the list (`RETIRED_CHALLENGES`; so far Klassic Ermac, whose Kameo comes from packs now), and a Kameo tagged before a challenge was retired gets untagged once. When a challenge Kameo's challenge is on or coming up, its card shows the dates and the Plan lists it under **Elder challenges**.
-- **Krypt and tower gear, and challenge Kameos** are tagged with their source. They're tracked, but only planned for when a pack you've entered actually drops them.
-- **Tower gear:** Cards → Tower gear lists every card tagged as tower gear, grouped by the tower it drops from (the tower name from a pasted list), with the towers that have the most gear left first. Each card shows how many copies it still needs, and you can change its level there. Maxed gear leaves the list like any other card. The older hand-kept per-tower counts were dropped.
-- **Filtering the card list:** the rarity filter on Cards has **All characters** (Diamond and Gold), **All equipment** (Epic, Rare and Uncommon) and **All Kameos** (Diamond and Gold), as well as each single rarity.
-
-## Event schedule
-
-MK Mobile Base keeps a copy of [mkmobileevent.com](https://mkmobileevent.com)'s schedule: shop packs (price, start, end, purchase limit), current and upcoming challenges, towers, and Realm Klash seasons. It doesn't include pack drop rates. Its API (`/api/events/schedule`) doesn't allow requests from other sites, so `npm run events` (`scripts/fetch-events.mjs`) saves it as `public/events.json`. The deploy workflow refreshes it on every push and also runs every day at 17:30 UTC, after the in-game rotations at 16:00. If the site is down, the committed copy is used. Pack names the site gets wrong are mapped to the game's names in `src/events.ts`: "Bloodfire" and "Powerplay" are Blood & Fire and Power Play, and the site calls every Kameo pack a "Kameo Summon Pack", but only the Dragon Krystal ones are Summon Packs in the game (the Blood Ruby ones are "… Kameo Pack"). Packs already saved under the site's names are renamed. The app reads it when it starts, again on pull to refresh, and again when you come back to the app after an hour or more, so an app left open for days still gets the new schedule. The service worker keeps the last copy for offline use.
-
-The app uses it for three things:
-
-- **In the shop** (Packs): packs on sale or coming up that you haven't added. **Add** opens the pack editor with the name, currency, cost, dates and limit filled in, so you only enter drop rates for the cards you need. **Not needed** hides a pack for good, for packs with none of your cards; this list syncs between devices. A permanent Blood Ruby pack (like the Kameo summon packs) isn't marked as leaving with the season.
-- **Elder challenge dates** for challenge Kameos you still need, on the card and in the Plan.
-- **The Realm Klash season end.** The site lists seasons a week at a time ("Circle of Shadow 2", then "Kold" twice), so back-to-back weeks with the same name count as one season.
-
-## How it scores
-
-Each copy of a card is worth: `phase multiplier × guest multiplier × Kameo multiplier × challenge multiplier × (1 + closeness bonus × progress)`.
-
-The Kameo multiplier (0.25 by default, set in Settings → Priority weights) keeps Kameos behind gear and characters. (Blood Rubies don't need it to put the Realm Klash gear first; see the gear order below.)
-
-The challenge multiplier (0.2 by default, also in Priority weights) only applies to Kameos tagged **Elder challenge**. Finishing that Elder challenge gives you the Kameo for sure, so a Kameo pack is ranked mostly on the Kameos you can only get from packs. A challenge Kameo still counts a little, since the challenge might not come back for a while.
-
-The phase depends on which copy it is:
-
-- **Unlock**: the first copy of a card you don't own.
-- **To Kard threshold**: copies that get the card to F3, where Fusion Up Kards become usable.
-- **Fusion**: a normal copy.
-- **Kards cover it**: copies your Fusion Up Kards would supply anyway, so they're worth less.
-- **Done**: worth 0. Cards that reach their goal are removed, so they never get scored.
-
-Fusion Up Kards aren't one per level. Each step costs more, and each rarity (Diamond, Gold, Epic, Rare) has its own kards and its own cost table, editable in Settings → Fusion rules. The Diamond costs come from the game; the others start as a copy of them until checked in-game.
-
-| Step | F3→F4 | F4→F5 | F5→F6 | F6→F7 | F7→F8 | F8→F9 | F9→F10 | Total |
-|---|---|---|---|---|---|---|---|---|
-| Diamond kards | 1 | 2 | 3 | 4 | 5 | 7 | 10 | 32 |
-
-Gold kards also cover ascension (F10→A1 up to A9→A10), up to each card's own A5 or A10 cap. The ascension costs haven't been checked in-game yet, so each step starts at 10 kards (the same as F9→F10). You can edit them in Settings → Fusion rules.
-
-Kards only work from F3 up. The Kard plan spends your kards one step at a time on the cheapest step available, because every step saves one pack copy no matter how much it costs. Guest cards count 1.5× and ties go to the card closest to max. It shows how many kards each card gets and how many are left over. The Wallet shows a kard count for each rarity that has cards past F3 still to go, so Epic kards show up once an Epic card other than Realm Klash gear has a max goal.
-
-A pack's value is the expected value of its drops (rolls × chance), added up across the drop table.
-
-**Blood Ruby gear comes first.** Before Blood Rubies go to any pack, character or Kameo, the plan maxes the Realm Klash gear (equipment you've added as a Blood Ruby store item), one piece at a time: all of the first piece's copies, then the next. Fusion Up Kards never go to this gear: Blood Rubies come in every day (65 or more), while kards are much harder to get, so the gear is bought all the way to max and the Kard plan leaves it out. The default order is Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, then Bloody Tomahawk, and any other gear goes after them by name. Change it with the arrows in Plan → **Blood Ruby gear order**; the order syncs. If you're short for the next copy, the plan says how many more rubies you need and buys nothing else. A piece whose store item has hit its purchase limit is skipped until it has purchases again. When every piece is done, the leftover rubies are planned like any other currency.
-
-The planner works on each currency's balance separately. It keeps buying the affordable pack with the best value per cost, and updates your expected progress after each buy so repeat buys are worth less. Limited-time packs get the `limitedBoost` urgency factor. Every weight and fusion table can be edited in Settings.
-
-## Icons
-
-The icon is a gold-ringed red medallion with a double up-chevron. `public/icon.svg` is the source. The PNGs next to it are rendered from it: `icon-192.png` and `icon-512.png` for the manifest, `icon-maskable-512.png` (the mark padded for Android's crop), and `apple-touch-icon.png` (180px). `public/logo-mark.svg` is the medallion without its background tile, used in the header. If you change the design, re-render all four PNGs. Phones cache home-screen icons, so remove the app and add it again to see a new one.
-
-The tab bar icons are inline SVGs in `src/icons.tsx`. They use the current text color, so the active tab's icon turns red.
+MK Max is an unofficial fan project and isn't affiliated with or endorsed by Warner Bros. Games or NetherRealm Studios. Mortal Kombat and all related names and art are trademarks of their owners.

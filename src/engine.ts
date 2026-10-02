@@ -424,6 +424,64 @@ export function buildPlan(ctx: Ctx, now: Date): Plan {
   return { currencies, expectedGains: gained };
 }
 
+/** Whole days until `shortBy` more comes in at `perDay` a day; null when the currency has no daily income set. */
+export function daysToAfford(shortBy: number, perDay: number | undefined) {
+  return perDay && perDay > 0 ? Math.ceil(shortBy / perDay) : null;
+}
+
+/**
+ * When each Realm Klash gear piece would be maxed, buying in gear order with today's balance plus `perDay` a
+ * day: the rubies spent up to and including that piece, and the whole days until they're in (0 = affordable
+ * now). Null days without a daily income. Rewards that land later only bring the dates closer.
+ */
+export function gearForecast(gear: GearStep[], balance: number, perDay: number | undefined) {
+  let total = 0;
+  return gear.map((g) => {
+    total += g.need * Math.min(...g.items.map((p) => p.cost));
+    return { cardId: g.card.id, total, days: total <= balance ? 0 : daysToAfford(total - balance, perDay) };
+  });
+}
+
+/** How close to its end a planned pack counts as ending soon. */
+export const ENDING_SOON_MS = 24 * 3600000;
+
+/** Packs the plan says to buy now that end within ENDING_SOON_MS. */
+export function endingSoon(plan: Plan, now: Date): Pack[] {
+  return plan.currencies.flatMap((c) =>
+    c.buys
+      .filter((b) => b.status === 'active' && b.pack.endsAt)
+      .map((b) => b.pack)
+      .filter((p) => {
+        const left = new Date(p.endsAt!).getTime() - now.getTime();
+        return left > 0 && left <= ENDING_SOON_MS;
+      }),
+  );
+}
+
+// ---------- Recording purchases ----------
+
+/** Level a card up or down by one copy, within its rarity's range. */
+export function stepCard(d: AppState, cardId: string, delta: 1 | -1) {
+  const card = d.cards.find((c) => c.id === cardId);
+  const rule = card && d.rarities.find((r) => r.id === card.rarityId);
+  if (card && rule) card.fusion = Math.min(maxFusion(rule), Math.max(0, card.fusion + delta));
+}
+
+/**
+ * Buy (delta 1) or take back (delta -1) one purchase of a pack: counts it, moves the cost out of (or back into)
+ * the balance, and for a store item, which always gives its card, levels that card. Random packs leave the
+ * cards to the "What did you pull?" step. Returns false when there's nothing to take back.
+ */
+export function recordPurchase(d: AppState, packId: string, delta: 1 | -1) {
+  const pack = d.packs.find((x) => x.id === packId);
+  if (!pack || (delta < 0 && pack.purchased <= 0)) return false;
+  pack.purchased += delta;
+  const cur = d.currencies.find((c) => c.id === pack.currencyId);
+  if (cur) cur.balance = Math.max(0, cur.balance - delta * pack.cost);
+  if (pack.store && pack.drops[0]) stepCard(d, pack.drops[0].cardId, delta);
+  return true;
+}
+
 // ---------- Realm Klash seasons ----------
 
 /** The Blood Ruby store's currency; its characters, Kameos and Kameo packs change every season. */

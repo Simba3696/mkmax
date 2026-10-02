@@ -316,7 +316,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
                     onChange={(e) =>
                       setPoolPicked((s) => {
                         const n = new Set(s);
-                        e.target.checked ? n.add(c.id) : n.delete(c.id);
+                        if (e.target.checked) n.add(c.id);
+                        else n.delete(c.id);
                         return n;
                       })
                     }
