@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { ConfirmButton } from '../ui';
+import { ConfirmButton, FoldCard } from '../ui';
 
 // Classic token pre-filled with only the gist scope; fine-grained tokens don't reliably offer Gists access.
 const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&description=MK%20Max%20sync';
@@ -26,8 +26,7 @@ export default function SyncPanel() {
   const { status } = sync;
 
   return (
-    <section className="card">
-      <h2>Sync between devices</h2>
+    <FoldCard id="settings-sync" title="Sync between devices">
       {!sync.connected ? (
         <>
           <p className="muted small">
@@ -84,7 +83,7 @@ export default function SyncPanel() {
         </>
       )}
       {status.kind === 'error' && <p className="small error">{status.message}</p>}
-    </section>
+    </FoldCard>
   );
 }
 

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { fetchStarterData, newId, normalize, useStore } from '../store';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
-import { ConfirmButton, NumInput } from '../ui';
+import { ConfirmButton, FoldCard, NumInput } from '../ui';
 import { copiesTotal, fLevel, levelLabel, maxFusion } from '../engine';
 import SyncPanel from './SyncPanel';
 import GearOrder from './GearOrder';
@@ -51,8 +51,7 @@ export default function SettingsView() {
     <>
       <SyncPanel />
 
-      <section className="card">
-        <h2>Fusion rules</h2>
+      <FoldCard id="settings-fusion" title="Fusion rules">
         <p className="muted small">
           Your first copy of a card is F0. Each step below is the number of duplicates needed for the next level. One Fusion Up Kard counts as +1 fusion level.
         </p>
@@ -176,10 +175,9 @@ export default function SettingsView() {
         >
           + Rarity
         </button>
-      </section>
+      </FoldCard>
 
-      <section className="card">
-        <h2>Currencies</h2>
+      <FoldCard id="settings-currencies" title="Currencies">
         {state.currencies.map((c, i) => {
           const used = state.packs.some((p) => p.currencyId === c.id);
           return (
@@ -202,12 +200,11 @@ export default function SettingsView() {
           The number is roughly how much you get each day. With it, the plan says when you can afford what it's saving for.
         </p>
         <button onClick={() => update((d) => void d.currencies.push({ id: newId(), name: 'New currency', balance: 0 }))}>+ Currency</button>
-      </section>
+      </FoldCard>
 
       <GearOrder />
 
-      <section className="card">
-        <h2>Priority weights</h2>
+      <FoldCard id="settings-weights" title="Priority weights">
         <p className="muted small">Every card is being maxed. These only decide which copies the planner goes after first.</p>
         {WEIGHT_HELP.map((w) => (
           <label key={w.key} className="field weight">
@@ -218,10 +215,9 @@ export default function SettingsView() {
           </label>
         ))}
         <button onClick={() => update((d) => void (d.weights = structuredClone(defaultWeights)))}>Reset weights</button>
-      </section>
+      </FoldCard>
 
-      <section className="card">
-        <h2>Data</h2>
+      <FoldCard id="settings-data" title="Data">
         <p className="muted small">Your data is saved in this browser only. Export a backup now and then, or use one to move to another device.</p>
         <div className="actions">
           <button className="primary" onClick={exportData}>
@@ -242,7 +238,7 @@ export default function SettingsView() {
           <ConfirmButton label="Erase everything" onConfirm={() => (replace(defaultState()), setMsg('All data erased.'))} />
         </div>
         {msg && <p className="small">{msg}</p>}
-      </section>
+      </FoldCard>
       <p className="muted small">Version {__APP_VERSION__}</p>
     </>
   );
