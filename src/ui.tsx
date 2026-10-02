@@ -198,7 +198,7 @@ export function useDeviceChoice<T extends string>(key: string, options: readonly
   return [value, choose] as const;
 }
 
-/** Plan cards folded on this device; not synced, since it's only how the page is shown. */
+/** Plan and Settings cards folded on this device; not synced, since it's only how the page is shown. */
 const FOLDED_KEY = 'mkmax:folded';
 const loadFolded = (): string[] => {
   try {

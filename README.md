@@ -22,7 +22,7 @@
 - **Ending-soon badge.** The Packs tab, and the home-screen icon where the phone supports it, counts planned packs that end within a day.
 - **Live shop schedule.** Packs on sale or coming up, Elder challenge dates and Realm Klash season ends come from [MK Mobile Base](https://mkmobilebase.com/) and are refreshed daily.
 - **Card art and rarities.** Looked up automatically from MK Mobile Base and the [MK Mobile wiki](https://mortalkombat-mobile.fandom.com/).
-- **Quick entry.** Paste a whole card list, split even-pool odds across cards in one go, and log a purchase with one tap. Undo works on all of these. Sort packs by end time or currency and cards by rarity, fusion level or name, and fold away Plan cards you don't need.
+- **Quick entry.** Paste a whole card list, split even-pool odds across cards in one go, and log a purchase with one tap. Undo works on all of these. Sort packs by end time or currency and cards by rarity, fusion level or name, and fold away Plan and Settings cards you don't need.
 - **Private by default.** Your data stays in your browser. Optional sync between devices uses a secret GitHub Gist that you own.
 
 ## How it decides

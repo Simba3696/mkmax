@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
 import { REALM_KLASH_CURRENCY, buildCtx, gearForecast, gearQueue, levelLabel, targetLevel } from '../engine';
-import { CardThumb, daysFromNow, fmt, FusionLabel, useNow } from '../ui';
+import { CardThumb, daysFromNow, FoldCard, fmt, FusionLabel, useNow } from '../ui';
 
 /** The Realm Klash gear still to max, in buying order, with when each piece is done at the daily Blood Ruby income. */
 function useGear() {
@@ -49,8 +49,7 @@ export default function GearOrder() {
       d.gearOrder = [...ids, ...(d.gearOrder ?? []).filter((id) => !ids.includes(id))];
     });
   return (
-    <section className="card">
-      <h2>Blood Ruby gear order</h2>
+    <FoldCard id="settings-gear" title="Blood Ruby gear order">
       <p className="muted small">
         Blood Rubies max these one at a time, top first, before buying any pack. A piece whose store item is out of purchases is skipped for now.
       </p>
@@ -79,6 +78,6 @@ export default function GearOrder() {
           </div>
         );
       })}
-    </section>
+    </FoldCard>
   );
 }
