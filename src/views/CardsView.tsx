@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
 import { ascensionCaps, buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
-import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useNow } from '../ui';
+import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice, useNow } from '../ui';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
 import { appRarityId, catalogPageUrl, findInCatalog, loadCatalog, wantsCatalogImage } from '../catalog';
@@ -166,6 +166,9 @@ export default function CardsView() {
   );
 }
 
+const CARD_SORTS = ['rarity', 'fusion-high', 'fusion-low', 'name'] as const;
+type CardSort = (typeof CARD_SORTS)[number];
+
 function CardList() {
   const { state, update } = useStore();
   const ctx = useMemo(() => buildCtx(state), [state]);
@@ -174,6 +177,7 @@ function CardList() {
   const [rarity, setRarity] = useState<string>('all');
   const [q, setQ] = useState('');
   const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all');
+  const [sortBy, setSortBy] = useDeviceChoice('mkmax:cardSort', CARD_SORTS);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [imageEditId, setImageEditId] = useState<string | null>(null);
   const [imgStatus, setImgStatus] = useState<{ busy: boolean; msg: string } | null>(null);
@@ -260,14 +264,16 @@ function CardList() {
     setDraft({ ...draft, name: '', fusion: 0, guest: false });
   }
 
-  const rarityOrder = (c: Card) => state.rarities.findIndex((r) => r.id === c.rarityId);
+  const rarityOrder = (c: Card) => (sortBy === 'name' ? 0 : state.rarities.findIndex((r) => r.id === c.rarityId));
+  // Stored levels compare across rarities: F0 is 1 everywhere, and Gold ascension (A1+) comes after F10.
+  const fusionOrder = (a: Card, b: Card) => (sortBy === 'fusion-high' ? b.fusion - a.fusion : sortBy === 'fusion-low' ? a.fusion - b.fusion : 0);
   const cards = state.cards
     // "kind:equipment" etc. groups every rarity of that kind (Diamond + Gold characters, all gear, both Kameo tiers).
     .filter((c) => rarity === 'all' || c.rarityId === rarity || rarity === `kind:${state.rarities.find((r) => r.id === c.rarityId)?.kind}`)
     .filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()))
     .filter((c) => sourceFilter === 'all' || (c.source ?? '') === sourceFilter)
-    // Stable order (rarity, then name) so a card doesn't jump around while you edit it.
-    .sort((a, b) => rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name));
+    // Rarity then name by default, so a card doesn't jump around while you edit it. By fusion, ties keep that order.
+    .sort((a, b) => fusionOrder(a, b) || rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name));
 
   return (
     <>
@@ -337,6 +343,12 @@ function CardList() {
               </option>
             ))}
           </optgroup>
+        </select>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as CardSort)} aria-label="Sort">
+          <option value="rarity">Sort: rarity</option>
+          <option value="fusion-high">Sort: fusion, highest first</option>
+          <option value="fusion-low">Sort: fusion, lowest first</option>
+          <option value="name">Sort: name</option>
         </select>
         <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as Source | 'all')} aria-label="Filter by source">
           <option value="all">Any source</option>

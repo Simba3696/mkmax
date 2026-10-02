@@ -1,7 +1,7 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
 import type { AppState, Card, RarityRule } from './types';
 import { ASCENSION_KARD_COST, DIAMOND_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
-import { pruneDone } from './engine';
+import { REALM_KLASH_CURRENCY, pruneDone } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
 import { fixPackNames } from './events';
 
@@ -94,7 +94,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 9,
+    version: 10,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,
@@ -127,6 +127,12 @@ export function normalize(input: unknown): AppState {
   if (version < 9) {
     out.packs = fixPackNames(out.packs).map((p) => (RENAMED[p.name] ? { ...p, name: RENAMED[p.name] } : p));
     for (const c of out.cards) if (RENAMED[c.name]) c.name = RENAMED[c.name];
+  }
+  // Version 10 fixes packs whose site name has a curly apostrophe, which were saved as "Kollector’S Diamond Kasket",
+  // and gives Blood Rubies their daily income (65), once, so clearing it sticks.
+  if (version < 10) {
+    out.packs = out.packs.map((p) => (/’S\b/.test(p.name) ? { ...p, name: p.name.replace(/’S\b/g, '’s') } : p));
+    out.currencies = out.currencies.map((c) => (c.id === REALM_KLASH_CURRENCY && c.perDay === undefined ? { ...c, perDay: 65 } : c));
   }
   pruneDone(out);
   return out;

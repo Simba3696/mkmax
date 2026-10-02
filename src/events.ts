@@ -101,9 +101,12 @@ export function currencyFor(site: string | null, currencies: AppState['currencie
   return currencies.find((c) => singular(c.name) === singular(site))?.id;
 }
 
-/** "MK11 FROST SUMMON PACK" → "MK11 Frost Summon Pack": title case, keeping words with digits as they are. */
+/**
+ * "MK11 FROST SUMMON PACK" → "MK11 Frost Summon Pack": title case, keeping words with digits as they are. Curly
+ * apostrophes count as part of a word, so "KOLLECTOR’S" is "Kollector’s", not "Kollector’S".
+ */
 export function titleCase(name: string) {
-  return name.toLowerCase().replace(/[a-z0-9']+/g, (w) => (/\d/.test(w) ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)));
+  return name.toLowerCase().replace(/[a-z0-9'’]+/g, (w) => (/\d/.test(w) ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)));
 }
 
 /** Packs MK Mobile Base misspells, keyed by the site's name, mapped to the game's name. */

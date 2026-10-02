@@ -1,51 +1,74 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { newId, useStore } from '../store';
-import { REALM_KLASH_CURRENCY, levelLabel, maxFusion, moveSeasonEnd, packStatus, seasonEnd, toLocalInput, urgency } from '../engine';
-import { CardThumb, ConfirmButton, fmt, useNow } from '../ui';
+import { REALM_KLASH_CURRENCY, levelLabel, maxFusion, moveSeasonEnd, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
+import { CardThumb, ConfirmButton, fmt, useDeviceChoice, useNow } from '../ui';
 import { PackTiming } from './PlanView';
 import PackEditor from './PackEditor';
 import { packFromShop, packName, scheduledSeasonEnd, shopSuggestions, useEvents } from '../events';
-import type { AppState, Pack } from '../types';
+import type { Pack } from '../types';
 
-export default function PacksView() {
+const SORTS = ['ending', 'currency'] as const;
+type SortBy = (typeof SORTS)[number];
+
+/** A pack opened from the plan: scrolled to and highlighted, with its "What did you pull?" step open when `pull`. */
+export interface PackFocus {
+  id: string;
+  pull?: boolean;
+}
+
+/** focus: a pack tapped in the plan, scrolled to once the tab opens; onFocused clears it. */
+export default function PacksView({ focus = null, onFocused }: { focus?: PackFocus | null; onFocused?: () => void }) {
+  const focusId = focus?.id ?? null;
   const { state, update } = useStore();
   const now = useNow();
   const [editing, setEditing] = useState<Pack | 'new' | null>(null);
-  const [showExpired, setShowExpired] = useState(false);
+  const focusPack = focusId ? state.packs.find((p) => p.id === focusId) : undefined;
+  const [showExpired, setShowExpired] = useState(() => !!focusPack && packStatus(focusPack, now) === 'expired');
+  const [flash, setFlash] = useState<string | null>(null);
+  // Runs after App's layout effect has reset the scroll for the new tab, so this scroll wins.
+  useEffect(() => {
+    if (!focusId) return;
+    document.getElementById(`pack-${focusId}`)?.scrollIntoView({ block: 'center' });
+    setFlash(focusId);
+    onFocused?.();
+    const t = setTimeout(() => setFlash(null), 1600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
   /** Random pack just bought: show its drop list so pulled cards can be levelled up in place. */
-  const [pulling, setPulling] = useState<string | null>(null);
+  const [pulling, setPulling] = useState<string | null>(focus?.pull ? focus.id : null);
   const rules = new Map(state.rarities.map((r) => [r.id, r]));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
   const cardName = (id: string) => state.cards.find((c) => c.id === id)?.name ?? '(deleted card)';
 
+  const [sortBy, chooseSort] = useDeviceChoice('mkmax:packSort', SORTS);
+  // By currency: in the order the currencies are listed in Settings, soonest-ending first within each.
+  const curIndex = (p: Pack) => {
+    const i = state.currencies.findIndex((c) => c.id === p.currencyId);
+    return i < 0 ? state.currencies.length : i;
+  };
   const groups = { active: [] as Pack[], upcoming: [] as Pack[], expired: [] as Pack[] };
   for (const p of state.packs) groups[packStatus(p, now)].push(p);
-  for (const g of Object.values(groups)) g.sort((a, b) => urgency(a) - urgency(b));
-
-  /** Level a card up or down by one copy, within its rarity's range. */
-  const stepCard = (d: AppState, cardId: string, delta: 1 | -1) => {
-    const card = d.cards.find((c) => c.id === cardId);
-    const rule = card && d.rarities.find((r) => r.id === card.rarityId);
-    if (card && rule) card.fusion = Math.min(maxFusion(rule), Math.max(0, card.fusion + delta));
-  };
+  for (const g of Object.values(groups)) g.sort((a, b) => (sortBy === 'currency' ? curIndex(a) - curIndex(b) : 0) || urgency(a) - urgency(b));
+  /** A status group's packs, with a currency heading before each currency's packs when sorted by currency. */
+  const renderGroup = (packs: Pack[]) =>
+    packs.map((p, i) => (
+      <div key={p.id}>
+        {sortBy === 'currency' && p.currencyId !== packs[i - 1]?.currencyId && <h4 className="currency-head">{curName(p.currencyId)}</h4>}
+        {renderPack(p)}
+      </div>
+    ));
 
   // Store items give a known card, so buying one levels it up; for random packs we ask what was pulled.
   const buy = (p: Pack, delta: 1 | -1) => {
-    update((d) => {
-      const pack = d.packs.find((x) => x.id === p.id)!;
-      if (delta < 0 && pack.purchased <= 0) return;
-      pack.purchased += delta;
-      const cur = d.currencies.find((c) => c.id === pack.currencyId);
-      if (cur) cur.balance = Math.max(0, cur.balance - delta * pack.cost);
-      if (pack.store && pack.drops[0]) stepCard(d, pack.drops[0].cardId, delta);
-    }, delta > 0 ? `Bought ${p.name}` : undefined);
+    update((d) => void recordPurchase(d, p.id, delta), delta > 0 ? `Bought ${p.name}` : undefined);
     if (!p.store) setPulling(delta > 0 ? p.id : null);
   };
 
   const duplicate = (p: Pack) => setEditing({ ...structuredClone(p), id: newId(), name: `${p.name} (rerun)`, purchased: 0, startsAt: null, endsAt: null });
 
   const renderPack = (p: Pack) => (
-    <div key={p.id} className="card pack">
+    <div key={p.id} id={`pack-${p.id}`} className={`card pack${flash === p.id ? ' flash' : ''}`}>
       <div className="row">
         <div className="grow">
           <div className="row-title">{p.name}</div>
@@ -138,10 +161,19 @@ export default function PacksView() {
       <SeasonBar />
       <ShopSuggestions onAdd={setEditing} />
 
+      {state.packs.length > 1 && (
+        <label className="sort-by">
+          <span className="muted small">Sort</span>
+          <select value={sortBy} onChange={(e) => chooseSort(e.target.value as SortBy)}>
+            <option value="ending">Ending soonest</option>
+            <option value="currency">Currency</option>
+          </select>
+        </label>
+      )}
       {groups.active.length > 0 && <h3>Available now</h3>}
-      {groups.active.map(renderPack)}
+      {renderGroup(groups.active)}
       {groups.upcoming.length > 0 && <h3>Coming up</h3>}
-      {groups.upcoming.map(renderPack)}
+      {renderGroup(groups.upcoming)}
       {groups.expired.length > 0 && (
         <div className="toolbar">
           <button className="ghost" onClick={() => setShowExpired(!showExpired)}>
@@ -155,7 +187,7 @@ export default function PacksView() {
           />
         </div>
       )}
-      {showExpired && groups.expired.map(renderPack)}
+      {showExpired && renderGroup(groups.expired)}
       {state.packs.length === 0 && <p className="muted">No packs yet.</p>}
 
       {editing && <PackEditor initial={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}

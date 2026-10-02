@@ -31,6 +31,7 @@ describe('event schedule', () => {
     expect(['Dragon Krystals', 'Blood Ruby', 'Soul'].map((c) => currencyFor(c, cur))).toEqual(['dragon-krystals', 'blood-rubies', 'souls']);
     expect(titleCase("MK11 FROST SUMMON PACK")).toBe('MK11 Frost Summon Pack');
     expect(titleCase("BEGINNER'S SUMMON PACK")).toBe("Beginner's Summon Pack");
+    expect(titleCase('KOLLECTOR’S DIAMOND KASKET')).toBe('Kollector’s Diamond Kasket');
     const pack = (name: string, currency = 'Blood Ruby') => packName({ name, currency });
     expect(pack('BLOODFIRE KAMEO SUMMON PACK')).toBe('Blood & Fire Kameo Pack'); // the site's spelling
     expect(pack('POWERPLAY KAMEO SUMMON PACK')).toBe('Power Play Kameo Pack');

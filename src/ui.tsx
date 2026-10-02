@@ -168,6 +168,68 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 }
 
 /** Two-step delete button (no native confirm dialogs). */
+/**
+ * A display choice remembered on this device (a list's sort order), not synced. Falls back to the first option
+ * when nothing valid is saved or storage is blocked.
+ */
+export function useDeviceChoice<T extends string>(key: string, options: readonly T[]) {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const saved = localStorage.getItem(key) as T | null;
+      return saved && options.includes(saved) ? saved : options[0];
+    } catch {
+      return options[0];
+    }
+  });
+  const choose = (v: T) => {
+    setValue(v);
+    try {
+      localStorage.setItem(key, v);
+    } catch {
+      // private mode: the choice just isn't remembered
+    }
+  };
+  return [value, choose] as const;
+}
+
+/** Plan cards folded on this device; not synced, since it's only how the page is shown. */
+const FOLDED_KEY = 'mkmax:folded';
+const loadFolded = (): string[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? '[]');
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+};
+
+/** A card whose heading folds it away; it stays folded (on this device) until tapped again. */
+export function FoldCard({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(() => !loadFolded().includes(id));
+  const toggle = () => {
+    setOpen(!open);
+    const rest = loadFolded().filter((x) => x !== id);
+    try {
+      localStorage.setItem(FOLDED_KEY, JSON.stringify(open ? [...rest, id] : rest));
+    } catch {
+      // private mode: the fold just isn't remembered
+    }
+  };
+  return (
+    <section className={`card fold${open ? '' : ' folded'}`}>
+      <h2>
+        <button className="fold-head" aria-expanded={open} onClick={toggle}>
+          <span className="fold-caret" aria-hidden="true">
+            ▾
+          </span>
+          {title}
+        </button>
+      </h2>
+      {open && children}
+    </section>
+  );
+}
+
 export function ConfirmButton({ label, onConfirm, className }: { label: string; onConfirm: () => void; className?: string }) {
   const [armed, setArmed] = useState(false);
   useEffect(() => {

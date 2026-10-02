@@ -183,13 +183,23 @@ export default function SettingsView() {
           const used = state.packs.some((p) => p.currencyId === c.id);
           return (
             <div key={c.id} className="drop-row">
-              <input className="grow" value={c.name} onChange={(e) => update((d) => void (d.currencies[i].name = e.target.value))} />
+              <input className="grow" value={c.name} onChange={(e) => update((d) => void (d.currencies[i].name = e.target.value))} aria-label="Name" />
+              <NumInput
+                className="per-day"
+                value={c.perDay ?? null}
+                min={0}
+                placeholder="per day"
+                onChange={(v) => update((d) => void (v == null || v <= 0 ? delete d.currencies[i].perDay : (d.currencies[i].perDay = v)))}
+              />
               <button className="ghost" disabled={used} title={used ? 'Used by a pack' : 'Remove'} onClick={() => update((d) => void d.currencies.splice(i, 1))}>
                 ✕
               </button>
             </div>
           );
         })}
+        <p className="muted small">
+          The number is roughly how much you get each day. With it, the plan says when you can afford what it's saving for.
+        </p>
         <button onClick={() => update((d) => void d.currencies.push({ id: newId(), name: 'New currency', balance: 0 }))}>+ Currency</button>
       </section>
 

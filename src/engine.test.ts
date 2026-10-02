@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
 import {
-  ascensionCaps, buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, seasonEnd, suggestSeason, targetLevel,
+  ascensionCaps, buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, recordPurchase, seasonEnd, suggestSeason, targetLevel,
 } from './engine';
 import { normalize } from './store';
 import type { AppState, Card, Pack } from './types';
@@ -239,6 +239,18 @@ describe('phases', () => {
     expect(normalize(deleted).rarities.some((r) => r.id === 'uncommon')).toBe(false);
   });
 
+  it("fixes pack names saved as \"Kollector’S\" once", () => {
+    const pack = { id: 'k', name: 'Kollector’S Diamond Kasket', currencyId: 'souls', cost: 0, rolls: 1, maxPurchases: null, purchased: 0, startsAt: null, endsAt: null, drops: [] };
+    expect(normalize({ ...defaultState(), version: 9, packs: [pack] }).packs[0].name).toBe('Kollector’s Diamond Kasket');
+  });
+
+  it('gives Blood Rubies a daily income once, keeping one that was cleared', () => {
+    const old = { ...defaultState(), version: 9, currencies: defaultState().currencies.map(({ perDay: _, ...c }) => c) };
+    expect(normalize(old).currencies.find((c) => c.id === 'blood-rubies')?.perDay).toBe(65);
+    const cleared = { ...normalize(old), currencies: old.currencies };
+    expect(normalize(cleared).currencies.find((c) => c.id === 'blood-rubies')?.perDay).toBeUndefined();
+  });
+
   it('extends older Gold kard tables through ascension, keeping edited fusion costs', () => {
     const s = defaultState();
     const gold = s.rarities.find((r) => r.id === 'gold')!;
@@ -307,6 +319,48 @@ describe('planner', () => {
     const s = setup([card('a', F(9))], [pack('p', [{ cardId: 'a', chance: 100 }])], (s) => (s.currencies[0].balance = 1000));
     const souls = buildPlan(buildCtx(s), NOW).currencies[0];
     expect(souls.buys[0].count).toBe(1);
+  });
+});
+
+describe('buying from the plan', () => {
+  it('records a store purchase: count, balance and the card', () => {
+    const s = setup([card('a', F(2))], [pack('p', [{ cardId: 'a', chance: 100 }], { store: true })], (s) => (s.currencies[0].balance = 250));
+    expect(recordPurchase(s, 'p', 1)).toBe(true);
+    expect([s.packs[0].purchased, s.currencies[0].balance, s.cards[0].fusion]).toEqual([1, 150, F(3)]);
+    expect(recordPurchase(s, 'p', -1)).toBe(true);
+    expect([s.packs[0].purchased, s.currencies[0].balance, s.cards[0].fusion]).toEqual([0, 250, F(2)]);
+    expect(recordPurchase(s, 'p', -1)).toBe(false);
+  });
+
+  it("leaves a random pack's cards to the pull step", () => {
+    const s = setup([card('a', F(2))], [pack('p', [{ cardId: 'a', chance: 50 }])], (s) => (s.currencies[0].balance = 100));
+    recordPurchase(s, 'p', 1);
+    expect([s.packs[0].purchased, s.currencies[0].balance, s.cards[0].fusion]).toEqual([1, 0, F(2)]);
+  });
+
+  it('works out days to afford from a daily income', () => {
+    expect(daysToAfford(130, 65)).toBe(2);
+    expect(daysToAfford(131, 65)).toBe(3);
+    expect(daysToAfford(100, undefined)).toBeNull();
+    expect(daysToAfford(100, 0)).toBeNull();
+  });
+
+  it('forecasts when each gear piece is maxed, in gear order', () => {
+    const step = (id: string, need: number, cost: number) => ({ card: card(id, 0), need, items: [pack(id, [], { cost }), pack(`${id}2`, [], { cost: cost * 2 })] });
+    const gear = [step('sash', 2, 300), step('ball', 3, 300)];
+    // 600 for the sash, 1,500 in all; 650 in hand and 65 a day.
+    expect(gearForecast(gear, 650, 65)).toEqual([
+      { cardId: 'sash', total: 600, days: 0 },
+      { cardId: 'ball', total: 1500, days: 14 },
+    ]);
+    expect(gearForecast(gear, 0, undefined).map((g) => g.days)).toEqual([null, null]);
+  });
+
+  it('flags planned packs ending within a day', () => {
+    const at = (h: number) => new Date(NOW.getTime() + h * 3600000).toISOString();
+    const drops = [{ cardId: 'a', chance: 50 }];
+    const s = setup([card('a', F(2))], [pack('soon', drops, { endsAt: at(5) }), pack('later', drops, { endsAt: at(30) }), pack('open', drops)], (s) => (s.currencies[0].balance = 1000));
+    expect(endingSoon(buildPlan(buildCtx(s), NOW), NOW).map((p) => p.id)).toEqual(['soon']);
   });
 });
 

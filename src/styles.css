@@ -66,7 +66,15 @@ a { color: var(--gold); cursor: pointer; text-decoration: underline; }
   color: var(--muted); padding: 0.5rem 0 0.6rem; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.75rem;
 }
 .tabbar button.active { color: var(--text); box-shadow: inset 0 2px 0 var(--red); }
-.tab-icon { display: flex; }
+.tab-icon { display: flex; position: relative; }
+.per-day { width: 6.5rem; }
+.sort-by { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; margin: 0.4rem 0; }
+.currency-head { margin: 0.6rem 0 0.4rem; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+/* Planned packs ending within a day, on the Packs tab. */
+.tab-badge {
+  position: absolute; top: -5px; right: -9px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: var(--red); color: #fff; font-size: 0.65rem; font-weight: 700; line-height: 16px; text-align: center;
+}
 .tabbar button.active .tab-icon { color: var(--red); }
 
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem; margin-bottom: 0.8rem; }
@@ -128,6 +136,26 @@ input[type='color'] { padding: 2px; width: 48px; }
 .plan-currency-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; }
 .plan-currency-head h3 { margin: 0.2rem 0; }
 .plan-row .row-title b { color: var(--gold); }
+/* Foldable plan cards: the whole heading is the toggle. */
+.fold-head {
+  display: flex; align-items: center; gap: 0.45rem; width: 100%; min-height: 0; padding: 0; border: 0;
+  background: none; color: inherit; font: inherit; text-align: left;
+}
+.fold-caret { display: inline-block; font-size: 0.8em; color: var(--muted); transition: transform 0.15s; }
+.folded .fold-caret { transform: rotate(-90deg); }
+.card.folded h2 { margin-bottom: 0; }
+@media (prefers-reduced-motion: reduce) { .fold-caret { transition: none; } }
+/* A row's text as a button (tap a pack in the plan to open it in Packs), styled like the plain row it replaces. */
+.row-link {
+  display: block; min-width: 0; min-height: 0; padding: 0.15rem 0.3rem; margin: 0 -0.3rem; border: 0; border-radius: 6px;
+  background: none; color: inherit; font: inherit; text-align: left;
+}
+.row-link > span { display: block; }
+.row-link:active { background: var(--panel-2); }
+/* A pack tapped in the plan, when Packs scrolls to it. */
+.card.pack.flash { animation: pack-flash 1.6s ease-out; }
+@keyframes pack-flash { 0%, 40% { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); } 100% { border-color: var(--line); box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .card.pack.flash { animation: none; border-color: var(--gold); } }
 
 .rank + .rank { border-top: 1px solid var(--line); margin-top: 0.3rem; padding-top: 0.3rem; }
 .target { padding-left: 0.8rem; }

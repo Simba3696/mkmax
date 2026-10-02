@@ -1,17 +1,17 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { fetchStarterData, useStore, type UndoEntry } from './store';
 import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
-import { moveSeasonEnd, seasonEnd } from './engine';
+import { buildCtx, buildPlan, endingSoon, moveSeasonEnd, seasonEnd } from './engine';
 import { refreshEvents, scheduledSeasonEnd, useEvents } from './events';
 import { checkForAppUpdate } from './appUpdate';
 import { useNow } from './ui';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
 import PlanView from './views/PlanView';
-import PacksView from './views/PacksView';
+import PacksView, { type PackFocus } from './views/PacksView';
 import CardsView from './views/CardsView';
 import SettingsView from './views/SettingsView';
 
@@ -92,6 +92,19 @@ export default function App() {
   /** Direction the next tab change should slide in from, set by go() and used once the new tab has rendered. */
   const enterDir = useRef<1 | -1 | 0>(0);
   const tabIndex = (t: TabId) => TABS.findIndex((x) => x.id === t);
+  /** Pack to scroll to when the Packs tab opens, set by tapping a pack in the plan. */
+  const [focusPack, setFocusPack] = useState<PackFocus | null>(null);
+  const openPack = (id: string, pull = false) => {
+    setFocusPack({ id, pull });
+    go('packs');
+  };
+  // Packs the plan says to buy that end within a day: a count on the Packs tab and, where the phone supports it,
+  // on the home-screen icon.
+  const soon = useMemo(() => endingSoon(buildPlan(buildCtx(state), now), now).length, [state, now]);
+  useEffect(() => {
+    if (!('setAppBadge' in navigator)) return;
+    (soon ? navigator.setAppBadge(soon) : navigator.clearAppBadge()).catch(() => {});
+  }, [soon]);
   const go = (t: TabId) => {
     if (t === tab) return;
     enterDir.current = tabIndex(t) > tabIndex(tab) ? 1 : -1;
@@ -136,8 +149,8 @@ export default function App() {
       </header>
       <main className="content">
         <div className="page" ref={pageRef}>
-          {tab === 'plan' && <PlanView goto={go} />}
-          {tab === 'packs' && <PacksView />}
+          {tab === 'plan' && <PlanView goto={go} openPack={openPack} />}
+          {tab === 'packs' && <PacksView focus={focusPack} onFocused={() => setFocusPack(null)} />}
           {tab === 'cards' && <CardsView />}
           {tab === 'settings' && <SettingsView />}
         </div>
@@ -148,6 +161,11 @@ export default function App() {
           <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => go(t.id)}>
             <span className="tab-icon">
               <t.Icon />
+              {t.id === 'packs' && soon > 0 && (
+                <span className="tab-badge" aria-label={`${soon} planned pack${soon === 1 ? '' : 's'} ending within a day`}>
+                  {soon}
+                </span>
+              )}
             </span>
             <span>{t.label}</span>
           </button>
