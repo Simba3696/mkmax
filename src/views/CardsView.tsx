@@ -267,11 +267,15 @@ function CardList() {
   const rarityOrder = (c: Card) => (sortBy === 'name' ? 0 : state.rarities.findIndex((r) => r.id === c.rarityId));
   // Stored levels compare across rarities: F0 is 1 everywhere, and Gold ascension (A1+) comes after F10.
   const fusionOrder = (a: Card, b: Card) => (sortBy === 'fusion-high' ? b.fusion - a.fusion : sortBy === 'fusion-low' ? a.fusion - b.fusion : 0);
+  // "kind:equipment" etc. groups every rarity of that kind (Diamond + Gold characters, all gear, both Kameo tiers).
+  const inRarity = (c: Card, value: string) => value === 'all' || c.rarityId === value || value === `kind:${state.rarities.find((r) => r.id === c.rarityId)?.kind}`;
+  const inSource = (c: Card, value: Source | 'all') => value === 'all' || (c.source ?? '') === value;
+  const matchesSearch = (c: Card) => !q || c.name.toLowerCase().includes(q.toLowerCase());
+  // Each filter option shows how many cards it would list, given the search and the other filter.
+  const rarityCount = (value: string) => state.cards.filter((c) => matchesSearch(c) && inSource(c, sourceFilter) && inRarity(c, value)).length;
+  const sourceCount = (value: Source | 'all') => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, value)).length;
   const cards = state.cards
-    // "kind:equipment" etc. groups every rarity of that kind (Diamond + Gold characters, all gear, both Kameo tiers).
-    .filter((c) => rarity === 'all' || c.rarityId === rarity || rarity === `kind:${state.rarities.find((r) => r.id === c.rarityId)?.kind}`)
-    .filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()))
-    .filter((c) => sourceFilter === 'all' || (c.source ?? '') === sourceFilter)
+    .filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter))
     // Rarity then name by default, so a card doesn't jump around while you edit it. By fusion, ties keep that order.
     .sort((a, b) => fusionOrder(a, b) || rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name));
 
@@ -332,14 +336,14 @@ function CardList() {
       <div className="filters">
         <input className="grow" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={rarity} onChange={(e) => setRarity(e.target.value)}>
-          <option value="all">All rarities</option>
-          <option value="kind:character">All characters</option>
-          <option value="kind:equipment">All equipment</option>
-          <option value="kind:kameo">All Kameos</option>
+          <option value="all">{`All rarities (${rarityCount('all')})`}</option>
+          <option value="kind:character">{`All characters (${rarityCount('kind:character')})`}</option>
+          <option value="kind:equipment">{`All equipment (${rarityCount('kind:equipment')})`}</option>
+          <option value="kind:kameo">{`All Kameos (${rarityCount('kind:kameo')})`}</option>
           <optgroup label="One rarity">
             {state.rarities.map((r) => (
               <option key={r.id} value={r.id}>
-                {r.label}
+                {`${r.label} (${rarityCount(r.id)})`}
               </option>
             ))}
           </optgroup>
@@ -351,11 +355,11 @@ function CardList() {
           <option value="name">Sort: name</option>
         </select>
         <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as Source | 'all')} aria-label="Filter by source">
-          <option value="all">Any source</option>
-          <option value="">Packs/store</option>
-          <option value="krypt">Krypt gear</option>
-          <option value="tower">Tower gear</option>
-          <option value="challenge">Elder challenge</option>
+          <option value="all">{`Any source (${sourceCount('all')})`}</option>
+          <option value="">{`Packs/store (${sourceCount('')})`}</option>
+          <option value="krypt">{`Krypt gear (${sourceCount('krypt')})`}</option>
+          <option value="tower">{`Tower gear (${sourceCount('tower')})`}</option>
+          <option value="challenge">{`Elder challenge (${sourceCount('challenge')})`}</option>
         </select>
         {missingImages.length > 0 && (
           <button onClick={findImages} disabled={imgStatus?.busy} title="Look up card art on MK Mobile Base, then the MK Mobile wiki">
