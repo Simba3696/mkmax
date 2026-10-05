@@ -18,6 +18,8 @@ npm run events    # refresh public/events.json from MK Mobile Base
 
 ## Project layout
 
+For how these pieces fit together, see [Architecture](architecture.md). Guidance for coding agents is in [AGENTS.md](../AGENTS.md), with Claude Code skills and agents in `.claude/`.
+
 | Path | What's in it |
 |---|---|
 | `src/engine.ts` | Scoring, the purchase planner, pack ranking and the Fusion Up Kard plan |

@@ -35,6 +35,7 @@ The full model is in [How it works](docs/how-it-works.md).
 
 - [User guide](docs/user-guide.md): getting started, everyday use, sync, and what's tracked for each rarity
 - [How it works](docs/how-it-works.md): scoring, the event schedule, and where card images come from
+- [Architecture](docs/architecture.md): how the app fits together, the planner, sync, and the design decisions behind them
 - [Development](docs/development.md): setup, project layout, migrations, hosting
 
 ## Quick start
