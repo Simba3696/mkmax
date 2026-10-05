@@ -78,7 +78,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
    */
   const renderGroup = (packs: Pack[]) =>
     packs.length > 0 && (
-      <div className="lg:grid lg:grid-cols-2 2xl:grid-cols-3 lg:gap-x-[0.8rem] lg:items-start">
+      <div className="lg:grid lg:grid-cols-2 2xl:grid-cols-3 lg:gap-x-[0.8rem]">
         {packs.map((p, i) => (
           <Fragment key={p.id}>
             {sortBy === 'currency' && p.currencyId !== packs[i - 1]?.currencyId && (
@@ -98,12 +98,13 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
 
   const duplicate = (p: Pack) => setEditing({ ...structuredClone(p), id: newId(), name: `${p.name} (rerun)`, purchased: 0, startsAt: null, endsAt: null });
 
-  // Cards keep their own height in the grid (items-start), so opening one's pull panel doesn't stretch its neighbour.
+  // In the grid, cards in a row stretch to the tallest one and a spacer pushes their buttons to the bottom, so a row of
+  // packs lines up whatever the length of each drop list.
   const renderPack = (p: Pack) => (
     <div
       key={p.id}
       id={`pack-${p.id}`}
-      className={`${card} min-w-0 ${flash === p.id ? 'animate-pack-flash motion-reduce:animate-none motion-reduce:border-gold' : ''}`}
+      className={`${card} min-w-0 lg:flex lg:flex-col ${flash === p.id ? 'animate-pack-flash motion-reduce:animate-none motion-reduce:border-gold' : ''}`}
     >
       <div className={`${row} items-center`}>
         <div className={grow}>
@@ -118,6 +119,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         <PackTiming pack={p} now={now} />
       </div>
       <DropList pack={p} cardName={cardName} open={openDrops.has(p.id)} onToggle={() => toggleDrops(p.id)} />
+      <div className="hidden lg:block lg:flex-1" aria-hidden />
       <div className={actions}>
         {packStatus(p, now) === 'active' && (
           <>
