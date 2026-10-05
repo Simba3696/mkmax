@@ -16,6 +16,11 @@ const drop = 'text-[0.8rem] bg-panel-2 rounded-[5px] py-[2px] px-[7px] [&_b]:tex
 /** Pack art in a shop suggestion, matching CardThumb. */
 // max-w-none undoes preflight's max-width: 100% on images, which shaves the box a subpixel in a flex row.
 const thumb = 'max-w-none flex-none rounded-panel border-2 border-line object-cover bg-panel-2';
+/** The pill that folds or unfolds a long drop list, sized like the drop pills around it. */
+const dropToggle = 'min-h-0 border-0 text-[0.8rem] bg-panel-2 rounded-[5px] py-[2px] px-[7px] text-gold md:hover:bg-line';
+/** Packs with more drops than this show only the first FOLDED_DROPS until unfolded, so one huge pool doesn't make its card a page long. */
+const FOLD_DROPS_OVER = 12;
+const FOLDED_DROPS = 8;
 type SortBy = (typeof SORTS)[number];
 
 /** A pack opened from the plan: scrolled to and highlighted, with its "What did you pull?" step open when `pull`. */
@@ -48,6 +53,14 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
   const rules = new Map(state.rarities.map((r) => [r.id, r]));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
   const cardName = (id: string) => state.cards.find((c) => c.id === id)?.name ?? '(deleted card)';
+  /** Packs whose long drop list is unfolded; folded again when the tab is reopened. */
+  const [openDrops, setOpenDrops] = useState<ReadonlySet<string>>(new Set());
+  const toggleDrops = (id: string) =>
+    setOpenDrops((s) => {
+      const next = new Set(s);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
 
   const [sortBy, chooseSort] = useDeviceChoice('mkmax:packSort', SORTS);
   // By currency: in the order the currencies are listed in Settings, soonest-ending first within each.
@@ -104,14 +117,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         </div>
         <PackTiming pack={p} now={now} />
       </div>
-      <div className="flex flex-wrap gap-[0.3rem] mt-[0.4rem]">
-        {p.drops.map((d, i) => (
-          <span key={i} className={drop}>
-            {cardName(d.cardId)} <b>{d.chance}%</b>
-          </span>
-        ))}
-        {p.drops.length === 0 && <span className={note}>No drops entered yet.</span>}
-      </div>
+      <DropList pack={p} cardName={cardName} open={openDrops.has(p.id)} onToggle={() => toggleDrops(p.id)} />
       <div className={actions}>
         {packStatus(p, now) === 'active' && (
           <>
@@ -330,5 +336,26 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
         </>
       )}
     </section>
+  );
+}
+
+/** A pack's drop pills; a long list shows its first few and a pill to unfold the rest. */
+function DropList({ pack, cardName, open, onToggle }: { pack: Pack; cardName: (id: string) => string; open: boolean; onToggle: () => void }) {
+  const foldable = pack.drops.length > FOLD_DROPS_OVER;
+  const shown = foldable && !open ? pack.drops.slice(0, FOLDED_DROPS) : pack.drops;
+  return (
+    <div className="flex flex-wrap gap-[0.3rem] mt-[0.4rem]">
+      {shown.map((d, i) => (
+        <span key={i} className={drop}>
+          {cardName(d.cardId)} <b>{d.chance}%</b>
+        </span>
+      ))}
+      {foldable && (
+        <button className={dropToggle} aria-expanded={open} onClick={onToggle}>
+          {open ? 'Show fewer' : `+${pack.drops.length - FOLDED_DROPS} more`}
+        </button>
+      )}
+      {pack.drops.length === 0 && <span className={note}>No drops entered yet.</span>}
+    </div>
   );
 }
