@@ -94,6 +94,12 @@ stateDiagram-v2
 
 `vite-plugin-pwa` precaches the app shell. `events.json` is network-first (it changes daily) and card art from MK Mobile Base and the wiki is cache-first for 90 days. The build stamps the short commit id and date into `__APP_VERSION__`, shown at the bottom of Settings. Pull to refresh checks for a new service worker and reloads into it.
 
+## Styling and layout
+
+Styles are Tailwind CSS v4 utilities, built at compile time by `@tailwindcss/vite`, so there's no runtime styling dependency. `src/styles.css` holds the theme tokens (`@theme`, with Tailwind's default palette removed so only the app's colors exist) and the base control styles. Shared class sets are in `src/classes.ts`. Each set owns its properties, so nothing should add a second utility for the same property on the same element at the same breakpoint.
+
+`App.tsx` has one layout that changes at `md` (768px). Below it, a header, a 720px page column and a bottom tab bar, which is the phone design and must stay as it is. From `md`, a left rail (88px, 220px from `lg`) replaces the header and tab bar, the page grows to 1400px, and views add columns. The rail is moved with `order-first` rather than in the DOM, so keyboard and screen reader order don't change. Only `<main data-scroll-root>` scrolls; pop-ups are portalled to `<body>` with `data-modal`. `scrollRoot.ts`, `PullToRefresh` and `useSwipeTabs` find these by attribute, so restyling can't break them.
+
 ## Testing
 
 Vitest covers the pure modules: the engine, migrations via `normalize`, sync decisions, the list parser, catalog and event name matching. Views have no tests; they're thin over the engine and are checked by running the app. CI runs lint and tests before every deploy.

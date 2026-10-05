@@ -16,7 +16,7 @@ export const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-
 /** True if the touch began on something that needs horizontal drags itself: a field, a modal, or a sideways scroller. */
 function ownsHorizontalDrag(target: EventTarget | null) {
   for (let el = target as HTMLElement | null; el && el !== document.body; el = el.parentElement) {
-    if (el.matches('input, select, textarea, .modal-backdrop')) return true;
+    if (el.matches('input, select, textarea, [data-modal]')) return true;
     const ox = getComputedStyle(el).overflowX;
     if ((ox === 'auto' || ox === 'scroll') && el.scrollWidth > el.clientWidth) return true;
   }

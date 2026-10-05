@@ -25,7 +25,7 @@ export default function PullToRefresh({ onRefresh }: { onRefresh: () => Promise<
     };
     const onStart = (e: TouchEvent) => {
       // Modals scroll on their own, so a pull inside one isn't a page pull.
-      const inModal = (e.target as Element | null)?.closest?.('.modal-backdrop');
+      const inModal = (e.target as Element | null)?.closest?.('[data-modal]');
       start.current = !busy.current && scrollTop() <= 0 && !inModal && e.touches.length === 1 ? e.touches[0].clientY : null;
       startX.current = e.touches[0]?.clientX ?? 0;
     };
@@ -78,12 +78,14 @@ export default function PullToRefresh({ onRefresh }: { onRefresh: () => Promise<
   if (offset === 0) return null;
   return (
     <div
-      className={`ptr ${refreshing ? 'ptr-spin' : ''} ${pull >= TRIGGER_PX ? 'ptr-ready' : ''}`}
+      className={`fixed left-1/2 top-[calc(env(safe-area-inset-top)-36px)] z-20 size-[36px] rounded-full flex items-center justify-center bg-panel-2 border text-[1.2rem] shadow-[0_2px_8px_rgba(0,0,0,0.5)] pointer-events-none ${refreshing || pull >= TRIGGER_PX ? 'border-gold text-gold' : 'border-line text-muted'}`}
       style={{ transform: `translate(-50%, ${offset}px)`, opacity: refreshing ? 1 : Math.min(1, pull / TRIGGER_PX) }}
       role="status"
       aria-label={refreshing ? 'Refreshing' : 'Pull to refresh'}
     >
-      <span style={refreshing ? undefined : { transform: `rotate(${pull * 3}deg)` }}>↻</span>
+      <span className={`block leading-none ${refreshing ? 'animate-spin-slow' : ''}`} style={refreshing ? undefined : { transform: `rotate(${pull * 3}deg)` }}>
+        ↻
+      </span>
     </div>
   );
 }

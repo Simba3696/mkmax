@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import { newId, useStore } from '../store';
 import { LevelOptions, Modal, NumInput, useNow } from '../ui';
+import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
 import { REALM_KLASH_CURRENCY, levelLabel, moveSeasonEnd, seasonEnd, suggestSeason } from '../engine';
 import { initialSource } from '../challenges';
 import type { Card, Pack, RarityRule } from '../types';
+
+/** A line of inputs: a drop's card and chance, or the pool and new-card controls. */
+const dropRow = 'flex gap-[0.4rem] items-center my-[0.35rem]';
+const pctInput = 'w-[80px]';
+const pickerItem = 'flex justify-between gap-[0.6rem] items-baseline py-[0.5rem] px-[0.7rem] cursor-pointer';
 
 const cardLabel = (c: Card, rule: RarityRule | undefined) => `${c.name} ${c.fusion ? `(${levelLabel(rule, c.fusion)})` : '(new)'}`;
 
@@ -33,8 +39,9 @@ function CardPicker({ value, exclude, onChange }: { value: string; exclude: Set<
   }
 
   return (
-    <div className="picker">
+    <div className="relative flex-1 min-w-0">
       <input
+        className="w-full"
         value={q ?? (chosen ? cardLabel(chosen, rules.get(chosen.rarityId)) : '')}
         placeholder="Search cards…"
         onFocus={(e) => {
@@ -63,8 +70,11 @@ function CardPicker({ value, exclude, onChange }: { value: string; exclude: Set<
         aria-label="Card"
       />
       {q != null && (
-        <ul className="picker-list" role="listbox">
-          {matches.length === 0 && <li className="muted small">No cards match.</li>}
+        <ul
+          className="absolute z-[2] inset-x-0 top-[calc(100%+2px)] m-0 py-[0.2rem] px-0 list-none max-h-[260px] md:max-h-[320px] overflow-y-auto overscroll-contain bg-panel-2 border border-line rounded-panel shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+          role="listbox"
+        >
+          {matches.length === 0 && <li className={`${pickerItem} text-muted text-small`}>No cards match.</li>}
           {matches.map((c, i) => {
             const rule = rules.get(c.rarityId);
             return (
@@ -73,7 +83,8 @@ function CardPicker({ value, exclude, onChange }: { value: string; exclude: Set<
                 key={c.id}
                 role="option"
                 aria-selected={i === hi}
-                className={i === hi ? 'active' : ''}
+                // Hover is a lighter fill on desktop, so the keyboard's active row still stands out.
+                className={`${pickerItem} ${i === hi ? 'bg-line' : 'md:hover:bg-line/50'}`}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   pick(c);
@@ -81,7 +92,7 @@ function CardPicker({ value, exclude, onChange }: { value: string; exclude: Set<
                 }}
               >
                 <span>{c.name}</span>
-                <span className="small" style={{ color: rule?.color }}>
+                <span className="text-small" style={{ color: rule?.color }}>
                   {rule?.label} · {c.fusion ? levelLabel(rule, c.fusion) : 'new'}
                 </span>
               </li>
@@ -184,13 +195,14 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   }
 
   return (
-    <Modal title={initial && state.packs.some((x) => x.id === initial.id) ? 'Edit pack' : 'New pack'} onClose={onClose}>
-      <div className="form">
-        <label className="field wide">
+    <Modal title={initial && state.packs.some((x) => x.id === initial.id) ? 'Edit pack' : 'New pack'} onClose={onClose} wide>
+      {/* The wide modal fits four columns: the name takes two and the store checkbox the other two rather than stretching a 900px input. */}
+      <div className={`${form} lg:grid-cols-4`}>
+        <label className={`${field} col-span-full lg:col-span-2`}>
           <span>Name</span>
           <input value={p.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Klassic Diamond Pack" autoFocus />
         </label>
-        <label className="check wide">
+        <label className={`${check} col-span-full lg:col-span-2`}>
           <input
             type="checkbox"
             checked={!!p.store}
@@ -204,7 +216,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
           />
           Store item: each purchase gives one guaranteed copy (e.g. the Realm Klash store)
         </label>
-        <label className="field">
+        <label className={field}>
           <span>Currency</span>
           <select value={p.currencyId} onChange={(e) => set('currencyId', e.target.value)}>
             {state.currencies.map((c) => (
@@ -214,48 +226,48 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
             ))}
           </select>
         </label>
-        <label className="field">
+        <label className={field}>
           <span>Cost</span>
           <NumInput value={p.cost} min={0} onChange={(v) => set('cost', v ?? 0)} />
         </label>
         {!p.store && (
-          <label className="field">
+          <label className={field}>
             <span>Cards per purchase</span>
             <NumInput value={p.rolls} min={1} step={1} onChange={(v) => set('rolls', v ?? 1)} />
           </label>
         )}
-        <label className="field">
+        <label className={field}>
           <span>Purchase limit</span>
           <NumInput value={p.maxPurchases} min={1} step={1} placeholder="unlimited" onChange={(v) => set('maxPurchases', v)} />
         </label>
-        <label className="field">
+        <label className={field}>
           <span>Already bought</span>
           <NumInput value={p.purchased} min={0} step={1} onChange={(v) => set('purchased', v ?? 0)} />
         </label>
-        <label className="field">
+        <label className={field}>
           <span>Starts (blank = now)</span>
           <input type="datetime-local" value={p.startsAt ?? ''} onChange={(e) => set('startsAt', e.target.value || null)} />
         </label>
         {p.currencyId === REALM_KLASH_CURRENCY && (
-          <label className="check wide">
+          <label className={`${check} col-span-full lg:col-span-2`}>
             <input type="checkbox" checked={seasonal} onChange={(e) => set('season', e.target.checked)} />
             Leaves when the Realm Klash season ends (characters, Kameos and Kameo packs rotate every 2 weeks; the gear stays)
           </label>
         )}
         {seasonal && !pastSeason ? (
-          <label className="field">
+          <label className={field}>
             <span>Season ends</span>
             <input type="datetime-local" value={seasonDraft ?? ''} onChange={(e) => setSeasonDraft(e.target.value || null)} />
           </label>
         ) : (
-          <label className="field">
+          <label className={field}>
             <span>Ends (blank = permanent)</span>
             <input type="datetime-local" value={p.endsAt ?? ''} onChange={(e) => set('endsAt', e.target.value || null)} />
           </label>
         )}
       </div>
       {seasonal && !pastSeason && (
-        <p className="muted small">
+        <p className="text-muted text-small lg:max-w-[75ch]">
           {seasonDraft
             ? 'Shared by every seasonal Blood Ruby item. After it passes, the next season is assumed to end 2 weeks later.'
             : 'Enter when this season ends (from the in-game timer). You only need to do this once; later seasons follow every 2 weeks.'}
@@ -264,28 +276,31 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
 
       <h3>{p.store ? 'Item' : 'Drop chances'}</h3>
       {!p.store && (
-        <p className="muted small">
+        <p className="text-muted text-small lg:max-w-[75ch]">
           Enter the chance per card, per roll, from the pack's info screen. Only list cards you care about; the rest of the pool doesn't matter.
         </p>
       )}
-      {(p.store ? p.drops.slice(0, 1) : p.drops).map((d, i) => (
-        <div key={i} className="drop-row">
-          <CardPicker value={d.cardId} exclude={inPack} onChange={(cardId) => setDrop(i, { cardId })} />
-          {!p.store && (
-            <>
-              <NumInput className="pct-input" value={d.chance} min={0} max={100} onChange={(v) => setDrop(i, { chance: v ?? 0 })} />
-              <span className="muted">%</span>
-              <button className="ghost" onClick={() => setP((x) => ({ ...x, drops: x.drops.filter((_, j) => j !== i) }))} aria-label="Remove drop">
-                ✕
-              </button>
-            </>
-          )}
-        </div>
-      ))}
+      {/* Wide screens cap the drop rows near the phone/tablet width so the card search isn't stretched. */}
+      <div className={p.store ? '' : 'lg:max-w-[640px]'}>
+        {(p.store ? p.drops.slice(0, 1) : p.drops).map((d, i) => (
+          <div key={i} className={dropRow}>
+            <CardPicker value={d.cardId} exclude={inPack} onChange={(cardId) => setDrop(i, { cardId })} />
+            {!p.store && (
+              <>
+                <NumInput className={pctInput} value={d.chance} min={0} max={100} onChange={(v) => setDrop(i, { chance: v ?? 0 })} />
+                <span className="text-muted">%</span>
+                <button className={btn.ghost} onClick={() => setP((x) => ({ ...x, drops: x.drops.filter((_, j) => j !== i) }))} aria-label="Remove drop">
+                  ✕
+                </button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
       {!p.store && (
         <>
-          <div className={`small ${totalChance > 100 ? 'error' : 'muted'}`}>Total listed: {+totalChance.toFixed(3)}%</div>
-          <div className="actions">
+          <div className={`text-small ${totalChance > 100 ? 'text-error' : 'text-muted'}`}>Total listed: {+totalChance.toFixed(3)}%</div>
+          <div className={actions}>
             <button onClick={() => setP((x) => ({ ...x, drops: [...x.drops, { cardId: '', chance: 0 }] }))}>+ Drop</button>
             <button onClick={() => setPoolOpen(!poolOpen)}>+ Even pool…</button>
           </div>
@@ -293,8 +308,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       )}
 
       {poolOpen && !p.store && (
-        <div className="subpanel">
-          <p className="muted small">
+        <div className={subpanel}>
+          <p className="text-muted text-small lg:max-w-[75ch]">
             For odds shown as "X% for one of these cards": pick the cards you want, enter X, and count every item in the pool, the ones you picked
             included. Each card gets X ÷ that count. A card that's already listed gets its share added to its chance.
           </p>
@@ -305,11 +320,11 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
               </option>
             ))}
           </select>
-          <div className="pick-list">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-2 gap-y-0 my-[0.4rem] max-h-[220px] md:max-h-[300px] overflow-y-auto">
             {state.cards
               .filter((c) => c.rarityId === poolRarity)
               .map((c) => (
-                <label key={c.id} className="check">
+                <label key={c.id} className={check}>
                   <input
                     type="checkbox"
                     checked={poolPicked.has(c.id)}
@@ -326,18 +341,18 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
                 </label>
               ))}
           </div>
-          <div className="drop-row wrap">
-            <NumInput className="pct-input" value={poolTotal} min={0} max={100} placeholder="total" onChange={setPoolTotal} />
-            <span className="muted">% for</span>
-            <NumInput className="pct-input" value={poolSize} min={1} step={1} placeholder={String(poolPicked.size || 'items')} onChange={setPoolSize} />
-            <span className="muted">items in the whole pool</span>
-            <button className="primary" disabled={!poolEach} onClick={addPool}>
+          <div className={`${dropRow} flex-wrap`}>
+            <NumInput className={pctInput} value={poolTotal} min={0} max={100} placeholder="total" onChange={setPoolTotal} />
+            <span className="text-muted">% for</span>
+            <NumInput className={pctInput} value={poolSize} min={1} step={1} placeholder={String(poolPicked.size || 'items')} onChange={setPoolSize} />
+            <span className="text-muted">items in the whole pool</span>
+            <button className={btn.primary} disabled={!poolEach} onClick={addPool}>
               Add {poolPicked.size || ''} at {poolEach ? +poolEach.toFixed(3) : '–'}% each
             </button>
           </div>
-          {poolSize != null && poolSize < poolPicked.size && <div className="small error">You picked more cards than the pool has; using {poolPicked.size}.</div>}
+          {poolSize != null && poolSize < poolPicked.size && <div className="text-small text-error">You picked more cards than the pool has; using {poolPicked.size}.</div>}
           {poolEach > 0 && poolUpdates.length > 0 && (
-            <div className="small muted">
+            <div className="text-small text-muted lg:max-w-[75ch]">
               Already listed, share added:{' '}
               {poolUpdates.map((d) => `${state.cards.find((c) => c.id === d.cardId)?.name} ${+d.chance.toFixed(3)}% → ${+(d.chance + poolEach).toFixed(3)}%`).join('; ')}
             </div>
@@ -345,18 +360,18 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
         </div>
       )}
 
-      <div className="subpanel">
-        <div className="small muted">Card not in your list yet? Add it here:</div>
-        <div className="drop-row wrap">
-          <input value={newCard.name} placeholder="Card name" onChange={(e) => setNewCard({ ...newCard, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addNewCard()} />
-          <select value={newCard.rarityId} onChange={(e) => setNewCard({ ...newCard, rarityId: e.target.value })}>
+      <div className={subpanel}>
+        <div className="text-small text-muted">Card not in your list yet? Add it here:</div>
+        <div className={`${dropRow} flex-wrap`}>
+          <input className="flex-1 lg:flex-[2]" value={newCard.name} placeholder="Card name" onChange={(e) => setNewCard({ ...newCard, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addNewCard()} />
+          <select className="flex-1" value={newCard.rarityId} onChange={(e) => setNewCard({ ...newCard, rarityId: e.target.value })}>
             {state.rarities.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.label}
               </option>
             ))}
           </select>
-          <select value={newCard.fusion} onChange={(e) => setNewCard({ ...newCard, fusion: Number(e.target.value) })}>
+          <select className="flex-1" value={newCard.fusion} onChange={(e) => setNewCard({ ...newCard, fusion: Number(e.target.value) })}>
             <LevelOptions rule={state.rarities.find((r) => r.id === newCard.rarityId)} />
           </select>
           <button onClick={addNewCard} disabled={!newCard.name.trim()}>
@@ -366,15 +381,15 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       </div>
 
       {errors.length > 0 && (
-        <ul className="error small">
+        <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
           {errors.map((e) => (
             <li key={e}>{e}</li>
           ))}
         </ul>
       )}
-      <div className="modal-foot">
+      <div className={modalFoot}>
         <button onClick={onClose}>Cancel</button>
-        <button className="primary" onClick={save} disabled={errors.length > 0}>
+        <button className={btn.primary} onClick={save} disabled={errors.length > 0}>
           Save pack
         </button>
       </div>
