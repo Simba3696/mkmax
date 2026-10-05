@@ -1,11 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, cardGoal, daysToAfford, isRealmKlashGear, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
 import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
 import { GearSummary } from './GearOrder';
-import { card, field, grow, hint, row, rowTitle, type ChipTone } from '../classes';
+import { btn, card, field, grow, hint, row, rowTitle, type ChipTone } from '../classes';
 
 const PHASE_LABEL: Record<Phase, string> = {
   unlock: 'Unlock',
@@ -25,6 +25,9 @@ const planRow = `${row} items-center`;
  */
 const rowLink = `${grow} block min-h-0 py-[0.15rem] px-[0.3rem] -mx-[0.3rem] border-0 rounded-[6px] bg-transparent text-inherit text-left [&>span]:block active:bg-panel-2 md:hover:bg-panel-2`;
 const note = 'text-muted text-small';
+/** Pack ranking shows this many packs per currency until unfolded; the rest are rarely worth reading. */
+const RANK_TOP = 3;
+const rankToggle = `${btn.ghost} block min-h-0 mt-[0.3rem] py-[0.15rem] px-[0.3rem] -mx-[0.3rem] rounded-[6px] text-small text-gold`;
 const done = 'text-muted line-through';
 /** A pack ranking's top targets, indented under it. */
 const target = `pl-[0.8rem] ${note}`;
@@ -45,6 +48,14 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
   const ctx = useMemo(() => buildCtx(state), [state]);
   const plan = useMemo(() => buildPlan(ctx, now), [ctx, now]);
   const ranks = useMemo(() => rankPacks(ctx, now), [ctx, now]);
+  /** Currencies whose full pack ranking is showing; back to the top few when the Plan is reopened. */
+  const [openRanks, setOpenRanks] = useState<ReadonlySet<string>>(new Set());
+  const toggleRanks = (id: string) =>
+    setOpenRanks((s) => {
+      const next = new Set(s);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
   const targets = useMemo(() => rankTargets(ctx, now).slice(0, 10), [ctx, now]);
   const events = useEvents();
   // Challenge Kameos you still need whose Elder challenge is on now or coming up, soonest first.
@@ -280,10 +291,11 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
             const group = ranks.filter((r) => r.pack.currencyId === cur.id);
             if (!group.length) return null;
             const best = group[0].evPerK;
+            const open = openRanks.has(cur.id);
             return (
               <div key={cur.id}>
                 <h3>{cur.name}</h3>
-                {group.map((r) => {
+                {(open ? group : group.slice(0, RANK_TOP)).map((r) => {
                   const eff = best > 0 ? r.evPerK / best : 0;
                   return (
                     <div key={r.pack.id} className="[&+&]:border-t [&+&]:border-line [&+&]:mt-[0.3rem] [&+&]:pt-[0.3rem]">
@@ -311,6 +323,11 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                     </div>
                   );
                 })}
+                {group.length > RANK_TOP && (
+                  <button className={rankToggle} aria-expanded={open} onClick={() => toggleRanks(cur.id)}>
+                    {open ? 'Show fewer' : `Show ${group.length - RANK_TOP} more`}
+                  </button>
+                )}
               </div>
             );
           })}
