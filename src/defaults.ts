@@ -4,10 +4,12 @@ const ones = (n: number) => Array(n).fill(1);
 
 /**
  * Fusion Up Kards per step from F3, for Diamond cards (from the game): F3→F4 1, F4→F5 2, F5→F6 3, F6→F7 4,
- * F7→F8 5, F8→F9 7, F9→F10 10. Other rarities start from the same table until checked in-game.
+ * F7→F8 5, F8→F9 7, F9→F10 10. Gold uses the same table up to F10.
  */
 export const DIAMOND_KARD_COSTS = [0, 0, 0, 1, 2, 3, 4, 5, 7, 10];
 const kardCosts = () => [...DIAMOND_KARD_COSTS];
+/** Epic and Rare gear kards per step from F3 (from the game): 1, 3, 5, 7, 9, 12, 15. */
+export const GEAR_KARD_COSTS = [0, 0, 0, 1, 3, 5, 7, 9, 12, 15];
 /** Gold ascension (F10→A1 … A9→A10) takes kards too. Costs unconfirmed: each step repeats F9→F10 until checked. */
 export const ASCENSION_KARD_COST = 10;
 
@@ -31,20 +33,20 @@ export function defaultRarities(): RarityRule[] {
     // Equipment colors match the game: Epic purple, Rare blue, Uncommon green.
     // Only tracked until F3 (4 copies from scratch); Fusion Up Kards finish them. Realm Klash gear is Epic too,
     // but those cards override the goal to max because they're bought outright.
-    { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
-    { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#4da3ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
+    { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: [...GEAR_KARD_COSTS] },
+    { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#4da3ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: [...GEAR_KARD_COSTS] },
     // Uncommon (green) gear is farmed from towers and taken to max; no Fusion Up Kards until checked in-game.
     { id: 'uncommon', label: 'Uncommon Equip', kind: 'equipment', color: '#5fd068', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
     // Kameos fuse to F10 in the game, but only owning one matters here: no duplicate steps, so the first copy (F0) is the goal.
-    // Kameos come in Diamond and Gold, like characters.
-    { id: 'kameo-diamond', label: 'Diamond Kameo', kind: 'kameo', color: '#ff7ab8', dupesPerLevel: [], fusionMax: 0, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
-    { id: 'kameo-gold', label: 'Gold Kameo', kind: 'kameo', color: '#ffb35c', dupesPerLevel: [], fusionMax: 0, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
+    // Kameos come in Diamond and Gold, like characters, and both have guests (Ghostface, Jason Voorhees).
+    { id: 'kameo-diamond', label: 'Diamond Kameo', kind: 'kameo', color: '#ff7ab8', dupesPerLevel: [], fusionMax: 0, goal: 'max', hasGuests: true, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
+    { id: 'kameo-gold', label: 'Gold Kameo', kind: 'kameo', color: '#ffb35c', dupesPerLevel: [], fusionMax: 0, goal: 'max', hasGuests: true, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [] },
   ];
 }
 
 export function defaultState(): AppState {
   return {
-    version: 11,
+    version: 12,
     rarities: defaultRarities(),
     currencies: [
       { id: 'souls', name: 'Souls', balance: 0 },

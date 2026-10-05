@@ -1,6 +1,6 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
 import type { AppState, Card, RarityRule } from './types';
-import { ASCENSION_KARD_COST, DIAMOND_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
+import { ASCENSION_KARD_COST, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
 import { REALM_KLASH_CURRENCY, pruneDone } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
 import { fixPackNames } from './events';
@@ -94,7 +94,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 11,
+    version: 12,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,
@@ -139,6 +139,15 @@ export function normalize(input: unknown): AppState {
   if (version < 11) {
     const used = (id: string) => out.packs.some((p) => p.currencyId === id);
     out.currencies = out.currencies.filter((c) => c.id !== 'time-krystals' || used(c.id) || c.balance > 0 || !!c.perDay);
+  }
+  // Version 12 swaps in the game's Epic and Rare gear kard costs where the save still has the Diamond copy they
+  // used to start from, and turns on guests for Kameos. Done once, so later edits stick.
+  if (version < 12) {
+    const same = (a: number[], b: number[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+    for (const r of out.rarities) {
+      if ((r.id === 'epic' || r.id === 'rare') && same(r.kardsPerLevel, DIAMOND_KARD_COSTS)) r.kardsPerLevel = [...GEAR_KARD_COSTS];
+      if (r.id === 'kameo-diamond' || r.id === 'kameo-gold') r.hasGuests = true;
+    }
   }
   pruneDone(out);
   return out;

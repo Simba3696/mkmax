@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultState } from './defaults';
+import { DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
   ascensionCaps, buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, recordPurchase, seasonEnd, suggestSeason, targetLevel,
 } from './engine';
@@ -253,6 +253,21 @@ describe('phases', () => {
     expect(normalize(kept).currencies.map((c) => c.id)).toContain('time-krystals');
     const added = { ...defaultState(), currencies: [...defaultState().currencies, tk] };
     expect(normalize(added).currencies.map((c) => c.id)).toContain('time-krystals');
+  });
+
+  it('gives Epic and Rare gear their kard costs and Kameos guests once, keeping edited tables', () => {
+    const old = structuredClone({ ...defaultState(), version: 11 });
+    for (const r of old.rarities) {
+      if (r.id === 'epic' || r.id === 'rare') r.kardsPerLevel = [...DIAMOND_KARD_COSTS];
+      if (r.kind === 'kameo') r.hasGuests = false;
+    }
+    old.rarities.find((r) => r.id === 'rare')!.kardsPerLevel[3] = 2;
+    const out = normalize(old).rarities;
+    expect(out.find((r) => r.id === 'epic')?.kardsPerLevel).toEqual(GEAR_KARD_COSTS);
+    expect(out.find((r) => r.id === 'rare')?.kardsPerLevel[3]).toBe(2);
+    expect(out.filter((r) => r.kind === 'kameo').every((r) => r.hasGuests)).toBe(true);
+    const cleared = { ...defaultState(), rarities: defaultState().rarities.map((r) => ({ ...r, hasGuests: false })) };
+    expect(normalize(cleared).rarities.find((r) => r.id === 'kameo-gold')?.hasGuests).toBe(false);
   });
 
   it('gives Blood Rubies a daily income once, keeping one that was cleared', () => {

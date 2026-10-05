@@ -112,8 +112,8 @@ export interface Weights {
 }
 
 export interface AppState {
-  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. 8–9 = renamed packs and cards to the game's spelling. 10 = fixed "Kollector’S" pack names and gave Blood Rubies a daily income. 11 = removed Time Krystals (console-only) when unused. */
-  version: 11;
+  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. 8–9 = renamed packs and cards to the game's spelling. 10 = fixed "Kollector’S" pack names and gave Blood Rubies a daily income. 11 = removed Time Krystals (console-only) when unused. 12 = gave Epic and Rare gear their own kard costs and Kameos guests. */
+  version: 12;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];
