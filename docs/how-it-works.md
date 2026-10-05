@@ -16,7 +16,7 @@ The phase depends on which copy it is:
 - **Kards cover it**: copies your Fusion Up Kards would supply anyway, so they're worth less.
 - **Done**: worth 0. Cards that reach their goal are removed, so they never get scored.
 
-Fusion Up Kards aren't one per level. Each step costs more, and each rarity (Diamond, Gold, Epic, Rare) has its own kards and its own cost table, editable in Settings → Fusion rules. The Diamond costs come from the game; the others start as a copy of them until checked in-game.
+Fusion Up Kards aren't one per level. Each step costs more, and each rarity (Diamond, Gold, Epic, Rare) has its own kards and its own cost table, editable in Settings → Fusion rules. The Diamond and gear costs come from the game: Diamond 1, 2, 3, 4, 5, 7, 10 and Epic and Rare gear 1, 3, 5, 7, 9, 12, 15. Gold uses the Diamond costs to F10, and each ascension step is assumed to cost 10 until checked in-game.
 
 | Step | F3→F4 | F4→F5 | F5→F6 | F6→F7 | F7→F8 | F8→F9 | F9→F10 | Total |
 |---|---|---|---|---|---|---|---|---|
