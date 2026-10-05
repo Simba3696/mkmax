@@ -245,6 +245,16 @@ describe('phases', () => {
     expect(normalize({ ...defaultState(), version: 9, packs: [pack] }).packs[0].name).toBe('Kollector’s Diamond Kasket');
   });
 
+  it('drops an unused Time Krystals currency once, keeping one that is in use', () => {
+    const tk = { id: 'time-krystals', name: 'Time Krystals', balance: 0 };
+    const old = { ...defaultState(), version: 10, currencies: [...defaultState().currencies, tk] };
+    expect(normalize(old).currencies.map((c) => c.id)).not.toContain('time-krystals');
+    const kept = { ...old, currencies: [...defaultState().currencies, { ...tk, balance: 40 }] };
+    expect(normalize(kept).currencies.map((c) => c.id)).toContain('time-krystals');
+    const added = { ...defaultState(), currencies: [...defaultState().currencies, tk] };
+    expect(normalize(added).currencies.map((c) => c.id)).toContain('time-krystals');
+  });
+
   it('gives Blood Rubies a daily income once, keeping one that was cleared', () => {
     const old = { ...defaultState(), version: 9, currencies: defaultState().currencies.map(({ perDay: _, ...c }) => c) };
     expect(normalize(old).currencies.find((c) => c.id === 'blood-rubies')?.perDay).toBe(65);
