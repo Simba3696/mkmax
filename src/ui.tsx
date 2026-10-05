@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Card, RarityRule } from './types';
 import { levelLabel } from './engine';
+import { btn, card, chipTone, type ChipTone } from './classes';
 
 export function fmt(n: number) {
   if (!isFinite(n)) return '∞';
@@ -53,12 +54,14 @@ export function useBrokenImageUrls(): ReadonlySet<string> {
   return brokenUrls;
 }
 
+const thumb = 'flex-none max-w-none rounded-panel border-2 border-line object-cover bg-panel-2';
+
 export function CardThumb({ card, rule, size = 44 }: { card: Card; rule?: RarityRule; size?: number }) {
   const [broken, setBroken] = useState(false);
   useEffect(() => setBroken(false), [card.imageUrl]);
   const style = { width: size, height: size, borderColor: rule?.color };
   if (card.imageUrl && !broken) {
-    return <img className="thumb" style={style} src={card.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => (setBroken(true), markBroken(card.imageUrl!))} />;
+    return <img className={thumb} style={style} src={card.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => (setBroken(true), markBroken(card.imageUrl!))} />;
   }
   const initials = card.name
     .split(/[\s,/]+/)
@@ -67,23 +70,25 @@ export function CardThumb({ card, rule, size = 44 }: { card: Card; rule?: Rarity
     .map((w) => w[0].toUpperCase())
     .join('');
   return (
-    <span className="thumb thumb-empty" style={{ ...style, color: rule?.color }} aria-hidden>
+    <span className={`${thumb} inline-flex items-center justify-center font-extrabold text-[0.8rem]`} style={{ ...style, color: rule?.color }} aria-hidden>
       {initials}
     </span>
   );
 }
 
+const badge = 'inline-block border rounded-chip px-[5px] text-tiny font-semibold mr-[4px]';
+
 export function RarityBadge({ rule }: { rule?: RarityRule }) {
-  if (!rule) return <span className="badge">?</span>;
+  if (!rule) return <span className={badge}>?</span>;
   return (
-    <span className="badge" style={{ borderColor: rule.color, color: rule.color }}>
+    <span className={badge} style={{ borderColor: rule.color, color: rule.color }}>
       {rule.label}
     </span>
   );
 }
 
 export function FusionLabel({ card, rule }: { card: Card; rule?: RarityRule }) {
-  return card.fusion === 0 ? <span className="muted">Not owned</span> : <span>{levelLabel(rule, card.fusion)}</span>;
+  return card.fusion === 0 ? <span className="text-muted">Not owned</span> : <span>{levelLabel(rule, card.fusion)}</span>;
 }
 
 /** <option>s for "Not owned" (optional) plus every level of a rarity, labelled F…/A…. */
@@ -142,7 +147,8 @@ export function NumInput({
   );
 }
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+/** `wide` gives forms with many columns (the pack editor) more room on desktop; phones are full width either way. */
+export function Modal({ title, onClose, wide, children }: { title: string; onClose: () => void; wide?: boolean; children: ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -152,11 +158,15 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
   // fixed elements inside a touch-scrolling container in that container's layer).
   return createPortal(
     // Tapping outside doesn't close it: a stray tap would throw away everything entered. Use ✕ or Cancel.
-    <div className="modal-backdrop">
-      <div className="modal" role="dialog" aria-label={title}>
-        <div className="modal-head">
-          <h2>{title}</h2>
-          <button className="ghost" onClick={onClose} aria-label="Close">
+    <div
+      data-modal
+      className="fixed inset-0 z-10 flex justify-center items-start overflow-y-auto overscroll-contain bg-black/70 px-2 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]"
+    >
+      {/* my-auto centres it on tall screens and collapses to the top once it's taller than the screen. */}
+      <div className={`w-full max-w-[640px] ${wide ? 'lg:max-w-[920px]' : ''} md:my-auto bg-panel border border-line rounded-modal p-4`} role="dialog" aria-label={title}>
+        <div className="flex justify-between items-center mb-[0.6rem]">
+          <h2 className="m-0">{title}</h2>
+          <button className={btn.ghost} onClick={onClose} aria-label="Close">
             ✕
           </button>
         </div>
@@ -222,10 +232,10 @@ export function FoldCard({ id, title, children }: { id: string; title: string; c
     }
   };
   return (
-    <section className={`card fold${open ? '' : ' folded'}`}>
-      <h2>
-        <button className="fold-head" aria-expanded={open} onClick={toggle}>
-          <span className="fold-caret" aria-hidden="true">
+    <section className={card}>
+      <h2 className={open ? undefined : 'mb-0'}>
+        <button className="group flex items-center gap-[0.45rem] w-full min-h-0 p-0 border-0 bg-transparent text-inherit text-left" aria-expanded={open} onClick={toggle}>
+          <span className={`inline-block text-[0.8em] text-muted md:group-hover:text-fg transition-transform duration-150 motion-reduce:transition-none ${open ? '' : '-rotate-90'}`} aria-hidden="true">
             ▾
           </span>
           {title}
@@ -243,8 +253,9 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
     const t = setTimeout(() => setArmed(false), 3000);
     return () => clearTimeout(t);
   }, [armed]);
+  // Ghost buttons (btn.ghost, alone or with extra classes after it) stay ghost when armed, as before; only the text changes.
   return (
-    <button className={`${className ?? ''} ${armed ? 'danger' : ''}`} onClick={() => (armed ? onConfirm() : setArmed(true))}>
+    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={() => (armed ? onConfirm() : setArmed(true))}>
       {armed ? 'Tap again to confirm' : label}
     </button>
   );
@@ -252,3 +263,8 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
 
 /** Chip text for where a card comes from besides packs. */
 export const SOURCE_LABELS: Record<NonNullable<Card['source']>, string> = { krypt: 'krypt', tower: 'tower', challenge: 'Elder challenge' };
+
+/** A small rounded label: time left, guest, source, plan phase. */
+export function Chip({ tone = 'plain', children }: { tone?: ChipTone; children: ReactNode }) {
+  return <span className={`inline-block text-tiny py-[2px] px-[7px] rounded-full border whitespace-nowrap mr-[4px] ${chipTone[tone]}`}>{children}</span>;
+}

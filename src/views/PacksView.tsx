@@ -1,13 +1,21 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { newId, useStore } from '../store';
 import { REALM_KLASH_CURRENCY, levelLabel, maxFusion, moveSeasonEnd, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
 import { CardThumb, ConfirmButton, fmt, useDeviceChoice, useNow } from '../ui';
+import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
 import PackEditor from './PackEditor';
 import { packFromShop, packName, scheduledSeasonEnd, shopSuggestions, useEvents } from '../events';
 import type { Pack } from '../types';
 
 const SORTS = ['ending', 'currency'] as const;
+/** Muted small print under titles and in help text. */
+const note = 'text-muted text-small';
+/** A drop-rate pill: card name with its chance in gold. */
+const drop = 'text-[0.8rem] bg-panel-2 rounded-[5px] py-[2px] px-[7px] [&_b]:text-gold';
+/** Pack art in a shop suggestion, matching CardThumb. */
+// max-w-none undoes preflight's max-width: 100% on images, which shaves the box a subpixel in a flex row.
+const thumb = 'max-w-none flex-none rounded-panel border-2 border-line object-cover bg-panel-2';
 type SortBy = (typeof SORTS)[number];
 
 /** A pack opened from the plan: scrolled to and highlighted, with its "What did you pull?" step open when `pull`. */
@@ -50,14 +58,24 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
   const groups = { active: [] as Pack[], upcoming: [] as Pack[], expired: [] as Pack[] };
   for (const p of state.packs) groups[packStatus(p, now)].push(p);
   for (const g of Object.values(groups)) g.sort((a, b) => (sortBy === 'currency' ? curIndex(a) - curIndex(b) : 0) || urgency(a) - urgency(b));
-  /** A status group's packs, with a currency heading before each currency's packs when sorted by currency. */
+  /**
+   * A status group's packs, with a currency heading before each currency's packs when sorted by currency. Phones stack
+   * them; wider screens lay the cards out in a grid (headings span it), so the heading and card are siblings rather
+   * than wrapped together. Block margins collapse the same either way, so phones look as before.
+   */
   const renderGroup = (packs: Pack[]) =>
-    packs.map((p, i) => (
-      <div key={p.id}>
-        {sortBy === 'currency' && p.currencyId !== packs[i - 1]?.currencyId && <h4 className="currency-head">{curName(p.currencyId)}</h4>}
-        {renderPack(p)}
+    packs.length > 0 && (
+      <div className="lg:grid lg:grid-cols-2 2xl:grid-cols-3 lg:gap-x-[0.8rem] lg:items-start">
+        {packs.map((p, i) => (
+          <Fragment key={p.id}>
+            {sortBy === 'currency' && p.currencyId !== packs[i - 1]?.currencyId && (
+              <h4 className="col-span-full mt-[0.6rem] lg:mt-0 mb-[0.4rem] text-[0.8rem] font-bold text-muted uppercase tracking-[0.04em]">{curName(p.currencyId)}</h4>
+            )}
+            {renderPack(p)}
+          </Fragment>
+        ))}
       </div>
-    ));
+    );
 
   // Store items give a known card, so buying one levels it up; for random packs we ask what was pulled.
   const buy = (p: Pack, delta: 1 | -1) => {
@@ -67,12 +85,17 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
 
   const duplicate = (p: Pack) => setEditing({ ...structuredClone(p), id: newId(), name: `${p.name} (rerun)`, purchased: 0, startsAt: null, endsAt: null });
 
+  // Cards keep their own height in the grid (items-start), so opening one's pull panel doesn't stretch its neighbour.
   const renderPack = (p: Pack) => (
-    <div key={p.id} id={`pack-${p.id}`} className={`card pack${flash === p.id ? ' flash' : ''}`}>
-      <div className="row">
-        <div className="grow">
-          <div className="row-title">{p.name}</div>
-          <div className="muted small">
+    <div
+      key={p.id}
+      id={`pack-${p.id}`}
+      className={`${card} min-w-0 ${flash === p.id ? 'animate-pack-flash motion-reduce:animate-none motion-reduce:border-gold' : ''}`}
+    >
+      <div className={`${row} items-center`}>
+        <div className={grow}>
+          <div className={rowTitle}>{p.name}</div>
+          <div className={note}>
             {fmt(p.cost)} {curName(p.currencyId)}
             {p.store && ' · store item'}
             {p.rolls > 1 && ` · ${p.rolls} cards per buy`} · bought {p.purchased}
@@ -81,19 +104,19 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         </div>
         <PackTiming pack={p} now={now} />
       </div>
-      <div className="drops">
+      <div className="flex flex-wrap gap-[0.3rem] mt-[0.4rem]">
         {p.drops.map((d, i) => (
-          <span key={i} className="drop">
+          <span key={i} className={drop}>
             {cardName(d.cardId)} <b>{d.chance}%</b>
           </span>
         ))}
-        {p.drops.length === 0 && <span className="muted small">No drops entered yet.</span>}
+        {p.drops.length === 0 && <span className={note}>No drops entered yet.</span>}
       </div>
-      <div className="actions">
+      <div className={actions}>
         {packStatus(p, now) === 'active' && (
           <>
             <button
-              className="primary"
+              className={btn.primary}
               disabled={p.maxPurchases != null && p.purchased >= p.maxPurchases}
               onClick={() => buy(p, 1)}
               title={p.store ? 'Adds a purchase, deducts the cost and levels up the card' : 'Adds a purchase and deducts the cost from your balance'}
@@ -112,23 +135,23 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         <ConfirmButton label="Delete" onConfirm={() => update((d) => void (d.packs = d.packs.filter((x) => x.id !== p.id)), `Deleted ${p.name}`)} />
       </div>
       {pulling === p.id && (
-        <div className="subpanel">
-          <div className="small">
-            <b>What did you pull?</b> <span className="muted">Tap + for each copy you got. Cards you don't track can be ignored.</span>
+        <div className={subpanel}>
+          <div className="text-small">
+            <b>What did you pull?</b> <span className="text-muted">Tap + for each copy you got. Cards you don't track can be ignored.</span>
           </div>
           {p.drops.map((d) => {
             const card = state.cards.find((c) => c.id === d.cardId);
             const rule = card && rules.get(card.rarityId);
             if (!card || !rule) return null;
             return (
-              <div key={d.cardId} className="row">
+              <div key={d.cardId} className={`${row} items-center`}>
                 <CardThumb card={card} rule={rule} size={36} />
-                <span className="grow">{card.name}</span>
-                <div className="stepper">
+                <span className={grow}>{card.name}</span>
+                <div className={stepper}>
                   <button onClick={() => update((s) => stepCard(s, card.id, -1))} disabled={card.fusion <= 0} aria-label="Remove a copy">
                     −
                   </button>
-                  <span className="stepper-val">{card.fusion === 0 ? '—' : levelLabel(rule, card.fusion)}</span>
+                  <span className={stepperVal}>{card.fusion === 0 ? '—' : levelLabel(rule, card.fusion)}</span>
                   <button onClick={() => update((s) => stepCard(s, card.id, 1))} disabled={card.fusion >= maxFusion(rule)} aria-label="Add a copy">
                     +
                   </button>
@@ -136,8 +159,8 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
               </div>
             );
           })}
-          <div className="actions">
-            <button className="primary" onClick={() => setPulling(null)}>
+          <div className={actions}>
+            <button className={btn.primary} onClick={() => setPulling(null)}>
               Done
             </button>
           </div>
@@ -148,35 +171,40 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
 
   return (
     <>
-      <div className="toolbar">
+      <div className={toolbar}>
         <h2>Packs</h2>
-        <button className="primary" onClick={() => setEditing('new')}>
+        <button className={btn.primary} onClick={() => setEditing('new')}>
           + Add pack
         </button>
       </div>
-      <p className="muted small">
+      {/* Capped on wide screens so the help text keeps a readable line length. */}
+      <p className={`${note} md:max-w-[90ch]`}>
         When a pack rotates in, copy its cost and odds from the in-game info screen. When you buy one, tap <b>I bought one</b>. Store items level up their card automatically; for random packs, tap + on whatever you pulled.
       </p>
 
       <SeasonBar />
       <ShopSuggestions onAdd={setEditing} />
 
-      {state.packs.length > 1 && (
-        <label className="sort-by">
-          <span className="muted small">Sort</span>
-          <select value={sortBy} onChange={(e) => chooseSort(e.target.value as SortBy)}>
-            <option value="ending">Ending soonest</option>
-            <option value="currency">Currency</option>
-          </select>
-        </label>
-      )}
-      {groups.active.length > 0 && <h3>Available now</h3>}
+      {/* From md the Sort control shares a row with the heading of the list it sorts (select stays first for tab order).
+          No classes below md, so margins collapse through the wrapper as before. */}
+      <div className="md:flex md:flex-row-reverse md:items-center md:gap-2">
+        {state.packs.length > 1 && (
+          <label className="flex items-center justify-end gap-2 my-[0.4rem]">
+            <span className={note}>Sort</span>
+            <select value={sortBy} onChange={(e) => chooseSort(e.target.value as SortBy)}>
+              <option value="ending">Ending soonest</option>
+              <option value="currency">Currency</option>
+            </select>
+          </label>
+        )}
+        {groups.active.length > 0 && <h3 className="md:my-[0.4rem] md:mr-auto">Available now</h3>}
+      </div>
       {renderGroup(groups.active)}
       {groups.upcoming.length > 0 && <h3>Coming up</h3>}
       {renderGroup(groups.upcoming)}
       {groups.expired.length > 0 && (
-        <div className="toolbar">
-          <button className="ghost" onClick={() => setShowExpired(!showExpired)}>
+        <div className={toolbar}>
+          <button className={btn.ghost} onClick={() => setShowExpired(!showExpired)}>
             {showExpired ? '▾' : '▸'} Expired ({groups.expired.length})
           </button>
           <ConfirmButton
@@ -188,7 +216,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         </div>
       )}
       {showExpired && renderGroup(groups.expired)}
-      {state.packs.length === 0 && <p className="muted">No packs yet.</p>}
+      {state.packs.length === 0 && <p className="text-muted">No packs yet.</p>}
 
       {editing && <PackEditor initial={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </>
@@ -212,19 +240,21 @@ function SeasonBar() {
   const leaving = `${seasonalNow} seasonal item${seasonalNow === 1 ? '' : 's'} leave${seasonalNow === 1 ? 's' : ''} then.`;
   if (scheduled) {
     return (
-      <div className="card">
-        <div className="row">
-          <span className="grow">Realm Klash season ends</span>
+      <div className={card}>
+        <div className={`${row} items-center`}>
+          {/* On wide screens the date follows its label rather than sitting at the far edge. */}
+          <span className={`${grow} md:flex-none`}>Realm Klash season ends</span>
           <b>{new Date(scheduled).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</b>
         </div>
-        <p className="muted small">{leaving} Date from MK Mobile Base's event schedule, refreshed daily.</p>
+        <p className={note}>{leaving} Date from MK Mobile Base's event schedule, refreshed daily.</p>
       </div>
     );
   }
   return (
-    <div className="card">
-      <div className="row wrap">
-        <label className="field grow">
+    <div className={card}>
+      <div className={`${row} flex-wrap items-end`}>
+        {/* A date doesn't need the full width of a desktop page. */}
+        <label className={`${field} flex-1 min-w-0 md:flex-none md:w-[18rem]`}>
           <span>Realm Klash season ends</span>
           <input type="datetime-local" value={end ?? ''} onChange={(e) => e.target.value && update((d) => moveSeasonEnd(d, e.target.value, now))} />
         </label>
@@ -235,7 +265,7 @@ function SeasonBar() {
           />
         )}
       </div>
-      <p className="muted small">
+      <p className={note}>
         {end
           ? `${leaving} Each season after is assumed to end 2 weeks later. If a season ends early, tap Ended early; if the new one's timer is different, change the date.`
           : 'Enter when the current season ends (from the in-game timer) so seasonal Blood Ruby items know when they leave.'}
@@ -258,41 +288,45 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
   if (!packs.length) return null;
   const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null);
   return (
-    <section className="card">
-      <div className="toolbar">
-        <button className="ghost" onClick={() => setOpen(!open)}>
+    <section className={card}>
+      <div className={toolbar}>
+        <button className={btn.ghost} onClick={() => setOpen(!open)}>
           {open ? '▾' : '▸'} In the shop ({packs.length})
         </button>
       </div>
       {open && (
         <>
-          <p className="muted small">
+          <p className={`${note} md:max-w-[90ch]`}>
             From MK Mobile Base's event schedule. It doesn't have drop rates, so <b>Add</b> fills in the rest and you enter the odds for cards you need.
             Packs with nothing you need: <b>Not needed</b> hides them for good.
           </p>
-          {packs.map((sp) => {
-            const upcoming = sp.start && new Date(sp.start) > now;
-            return (
-              <div key={sp.name} className="row">
-                {sp.image && <img className="thumb" src={sp.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 44, height: 44 }} />}
-                <div className="grow">
-                  <div className="row-title">{packName(sp)}</div>
-                  <div className="muted small">
-                    {sp.cost != null && `${fmt(sp.cost)} ${sp.currency} · `}
-                    {sp.limit != null ? `limit ${sp.limit}` : 'no limit'}
-                    {upcoming ? ` · starts ${when(sp.start)}` : sp.end ? ` · ends ${when(sp.end)}` : ' · permanent'}
+          {/* Two columns from xl (1280px), where each column is wide enough for a one-line title; there every row gets its
+              divider, so both columns start with one under the text. */}
+          <div className="xl:grid xl:grid-cols-2 xl:gap-x-8">
+            {packs.map((sp) => {
+              const upcoming = sp.start && new Date(sp.start) > now;
+              return (
+                <div key={sp.name} className={`${row} items-center xl:border-t xl:border-line`}>
+                  {sp.image && <img className={thumb} src={sp.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 44, height: 44 }} />}
+                  <div className={grow}>
+                    <div className={rowTitle}>{packName(sp)}</div>
+                    <div className={note}>
+                      {sp.cost != null && `${fmt(sp.cost)} ${sp.currency} · `}
+                      {sp.limit != null ? `limit ${sp.limit}` : 'no limit'}
+                      {upcoming ? ` · starts ${when(sp.start)}` : sp.end ? ` · ends ${when(sp.end)}` : ' · permanent'}
+                    </div>
                   </div>
+                  <button onClick={() => onAdd(packFromShop(sp, state, newId()))}>Add</button>
+                  <button
+                    className={btn.ghost}
+                    onClick={() => update((d) => void (d.dismissedShopPacks = [...(d.dismissedShopPacks ?? []), sp.name]), `Hid ${packName(sp)}`)}
+                  >
+                    Not needed
+                  </button>
                 </div>
-                <button onClick={() => onAdd(packFromShop(sp, state, newId()))}>Add</button>
-                <button
-                  className="ghost"
-                  onClick={() => update((d) => void (d.dismissedShopPacks = [...(d.dismissedShopPacks ?? []), sp.name]), `Hid ${packName(sp)}`)}
-                >
-                  Not needed
-                </button>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </>
       )}
     </section>

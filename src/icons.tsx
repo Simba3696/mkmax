@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 /** 24px line icon that takes the text color, so tabs tint it with their active/inactive color. */
 function Icon({ children }: { children: ReactNode }) {
   return (
-    <svg className="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       {children}
     </svg>
   );

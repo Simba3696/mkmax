@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useStore } from '../store';
 import { REALM_KLASH_CURRENCY, buildCtx, gearForecast, gearQueue, levelLabel, targetLevel } from '../engine';
 import { CardThumb, daysFromNow, FoldCard, fmt, FusionLabel, useNow } from '../ui';
+import { grow, hint, row, rowTitle } from '../classes';
 
 /** The Realm Klash gear still to max, in buying order, with when each piece is done at the daily Blood Ruby income. */
 function useGear() {
@@ -21,7 +22,7 @@ export function GearSummary() {
   const all = done.at(-1);
   if (!all) return null;
   return (
-    <p className="hint">
+    <p className={hint}>
       {all.days == null ? (
         <>
           Maxing the Realm Klash gear takes {fmt(all.total)} {rubyName} in all. Set how many you get a day in Settings → Currencies to see when it's done.
@@ -50,34 +51,37 @@ export default function GearOrder() {
     });
   return (
     <FoldCard id="settings-gear" title="Blood Ruby gear order">
-      <p className="muted small">
+      <p className="text-muted text-small">
         Blood Rubies max these one at a time, top first, before buying any pack. A piece whose store item is out of purchases is skipped for now.
       </p>
-      {gear.map((g, i) => {
-        const rule = ctx.rules.get(g.card.rarityId);
-        const cost = Math.min(...g.items.map((p) => p.cost));
-        const days = done[i]?.days;
-        return (
-          <div key={g.card.id} className="row">
-            <CardThumb card={g.card} rule={rule} />
-            <div className="grow">
-              <div className="row-title">
-                {i + 1}. {g.card.name}
+      {/* From tablets on, keep the ↑/↓ buttons near the piece they move instead of at the far edge of a wide card. */}
+      <div className="md:max-w-[40rem]">
+        {gear.map((g, i) => {
+          const rule = ctx.rules.get(g.card.rarityId);
+          const cost = Math.min(...g.items.map((p) => p.cost));
+          const days = done[i]?.days;
+          return (
+            <div key={g.card.id} className={`${row} items-center`}>
+              <CardThumb card={g.card} rule={rule} />
+              <div className={grow}>
+                <div className={rowTitle}>
+                  {i + 1}. {g.card.name}
+                </div>
+                <div className="text-muted text-small">
+                  <FusionLabel card={g.card} rule={rule} /> · {fmt(g.need)} to {rule && levelLabel(rule, targetLevel(g.card, rule))} · {fmt(g.need * cost)} {rubyName}
+                  {days != null && ` · maxed ${onDay(days)}`}
+                </div>
               </div>
-              <div className="muted small">
-                <FusionLabel card={g.card} rule={rule} /> · {fmt(g.need)} to {rule && levelLabel(rule, targetLevel(g.card, rule))} · {fmt(g.need * cost)} {rubyName}
-                {days != null && ` · maxed ${onDay(days)}`}
-              </div>
+              <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
+                ↑
+              </button>
+              <button onClick={() => move(i, 1)} disabled={i === gear.length - 1} aria-label="Move down">
+                ↓
+              </button>
             </div>
-            <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
-              ↑
-            </button>
-            <button onClick={() => move(i, 1)} disabled={i === gear.length - 1} aria-label="Move down">
-              ↓
-            </button>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </FoldCard>
   );
 }

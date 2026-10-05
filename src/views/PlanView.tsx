@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
 import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, cardGoal, daysToAfford, isRealmKlashGear, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
-import { CardThumb, daysFromNow, FoldCard, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
+import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
 import { GearSummary } from './GearOrder';
+import { card, field, grow, hint, row, rowTitle, type ChipTone } from '../classes';
 
 const PHASE_LABEL: Record<Phase, string> = {
   unlock: 'Unlock',
@@ -14,15 +15,28 @@ const PHASE_LABEL: Record<Phase, string> = {
   maxed: 'Maxed',
   skip: 'Skip',
 };
+const PHASE_TONE: Record<Phase, ChipTone> = { unlock: 'unlock', toThreshold: 'warn', normal: 'plain', kardCovered: 'good', maxed: 'plain', skip: 'plain' };
+
+/** A plan row: centred items, divider between consecutive rows. */
+const planRow = `${row} items-center`;
+/**
+ * A row's text as a button (tap a pack in the plan to open it in Packs), styled like the plain row it replaces.
+ * Pointer devices get a hover tint, matching the tap feedback on phones.
+ */
+const rowLink = `${grow} block min-h-0 py-[0.15rem] px-[0.3rem] -mx-[0.3rem] border-0 rounded-[6px] bg-transparent text-inherit text-left [&>span]:block active:bg-panel-2 md:hover:bg-panel-2`;
+const note = 'text-muted text-small';
+const done = 'text-muted line-through';
+/** A pack ranking's top targets, indented under it. */
+const target = `pl-[0.8rem] ${note}`;
 
 export function PackTiming({ pack, now }: { pack: Pack; now: Date }) {
-  if (pack.startsAt && new Date(pack.startsAt) > now) return <span className="chip upcoming">starts in {timeUntil(pack.startsAt, now)}</span>;
+  if (pack.startsAt && new Date(pack.startsAt) > now) return <Chip tone="upcoming">starts in {timeUntil(pack.startsAt, now)}</Chip>;
   if (pack.endsAt) {
     const hours = (new Date(pack.endsAt).getTime() - now.getTime()) / 3600000;
-    if (hours < 0) return <span className="chip muted">expired</span>;
-    return <span className={`chip ${hours < 24 ? 'urgent' : 'limited'}`}>{timeUntil(pack.endsAt, now)} left</span>;
+    if (hours < 0) return <Chip tone="muted">expired</Chip>;
+    return <Chip tone={hours < 24 ? 'urgent' : 'limited'}>{timeUntil(pack.endsAt, now)} left</Chip>;
   }
-  return <span className="chip muted">permanent</span>;
+  return <Chip tone="muted">permanent</Chip>;
 }
 
 export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'cards' | 'settings') => void; openPack: (id: string, pull?: boolean) => void }) {
@@ -70,15 +84,15 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
   );
 
   const wallet = (
-    <div className="wallet">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-[0.6rem] md:items-end">
       {state.currencies.map((c, i) => (
-        <label key={c.id} className="field">
+        <label key={c.id} className={field}>
           <span>{c.name}</span>
           <NumInput value={c.balance} min={0} onChange={(v) => update((d) => void (d.currencies[i].balance = v ?? 0))} />
         </label>
       ))}
       {kardRarities.map((r) => (
-        <label key={r.id} className="field">
+        <label key={r.id} className={field}>
           <span>{r.label} Fusion Up Kards</span>
           <NumInput
             value={r.fusionUpKards}
@@ -93,18 +107,19 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
 
   if (state.cards.length === 0 || state.packs.length === 0) {
     return (
-      <section className="card">
+      // Line length stays readable on wide screens; phones are narrower than this anyway.
+      <section className={`${card} md:max-w-page`}>
         <h2>Get started</h2>
-        <ol className="steps">
-          <li className={state.cards.length ? 'done' : ''}>
+        <ol className="list-decimal pl-[40px] my-[1em] [&>li]:my-[0.4rem]">
+          <li className={state.cards.length ? done : undefined}>
             Add the cards you care about and their current fusion in <a onClick={() => goto('cards')}>Cards</a>.
           </li>
-          <li className={state.packs.length ? 'done' : ''}>
+          <li className={state.packs.length ? done : undefined}>
             Add the packs in the store right now, with the odds from each pack's info screen, in <a onClick={() => goto('packs')}>Packs</a>.
           </li>
           <li>Enter your Souls, Koins and Fusion Up Kards below. The plan will show up here.</li>
         </ol>
-        <p className="muted small">
+        <p className={note}>
           Or go to <a onClick={() => goto('settings')}>Settings</a> to load your OneNote data or the sample data.
         </p>
         {wallet}
@@ -112,187 +127,195 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
     );
   }
 
+  // Wide screens flow the sections into columns (CSS columns, so DOM and tab order stay top to bottom). The column
+  // count follows the width the Plan actually gets (a container query, not the viewport, since the rail widens at lg;
+  // 55.5rem/83rem are ~832px/1245px at the 15px root, so a column is never under ~400px), and forced breaks pin each
+  // section to its column so folding one never moves others across. Pack ranking is always the last section and
+  // Priority targets the one before it; the 3rd is the first of kards / challenges / targets.
+  // Two columns: wallet, buy, kards, challenges | targets, ranking. Three: wallet, buy | kards, challenges, targets | ranking.
   return (
-    <>
-      <FoldCard id="wallet" title="Wallet">
-        {wallet}
-      </FoldCard>
+    <div className="@container">
+      <div className="@min-[55.5rem]:columns-2 @min-[83rem]:columns-3 @min-[55.5rem]:gap-[0.8rem] @min-[55.5rem]:[&>section]:break-inside-avoid @min-[55.5rem]:[&>section:nth-last-child(2)]:break-before-column @min-[83rem]:[&>section:nth-last-child(2):not(:nth-child(3))]:break-before-auto @min-[83rem]:[&>section:nth-child(3)]:break-before-column @min-[83rem]:[&>section:last-child]:break-before-column">
+        <FoldCard id="wallet" title="Wallet">
+          {wallet}
+        </FoldCard>
 
-      <FoldCard id="buy" title="What to buy">
-        {plan.currencies.every((c) => c.buys.length === 0 && !c.saveFor) && (
-          <p className="muted">No worthwhile purchases. Add packs that drop cards you haven't maxed, or top up your balances.</p>
-        )}
-        {plan.currencies
-          .filter((c) => c.buys.length || c.saveFor)
-          .map((c) => (
-            <div key={c.currencyId} className="plan-currency">
-              <div className="plan-currency-head">
-                <h3>{curName(c.currencyId)}</h3>
-                <span className="muted small">
-                  spend {fmt(c.spent)} of {fmt(c.startBalance)} · {fmt(c.startBalance - c.spent)} left
-                </span>
-              </div>
-              {c.buys.map((b) => (
-                <div key={b.pack.id} className="row plan-row">
-                  <button className="row-link grow" onClick={() => openPack(b.pack.id)} title="Show in Packs">
-                    <span className="row-title">
-                      {b.status === 'upcoming' ? 'Save for' : 'Buy'} <b>{b.count}×</b> {b.pack.name}
-                    </span>
-                    <span className="muted small">
-                      {fmt(b.totalCost)} {curName(c.currencyId)} · value {fmt(b.ev)}
-                    </span>
-                  </button>
-                  <PackTiming pack={b.pack} now={now} />
-                  {b.status === 'active' && (
-                    <button
-                      className="small"
-                      onClick={() => buyNow(b.pack)}
-                      title={b.pack.store ? 'Adds a purchase, deducts the cost and levels up the card' : 'Adds a purchase, deducts the cost and opens the pack to log what you pulled'}
-                    >
-                      Bought one
-                    </button>
-                  )}
+        <FoldCard id="buy" title="What to buy">
+          {plan.currencies.every((c) => c.buys.length === 0 && !c.saveFor) && (
+            <p className="text-muted">No worthwhile purchases. Add packs that drop cards you haven't maxed, or top up your balances.</p>
+          )}
+          {plan.currencies
+            .filter((c) => c.buys.length || c.saveFor)
+            .map((c) => (
+              <div key={c.currencyId} className="[&+&]:mt-[0.9rem]">
+                <div className="flex justify-between items-baseline flex-wrap gap-[0.4rem]">
+                  <h3 className="my-[0.2rem]">{curName(c.currencyId)}</h3>
+                  <span className={note}>
+                    spend {fmt(c.spent)} of {fmt(c.startBalance)} · {fmt(c.startBalance - c.spent)} left
+                  </span>
                 </div>
-              ))}
-              {c.currencyId === REALM_KLASH_CURRENCY && <GearSummary />}
-              {c.saveFor?.gear ? (
-                <p className="hint">
-                  Next: <a onClick={() => openPack(c.saveFor!.pack.id)}>{c.saveFor.pack.name}</a>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another copy.
-                  {forecast(c)} Packs wait until the gear is maxed.
-                </p>
-              ) : (
-                c.saveFor && (
-                  <p className="hint">
-                    Next best: <a onClick={() => openPack(c.saveFor!.pack.id)}>{c.saveFor.pack.name}</a>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another purchase.
-                    {forecast(c)}
-                  </p>
-                )
-              )}
-            </div>
-          ))}
-        <p className="muted small">
-          Tap a pack to jump to it in Packs, or <b>Bought one</b> to log a purchase here. Blood Ruby gear comes first, in the order set in Settings. Then limited-time packs are listed first, soonest-ending at the top. "Save for" means the pack hasn't started yet, so hold the currency for it.
-        </p>
-      </FoldCard>
-
-      {kardRarities.some((r) => r.fusionUpKards > 0) && (
-        <FoldCard id="kards" title="Fusion Up Kard plan">
-          {kardRarities.map((r) => {
-            const plan = ctx.kardPlan.get(r.id);
-            if (r.fusionUpKards <= 0 || !plan) return null;
-            const used = r.fusionUpKards - plan.left;
-            return (
-              <div key={r.id}>
-                <h3>
-                  <RarityBadge rule={r} /> {r.fusionUpKards} kard{r.fusionUpKards === 1 ? '' : 's'}
-                  {plan.assignments.length > 0 && <span className="muted small"> · uses {used}, {plan.left} left over</span>}
-                </h3>
-                {plan.assignments.length === 0 ? (
-                  <p className="muted small">
-                    Not enough kards for any step yet. Kards start at F{r.fusionUpThreshold}, and the cheapest step there costs{' '}
-                    {r.kardsPerLevel[r.fusionUpThreshold ?? 0] || '?'}.
+                {c.buys.map((b) => (
+                  <div key={b.pack.id} className={planRow}>
+                    <button className={rowLink} onClick={() => openPack(b.pack.id)} title="Show in Packs">
+                      <span className={`${rowTitle} [&_b]:text-gold`}>
+                        {b.status === 'upcoming' ? 'Save for' : 'Buy'} <b>{b.count}×</b> {b.pack.name}
+                      </span>
+                      <span className={note}>
+                        {fmt(b.totalCost)} {curName(c.currencyId)} · value {fmt(b.ev)}
+                      </span>
+                    </button>
+                    <PackTiming pack={b.pack} now={now} />
+                    {b.status === 'active' && (
+                      <button
+                        className="text-small"
+                        onClick={() => buyNow(b.pack)}
+                        title={b.pack.store ? 'Adds a purchase, deducts the cost and levels up the card' : 'Adds a purchase, deducts the cost and opens the pack to log what you pulled'}
+                      >
+                        Bought one
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {c.currencyId === REALM_KLASH_CURRENCY && <GearSummary />}
+                {c.saveFor?.gear ? (
+                  <p className={hint}>
+                    Next: <a onClick={() => openPack(c.saveFor!.pack.id)}>{c.saveFor.pack.name}</a>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another copy.
+                    {forecast(c)} Packs wait until the gear is maxed.
                   </p>
                 ) : (
-                  plan.assignments.map((a) => (
-                    <div key={a.cardId} className="row">
-                      <span className="grow">{ctx.cards.get(a.cardId)?.name}</span>
-                      <span>
-                        {levelLabel(r, a.from)} → <b>{levelLabel(r, a.to)}</b> <span className="muted small">({a.kards} kard{a.kards === 1 ? '' : 's'})</span>
-                      </span>
-                    </div>
-                  ))
+                  c.saveFor && (
+                    <p className={hint}>
+                      Next best: <a onClick={() => openPack(c.saveFor!.pack.id)}>{c.saveFor.pack.name}</a>. You need {fmt(c.saveFor.shortBy)} more {curName(c.currencyId)} for another purchase.
+                      {forecast(c)}
+                    </p>
+                  )
                 )}
+              </div>
+            ))}
+          <p className={note}>
+            Tap a pack to jump to it in Packs, or <b>Bought one</b> to log a purchase here. Blood Ruby gear comes first, in the order set in Settings. Then limited-time packs are listed first, soonest-ending at the top. "Save for" means the pack hasn't started yet, so hold the currency for it.
+          </p>
+        </FoldCard>
+
+        {kardRarities.some((r) => r.fusionUpKards > 0) && (
+          <FoldCard id="kards" title="Fusion Up Kard plan">
+            {kardRarities.map((r) => {
+              const plan = ctx.kardPlan.get(r.id);
+              if (r.fusionUpKards <= 0 || !plan) return null;
+              const used = r.fusionUpKards - plan.left;
+              return (
+                <div key={r.id}>
+                  <h3>
+                    <RarityBadge rule={r} /> {r.fusionUpKards} kard{r.fusionUpKards === 1 ? '' : 's'}
+                    {plan.assignments.length > 0 && <span className={note}> · uses {used}, {plan.left} left over</span>}
+                  </h3>
+                  {plan.assignments.length === 0 ? (
+                    <p className={note}>
+                      Not enough kards for any step yet. Kards start at F{r.fusionUpThreshold}, and the cheapest step there costs{' '}
+                      {r.kardsPerLevel[r.fusionUpThreshold ?? 0] || '?'}.
+                    </p>
+                  ) : (
+                    plan.assignments.map((a) => (
+                      <div key={a.cardId} className={planRow}>
+                        <span className={grow}>{ctx.cards.get(a.cardId)?.name}</span>
+                        <span>
+                          {levelLabel(r, a.from)} → <b>{levelLabel(r, a.to)}</b> <span className={note}>({a.kards} kard{a.kards === 1 ? '' : 's'})</span>
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              );
+            })}
+            <p className={note}>Kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra.</p>
+          </FoldCard>
+        )}
+
+        {challengeKameos.length > 0 && (
+          <FoldCard id="challenges" title="Elder challenges">
+            <p className={note}>Kameos you still need that an Elder challenge on MK Mobile Base's schedule gives for sure.</p>
+            {challengeKameos.map(({ card, ch }) => (
+              <div key={card.id} className={planRow}>
+                <CardThumb card={card} rule={state.rarities.find((r) => r.id === card.rarityId)} />
+                <span className={grow}>{card.name}</span>
+                <Chip tone={ch.start && new Date(ch.start) > now ? 'limited' : 'urgent'}>{challengeWhen(ch, now)}</Chip>
+              </div>
+            ))}
+          </FoldCard>
+        )}
+
+        <FoldCard id="targets" title="Priority targets">
+          <p className={note}>Ranked by how much the next copy is worth to you.</p>
+          {targets.map((t) => {
+            const rule = ctx.rules.get(t.card.rarityId);
+            const thr = rule?.fusionUpThreshold;
+            const thrLevel = rule ? thresholdLevel(rule) : null;
+            return (
+              <div key={t.card.id} className={planRow}>
+                <CardThumb card={t.card} rule={rule} size={40} />
+                <div className={grow}>
+                  <div className={rowTitle}>
+                    {t.card.name} {t.card.guest && <Chip tone="guest">guest</Chip>}
+                    {t.card.source && <Chip tone="source">{SOURCE_LABELS[t.card.source]}</Chip>}
+                  </div>
+                  <div className={note}>
+                    <RarityBadge rule={rule} /> <FusionLabel card={t.card} rule={rule} />
+                    {/* A Kameo's only goal is owning it, which "Not owned" already says. */}
+                    {t.target > 1 && ` · ${t.copiesToMax} to ${levelLabel(rule, t.target)}`}
+                    {t.copiesToThreshold > 0 && thrLevel != null && thrLevel < t.target &&` · ${t.copiesToThreshold} to F${thr}`}
+                    {t.inPacks === 0 && ' · not in any current pack'}
+                  </div>
+                </div>
+                <Chip tone={PHASE_TONE[t.phase]}>{PHASE_LABEL[t.phase]}</Chip>
               </div>
             );
           })}
-          <p className="muted small">Kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra.</p>
         </FoldCard>
-      )}
 
-      {challengeKameos.length > 0 && (
-        <FoldCard id="challenges" title="Elder challenges">
-          <p className="muted small">Kameos you still need that an Elder challenge on MK Mobile Base's schedule gives for sure.</p>
-          {challengeKameos.map(({ card, ch }) => (
-            <div key={card.id} className="row">
-              <CardThumb card={card} rule={state.rarities.find((r) => r.id === card.rarityId)} />
-              <span className="grow">{card.name}</span>
-              <span className={`chip ${ch.start && new Date(ch.start) > now ? 'limited' : 'urgent'}`}>{challengeWhen(ch, now)}</span>
-            </div>
-          ))}
-        </FoldCard>
-      )}
-
-      <FoldCard id="targets" title="Priority targets">
-        <p className="muted small">Ranked by how much the next copy is worth to you.</p>
-        {targets.map((t) => {
-          const rule = ctx.rules.get(t.card.rarityId);
-          const thr = rule?.fusionUpThreshold;
-          const thrLevel = rule ? thresholdLevel(rule) : null;
-          return (
-            <div key={t.card.id} className="row">
-              <CardThumb card={t.card} rule={rule} size={40} />
-              <div className="grow">
-                <div className="row-title">
-                  {t.card.name} {t.card.guest && <span className="chip guest">guest</span>}
-                  {t.card.source && <span className="chip krypt">{SOURCE_LABELS[t.card.source]}</span>}
-                </div>
-                <div className="muted small">
-                  <RarityBadge rule={rule} /> <FusionLabel card={t.card} rule={rule} />
-                  {/* A Kameo's only goal is owning it, which "Not owned" already says. */}
-                  {t.target > 1 && ` · ${t.copiesToMax} to ${levelLabel(rule, t.target)}`}
-                  {t.copiesToThreshold > 0 && thrLevel != null && thrLevel < t.target &&` · ${t.copiesToThreshold} to F${thr}`}
-                  {t.inPacks === 0 && ' · not in any current pack'}
-                </div>
-              </div>
-              <span className={`chip phase-${t.phase}`}>{PHASE_LABEL[t.phase]}</span>
-            </div>
-          );
-        })}
-      </FoldCard>
-
-      <FoldCard id="ranking" title="Pack ranking">
-        <p className="muted small">
-          Efficiency is value per cost, relative to the best pack in the same currency. It uses your cards as they are now.
-        </p>
-        {state.currencies.map((cur) => {
-          const group = ranks.filter((r) => r.pack.currencyId === cur.id);
-          if (!group.length) return null;
-          const best = group[0].evPerK;
-          return (
-            <div key={cur.id}>
-              <h3>{cur.name}</h3>
-              {group.map((r) => {
-                const eff = best > 0 ? r.evPerK / best : 0;
-                return (
-                  <div key={r.pack.id} className="rank">
-                    <div className="row">
-                      <button className="row-link grow" onClick={() => openPack(r.pack.id)} title="Show in Packs">
-                        <span className="row-title">{r.pack.name}</span>
-                        <span className="muted small">
-                          {fmt(r.pack.cost)} {cur.name} · value {fmt(r.ev)} per buy
-                        </span>
-                        <span className="effbar" title={`${Math.round(eff * 100)}% efficiency`}>
-                          <span style={{ width: `${eff * 100}%` }} />
-                        </span>
-                      </button>
-                      <div className="rank-side">
-                        <PackTiming pack={r.pack} now={now} />
-                        <span className="small">{Math.round(eff * 100)}%</span>
+        <FoldCard id="ranking" title="Pack ranking">
+          <p className={note}>
+            Efficiency is value per cost, relative to the best pack in the same currency. It uses your cards as they are now.
+          </p>
+          {state.currencies.map((cur) => {
+            const group = ranks.filter((r) => r.pack.currencyId === cur.id);
+            if (!group.length) return null;
+            const best = group[0].evPerK;
+            return (
+              <div key={cur.id}>
+                <h3>{cur.name}</h3>
+                {group.map((r) => {
+                  const eff = best > 0 ? r.evPerK / best : 0;
+                  return (
+                    <div key={r.pack.id} className="[&+&]:border-t [&+&]:border-line [&+&]:mt-[0.3rem] [&+&]:pt-[0.3rem]">
+                      <div className={planRow}>
+                        <button className={rowLink} onClick={() => openPack(r.pack.id)} title="Show in Packs">
+                          <span className={rowTitle}>{r.pack.name}</span>
+                          <span className={note}>
+                            {fmt(r.pack.cost)} {cur.name} · value {fmt(r.ev)} per buy
+                          </span>
+                          <span className="h-[4px] bg-panel-2 rounded-[2px] mt-[5px] overflow-hidden" title={`${Math.round(eff * 100)}% efficiency`}>
+                            <span className="block h-full bg-[linear-gradient(90deg,var(--color-red),var(--color-gold))]" style={{ width: `${eff * 100}%` }} />
+                          </span>
+                        </button>
+                        <div className="flex flex-col items-end gap-[4px]">
+                          <PackTiming pack={r.pack} now={now} />
+                          <span className="text-small">{Math.round(eff * 100)}%</span>
+                        </div>
                       </div>
+                      {r.targets.slice(0, 3).map((t) => (
+                        <div key={t.card.id} className={target}>
+                          {t.card.name}: {pct(t.pAtLeastOne)} per buy · about {fmt(t.buysPerCopy)} buys per copy
+                        </div>
+                      ))}
+                      {r.targets.length === 0 && <div className={target}>Nothing you still need.</div>}
                     </div>
-                    {r.targets.slice(0, 3).map((t) => (
-                      <div key={t.card.id} className="target muted small">
-                        {t.card.name}: {pct(t.pAtLeastOne)} per buy · about {fmt(t.buysPerCopy)} buys per copy
-                      </div>
-                    ))}
-                    {r.targets.length === 0 && <div className="target muted small">Nothing you still need.</div>}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </FoldCard>
-    </>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </FoldCard>
+      </div>
+    </div>
   );
 }

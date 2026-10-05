@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
 import { ascensionCaps, buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
-import { CardThumb, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice, useNow } from '../ui';
+import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice, useNow } from '../ui';
+import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
 import { appRarityId, catalogPageUrl, findInCatalog, loadCatalog, wantsCatalogImage } from '../catalog';
@@ -38,7 +39,7 @@ function GoalSelect({ rule, value, onChange }: { rule: RarityRule; value: Card['
   if (rule.kind !== 'equipment' || rule.fusionUpThreshold == null) return null;
   const current = value ?? rule.goal;
   return (
-    <label className="check">
+    <label className={check}>
       Goal
       <select value={current} onChange={(e) => onChange(e.target.value === rule.goal ? undefined : (e.target.value as Card['goal']))}>
         <option value="threshold">F{rule.fusionUpThreshold} (Kards finish it)</option>
@@ -58,7 +59,7 @@ function CapSelect({ rule, value, onChange }: { rule: RarityRule; value: number 
   if (caps.length < 2) return null;
   const current = value ?? max;
   return (
-    <label className="check">
+    <label className={check}>
       Max
       <select value={current} onChange={(e) => onChange(Number(e.target.value) === max ? null : Number(e.target.value))}>
         {!caps.includes(current) && <option value={current}>{levelLabel(rule, current)} (not a real cap)</option>}
@@ -84,7 +85,7 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
 
   if (!open) {
     return (
-      <div className="actions">
+      <div className={actions}>
         <button onClick={() => setOpen(true)}>Paste a list…</button>
       </div>
     );
@@ -115,20 +116,21 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
 
   const startLabel = state.rarities.find((r) => r.id === startRarityId)?.label ?? '';
   return (
-    <div className="subpanel">
-      <p className="muted small">
+    <div className={subpanel}>
+      {/* A readable line length; the textarea below still takes the full width. */}
+      <p className="text-muted text-small md:max-w-[80ch]">
         One card per line. A line can be just a name, like "Jade, Lizard", which goes in as not owned. Those use {startLabel} (the rarity picked above) until a
         line that's just a rarity name, like "Gold Kameo", switches it. A line can also add details after " - ": rarity, where it comes from and level, like
         "Kori Blade - Epic - Lin Kuei Tower - F2" or "Man in Control - Epic - Krypt Gear - Unowned". Cards already in your list get the new level and source.
       </p>
       <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
-      <div className="small muted">
+      <div className="text-small text-muted">
         {counts.length ? `New: ${counts.map((x) => `${x.n} ${x.label}`).join(' · ')}` : parsed.updates.length ? '' : 'Nothing to add yet.'}
         {parsed.updates.length > 0 && ` · updating ${parsed.updates.length} already listed (${parsed.updates.map((u) => u.name).join('; ')})`}
         {parsed.duplicates.length > 0 && ` · skipping ${parsed.duplicates.length} already listed (${parsed.duplicates.join('; ')})`}
       </div>
       {parsed.problems.length > 0 && (
-        <ul className="error small">
+        <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
           {parsed.problems.map((p) => (
             <li key={p.line}>
               Skipped "{p.line}": {p.reason}.
@@ -136,9 +138,9 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
           ))}
         </ul>
       )}
-      <div className="actions">
+      <div className={actions}>
         <button onClick={() => setOpen(false)}>Cancel</button>
-        <button className="primary" disabled={!total} onClick={addAll}>
+        <button className={btn.primary} disabled={!total} onClick={addAll}>
           {parsed.cards.length > 0 && `Add ${parsed.cards.length}`}
           {parsed.cards.length > 0 && parsed.updates.length > 0 && ', '}
           {parsed.updates.length > 0 && `update ${parsed.updates.length}`}
@@ -153,11 +155,12 @@ export default function CardsView() {
   const [sub, setSub] = useState<'cards' | 'towers'>('cards');
   return (
     <>
-      <div className="segmented">
-        <button className={sub === 'cards' ? 'active' : ''} onClick={() => setSub('cards')}>
+      {/* A short switch on wide screens: stretched across 1000px+ it reads as a banner, not two buttons. */}
+      <div className="flex mb-[0.8rem] border border-line rounded-panel overflow-hidden md:max-w-[360px]">
+        <button className={segment(sub === 'cards')} onClick={() => setSub('cards')}>
           Cards
         </button>
-        <button className={sub === 'towers' ? 'active' : ''} onClick={() => setSub('towers')}>
+        <button className={segment(sub === 'towers')} onClick={() => setSub('towers')}>
           Tower gear
         </button>
       </div>
@@ -165,6 +168,8 @@ export default function CardsView() {
     </>
   );
 }
+
+const segment = (active: boolean) => `flex-1 border-0 rounded-none focus-visible:-outline-offset-2 ${active ? 'bg-red-dim text-fg' : 'bg-panel text-muted hover:text-fg'}`;
 
 const CARD_SORTS = ['rarity', 'fusion-high', 'fusion-low', 'name'] as const;
 type CardSort = (typeof CARD_SORTS)[number];
@@ -281,14 +286,15 @@ function CardList() {
 
   return (
     <>
-      <section className="card">
+      <section className={card}>
         <h2>Add card</h2>
-        <div className="form">
-          <label className="field wide">
+        <div className={form}>
+          {/* Full width on phones; on wider screens the name shares its line with the other fields. */}
+          <label className={`${field} col-span-full md:col-span-2`}>
             <span>Name</span>
             <input value={draft.name} placeholder="e.g. Sub-Zero, Klassic (name, variant)" onChange={(e) => setDraft({ ...draft, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
           </label>
-          <label className="field">
+          <label className={field}>
             <span>Rarity</span>
             <select value={draft.rarityId} onChange={(e) => setDraft({ ...draft, rarityId: e.target.value, fusion: 0, maxLevel: null })}>
               {state.rarities.map((r) => (
@@ -300,7 +306,7 @@ function CardList() {
           </label>
           {/* Kameos are only tracked until you own one, so a new one is always "not owned": no level to pick. */}
           {draftRule && maxFusion(draftRule) > 1 && (
-            <label className="field">
+            <label className={field}>
               <span>Current level</span>
               <select value={draft.fusion} onChange={(e) => setDraft({ ...draft, fusion: Number(e.target.value) })}>
                 <LevelOptions rule={draftRule} />
@@ -310,31 +316,32 @@ function CardList() {
           {draftRule && <GoalSelect rule={draftRule} value={draft.goal} onChange={(v) => setDraft({ ...draft, goal: v })} />}
           {draftRule && <CapSelect rule={draftRule} value={draft.maxLevel} onChange={(v) => setDraft({ ...draft, maxLevel: v })} />}
           {draftRule?.hasGuests && (
-            <label className="check">
+            <label className={check}>
               <input type="checkbox" checked={draft.guest} onChange={(e) => setDraft({ ...draft, guest: e.target.checked })} />
               Guest card
             </label>
           )}
           {draftRule?.kind === 'equipment' && (
-            <label className="field">
+            <label className={field}>
               <span>Source</span>
               <SourceSelect kind="equipment" value={draft.source} onChange={(v) => setDraft({ ...draft, source: v })} />
             </label>
           )}
-          <button className="primary" onClick={add} disabled={!draft.name.trim()}>
+          <button className={`${btn.primary} md:-col-end-1`} onClick={add} disabled={!draft.name.trim()}>
             Add
           </button>
         </div>
         {draftRule && cardGoal(draft as Card, draftRule) === 'threshold' && (
-          <p className="muted small">
+          <p className="text-muted text-small">
             {draftRule.label} is tracked only until F{draftRule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.
           </p>
         )}
         <PasteList startRarityId={draft.rarityId} />
       </section>
 
-      <div className="filters">
-        <input className="grow" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
+      {/* Kept in view while scrolling a long list on wide screens, where it fits on one row; elsewhere it scrolls away as before. */}
+      <div className="flex flex-wrap gap-2 mb-[0.8rem] items-center xl:sticky xl:top-0 xl:z-[2] xl:bg-bg xl:py-2">
+        <input className="flex-1 min-w-0 md:min-w-[200px] md:max-w-[360px]" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={rarity} onChange={(e) => setRarity(e.target.value)}>
           <option value="all">{`All rarities (${rarityCount('all')})`}</option>
           <option value="kind:character">{`All characters (${rarityCount('kind:character')})`}</option>
@@ -362,122 +369,125 @@ function CardList() {
           <option value="challenge">{`Elder challenge (${sourceCount('challenge')})`}</option>
         </select>
         {missingImages.length > 0 && (
-          <button onClick={findImages} disabled={imgStatus?.busy} title="Look up card art on MK Mobile Base, then the MK Mobile wiki">
+          <button className="xl:ml-auto" onClick={findImages} disabled={imgStatus?.busy} title="Look up card art on MK Mobile Base, then the MK Mobile wiki">
             {imgStatus?.busy ? 'Finding…' : `Find images (${missingImages.length})`}
           </button>
         )}
       </div>
-      {imgStatus && <p className="small muted">{imgStatus.msg}</p>}
+      {imgStatus && <p className="text-small text-muted">{imgStatus.msg}</p>}
       {rarityFixes.length > 0 && (
-        <div className="hint">
+        <div className={hint}>
           <p>MK Mobile Base lists a different rarity for {rarityFixes.length === 1 ? 'this card' : 'these cards'}:</p>
-          <ul className="small">
+          <ul className="list-disc pl-[40px] my-[1em] text-small">
             {rarityFixes.map((f) => (
               <li key={f.cardId}>
                 {f.name}: {f.from} here, <b>{ctx.rules.get(f.to)?.label ?? f.to}</b> on the site
               </li>
             ))}
           </ul>
-          <div className="actions">
-            <button className="primary" onClick={applyRarityFixes}>
+          <div className={actions}>
+            <button className={btn.primary} onClick={applyRarityFixes}>
               Use the site's rarity
             </button>
-            <button className="ghost" onClick={() => setRarityFixes([])}>
+            <button className={btn.ghost} onClick={() => setRarityFixes([])}>
               Keep mine
             </button>
           </div>
         </div>
       )}
 
-      {cards.length === 0 && <p className="muted">No cards match.</p>}
-      {cards.map((c) => {
-        const rule = ctx.rules.get(c.rarityId);
-        if (!rule) return null;
-        const max = maxFusion(rule);
-        const target = targetLevel(c, rule);
-        const toThr = copiesToThreshold(c, rule);
-        const toMax = copiesToMax(c, rule);
-        const kards = ctx.kardCopies.get(c.id) ?? 0;
-        return (
-          <div key={c.id} className="card card-row">
-            <div className="row">
-              <CardThumb card={c} rule={rule} />
-              <div className="grow">
-                {editingId === c.id ? (
-                  <input value={c.name} autoFocus onChange={(e) => patch(c.id, { name: e.target.value })} onBlur={() => setEditingId(null)} onKeyDown={(e) => e.key === 'Enter' && setEditingId(null)} />
-                ) : (
-                  <div className="row-title" onClick={() => setEditingId(c.id)} title="Tap to rename">
-                    {c.name}
+      {cards.length === 0 && <p className="text-muted">No cards match.</p>}
+      {/* Two columns only once each card is about 514px wide (from 1344px): a gear card's Goal, Source, Image and Delete need about 513px on one line. Never three. */}
+      <div className="min-[1344px]:grid min-[1344px]:grid-cols-2 min-[1344px]:gap-[0.8rem]">
+        {cards.map((c) => {
+          const rule = ctx.rules.get(c.rarityId);
+          if (!rule) return null;
+          const max = maxFusion(rule);
+          const target = targetLevel(c, rule);
+          const toThr = copiesToThreshold(c, rule);
+          const toMax = copiesToMax(c, rule);
+          const kards = ctx.kardCopies.get(c.id) ?? 0;
+          return (
+            <div key={c.id} className={`${surface} py-[0.7rem] px-[0.9rem] mb-[0.8rem] min-[1344px]:mb-0`}>
+              <div className={`${row} items-center`}>
+                <CardThumb card={c} rule={rule} />
+                <div className={grow}>
+                  {editingId === c.id ? (
+                    <input value={c.name} autoFocus onChange={(e) => patch(c.id, { name: e.target.value })} onBlur={() => setEditingId(null)} onKeyDown={(e) => e.key === 'Enter' && setEditingId(null)} />
+                  ) : (
+                    <div className={`${rowTitle} hover:underline decoration-muted underline-offset-2 md:cursor-pointer`} onClick={() => setEditingId(c.id)} title="Tap to rename">
+                      {c.name}
+                    </div>
+                  )}
+                  <div className="text-small">
+                    <RarityBadge rule={rule} />
+                    {c.guest && <Chip tone="guest">guest</Chip>}
+                    {c.source && <Chip tone="source">{SOURCE_LABELS[c.source]}{c.sourceNote && `: ${c.sourceNote}`}</Chip>}
+                    {c.source === 'challenge' && (() => {
+                      const ch = challengeFor(c, events, now);
+                      return ch && <Chip tone="limited">challenge {challengeWhen(ch, now)}</Chip>;
+                    })()}
+                    {/* Cards that reach their goal are removed, so every card listed still has copies to go. */}
+                    {toThr > 0 && thresholdLevel(rule)! < target && <Chip tone="warn">{toThr} to F{rule.fusionUpThreshold}</Chip>}
+                    <Chip tone={cardGoal(c, rule) === 'threshold' ? 'warn' : 'muted'}>
+                      {maxFusion(rule) === 1 ? 'Not owned yet' : `${toMax} to ${levelLabel(rule, target)}`}
+                    </Chip>
+                    {kards > 0 && <Chip tone="good">kards give {kards}</Chip>}
                   </div>
-                )}
-                <div className="small">
-                  <RarityBadge rule={rule} />
-                  {c.guest && <span className="chip guest">guest</span>}
-                  {c.source && <span className="chip krypt">{SOURCE_LABELS[c.source]}{c.sourceNote && `: ${c.sourceNote}`}</span>}
-                  {c.source === 'challenge' && (() => {
-                    const ch = challengeFor(c, events, now);
-                    return ch && <span className="chip limited">challenge {challengeWhen(ch, now)}</span>;
-                  })()}
-                  {/* Cards that reach their goal are removed, so every card listed still has copies to go. */}
-                  {toThr > 0 && thresholdLevel(rule)! < target && <span className="chip phase-toThreshold">{toThr} to F{rule.fusionUpThreshold}</span>}
-                  <span className={`chip ${cardGoal(c, rule) === 'threshold' ? 'phase-toThreshold' : 'muted'}`}>
-                    {maxFusion(rule) === 1 ? 'Not owned yet' : `${toMax} to ${levelLabel(rule, target)}`}
-                  </span>
-                  {kards > 0 && <span className="chip phase-kardCovered">kards give {kards}</span>}
+                </div>
+                <div className={stepper}>
+                  <button onClick={() => patch(c.id, { fusion: Math.max(0, c.fusion - 1) })} disabled={c.fusion <= 0} aria-label="Lower level">
+                    −
+                  </button>
+                  <span className={stepperVal}>{c.fusion === 0 ? '—' : levelLabel(rule, c.fusion)}</span>
+                  <button onClick={() => patch(c.id, { fusion: Math.min(max, c.fusion + 1) })} disabled={c.fusion >= max} aria-label="Raise level">
+                    +
+                  </button>
                 </div>
               </div>
-              <div className="stepper">
-                <button onClick={() => patch(c.id, { fusion: Math.max(0, c.fusion - 1) })} disabled={c.fusion <= 0} aria-label="Lower level">
-                  −
-                </button>
-                <span className="stepper-val">{c.fusion === 0 ? '—' : levelLabel(rule, c.fusion)}</span>
-                <button onClick={() => patch(c.id, { fusion: Math.min(max, c.fusion + 1) })} disabled={c.fusion >= max} aria-label="Raise level">
-                  +
-                </button>
-              </div>
-            </div>
-            <div className="actions">
-              <GoalSelect rule={rule} value={c.goal} onChange={(v) => patch(c.id, { goal: v })} />
-              <CapSelect rule={rule} value={c.maxLevel} onChange={(v) => patch(c.id, { maxLevel: v })} />
-              {rule.hasGuests && (
-                <label className="check">
-                  <input type="checkbox" checked={c.guest} onChange={(e) => patch(c.id, { guest: e.target.checked })} />
-                  Guest
-                </label>
-              )}
-              {rule.kind !== 'character' && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v })} />}
-              <button className="ghost" onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
-                Image
-              </button>
-              <ConfirmButton
-                label="Delete"
-                className="ghost"
-                onConfirm={() =>
-                  update((d) => {
-                    d.cards = d.cards.filter((x) => x.id !== c.id);
-                    for (const p of d.packs) p.drops = p.drops.filter((x) => x.cardId !== c.id);
-                  }, `Deleted ${c.name}`)
-                }
-              />
-            </div>
-            {imageEditId === c.id && (
-              <div className="drop-row wrap">
-                <input
-                  className="grow"
-                  value={c.imageUrl ?? ''}
-                  placeholder="Paste an image URL"
-                  onChange={(e) => patch(c.id, { imageUrl: e.target.value.trim() || undefined, wikiTitle: undefined, imagePage: undefined })}
-                />
-                {(c.imagePage || c.wikiTitle) && (
-                  <a className="small" href={c.imagePage ?? wikiUrl(c.wikiTitle!)} target="_blank" rel="noreferrer">
-                    {(c.imagePage ?? '').includes('mkmobilebase') ? 'MK Mobile Base page' : 'Wiki page'}
-                  </a>
+              <div className="flex flex-wrap gap-[0.4rem] items-center mt-[0.3rem]">
+                <GoalSelect rule={rule} value={c.goal} onChange={(v) => patch(c.id, { goal: v })} />
+                <CapSelect rule={rule} value={c.maxLevel} onChange={(v) => patch(c.id, { maxLevel: v })} />
+                {rule.hasGuests && (
+                  <label className={check}>
+                    <input type="checkbox" checked={c.guest} onChange={(e) => patch(c.id, { guest: e.target.checked })} />
+                    Guest
+                  </label>
                 )}
+                {rule.kind !== 'character' && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v })} />}
+                <button className={btn.ghost} onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
+                  Image
+                </button>
+                <ConfirmButton
+                  label="Delete"
+                  className={btn.ghost}
+                  onConfirm={() =>
+                    update((d) => {
+                      d.cards = d.cards.filter((x) => x.id !== c.id);
+                      for (const p of d.packs) p.drops = p.drops.filter((x) => x.cardId !== c.id);
+                    }, `Deleted ${c.name}`)
+                  }
+                />
               </div>
-            )}
-          </div>
-        );
-      })}
+              {imageEditId === c.id && (
+                <div className="flex flex-wrap gap-[0.4rem] items-center my-[0.35rem]">
+                  <input
+                    className="flex-1 min-w-0"
+                    value={c.imageUrl ?? ''}
+                    placeholder="Paste an image URL"
+                    onChange={(e) => patch(c.id, { imageUrl: e.target.value.trim() || undefined, wikiTitle: undefined, imagePage: undefined })}
+                  />
+                  {(c.imagePage || c.wikiTitle) && (
+                    <a className="text-small" href={c.imagePage ?? wikiUrl(c.wikiTitle!)} target="_blank" rel="noreferrer">
+                      {(c.imagePage ?? '').includes('mkmobilebase') ? 'MK Mobile Base page' : 'Wiki page'}
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </>
   );
 }

@@ -1,242 +1,186 @@
-:root {
-  --bg: #0e0b0b;
-  --panel: #1a1414;
-  --panel-2: #231b1b;
-  --line: #3a2c2c;
-  --text: #f1e9e4;
-  --muted: #a8988f;
-  --red: #d8342b;
-  --red-dim: #7a1e19;
-  --gold: #f2c14e;
-  --ok: #58c27d;
-  --warn: #ff9f43;
-  color-scheme: dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 15px;
-  line-height: 1.4;
-  color: var(--text);
-  background: var(--bg);
+@import 'tailwindcss';
+
+/* Only the app's own palette: no stray Tailwind colors (red-500 and so on). */
+@theme {
+  --color-*: initial;
+  --color-white: #fff;
+  --color-black: #000;
+
+  --color-bg: #0e0b0b;
+  --color-panel: #1a1414;
+  --color-panel-2: #231b1b;
+  --color-line: #3a2c2c;
+  --color-fg: #f1e9e4;
+  --color-muted: #a8988f;
+  --color-red: #d8342b;
+  --color-red-dim: #7a1e19;
+  --color-gold: #f2c14e;
+  --color-ok: #58c27d;
+  --color-warn: #ff9f43;
+  --color-error: #ff6b61;
+  --color-hint: #2b2210;
+  --color-bar: #120d0d;
+  /* Chip and badge accents. */
+  --color-sky: #7fb4ff;
+  --color-cyan: #7fd8ff;
+  --color-pink: #ff7ad9;
+  --color-steel: #9aa5b1;
+  --color-steel-fg: #c9d1d9;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --text-small: 0.82rem;
+  --text-tiny: 0.72rem;
+
+  --radius-chip: 4px;
+  --radius-control: 7px;
+  --radius-panel: 8px;
+  --radius-card: 10px;
+  --radius-modal: 12px;
+
+  /* The phone column; wider screens get more room, see App. */
+  --container-page: 720px;
+
+  --animate-pack-flash: pack-flash 1.6s ease-out;
+  --animate-spin-slow: spin 0.8s linear infinite;
+  @keyframes pack-flash {
+    0%,
+    40% {
+      border-color: var(--color-gold);
+      box-shadow: 0 0 0 2px var(--color-gold);
+    }
+    100% {
+      border-color: var(--color-line);
+      box-shadow: none;
+    }
+  }
 }
 
-* { box-sizing: border-box; }
-/*
- * The page itself never scrolls: the app is a fixed-height column (header, scrolling content, tab bar). iOS Safari
- * can leave position:fixed bars stranded mid-screen when the page's scroll position jumps during momentum
- * scrolling (as on every tab switch), so nothing here is fixed over a scrolling page. Our own pull-to-refresh and
- * tab swipes replace the browser's reload and back/forward overscroll gestures.
- */
-html, body, #root { height: 100%; overflow: hidden; overscroll-behavior: none; }
-body { margin: 0; background: var(--bg); }
-h2 { font-size: 1.1rem; margin: 0 0 0.6rem; }
-h3 { font-size: 0.95rem; margin: 0.9rem 0 0.4rem; color: var(--gold); }
-a { color: var(--gold); cursor: pointer; text-decoration: underline; }
+@layer base {
+  :root {
+    color-scheme: dark;
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--color-fg);
+    background: var(--color-bg);
+  }
+  /*
+   * The page itself never scrolls: the app is a fixed-height column (header, scrolling content, tab bar). iOS Safari
+   * can leave position:fixed bars stranded mid-screen when the page's scroll position jumps during momentum
+   * scrolling (as on every tab switch), so nothing here is fixed over a scrolling page. Our own pull-to-refresh and
+   * tab swipes replace the browser's reload and back/forward overscroll gestures.
+   */
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  body {
+    background: var(--color-bg);
+  }
+  h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 0.6rem;
+  }
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0.9rem 0 0.4rem;
+    color: var(--color-gold);
+  }
+  /* Preflight zeroes paragraph margins; the app's help text is written with the browser's spacing in mind. */
+  p {
+    margin-block: 1em;
+  }
+  a {
+    color: var(--color-gold);
+    cursor: pointer;
+    text-decoration: underline;
+  }
 
-/* Vertical scrolling and pinch zoom stay native; horizontal drags are left to the tab swipe. */
-.app { touch-action: pan-y pinch-zoom; height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
-/* Page width is capped at 720px; the bars span the screen but keep their contents in the same column. */
-.column-gutter { padding-left: max(1rem, calc((100% - 720px) / 2 + 1rem)); padding-right: max(1rem, calc((100% - 720px) / 2 + 1rem)); }
-
-.topbar {
-  flex: none; position: relative; z-index: 5;
-  display: flex; align-items: center; gap: 0.6rem;
-  padding-top: calc(0.7rem + env(safe-area-inset-top)); padding-bottom: 0.7rem;
-  background: linear-gradient(180deg, #1c0d0c, var(--bg));
-  border-bottom: 1px solid var(--line);
-}
-.logo { display: inline-flex; align-items: center; gap: 0.45rem; font-weight: 900; letter-spacing: 0.08em; font-size: 1.2rem; }
-.logo-mark { width: 26px; height: 26px; }
-.logo b { color: var(--red); }
-
-/* The only scrolling area. overflow-x is hidden explicitly so the swipe code doesn't mistake it for a sideways scroller. */
-.content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
-.page { max-width: 720px; margin: 0 auto; padding: 1rem; }
-
-.sync-pill { margin-left: auto; min-height: 28px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); }
-.sync-pill.sync-error, .sync-pill.sync-conflict { border-color: var(--red); color: #ff6b61; }
-.sync-pill.sync-idle { color: var(--ok); }
-
-.tabbar {
-  flex: none; position: relative; z-index: 5;
-  display: flex; justify-content: center;
-  background: #120d0d; border-top: 1px solid var(--line);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.tabbar button {
-  flex: 1; max-width: 180px; background: none; border: 0; border-radius: 0;
-  color: var(--muted); padding: 0.5rem 0 0.6rem; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.75rem;
-}
-.tabbar button.active { color: var(--text); box-shadow: inset 0 2px 0 var(--red); }
-.tab-icon { display: flex; position: relative; }
-.per-day { width: 6.5rem; }
-.sort-by { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; margin: 0.4rem 0; }
-.currency-head { margin: 0.6rem 0 0.4rem; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-/* Planned packs ending within a day, on the Packs tab. */
-.tab-badge {
-  position: absolute; top: -5px; right: -9px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
-  background: var(--red); color: #fff; font-size: 0.65rem; font-weight: 700; line-height: 16px; text-align: center;
-}
-.tabbar button.active .tab-icon { color: var(--red); }
-
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem; margin-bottom: 0.8rem; }
-.subpanel { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem; margin: 0.6rem 0; }
-
-.row { display: flex; align-items: center; gap: 0.6rem; padding: 0.35rem 0; }
-.row + .row { border-top: 1px solid var(--line); }
-.grow { flex: 1; min-width: 0; }
-.row-title { font-weight: 600; overflow-wrap: anywhere; }
-.muted { color: var(--muted); }
-.small { font-size: 0.82rem; }
-.error { color: #ff6b61; }
-.hint { background: #2b2210; border-left: 3px solid var(--gold); padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.85rem; }
-
-button, input, select, textarea {
-  font: inherit; color: var(--text); background: var(--panel-2);
-  border: 1px solid var(--line); border-radius: 7px; padding: 0.45rem 0.7rem; min-height: 38px;
-}
-input, select { min-width: 0; }
-textarea { width: 100%; min-height: 8rem; resize: vertical; }
-input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--red); outline-offset: 1px; }
-button { cursor: pointer; }
-button:disabled { opacity: 0.4; cursor: default; }
-button.primary { background: var(--red); border-color: var(--red); color: #fff; font-weight: 600; }
-button.danger { background: var(--red-dim); border-color: var(--red); }
-button.ghost { background: transparent; border-color: transparent; }
-input[type='checkbox'] { min-height: auto; width: 18px; height: 18px; accent-color: var(--red); }
-input[type='color'] { padding: 2px; width: 48px; }
-
-.form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; align-items: end; }
-.field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem; color: var(--muted); }
-.field > input, .field > select { color: var(--text); font-size: 0.95rem; }
-.field.wide { grid-column: 1 / -1; }
-.field.weight { margin: 0.6rem 0; }
-.field.weight input { max-width: 120px; }
-.check { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; min-height: 38px; }
-
-.wallet { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.6rem; }
-
-.actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-top: 0.6rem; }
-.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin: 0.4rem 0; }
-.toolbar h2 { margin: 0; }
-.filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.8rem; align-items: center; }
-
-.badge { display: inline-block; border: 1px solid; border-radius: 4px; padding: 0 5px; font-size: 0.72rem; font-weight: 600; margin-right: 4px; }
-.chip { display: inline-block; font-size: 0.72rem; padding: 2px 7px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--line); white-space: nowrap; margin-right: 4px; }
-.chip.limited { border-color: var(--gold); color: var(--gold); }
-.chip.urgent { background: var(--red); border-color: var(--red); color: #fff; }
-.chip.upcoming { border-color: #7fb4ff; color: #7fb4ff; }
-.chip.guest { border-color: #ff7ad9; color: #ff7ad9; }
-.chip.krypt { border-color: #9aa5b1; color: #c9d1d9; }
-.chip.maxed { border-color: var(--ok); color: var(--ok); }
-.chip.phase-unlock { border-color: #7fd8ff; color: #7fd8ff; }
-.chip.phase-toThreshold { border-color: var(--warn); color: var(--warn); }
-.chip.phase-normal { color: var(--text); }
-.chip.phase-kardCovered { border-color: var(--ok); color: var(--ok); }
-
-.plan-currency + .plan-currency { margin-top: 0.9rem; }
-.plan-currency-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; }
-.plan-currency-head h3 { margin: 0.2rem 0; }
-.plan-row .row-title b { color: var(--gold); }
-/* Foldable plan cards: the whole heading is the toggle. */
-.fold-head {
-  display: flex; align-items: center; gap: 0.45rem; width: 100%; min-height: 0; padding: 0; border: 0;
-  background: none; color: inherit; font: inherit; text-align: left;
-}
-.fold-caret { display: inline-block; font-size: 0.8em; color: var(--muted); transition: transform 0.15s; }
-.folded .fold-caret { transform: rotate(-90deg); }
-.card.folded h2 { margin-bottom: 0; }
-@media (prefers-reduced-motion: reduce) { .fold-caret { transition: none; } }
-/* A row's text as a button (tap a pack in the plan to open it in Packs), styled like the plain row it replaces. */
-.row-link {
-  display: block; min-width: 0; min-height: 0; padding: 0.15rem 0.3rem; margin: 0 -0.3rem; border: 0; border-radius: 6px;
-  background: none; color: inherit; font: inherit; text-align: left;
-}
-.row-link > span { display: block; }
-.row-link:active { background: var(--panel-2); }
-/* A pack tapped in the plan, when Packs scrolls to it. */
-.card.pack.flash { animation: pack-flash 1.6s ease-out; }
-@keyframes pack-flash { 0%, 40% { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); } 100% { border-color: var(--line); box-shadow: none; } }
-@media (prefers-reduced-motion: reduce) { .card.pack.flash { animation: none; border-color: var(--gold); } }
-
-.rank + .rank { border-top: 1px solid var(--line); margin-top: 0.3rem; padding-top: 0.3rem; }
-.target { padding-left: 0.8rem; }
-.rank-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.effbar { height: 4px; background: var(--panel-2); border-radius: 2px; margin-top: 5px; overflow: hidden; }
-.effbar span { display: block; height: 100%; background: linear-gradient(90deg, var(--red), var(--gold)); }
-
-.steps li { margin: 0.4rem 0; }
-.steps li.done { color: var(--muted); text-decoration: line-through; }
-
-.drops { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; }
-.drop { font-size: 0.8rem; background: var(--panel-2); border-radius: 5px; padding: 2px 7px; }
-.drop b { color: var(--gold); }
-.drop-row { display: flex; gap: 0.4rem; align-items: center; margin: 0.35rem 0; }
-.drop-row.wrap { flex-wrap: wrap; }
-.row.wrap { flex-wrap: wrap; align-items: flex-end; }
-.drop-row select, .drop-row > input:not(.pct-input) { flex: 1; }
-.pct-input { width: 80px; }
-.picker { position: relative; flex: 1; min-width: 0; }
-.picker > input { width: 100%; }
-.picker-list {
-  position: absolute; z-index: 2; left: 0; right: 0; top: calc(100% + 2px);
-  margin: 0; padding: 0.2rem 0; list-style: none; max-height: 260px; overflow-y: auto; overscroll-behavior: contain;
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-}
-.picker-list li { display: flex; justify-content: space-between; gap: 0.6rem; align-items: baseline; padding: 0.5rem 0.7rem; cursor: pointer; }
-.picker-list li.active { background: var(--line); }
-.pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0 0.5rem; margin: 0.4rem 0; max-height: 220px; overflow-y: auto; }
-
-.thumb { flex: none; border-radius: 8px; border: 2px solid var(--line); object-fit: cover; background: var(--panel-2); }
-.thumb-empty { display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem; }
-
-.stepper { display: flex; align-items: center; gap: 0.3rem; }
-.stepper button { width: 38px; padding: 0; font-size: 1.2rem; }
-.stepper-val { min-width: 40px; text-align: center; font-weight: 700; color: var(--gold); }
-.stepper-val small { font-size: 0.7rem; color: var(--muted); margin-left: 2px; }
-.done-text { text-decoration: line-through; color: var(--muted); }
-.check.wide { grid-column: 1 / -1; }
-.segmented { display: flex; gap: 0; margin-bottom: 0.8rem; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.segmented button { flex: 1; border: 0; border-radius: 0; background: var(--panel); color: var(--muted); }
-.segmented button.active { background: var(--red-dim); color: var(--text); }
-.card-row { padding: 0.7rem 0.9rem; }
-.card-row .actions { margin-top: 0.3rem; }
-
-.levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 0.4rem; margin-top: 0.6rem; }
-.level-caption { margin-top: 0.8rem; }
-.level { display: flex; flex-direction: column; gap: 2px; }
-.level input { width: 100%; }
-
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 10; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; overscroll-behavior: contain; padding: calc(1rem + env(safe-area-inset-top)) 0.5rem calc(1rem + env(safe-area-inset-bottom)); }
-.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; width: 100%; max-width: 640px; padding: 1rem; }
-.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; }
-.modal-head h2 { margin: 0; }
-.modal-foot { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; border-top: 1px solid var(--line); padding-top: 0.8rem; }
-
-.ptr {
-  position: fixed; left: 50%; top: calc(env(safe-area-inset-top) - 36px); z-index: 20;
-  width: 36px; height: 36px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--panel-2); border: 1px solid var(--line); color: var(--muted);
-  font-size: 1.2rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  pointer-events: none;
-}
-.ptr span { display: block; line-height: 1; }
-.ptr-ready, .ptr-spin { color: var(--gold); border-color: var(--gold); }
-.ptr-spin span { animation: ptr-spin 0.8s linear infinite; }
-@keyframes ptr-spin { to { transform: rotate(360deg); } }
-
-.toast {
-  position: fixed; left: 50%; transform: translateX(-50%); z-index: 8;
-  bottom: calc(70px + env(safe-area-inset-bottom));
-  width: calc(100% - 2rem); max-width: 480px;
-  display: flex; align-items: center; gap: 0.3rem;
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
-  padding: 0.3rem 0.3rem 0.3rem 0.9rem; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
-  font-size: 0.9rem;
-}
-.toast .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.toast-undo { color: var(--gold); font-weight: 700; }
-
-/* iOS zooms into any field under 16px when it's focused, and the page then pans sideways. */
-@media (pointer: coarse) {
-  input, select, textarea, .field > input, .field > select { font-size: 16px; }
+  /* Every control starts with the app's look; variants (primary, ghost, danger) are utilities on top. */
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: var(--color-fg);
+    background: var(--color-panel-2);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    padding: 0.45rem 0.7rem;
+    min-height: 38px;
+  }
+  input,
+  select {
+    min-width: 0;
+  }
+  textarea {
+    width: 100%;
+    min-height: 8rem;
+    resize: vertical;
+  }
+  input:focus,
+  select:focus,
+  textarea:focus,
+  button:focus-visible {
+    outline: 2px solid var(--color-red);
+    outline-offset: 1px;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  /* Pointer feedback on tablets and desktops. Utilities beat this base rule, so buttons with their own border color
+     (primary, ghost, danger, chips) keep it; ghost buttons get a background tint in classes.ts instead. */
+  @media (min-width: 768px) and (hover: hover) {
+    button:not(:disabled):hover {
+      border-color: var(--color-muted);
+    }
+  }
+  /* Preflight lightens placeholders to half the text color; keep the browser's grey the app was designed with. */
+  input::placeholder,
+  textarea::placeholder {
+    color: #757575;
+  }
+  input[type='checkbox'] {
+    min-height: auto;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    /* The browser's default, which preflight removes; it spaces the box from its label. */
+    margin: 3px 3px 3px 4px;
+    accent-color: var(--color-red);
+  }
+  /* Preflight trims the padding inside Chrome's date and time fields, which makes them 2px shorter than other inputs. */
+  ::-webkit-datetime-edit,
+  ::-webkit-datetime-edit-fields-wrapper,
+  ::-webkit-datetime-edit-year-field,
+  ::-webkit-datetime-edit-month-field,
+  ::-webkit-datetime-edit-day-field,
+  ::-webkit-datetime-edit-hour-field,
+  ::-webkit-datetime-edit-minute-field,
+  ::-webkit-datetime-edit-second-field,
+  ::-webkit-datetime-edit-millisecond-field,
+  ::-webkit-datetime-edit-meridiem-field {
+    padding: revert;
+  }
+  input[type='color'] {
+    padding: 2px;
+    width: 48px;
+  }
+  /* iOS zooms into any field under 16px when it's focused, and the page then pans sideways. */
+  @media (pointer: coarse) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
 }

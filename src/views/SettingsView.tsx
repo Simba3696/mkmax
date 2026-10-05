@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { fetchStarterData, newId, normalize, useStore } from '../store';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
+import { actions, btn, check, field, form, grow, subpanel } from '../classes';
 import { copiesTotal, fLevel, levelLabel, maxFusion } from '../engine';
 import SyncPanel from './SyncPanel';
 import GearOrder from './GearOrder';
@@ -23,6 +24,11 @@ const kardSteps = (r: RarityRule) => Array.from({ length: Math.max(0, r.dupesPer
 
 /** Kards needed to take a card of this rarity from the threshold to its top level. */
 const kardTotal = (r: RarityRule) => kardSteps(r).reduce((a, f) => a + (r.kardsPerLevel[f] || 0), 0);
+
+const note = 'text-muted text-small';
+const levelCaption = 'text-small text-muted mt-[0.8rem]';
+const levels = 'grid grid-cols-[repeat(auto-fill,minmax(70px,1fr))] gap-[0.4rem] mt-[0.6rem]';
+const level = 'flex flex-col gap-[2px] [&_input]:w-full';
 
 export default function SettingsView() {
   const { state, update, replace } = useStore();
@@ -48,155 +54,172 @@ export default function SettingsView() {
   }
 
   return (
-    <>
+    // From 2xl the rarity editors, the biggest section, get a column of their own on the right and the smaller sections
+    // stack in a narrower column on the left, in DOM order (auto-placement skips the right column, which the Fusion
+    // rules span). The last row is 1fr so it soaks up Fusion rules' extra height instead of spreading gaps between
+    // the left-hand cards. The 6 in grid-rows is the number of left-column children (SyncPanel, Currencies, GearOrder,
+    // Priority weights, Data, Version); change it when a section is added or removed.
+    <div className="2xl:grid 2xl:grid-cols-[minmax(0,27rem)_minmax(0,1fr)] 2xl:grid-rows-[repeat(6,auto)_1fr] 2xl:gap-x-5 2xl:items-start">
       <SyncPanel />
 
-      <FoldCard id="settings-fusion" title="Fusion rules">
-        <p className="muted small">
-          Your first copy of a card is F0. Each step below is the number of duplicates needed for the next level. One Fusion Up Kard counts as +1 fusion level.
-        </p>
-        {state.rarities.map((r, ri) => (
-          <div key={r.id} className="subpanel">
-            <div className="form">
-              <label className="field">
-                <span>Name</span>
-                <input value={r.label} onChange={(e) => update((d) => void (d.rarities[ri].label = e.target.value))} />
-              </label>
-              <label className="field">
-                <span>Fusion Up Kards usable from</span>
-                <select
-                  value={r.fusionUpThreshold ?? ''}
-                  onChange={(e) => update((d) => void (d.rarities[ri].fusionUpThreshold = e.target.value ? Number(e.target.value) : null))}
-                >
-                  <option value="">No kards for this rarity</option>
-                  {Array.from({ length: r.fusionMax }, (_, i) => (
-                    <option key={i} value={i + 1}>
-                      F{i + 1}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Track until</span>
-                <select value={r.goal} onChange={(e) => update((d) => void (d.rarities[ri].goal = e.target.value as 'max' | 'threshold'))}>
-                  <option value="max">Max</option>
-                  <option value="threshold" disabled={r.fusionUpThreshold == null}>
-                    Kard threshold (F{r.fusionUpThreshold ?? '?'})
-                  </option>
-                </select>
-              </label>
-              <label className="field">
-                <span>Highest fusion (F…), rest are ascension</span>
-                <NumInput value={r.fusionMax} min={1} step={1} onChange={(v) => update((d) => void (d.rarities[ri].fusionMax = v ?? 10))} />
-              </label>
-              <label className="field">
-                <span>Kind</span>
-                <select value={r.kind} onChange={(e) => update((d) => void (d.rarities[ri].kind = e.target.value as RarityRule['kind']))}>
-                  <option value="character">Character</option>
-                  <option value="equipment">Equipment</option>
-                  <option value="kameo">Kameo (only need one copy)</option>
-                </select>
-              </label>
-              <label className="check">
-                <input type="checkbox" checked={r.hasGuests} onChange={(e) => update((d) => void (d.rarities[ri].hasGuests = e.target.checked))} />
-                Has guest cards
-              </label>
-              <label className="field">
-                <span>Color</span>
-                <input type="color" value={r.color} onChange={(e) => update((d) => void (d.rarities[ri].color = e.target.value))} />
-              </label>
-            </div>
-            <div className="small muted level-caption">Duplicates per step</div>
-            <div className="levels">
-              {r.dupesPerLevel.map((n, li) => (
-                <label key={li} className="level">
-                  <span className="small muted">
-                    {levelLabel(r, li + 1)}→{levelLabel(r, li + 2)}
-                  </span>
-                  <NumInput value={n} min={0} step={1} onChange={(v) => update((d) => void (d.rarities[ri].dupesPerLevel[li] = v ?? 0))} />
-                </label>
-              ))}
-            </div>
-            <div className="actions">
-              <button onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.push(1))}>+ Level</button>
-              <button disabled={r.dupesPerLevel.length <= 1} onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.pop())}>
-                − Level
-              </button>
-              <span className="muted small">
-                Max {levelLabel(r, r.dupesPerLevel.length + 1)} · {copiesTotal(r)} copies total
-              </span>
-              <span className="grow" />
-              <button
-                className="ghost"
-                disabled={state.cards.some((c) => c.rarityId === r.id)}
-                title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : 'Remove rarity'}
-                onClick={() => update((d) => void d.rarities.splice(ri, 1))}
-              >
-                Remove
-              </button>
-            </div>
-            {r.fusionUpThreshold != null && (
-              <>
-                <div className="small muted level-caption">
-                  Fusion Up Kards per step · {kardTotal(r)} kards from F{r.fusionUpThreshold} to {levelLabel(r, maxFusion(r))}
+      <div className="2xl:col-start-2 2xl:row-[1/-1]">
+        <FoldCard id="settings-fusion" title="Fusion rules">
+          <p className={`${note} md:max-w-[75ch]`}>
+            Your first copy of a card is F0. Each step below is the number of duplicates needed for the next level. One Fusion Up Kard counts as +1 fusion level.
+          </p>
+          {/*
+            Two columns of rarities from lg, where each still gets room for a few form columns. CSS columns rather than a grid: the editors differ a lot in height (ascension levels), and columns
+            stack them without the gaps a grid row leaves. Top margins are dropped since a column break swallows them,
+            which left the two column tops out of line.
+          */}
+          <div className="lg:columns-2 lg:gap-3 lg:[&>div]:break-inside-avoid lg:[&>div]:mt-0 lg:[&>div]:mb-3">
+            {state.rarities.map((r, ri) => (
+              <div key={r.id} className={subpanel}>
+                <div className={form}>
+                  <label className={field}>
+                    <span>Name</span>
+                    <input value={r.label} onChange={(e) => update((d) => void (d.rarities[ri].label = e.target.value))} />
+                  </label>
+                  <label className={field}>
+                    <span>Fusion Up Kards usable from</span>
+                    <select
+                      value={r.fusionUpThreshold ?? ''}
+                      onChange={(e) => update((d) => void (d.rarities[ri].fusionUpThreshold = e.target.value ? Number(e.target.value) : null))}
+                    >
+                      <option value="">No kards for this rarity</option>
+                      {Array.from({ length: r.fusionMax }, (_, i) => (
+                        <option key={i} value={i + 1}>
+                          F{i + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={field}>
+                    <span>Track until</span>
+                    <select value={r.goal} onChange={(e) => update((d) => void (d.rarities[ri].goal = e.target.value as 'max' | 'threshold'))}>
+                      <option value="max">Max</option>
+                      <option value="threshold" disabled={r.fusionUpThreshold == null}>
+                        Kard threshold (F{r.fusionUpThreshold ?? '?'})
+                      </option>
+                    </select>
+                  </label>
+                  <label className={field}>
+                    <span>Highest fusion (F…), rest are ascension</span>
+                    <NumInput value={r.fusionMax} min={1} step={1} onChange={(v) => update((d) => void (d.rarities[ri].fusionMax = v ?? 10))} />
+                  </label>
+                  <label className={field}>
+                    <span>Kind</span>
+                    <select value={r.kind} onChange={(e) => update((d) => void (d.rarities[ri].kind = e.target.value as RarityRule['kind']))}>
+                      <option value="character">Character</option>
+                      <option value="equipment">Equipment</option>
+                      <option value="kameo">Kameo (only need one copy)</option>
+                    </select>
+                  </label>
+                  <label className={check}>
+                    <input type="checkbox" checked={r.hasGuests} onChange={(e) => update((d) => void (d.rarities[ri].hasGuests = e.target.checked))} />
+                    Has guest cards
+                  </label>
+                  <label className={field}>
+                    <span>Color</span>
+                    <input type="color" value={r.color} onChange={(e) => update((d) => void (d.rarities[ri].color = e.target.value))} />
+                  </label>
                 </div>
-                <div className="levels">
-                  {kardSteps(r).map((f) => (
-                    <label key={f} className="level">
-                      <span className="small muted">
-                        {levelLabel(r, fLevel(f))}→{levelLabel(r, fLevel(f + 1))}
+                <div className={levelCaption}>Duplicates per step</div>
+                <div className={levels}>
+                  {r.dupesPerLevel.map((n, li) => (
+                    <label key={li} className={level}>
+                      <span className={note}>
+                        {levelLabel(r, li + 1)}→{levelLabel(r, li + 2)}
                       </span>
-                      <NumInput
-                        value={r.kardsPerLevel[f] ?? 0}
-                        min={0}
-                        step={1}
-                        onChange={(v) =>
-                          update((d) => {
-                            const costs = d.rarities[ri].kardsPerLevel;
-                            while (costs.length <= f) costs.push(0);
-                            costs[f] = v ?? 0;
-                          })
-                        }
-                      />
+                      <NumInput value={n} min={0} step={1} onChange={(v) => update((d) => void (d.rarities[ri].dupesPerLevel[li] = v ?? 0))} />
                     </label>
                   ))}
                 </div>
-              </>
-            )}
+                <div className={actions}>
+                  <button onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.push(1))}>+ Level</button>
+                  <button disabled={r.dupesPerLevel.length <= 1} onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.pop())}>
+                    − Level
+                  </button>
+                  <span className={`${note} lg:flex-1 lg:min-w-0`}>
+                    Max {levelLabel(r, r.dupesPerLevel.length + 1)} · {copiesTotal(r)} copies total
+                  </span>
+                  <span className={`${grow} lg:hidden`} />
+                  <button
+                    className={btn.ghost}
+                    disabled={state.cards.some((c) => c.rarityId === r.id)}
+                    title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : 'Remove rarity'}
+                    onClick={() => update((d) => void d.rarities.splice(ri, 1))}
+                  >
+                    Remove
+                  </button>
+                </div>
+                {r.fusionUpThreshold != null && (
+                  <>
+                    <div className={levelCaption}>
+                      Fusion Up Kards per step · {kardTotal(r)} kards from F{r.fusionUpThreshold} to {levelLabel(r, maxFusion(r))}
+                    </div>
+                    <div className={levels}>
+                      {kardSteps(r).map((f) => (
+                        <label key={f} className={level}>
+                          <span className={note}>
+                            {levelLabel(r, fLevel(f))}→{levelLabel(r, fLevel(f + 1))}
+                          </span>
+                          <NumInput
+                            value={r.kardsPerLevel[f] ?? 0}
+                            min={0}
+                            step={1}
+                            onChange={(v) =>
+                              update((d) => {
+                                const costs = d.rarities[ri].kardsPerLevel;
+                                while (costs.length <= f) costs.push(0);
+                                costs[f] = v ?? 0;
+                              })
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
-        <button
-          onClick={() =>
-            update(
-              (d) =>
-                void d.rarities.push({ id: newId(), label: 'New rarity', kind: 'equipment', color: '#cccccc', dupesPerLevel: Array(10).fill(1), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [...DIAMOND_KARD_COSTS] }),
-            )
-          }
-        >
-          + Rarity
-        </button>
-      </FoldCard>
+          <button
+            onClick={() =>
+              update(
+                (d) =>
+                  void d.rarities.push({ id: newId(), label: 'New rarity', kind: 'equipment', color: '#cccccc', dupesPerLevel: Array(10).fill(1), fusionMax: 10, goal: 'max', hasGuests: false, fusionUpThreshold: null, fusionUpKards: 0, kardsPerLevel: [...DIAMOND_KARD_COSTS] }),
+              )
+            }
+          >
+            + Rarity
+          </button>
+        </FoldCard>
+      </div>
 
       <FoldCard id="settings-currencies" title="Currencies">
-        {state.currencies.map((c, i) => {
-          const used = state.packs.some((p) => p.currencyId === c.id);
-          return (
-            <div key={c.id} className="drop-row">
-              <input className="grow" value={c.name} onChange={(e) => update((d) => void (d.currencies[i].name = e.target.value))} aria-label="Name" />
-              <NumInput
-                className="per-day"
-                value={c.perDay ?? null}
-                min={0}
-                placeholder="per day"
-                onChange={(v) => update((d) => void (v == null || v <= 0 ? delete d.currencies[i].perDay : (d.currencies[i].perDay = v)))}
-              />
-              <button className="ghost" disabled={used} title={used ? 'Used by a pack' : 'Remove'} onClick={() => update((d) => void d.currencies.splice(i, 1))}>
-                ✕
-              </button>
-            </div>
-          );
-        })}
-        <p className="muted small">
+        {/* Two per line on tablets and laptops so the name and per-day boxes don't stretch across the page. */}
+        <div className="md:grid md:grid-cols-2 md:gap-x-6 2xl:block">
+          {state.currencies.map((c, i) => {
+            const used = state.packs.some((p) => p.currencyId === c.id);
+            return (
+              <div key={c.id} className="flex gap-[0.4rem] items-center my-[0.35rem]">
+                <input className="flex-1 min-w-0" value={c.name} onChange={(e) => update((d) => void (d.currencies[i].name = e.target.value))} aria-label="Name" />
+                <NumInput
+                  className="flex-1"
+                  value={c.perDay ?? null}
+                  min={0}
+                  placeholder="per day"
+                  onChange={(v) => update((d) => void (v == null || v <= 0 ? delete d.currencies[i].perDay : (d.currencies[i].perDay = v)))}
+                />
+                <button className={btn.ghost} disabled={used} title={used ? 'Used by a pack' : 'Remove'} onClick={() => update((d) => void d.currencies.splice(i, 1))}>
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <p className={`${note} md:max-w-[75ch]`}>
           The number is roughly how much you get each day. With it, the plan says when you can afford what it's saving for.
         </p>
         <button onClick={() => update((d) => void d.currencies.push({ id: newId(), name: 'New currency', balance: 0 }))}>+ Currency</button>
@@ -205,22 +228,25 @@ export default function SettingsView() {
       <GearOrder />
 
       <FoldCard id="settings-weights" title="Priority weights">
-        <p className="muted small">Every card is being maxed. These only decide which copies the planner goes after first.</p>
-        {WEIGHT_HELP.map((w) => (
-          <label key={w.key} className="field weight">
-            <span>
-              {w.label} <span className="muted small">— {w.help}</span>
-            </span>
-            <NumInput value={state.weights[w.key]} min={0} onChange={(v) => update((d) => void (d.weights[w.key] = v ?? 0))} />
-          </label>
-        ))}
+        <p className={`${note} md:max-w-[75ch]`}>Every card is being maxed. These only decide which copies the planner goes after first.</p>
+        {/* Two columns while the section is page-wide, inputs lined up along each row's bottom. */}
+        <div className="md:grid md:grid-cols-2 md:gap-x-6 md:items-end 2xl:block">
+          {WEIGHT_HELP.map((w) => (
+            <label key={w.key} className={`${field} my-[0.6rem] [&_input]:max-w-[120px]`}>
+              <span>
+                {w.label} <span className={note}>— {w.help}</span>
+              </span>
+              <NumInput value={state.weights[w.key]} min={0} onChange={(v) => update((d) => void (d.weights[w.key] = v ?? 0))} />
+            </label>
+          ))}
+        </div>
         <button onClick={() => update((d) => void (d.weights = structuredClone(defaultWeights)))}>Reset weights</button>
       </FoldCard>
 
       <FoldCard id="settings-data" title="Data">
-        <p className="muted small">Your data is saved in this browser only. Export a backup now and then, or use one to move to another device.</p>
-        <div className="actions">
-          <button className="primary" onClick={exportData}>
+        <p className={`${note} md:max-w-[75ch]`}>Your data is saved in this browser only. Export a backup now and then, or use one to move to another device.</p>
+        <div className={actions}>
+          <button className={btn.primary} onClick={exportData}>
             Export backup
           </button>
           <button onClick={() => fileRef.current?.click()}>Import backup</button>
@@ -237,9 +263,9 @@ export default function SettingsView() {
           <ConfirmButton label="Load sample data" onConfirm={() => (replace(sampleState()), setMsg('Sample data loaded.'))} />
           <ConfirmButton label="Erase everything" onConfirm={() => (replace(defaultState()), setMsg('All data erased.'))} />
         </div>
-        {msg && <p className="small">{msg}</p>}
+        {msg && <p className="text-small">{msg}</p>}
       </FoldCard>
-      <p className="muted small">Version {__APP_VERSION__}</p>
-    </>
+      <p className={note}>Version {__APP_VERSION__}</p>
+    </div>
   );
 }

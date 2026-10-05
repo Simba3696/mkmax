@@ -22,7 +22,8 @@ A change is done when `npm run lint`, `npm test` and `npm run build` all pass. C
 - **Changing the saved shape or meaning means a migration.** Use the `save-migration` skill (`.claude/skills/save-migration/`). Never pull synced data with `version <= 2`.
 - **Update the docs in the same change.** Behaviour goes in `docs/user-guide.md`, scoring and data sources in `docs/how-it-works.md`, structure in `docs/architecture.md`, setup and conventions in `docs/development.md`. Touch the README's Features list only for headline features.
 - **Write like the existing docs and commits.** Plain sentences about what the user sees, no jargon, no `feat:` prefixes. Commit subjects read like "Show how many cards each rarity and source filter option would list". Comments explain why, not what.
-- **Don't add dependencies** without a strong reason. The app has two runtime dependencies and should stay small.
+- **Style with the theme and shared class sets.** Use the colors and sizes from `src/styles.css` and the sets in `src/classes.ts`. Never put two utilities that set the same property on one element at the same breakpoint. Keep phones (below 768px) looking the same; desktop styles go behind `md:` and up. See [Development → Styling](docs/development.md#styling).
+- **Don't add dependencies** without a strong reason. The app has two runtime dependencies and should stay small. Tailwind (`tailwindcss`, `@tailwindcss/vite`) is a dev dependency: it runs at build time and adds nothing to the shipped app.
 
 ## Game rules the code depends on
 
