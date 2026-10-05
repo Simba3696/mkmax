@@ -94,7 +94,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 10,
+    version: 11,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,
@@ -133,6 +133,12 @@ export function normalize(input: unknown): AppState {
   if (version < 10) {
     out.packs = out.packs.map((p) => (/’S\b/.test(p.name) ? { ...p, name: p.name.replace(/’S\b/g, '’s') } : p));
     out.currencies = out.currencies.map((c) => (c.id === REALM_KLASH_CURRENCY && c.perDay === undefined ? { ...c, perDay: 65 } : c));
+  }
+  // Version 11 drops Time Krystals, which only exist in the console games, once, unless a pack is priced in them or
+  // there's a balance or daily income to keep.
+  if (version < 11) {
+    const used = (id: string) => out.packs.some((p) => p.currencyId === id);
+    out.currencies = out.currencies.filter((c) => c.id !== 'time-krystals' || used(c.id) || c.balance > 0 || !!c.perDay);
   }
   pruneDone(out);
   return out;
