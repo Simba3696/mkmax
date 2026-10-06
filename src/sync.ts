@@ -96,11 +96,13 @@ export const OUTDATED_MESSAGE =
 /**
  * What a sync should do, given the gist's copy, this device's copy, and the version both last agreed on.
  * Only one side changed → that side wins; both changed → the user decides. Data from an outdated app is
- * replaced with this device's copy.
+ * replaced with this device's copy. A device that has never synced and has no cards or packs takes the gist's
+ * copy without asking, since keeping its own would wipe the gist with an empty one.
  */
 export function decideSync(remote: AppState | null, local: AppState, base: number): 'pull' | 'push' | 'conflict' | 'none' | 'outdated' {
   if (!remote) return 'push';
   if (fromOutdatedApp(remote)) return 'outdated';
+  if (base === 0 && local.cards.length === 0 && local.packs.length === 0) return 'pull';
   const remoteMoved = stamp(remote) > base;
   const localMoved = stamp(local) > base;
   if (remoteMoved && localMoved) return stamp(remote) === stamp(local) ? 'none' : 'conflict';

@@ -44,7 +44,7 @@ export default function SyncPanel() {
             <li>Paste it below. The token stays on this device only; it is never put into the synced data or your backups.</li>
           </ol>
           <div className="flex flex-wrap gap-[0.4rem] items-center my-[0.35rem] md:max-w-[32rem]">
-            <input className="flex-1 min-w-0" type="password" autoComplete="off" placeholder="github_pat_…" value={token} onChange={(e) => setToken(e.target.value)} />
+            <input className="flex-1 min-w-0" type="password" autoComplete="off" placeholder="ghp_…" value={token} onChange={(e) => setToken(e.target.value)} />
             <button className={btn.primary} disabled={!token.trim() || status.kind === 'syncing'} onClick={() => sync.connect(token).then(() => setToken(''), () => {})}>
               {status.kind === 'syncing' ? 'Connecting…' : 'Connect'}
             </button>

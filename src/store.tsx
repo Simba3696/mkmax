@@ -19,8 +19,12 @@ function load(): AppState {
   return defaultState();
 }
 
-/** Pass an undo label to offer "Undo <label>" for this change. */
-type Update = (recipe: (draft: AppState) => void, undoLabel?: string) => void;
+/**
+ * Pass an undo label to offer "Undo <label>" for this change. `auto` marks a change the app makes by itself
+ * (schedule dates, card art): it's saved but doesn't count as an edit for sync, since every device works it out
+ * on its own, so it can't make two devices disagree.
+ */
+type Update = (recipe: (draft: AppState) => void, undoLabel?: string, opts?: { auto?: boolean }) => void;
 
 /** The most recent undoable change: the state from just before it. */
 export interface UndoEntry {
@@ -157,18 +161,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const update: Update = (recipe, undoLabel) => {
+  const update: Update = (recipe, undoLabel, opts) => {
     // Built from the ref rather than a setState updater so the undo label can include what got pruned.
     const prev = stateRef.current;
     const draft = structuredClone(prev);
     recipe(draft);
     const removed = pruneDone(draft);
-    draft.updatedAt = Date.now();
+    if (!opts?.auto) draft.updatedAt = Date.now();
     stateRef.current = draft;
     setState(draft);
     const label = [undoLabel, removed.length > 0 && `${removed.join(', ')} ${removed.length > 1 ? 'are' : 'is'} maxed and removed`].filter(Boolean).join(' · ');
     if (label) setLastUndo({ label, prev, at: Date.now() });
-    schedulePush();
+    if (!opts?.auto) schedulePush();
   };
 
   const replace = (s: AppState) => {

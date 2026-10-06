@@ -45,7 +45,7 @@ flowchart TB
 ```
 
 - **`engine.ts` is plain TypeScript with no React and no I/O.** It takes an `AppState` and a `now` and returns plans. That's what makes the planner unit-testable (`engine.test.ts` is the biggest test file) and lets scripts reuse it. Keep it that way: anything that needs the clock, the network or the DOM belongs in a view, the store or an `Ext` module, and gets passed in.
-- **`store.tsx` owns the single `AppState`.** Every change goes through `update(recipe, undoLabel?)`, which clones the state, applies the recipe, removes finished cards (`pruneDone`), stamps `updatedAt`, saves to localStorage and schedules a sync push.
+- **`store.tsx` owns the single `AppState`.** Every change goes through `update(recipe, undoLabel?)`, which clones the state, applies the recipe, removes finished cards (`pruneDone`), stamps `updatedAt`, saves to localStorage and schedules a sync push. Changes the app makes by itself (season end from the schedule, catalog art) pass `{ auto: true }`, which saves them without stamping or pushing: every device derives them, so they shouldn't count as an edit and cause sync conflicts.
 - **Views derive everything else on render**: `buildCtx(state)` then `buildPlan(ctx, now)`. Nothing derived is stored, so there's no cache to invalidate.
 
 ## State model
@@ -88,7 +88,7 @@ stateDiagram-v2
   Pull --> Idle: normalize() then replace
 ```
 
-`decideSync` in `sync.ts` compares each side's `updatedAt` with `baseUpdatedAt`, the stamp both last agreed on. It's last-writer-wins with conflict detection, not a merge: the data is small and edited by one person, so asking which copy to keep is simpler and safer than merging fields.
+`decideSync` in `sync.ts` compares each side's `updatedAt` with `baseUpdatedAt`, the stamp both last agreed on. A device that has never synced (`baseUpdatedAt` 0) and has no cards or packs pulls without asking, since keeping its copy would wipe the gist. It's last-writer-wins with conflict detection, not a merge: the data is small and edited by one person, so asking which copy to keep is simpler and safer than merging fields.
 
 ## Offline and updates
 
