@@ -345,9 +345,9 @@ The box at the top of Packs shows when the current Realm Klash season ends. It a
 
 Realm Klash seasons last 2 weeks. Each season the Blood Ruby store swaps its characters, Kameos and Kameo packs, but the Realm Klash gear stays.
 
-- **When MK Mobile Base's event schedule covers the current season**, its end date is used instead of your date and the 2-week guess, and seasonal items move to it by themselves. The box then shows that date and can't be edited. With sync on, the move waits until the app has tried to sync after opening, since another device may have made it already.
+- **When MK Mobile Base's event schedule covers the current season**, its end date is used instead of your date and the 2-week guess, and seasonal items move to it by themselves. This includes a season the schedule extends by a week after your saved end has passed: if your saved end was the end of that season's earlier week, its items move from there to the new end. The box then shows that date and can't be edited. With sync on, the move waits until the app has tried to sync after opening, since another device may have made it already.
 - **Otherwise**, enter the season's end from the in-game timer once. After that the app assumes each new season ends 2 weeks after the last one, so seasonal items get that end date, count as limited-time in the planner, and show up as expired when the season is over.
-- **If the timer turns out to be different**, change the date here (or on any seasonal item) and every item from that season moves with it. Typing a date has no Undo.
+- **If the timer turns out to be different**, change the date here and every item from that season moves with it. The new date applies when you leave the box, press Enter or leave Packs, with Undo. You can also change it on any seasonal item, where it applies when you save the pack.
 - **Seasons sometimes end early**, for example a short in-between season while an app update is delayed. When that happens, tap **Ended early** (two taps, with Undo): that season's items expire now, and the next season is assumed to end 2 weeks later until you enter its real end date.
 - "N seasonal items leave then" counts the seasonal packs ending on that date.
 

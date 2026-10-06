@@ -6,7 +6,7 @@ import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
 import { buildCtx, buildPlan, endingSoon, moveSeasonEnd, seasonEnd } from './engine';
-import { refreshEvents, scheduledSeasonEnd, useEvents } from './events';
+import { refreshEvents, scheduledSeason, useEvents } from './events';
 import { checkForAppUpdate } from './appUpdate';
 import { useNow } from './ui';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
@@ -95,7 +95,8 @@ export default function App() {
   // 2-week guess) whenever it covers today, moving that season's items with it.
   const events = useEvents();
   const now = useNow();
-  const scheduledEnd = scheduledSeasonEnd(events, now);
+  const season = scheduledSeason(events, now);
+  const scheduledEnd = season?.end ?? null;
   const savedEnd = seasonEnd(state.realmKlashSeasonEnd, now);
   useEffect(() => {
     if (!scheduledEnd || scheduledEnd === savedEnd) return;
@@ -104,7 +105,7 @@ export default function App() {
     if (!sync.settled) return;
     // Which packs this moves depends on when it runs, so it's a real change that syncs. The exception is a fresh
     // install, which has nothing to move: stamping it would make a new device ask which copy to keep when it joins.
-    update((d) => moveSeasonEnd(d, scheduledEnd, now), undefined, { auto: !state.updatedAt && state.packs.length === 0 });
+    update((d) => moveSeasonEnd(d, scheduledEnd, now, season?.weekEnds), undefined, { auto: !state.updatedAt && state.packs.length === 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduledEnd, savedEnd, sync.settled]);
 

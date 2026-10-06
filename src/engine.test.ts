@@ -446,6 +446,26 @@ describe('Realm Klash seasons', () => {
     expect(seasonEnd(s.realmKlashSeasonEnd, NOW)).toBe('2026-01-24T11:59');
   });
 
+  it('moves items still on the saved end when the schedule extended the season after that end passed', () => {
+    // The schedule listed one week of a season ending Jan 10 11:00; a second week was added after it passed.
+    const s = setup([], [
+      pack('this', [], { season: true, endsAt: '2026-01-10T11:00' }),
+      pack('before', [], { season: true, endsAt: '2026-01-03T11:00' }),
+      pack('guess', [], { season: true, endsAt: '2026-01-24T11:00' }),
+    ], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
+    moveSeasonEnd(s, '2026-01-17T11:00', NOW, ['2026-01-10T11:00']);
+    // The season before ended at this season's start, so its items stay.
+    expect(s.packs.map((p) => p.endsAt)).toEqual(['2026-01-17T11:00', '2026-01-03T11:00', '2026-01-17T11:00']);
+    expect(s.realmKlashSeasonEnd).toBe('2026-01-17T11:00');
+  });
+
+  it("leaves the last season's items alone when its end was set a little after the real changeover", () => {
+    // Ended early tapped at 11:00; the schedule then lists a new season that started at 10:00.
+    const s = setup([], [pack('last', [], { season: true, endsAt: '2026-01-10T11:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
+    moveSeasonEnd(s, '2026-01-17T10:00', NOW, []);
+    expect(s.packs[0].endsAt).toBe('2026-01-10T11:00');
+  });
+
   it('assumes Blood Ruby characters, Kameos and Kameo packs rotate, but not the gear', () => {
     const s = setup([card('hero', F(2)), card('gear', F(5), { rarityId: 'epic', goal: 'max' }), card('kameo', 0, { rarityId: 'kameo-gold' })]);
     const item = (cardId: string) => pack(cardId, [{ cardId, chance: 100 }], { currencyId: 'blood-rubies', store: true });

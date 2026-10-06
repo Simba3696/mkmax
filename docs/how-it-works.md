@@ -42,7 +42,7 @@ The app uses it for three things:
 
 - **In the shop** (Packs): packs on sale or coming up that you haven't added. **Add** opens the pack editor with the name, currency, cost, dates and limit filled in, so you only enter drop rates for the cards you need. **Not needed** hides a pack for good, for packs with none of your cards; this list syncs between devices. A permanent Blood Ruby pack (like the Kameo summon packs) isn't marked as leaving with the season.
 - **Elder challenge dates** for challenge Kameos you still need, on the card and in the Plan.
-- **The Realm Klash season end.** The site lists seasons a week at a time ("Circle of Shadow 2", then "Kold" twice), so back-to-back weeks with the same name count as one season.
+- **The Realm Klash season end.** The site lists seasons a week at a time ("Circle of Shadow 2", then "Kold" twice), so back-to-back weeks with the same name count as one season. When a week is added after the saved end has passed, the season's items still on that end move to the new one.
 
 ## Card images
 
