@@ -90,6 +90,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
   // count: it's maxed with Blood Rubies.
   const kardRarities = state.rarities.filter(
     (r) =>
+      r.kind !== 'kameo' &&
       r.fusionUpThreshold != null &&
       (r.goal === 'max' || state.cards.some((c) => c.rarityId === r.id && cardGoal(c, r) === 'max' && !isRealmKlashGear(state, c))),
   );

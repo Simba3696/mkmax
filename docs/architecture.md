@@ -45,7 +45,7 @@ flowchart TB
 ```
 
 - **`engine.ts` is plain TypeScript with no React and no I/O.** It takes an `AppState` and a `now` and returns plans. That's what makes the planner unit-testable (`engine.test.ts` is the biggest test file) and lets scripts reuse it. Keep it that way: anything that needs the clock, the network or the DOM belongs in a view, the store or an `Ext` module, and gets passed in.
-- **`store.tsx` owns the single `AppState`.** Every change goes through `update(recipe, undoLabel?)`, which clones the state, applies the recipe, removes finished cards (`pruneDone`), stamps `updatedAt`, saves to localStorage and schedules a sync push. Changes the app makes by itself (season end from the schedule, catalog art) pass `{ auto: true }`, which saves them without stamping or pushing: every device derives them, so they shouldn't count as an edit and cause sync conflicts.
+- **`store.tsx` owns the single `AppState`.** Every change goes through `update(recipe, undoLabel?)`, which clones the state, applies the recipe, removes finished cards (`pruneDone`), stamps `updatedAt`, saves to localStorage and schedules a sync push. Changes the app makes by itself that every device derives the same way (catalog art) pass `{ auto: true }`, which saves them without stamping or pushing, so they can't cause sync conflicts. The season-end move from the schedule is a normal change, since which packs it moves depends on when it runs, except on a fresh install (no stamp, no packs): stamping that would make a new device's first sync a conflict instead of a pull. It waits for `sync.settled` (this launch's first sync attempt has finished, whatever the outcome) so it usually runs on the other devices' latest data.
 - **Views derive everything else on render**: `buildCtx(state)` then `buildPlan(ctx, now)`. Nothing derived is stored, so there's no cache to invalidate.
 
 ## State model
@@ -78,9 +78,9 @@ stateDiagram-v2
   [*] --> Decide: app opens / comes to front / every 2 min / 1.5 s after a change
   Decide --> Push: only local changed (or no gist file)
   Decide --> Pull: only remote changed
-  Decide --> Conflict: both changed since base
+  Decide --> Conflict: both changed since base, to different data
   Decide --> Outdated: remote saved by a build from before 2026-09-28
-  Decide --> Idle: neither changed
+  Decide --> Idle: neither changed, or both made the same change
   Conflict --> Push: user keeps mine
   Conflict --> Pull: user keeps theirs
   Outdated --> Push: overwrite and show an error
@@ -88,7 +88,7 @@ stateDiagram-v2
   Pull --> Idle: normalize() then replace
 ```
 
-`decideSync` in `sync.ts` compares each side's `updatedAt` with `baseUpdatedAt`, the stamp both last agreed on. A device that has never synced (`baseUpdatedAt` 0) and has no cards or packs pulls without asking, since keeping its copy would wipe the gist. It's last-writer-wins with conflict detection, not a merge: the data is small and edited by one person, so asking which copy to keep is simpler and safer than merging fields.
+`decideSync` in `sync.ts` compares each side's `updatedAt` with `baseUpdatedAt`, the stamp both last agreed on. When both sides moved but hold the same data apart from the stamp (each device moved the season end by itself), `sameData` makes it a no-op and both stamps count as agreed. While a conflict waits for the user, background syncs hold off, and a sync that ends in a conflict or an error doesn't reschedule itself; the regular pulls retry. Keeping this device's copy first re-reads the gist: if the other device pushed again while the prompt was up, the prompt shows that copy instead. Otherwise it restamps the kept copy above both copies (the outdated branch does the same), so the other device pulls it, or asks if it has changed since, rather than overwriting it with its own next edit. A sync that finishes after the user disconnected changes nothing. It's last-writer-wins with conflict detection, not a merge: the data is small and edited by one person, so asking which copy to keep is simpler and safer than merging fields.
 
 ## Offline and updates
 

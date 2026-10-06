@@ -4,6 +4,7 @@ import {
   ascensionCaps, buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, recordPurchase, seasonEnd, suggestSeason, targetLevel,
 } from './engine';
 import { normalize } from './store';
+import { kardTable } from './normalize';
 import { daysFromNow } from './ui';
 import type { AppState, Card, Pack } from './types';
 
@@ -238,6 +239,13 @@ describe('phases', () => {
     expect(out.rarities.find((r) => r.id === 'uncommon')).toMatchObject({ goal: 'max', fusionUpThreshold: null, kardsPerLevel: [] });
     const deleted = { ...out, rarities: out.rarities.filter((r) => r.id !== 'uncommon') };
     expect(normalize(deleted).rarities.some((r) => r.id === 'uncommon')).toBe(false);
+  });
+
+  it('starts kard costs at 0 when kards are turned on for a built-in rarity that has none, like Uncommon gear', () => {
+    const uncommon = { ...defaultState().rarities.find((r) => r.id === 'uncommon')!, fusionUpThreshold: 3 };
+    expect(kardTable(uncommon)).toEqual(Array(10).fill(0));
+    // A custom rarity with no table still gets the Diamond curve.
+    expect(kardTable({ ...uncommon, id: 'custom' }).slice(3, 10)).toEqual(DIAMOND_KARD_COSTS.slice(3, 10));
   });
 
   it("fixes pack names saved as \"Kollector’S\" once", () => {

@@ -83,6 +83,13 @@ export async function writeRemote(cfg: SyncConfig, state: AppState) {
 
 export const stamp = (s: AppState | null | undefined) => s?.updatedAt ?? 0;
 
+/** JSON with object keys sorted, so two copies compare equal however their keys were ordered. */
+const canonical = (v: unknown) =>
+  JSON.stringify(v, (_k, x: unknown) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : x));
+
+/** Whether two copies hold the same data, ignoring when each was stamped. */
+export const sameData = (a: AppState, b: AppState) => canonical({ ...a, updatedAt: 0 }) === canonical({ ...b, updatedAt: 0 });
+
 /**
  * Builds up to 19ef952 (2026-09-28) wrote version 2 and treated any other version as the old F1-based format,
  * so a copy of one still open on another device raised every level by one when it pulled newer data, then
@@ -96,16 +103,15 @@ export const OUTDATED_MESSAGE =
 /**
  * What a sync should do, given the gist's copy, this device's copy, and the version both last agreed on.
  * Only one side changed → that side wins; both changed → the user decides. Data from an outdated app is
- * replaced with this device's copy. A device that has never synced and has no cards or packs takes the gist's
- * copy without asking, since keeping its own would wipe the gist with an empty one.
+ * replaced with this device's copy. Two copies that differ only in their stamp aren't a conflict: both devices
+ * made the same change by themselves (like moving the Realm Klash season end from the schedule).
  */
 export function decideSync(remote: AppState | null, local: AppState, base: number): 'pull' | 'push' | 'conflict' | 'none' | 'outdated' {
   if (!remote) return 'push';
   if (fromOutdatedApp(remote)) return 'outdated';
-  if (base === 0 && local.cards.length === 0 && local.packs.length === 0) return 'pull';
   const remoteMoved = stamp(remote) > base;
   const localMoved = stamp(local) > base;
-  if (remoteMoved && localMoved) return stamp(remote) === stamp(local) ? 'none' : 'conflict';
+  if (remoteMoved && localMoved) return stamp(remote) === stamp(local) || sameData(remote, local) ? 'none' : 'conflict';
   if (remoteMoved) return 'pull';
   if (localMoved) return 'push';
   return 'none';
