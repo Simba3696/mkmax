@@ -62,11 +62,14 @@ function migrateKameos(s: Partial<AppState>, version: number): Partial<AppState>
  * Saves from before kard costs existed get the rarity's default table (the Diamond curve). Tables from before
  * kards covered ascension are extended with the default ascension costs, keeping the user's fusion costs.
  */
-function kardTable(r: RarityRule): number[] {
+export function kardTable(r: RarityRule): number[] {
   if (r.fusionUpThreshold == null) return r.kardsPerLevel ?? []; // no kards (Kameos, Uncommon gear)
-  const d = defaultRarities().find((x) => x.id === r.id)?.kardsPerLevel ?? [...DIAMOND_KARD_COSTS];
+  const builtIn = defaultRarities().find((x) => x.id === r.id);
+  const d = builtIn?.kardsPerLevel ?? [...DIAMOND_KARD_COSTS];
+  // Built-in rarities that come with no kards (Uncommon gear, Kameos) start at 0 a step when kards are turned on.
+  const pad = builtIn && d.length === 0 ? 0 : ASCENSION_KARD_COST;
   const costs = r.kardsPerLevel?.length ? [...r.kardsPerLevel] : [...d];
-  for (let i = costs.length; i < (r.dupesPerLevel?.length ?? 0); i++) costs.push(d[i] ?? ASCENSION_KARD_COST);
+  for (let i = costs.length; i < (r.dupesPerLevel?.length ?? 0); i++) costs.push(d[i] ?? pad);
   return costs;
 }
 

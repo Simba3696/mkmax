@@ -345,7 +345,7 @@ The box at the top of Packs shows when the current Realm Klash season ends. It a
 
 Realm Klash seasons last 2 weeks. Each season the Blood Ruby store swaps its characters, Kameos and Kameo packs, but the Realm Klash gear stays.
 
-- **When MK Mobile Base's event schedule covers the current season**, its end date is used instead of your date and the 2-week guess, and seasonal items move to it by themselves. The box then shows that date and can't be edited.
+- **When MK Mobile Base's event schedule covers the current season**, its end date is used instead of your date and the 2-week guess, and seasonal items move to it by themselves. The box then shows that date and can't be edited. With sync on, the move waits until the app has tried to sync after opening, since another device may have made it already.
 - **Otherwise**, enter the season's end from the in-game timer once. After that the app assumes each new season ends 2 weeks after the last one, so seasonal items get that end date, count as limited-time in the planner, and show up as expired when the season is over.
 - **If the timer turns out to be different**, change the date here (or on any seasonal item) and every item from that season moves with it. Typing a date has no Undo.
 - **Seasons sometimes end early**, for example a short in-between season while an app update is delayed. When that happens, tap **Ended early** (two taps, with Undo): that season's items expire now, and the next season is assumed to end 2 weeks later until you enter its real end date.
@@ -360,7 +360,7 @@ Realm Klash seasons last 2 weeks. Each season the Blood Ruby store swaps its cha
 - Kard boxes:
   - Diamond and Gold always show.
   - Epic and Rare show once their **Track until** is Max in Settings → Fusion rules, or once a card of that rarity (other than Realm Klash gear) has its **Goal** set to Max. By default gear stops at F3 and you finish it with kards in the game yourself.
-  - Uncommon and Kameos have no kards.
+  - Uncommon shows once you turn its kards on in Settings → Fusion rules. Kameos have no kards.
   - The app never takes kards off. After fusing in the game, lower the count here and raise the card on Cards.
 
 ### What to buy
@@ -439,9 +439,9 @@ Settings has, in order: **Sync between devices**, **Fusion rules**, **Currencies
 Sync keeps your devices on the same data through a secret gist on your GitHub account, so you need a GitHub account.
 
 - **Connecting:** go to Settings → Sync between devices and paste a classic GitHub token that has only the `gist` scope ([create one](https://github.com/settings/tokens/new?scopes=gist&description=MK%20Max%20sync); the link pre-fills it). A classic token starts with `ghp_`. Do this once on each device. Your data is saved as `mkmax-data.json` in a secret gist named "MK Max sync data".
-- **The first time:** if there's no gist yet, it creates one with this device's data. If there is one, a device with no cards or packs simply downloads it. A device that already has its own cards or packs asks which copy to keep, and the copy you don't pick is replaced. So connect a new device before entering anything on it.
+- **The first time:** if there's no gist yet, it creates one with this device's data. If there is one, a device you haven't entered anything on yet simply downloads it. A device with changes of its own (cards, packs, balances or settings) asks which copy to keep, and the copy you don't pick is replaced. So connect a new device before entering anything on it.
 - **When it syncs:** it uploads a moment after each change and downloads when the app opens or comes back to the foreground. It also checks every 2 minutes and when the device comes back online.
-- **If both devices changed data** since they last synced, the app asks which copy to keep. The prompt shows each copy's card count and when it changed. Nothing is merged, and sync waits until you choose.
+- **If both devices changed data** since they last synced, the app asks which copy to keep. It doesn't ask when both made the same change, like each moving the Realm Klash season end from the event schedule. The prompt shows each copy's card count and when it changed. Nothing is merged, and sync waits until you choose.
 - **Errors:** "GitHub rejected the token…" means the token is wrong or has expired; make a new one. "GitHub error 404" or "403" usually means the token is missing the gist scope. A message about "an old version of MK Max" means another device is running an old build: close MK Max on your other devices and open it again.
 - **Sync now** syncs straight away.
 - **Disconnect this device** (two taps) forgets the token on this device only. Your data and the gist stay, and other devices stay connected.
@@ -449,13 +449,13 @@ Sync keeps your devices on the same data through a secret gist on your GitHub ac
 
 ### Fusion rules
 
-One box per rarity:
+One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gold Kameo, show only **Name**, **Kind**, **Has guest cards**, **Color** and **Remove**, since a Kameo has no fusion steps. The others have:
 
 - **Name:** renaming changes the label. **Paste a list…** uses the new name for headings and details.
 - **Fusion Up Kards usable from:** the level where kards start. **No kards for this rarity** hides the kard costs. Uncommon gear has no kards unless you pick a level here and fill in its **Fusion Up Kards per step**, which start at 0.
 - **Track until:** **Max**, or **Kard threshold** (F3). Switching to the threshold removes cards already at F3 or above, with a brief Undo.
 - **Highest fusion:** the last F level; levels past it are ascension (A1, A2, …).
-- **Kind:** Character, Equipment or **Kameo (only need one copy)**. It decides the Kameo weight, whether cards can be gear, whether they have a **Goal** control (equipment only), and which sources a card can pick. Kameo means only owning one counts. Switching a rarity to Kameo removes the cards of that rarity you already own straight away, with Undo. Switching it back gives it 1 duplicate per level up to its **Highest fusion**, which you can then edit.
+- **Kind:** Character, Equipment or **Kameo (only need one copy)**. It decides the Kameo weight, whether cards can be gear, whether they have a **Goal** control (equipment only), and which sources a card can pick. Kameo means only owning one counts. Switching a rarity to Kameo removes the cards of that rarity you already own straight away, with Undo. It also turns off its kards (and clears its kard count) and hides its fusion settings, since a Kameo has no fusion steps. Switching it back gives it 1 duplicate per level up to F10, which you can then edit.
 - **Has guest cards:** shows the Guest checkbox on that rarity's cards. Unticking it only hides the checkbox, and it turns itself back on the next time the app loads while any card of that rarity is still a guest.
 - **Color:** the rarity's color on badges and thumbnails.
 - **Duplicates per step**, with **+ Level** and **− Level**. **− Level** removes cards that are now at or past the new top level, with a brief Undo.
@@ -552,7 +552,7 @@ The bottom of Settings shows which version you have and when it was built, for e
 - Updates countdowns every minute.
 - Removes cards already at their goal when it loads.
 
-The art and the season end don't count as changes for sync: every device works them out by itself, so they never make two devices ask which copy to keep.
+The art doesn't count as a change for sync: every device adds the same art by itself, so it never makes two devices ask which copy to keep.
 
 ## When something looks wrong
 

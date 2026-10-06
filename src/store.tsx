@@ -3,7 +3,7 @@ import type { AppState } from './types';
 import { defaultState } from './defaults';
 import { normalize } from './normalize';
 import { pruneDone } from './engine';
-import { OUTDATED_MESSAGE, decideSync, findOrCreateGist, loadSyncConfig, readRemote, saveSyncConfig, stamp, writeRemote, type SyncConfig } from './sync';
+import { OUTDATED_MESSAGE, decideSync, findOrCreateGist, loadSyncConfig, readRemote, sameData, saveSyncConfig, stamp, writeRemote, type SyncConfig } from './sync';
 
 export { normalize };
 
@@ -20,9 +20,9 @@ function load(): AppState {
 }
 
 /**
- * Pass an undo label to offer "Undo <label>" for this change. `auto` marks a change the app makes by itself
- * (schedule dates, card art): it's saved but doesn't count as an edit for sync, since every device works it out
- * on its own, so it can't make two devices disagree.
+ * Pass an undo label to offer "Undo <label>" for this change. `auto` marks a change the app makes by itself that
+ * every device works out the same way (catalog art, or the season end on a fresh install): it's saved but doesn't count as an edit for sync, so it can't
+ * make two devices disagree.
  */
 type Update = (recipe: (draft: AppState) => void, undoLabel?: string, opts?: { auto?: boolean }) => void;
 
@@ -48,6 +48,8 @@ export interface SyncApi {
   disconnect: () => void;
   syncNow: () => Promise<void>;
   resolve: (keep: 'mine' | 'theirs') => Promise<void>;
+  /** False until this launch's first sync attempt has finished (true when sync is off), so automatic changes can wait for fresh data. */
+  settled: boolean;
 }
 
 interface StoreApi {
@@ -74,6 +76,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(!!cfgRef.current);
   const [status, setStatus] = useState<SyncStatus>(cfgRef.current ? { kind: 'idle', at: null } : { kind: 'off' });
   const busy = useRef(false);
+  /** A conflict waiting for the user. Background syncs hold off so the prompt stays put and GitHub isn't polled. */
+  const conflictPending = useRef(false);
+  const [settled, setSettled] = useState(!cfgRef.current);
   const pushTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [lastUndo, setLastUndo] = useState<UndoEntry | null>(null);
 
@@ -99,23 +104,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLastUndo(null);
   };
 
+  /**
+   * Stamps this device's copy after both the gist's and the last agreed one before it overwrites the gist, so the
+   * other device sees it as newer than anything it has and pulls it (or asks, if it has changed since) instead of
+   * carrying on with its own copy.
+   */
+  function restampToKeep(cfg: SyncConfig, remote: AppState | null) {
+    const kept = { ...stateRef.current, updatedAt: Math.max(Date.now(), stamp(remote) + 1, cfg.baseUpdatedAt + 1) };
+    stateRef.current = kept;
+    setState(kept);
+    return kept;
+  }
+
+  /** Still connected to the gist a sync started with (not disconnected or switched while GitHub answered). */
+  function sameGist(cfg: SyncConfig) {
+    return cfgRef.current?.gistId === cfg.gistId && cfgRef.current.token === cfg.token;
+  }
+
   /** Pull if the gist moved on, push if only this device did, or report a conflict if both did. */
   async function syncNow() {
     const cfg = cfgRef.current;
-    if (!cfg || busy.current) return;
+    if (!cfg || busy.current || conflictPending.current) return;
     busy.current = true;
+    let ok = false;
     setStatus({ kind: 'syncing' });
     try {
       const remote = await readRemote(cfg);
+      // Disconnected (or switched gist) while GitHub answered: this sync's result no longer applies.
+      if (!sameGist(cfg)) return;
       const local = stateRef.current;
       const action = decideSync(remote, local, cfg.baseUpdatedAt);
       if (action === 'conflict') {
+        conflictPending.current = true;
         setStatus({ kind: 'conflict', remote: remote! });
         return;
       }
       if (action === 'outdated') {
-        await writeRemote(cfg, local);
-        setConfig({ ...cfg, baseUpdatedAt: stamp(local) });
+        const kept = restampToKeep(cfg, remote);
+        await writeRemote(cfg, kept);
+        if (!sameGist(cfg)) return;
+        setConfig({ ...cfg, baseUpdatedAt: stamp(kept) });
         setStatus({ kind: 'error', message: OUTDATED_MESSAGE });
         return;
       }
@@ -124,18 +152,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setConfig({ ...cfg, baseUpdatedAt: stamp(remote) });
       } else if (action === 'push') {
         await writeRemote(cfg, local);
+        if (!sameGist(cfg)) return;
         setConfig({ ...cfg, baseUpdatedAt: stamp(local) });
       } else {
-        setConfig({ ...cfg, baseUpdatedAt: Math.max(cfg.baseUpdatedAt, stamp(local)) });
+        // Same data on both sides (maybe with different stamps), so both stamps count as agreed.
+        setConfig({ ...cfg, baseUpdatedAt: Math.max(cfg.baseUpdatedAt, stamp(local), stamp(remote)) });
       }
       setStatus({ kind: 'idle', at: Date.now() });
+      ok = true;
     } catch (e) {
-      setStatus({ kind: 'error', message: (e as Error).message });
+      if (sameGist(cfg)) setStatus({ kind: 'error', message: (e as Error).message });
     } finally {
       busy.current = false;
-      // Edits made while this sync was in flight still need pushing.
+      // Offline or refused, automatic changes still go ahead rather than wait for the whole session.
+      setSettled(true);
+      // Edits made while this sync was in flight still need pushing. After a conflict or an error, the next pull
+      // (every 2 minutes, on reconnect or on return to the app) picks them up instead of retrying in a tight loop.
       const cfgNow = cfgRef.current;
-      if (cfgNow && stamp(stateRef.current) > cfgNow.baseUpdatedAt) schedulePush();
+      if (ok && cfgNow && stamp(stateRef.current) > cfgNow.baseUpdatedAt) schedulePush();
     }
   }
   const syncRef = useRef(syncNow);
@@ -198,11 +232,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     async connect(token) {
       setStatus({ kind: 'syncing' });
       try {
-        const { gistId, created } = await findOrCreateGist(token.trim(), stateRef.current);
+        // The copy a new gist is made from; edits made while GitHub answers come after it and still need pushing.
+        const snap = stateRef.current;
+        const { gistId, created } = await findOrCreateGist(token.trim(), snap);
         // A new gist already holds this device's data; an existing one gets compared on the first sync.
-        setConfig({ token: token.trim(), gistId, baseUpdatedAt: created ? stamp(stateRef.current) : 0 });
+        setConfig({ token: token.trim(), gistId, baseUpdatedAt: created ? stamp(snap) : 0 });
         setStatus({ kind: 'idle', at: created ? Date.now() : null });
         if (!created) await syncRef.current();
+        else if (stamp(stateRef.current) > stamp(snap)) schedulePush();
       } catch (e) {
         setStatus({ kind: 'error', message: (e as Error).message });
         throw e;
@@ -210,28 +247,52 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     disconnect() {
       clearTimeout(pushTimer.current);
+      conflictPending.current = false;
       setConfig(null);
       setStatus({ kind: 'off' });
+      setSettled(true);
     },
     syncNow: () => syncRef.current(),
     async resolve(keep) {
       const cfg = cfgRef.current;
-      if (!cfg || status.kind !== 'conflict') return;
+      if (!cfg || status.kind !== 'conflict' || busy.current) return;
+      clearTimeout(pushTimer.current);
+      conflictPending.current = false;
       if (keep === 'theirs') {
         applyRemote(status.remote);
         setConfig({ ...cfg, baseUpdatedAt: stamp(status.remote) });
         setStatus({ kind: 'idle', at: Date.now() });
         return;
       }
+      busy.current = true;
       setStatus({ kind: 'syncing' });
+      let ok = false;
       try {
-        await writeRemote(cfg, stateRef.current);
-        setConfig({ ...cfg, baseUpdatedAt: stamp(stateRef.current) });
+        // Background syncs hold off while the prompt is up, so the other device may have pushed again since. Show
+        // that copy instead of overwriting it unseen.
+        const fresh = await readRemote(cfg);
+        if (!sameGist(cfg)) return;
+        if (fresh && stamp(fresh) !== stamp(status.remote) && !sameData(fresh, status.remote)) {
+          conflictPending.current = true;
+          setStatus({ kind: 'conflict', remote: fresh });
+          return;
+        }
+        const kept = restampToKeep(cfg, fresh);
+        await writeRemote(cfg, kept);
+        if (!sameGist(cfg)) return;
+        setConfig({ ...cfg, baseUpdatedAt: stamp(kept) });
         setStatus({ kind: 'idle', at: Date.now() });
+        ok = true;
       } catch (e) {
-        setStatus({ kind: 'error', message: (e as Error).message });
+        if (sameGist(cfg)) setStatus({ kind: 'error', message: (e as Error).message });
+      } finally {
+        busy.current = false;
+        // Edits made while the kept copy was uploading still need pushing.
+        const cfgNow = cfgRef.current;
+        if (ok && cfgNow && stamp(stateRef.current) > cfgNow.baseUpdatedAt) schedulePush();
       }
     },
+    settled,
   };
 
   return <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: () => setLastUndo(null) }}>{children}</Ctx.Provider>;

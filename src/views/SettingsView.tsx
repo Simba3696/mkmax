@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { fetchStarterData, newId, normalize, useStore } from '../store';
+import { kardTable } from '../normalize';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
 import { actions, btn, check, field, form, grow, subpanel } from '../classes';
@@ -56,8 +57,8 @@ export default function SettingsView() {
   }
 
   /**
-   * Kameos only need owning, so a Kameo rarity has no fusion steps (normalize enforces it on load). Applying that
-   * here removes the rarity's owned cards now, with Undo, rather than silently on the next load.
+   * Kameos only need owning, so a Kameo rarity has no fusion steps or kards (normalize enforces the steps on load).
+   * Applying that here removes the rarity's owned cards now, with Undo, rather than silently on the next load.
    */
   function setKind(ri: number, kind: RarityRule['kind']) {
     const r = state.rarities[ri];
@@ -65,8 +66,12 @@ export default function SettingsView() {
       (d) => {
         const dr = d.rarities[ri];
         dr.kind = kind;
-        if (kind === 'kameo') dr.dupesPerLevel = [];
-        else if (dr.dupesPerLevel.length === 0) dr.dupesPerLevel = Array(dr.fusionMax).fill(1);
+        if (kind === 'kameo') Object.assign(dr, { dupesPerLevel: [], fusionMax: 0, goal: 'max', fusionUpThreshold: null, fusionUpKards: 0 });
+        else if (dr.dupesPerLevel.length === 0) {
+          // Built-in Kameo rarities have no fusion levels at all; start from the usual F10.
+          if (dr.fusionMax < 1) dr.fusionMax = 10;
+          dr.dupesPerLevel = Array(dr.fusionMax).fill(1);
+        }
       },
       `Changed ${r.label} to ${KIND_LABEL[kind]}`,
     );
@@ -92,116 +97,141 @@ export default function SettingsView() {
             which left the two column tops out of line.
           */}
           <div className="lg:columns-2 lg:gap-3 lg:[&>div]:break-inside-avoid lg:[&>div]:mt-0 lg:[&>div]:mb-3">
-            {state.rarities.map((r, ri) => (
-              <div key={r.id} className={subpanel}>
-                <div className={form}>
-                  <label className={field}>
-                    <span>Name</span>
-                    <input value={r.label} onChange={(e) => update((d) => void (d.rarities[ri].label = e.target.value))} />
-                  </label>
-                  <label className={field}>
-                    <span>Fusion Up Kards usable from</span>
-                    <select
-                      value={r.fusionUpThreshold ?? ''}
-                      onChange={(e) => update((d) => void (d.rarities[ri].fusionUpThreshold = e.target.value ? Number(e.target.value) : null))}
-                    >
-                      <option value="">No kards for this rarity</option>
-                      {Array.from({ length: r.fusionMax }, (_, i) => (
-                        <option key={i} value={i + 1}>
-                          F{i + 1}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className={field}>
-                    <span>Track until</span>
-                    <select value={r.goal} onChange={(e) => update((d) => void (d.rarities[ri].goal = e.target.value as 'max' | 'threshold'))}>
-                      <option value="max">Max</option>
-                      <option value="threshold" disabled={r.fusionUpThreshold == null}>
-                        Kard threshold (F{r.fusionUpThreshold ?? '?'})
-                      </option>
-                    </select>
-                  </label>
-                  <label className={field}>
-                    <span>Highest fusion (F…), rest are ascension</span>
-                    <NumInput value={r.fusionMax} min={1} step={1} onChange={(v) => update((d) => void (d.rarities[ri].fusionMax = v ?? 10))} />
-                  </label>
-                  <label className={field}>
-                    <span>Kind</span>
-                    <select value={r.kind} onChange={(e) => setKind(ri, e.target.value as RarityRule['kind'])}>
-                      <option value="character">Character</option>
-                      <option value="equipment">Equipment</option>
-                      <option value="kameo">Kameo (only need one copy)</option>
-                    </select>
-                  </label>
-                  <label className={check}>
-                    <input type="checkbox" checked={r.hasGuests} onChange={(e) => update((d) => void (d.rarities[ri].hasGuests = e.target.checked))} />
-                    Has guest cards
-                  </label>
-                  <label className={field}>
-                    <span>Color</span>
-                    <input type="color" value={r.color} onChange={(e) => update((d) => void (d.rarities[ri].color = e.target.value))} />
-                  </label>
-                </div>
-                <div className={levelCaption}>Duplicates per step</div>
-                <div className={levels}>
-                  {r.dupesPerLevel.map((n, li) => (
-                    <label key={li} className={level}>
-                      <span className={note}>
-                        {levelLabel(r, li + 1)}→{levelLabel(r, li + 2)}
-                      </span>
-                      <NumInput value={n} min={0} step={1} onChange={(v) => update((d) => void (d.rarities[ri].dupesPerLevel[li] = v ?? 0))} />
+            {state.rarities.map((r, ri) => {
+              const kameo = r.kind === 'kameo';
+              return (
+                <div key={r.id} className={subpanel}>
+                  <div className={form}>
+                    <label className={field}>
+                      <span>Name</span>
+                      <input value={r.label} onChange={(e) => update((d) => void (d.rarities[ri].label = e.target.value))} />
                     </label>
-                  ))}
-                </div>
-                <div className={actions}>
-                  <button onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.push(1))}>+ Level</button>
-                  <button disabled={r.dupesPerLevel.length <= 1} onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.pop())}>
-                    − Level
-                  </button>
-                  <span className={`${note} lg:flex-1 lg:min-w-0`}>
-                    Max {levelLabel(r, r.dupesPerLevel.length + 1)} · {copiesTotal(r)} copies total
-                  </span>
-                  <span className={`${grow} lg:hidden`} />
-                  <button
-                    className={btn.ghost}
-                    disabled={state.cards.some((c) => c.rarityId === r.id)}
-                    title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : 'Remove rarity'}
-                    onClick={() => update((d) => void d.rarities.splice(ri, 1))}
-                  >
-                    Remove
-                  </button>
-                </div>
-                {r.fusionUpThreshold != null && (
-                  <>
-                    <div className={levelCaption}>
-                      Fusion Up Kards per step · {kardTotal(r)} kards from F{r.fusionUpThreshold} to {levelLabel(r, maxFusion(r))}
-                    </div>
-                    <div className={levels}>
-                      {kardSteps(r).map((f) => (
-                        <label key={f} className={level}>
-                          <span className={note}>
-                            {levelLabel(r, fLevel(f))}→{levelLabel(r, fLevel(f + 1))}
-                          </span>
-                          <NumInput
-                            value={r.kardsPerLevel[f] ?? 0}
-                            min={0}
-                            step={1}
-                            onChange={(v) =>
+                    {!kameo && (
+                      <>
+                        <label className={field}>
+                          <span>Fusion Up Kards usable from</span>
+                          <select
+                            value={r.fusionUpThreshold ?? ''}
+                            onChange={(e) =>
                               update((d) => {
-                                const costs = d.rarities[ri].kardsPerLevel;
-                                while (costs.length <= f) costs.push(0);
-                                costs[f] = v ?? 0;
+                                const dr = d.rarities[ri];
+                                dr.fusionUpThreshold = e.target.value ? Number(e.target.value) : null;
+                                // Fill in missing costs now, as the next load would, so the plan doesn't change on a reload.
+                                dr.kardsPerLevel = kardTable(dr);
                               })
                             }
-                          />
+                          >
+                            <option value="">No kards for this rarity</option>
+                            {Array.from({ length: r.fusionMax }, (_, i) => (
+                              <option key={i} value={i + 1}>
+                                F{i + 1}
+                              </option>
+                            ))}
+                          </select>
                         </label>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+                        <label className={field}>
+                          <span>Track until</span>
+                          <select value={r.goal} onChange={(e) => update((d) => void (d.rarities[ri].goal = e.target.value as 'max' | 'threshold'))}>
+                            <option value="max">Max</option>
+                            <option value="threshold" disabled={r.fusionUpThreshold == null}>
+                              Kard threshold (F{r.fusionUpThreshold ?? '?'})
+                            </option>
+                          </select>
+                        </label>
+                        <label className={field}>
+                          <span>Highest fusion (F…), rest are ascension</span>
+                          <NumInput value={r.fusionMax} min={1} step={1} onChange={(v) => update((d) => void (d.rarities[ri].fusionMax = v ?? 10))} />
+                        </label>
+                      </>
+                    )}
+                    <label className={field}>
+                      <span>Kind</span>
+                      <select value={r.kind} onChange={(e) => setKind(ri, e.target.value as RarityRule['kind'])}>
+                        <option value="character">Character</option>
+                        <option value="equipment">Equipment</option>
+                        <option value="kameo">Kameo (only need one copy)</option>
+                      </select>
+                    </label>
+                    <label className={check}>
+                      <input type="checkbox" checked={r.hasGuests} onChange={(e) => update((d) => void (d.rarities[ri].hasGuests = e.target.checked))} />
+                      Has guest cards
+                    </label>
+                    <label className={field}>
+                      <span>Color</span>
+                      <input type="color" value={r.color} onChange={(e) => update((d) => void (d.rarities[ri].color = e.target.value))} />
+                    </label>
+                  </div>
+                  {/* Kameos have no fusion steps; a step added here would be wiped on the next load, deleting owned Kameos. */}
+                  {!kameo && (
+                    <>
+                      <div className={levelCaption}>Duplicates per step</div>
+                      <div className={levels}>
+                        {r.dupesPerLevel.map((n, li) => (
+                          <label key={li} className={level}>
+                            <span className={note}>
+                              {levelLabel(r, li + 1)}→{levelLabel(r, li + 2)}
+                            </span>
+                            <NumInput value={n} min={0} step={1} onChange={(v) => update((d) => void (d.rarities[ri].dupesPerLevel[li] = v ?? 0))} />
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <div className={actions}>
+                    {kameo ? (
+                      <span className={`${note} lg:flex-1 lg:min-w-0`}>Kameos only need one copy, so there are no fusion steps.</span>
+                    ) : (
+                      <>
+                        <button onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.push(1))}>+ Level</button>
+                        <button disabled={r.dupesPerLevel.length <= 1} onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.pop())}>
+                          − Level
+                        </button>
+                        <span className={`${note} lg:flex-1 lg:min-w-0`}>
+                          Max {levelLabel(r, r.dupesPerLevel.length + 1)} · {copiesTotal(r)} copies total
+                        </span>
+                      </>
+                    )}
+                    <span className={`${grow} lg:hidden`} />
+                    <button
+                      className={btn.ghost}
+                      disabled={state.cards.some((c) => c.rarityId === r.id)}
+                      title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : 'Remove rarity'}
+                      onClick={() => update((d) => void d.rarities.splice(ri, 1))}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {!kameo && r.fusionUpThreshold != null && (
+                    <>
+                      <div className={levelCaption}>
+                        Fusion Up Kards per step · {kardTotal(r)} kards from F{r.fusionUpThreshold} to {levelLabel(r, maxFusion(r))}
+                      </div>
+                      <div className={levels}>
+                        {kardSteps(r).map((f) => (
+                          <label key={f} className={level}>
+                            <span className={note}>
+                              {levelLabel(r, fLevel(f))}→{levelLabel(r, fLevel(f + 1))}
+                            </span>
+                            <NumInput
+                              value={r.kardsPerLevel[f] ?? 0}
+                              min={0}
+                              step={1}
+                              onChange={(v) =>
+                                update((d) => {
+                                  const costs = d.rarities[ri].kardsPerLevel;
+                                  while (costs.length <= f) costs.push(0);
+                                  costs[f] = v ?? 0;
+                                })
+                              }
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <button
             onClick={() =>

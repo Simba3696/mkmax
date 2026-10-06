@@ -98,9 +98,15 @@ export default function App() {
   const scheduledEnd = scheduledSeasonEnd(events, now);
   const savedEnd = seasonEnd(state.realmKlashSeasonEnd, now);
   useEffect(() => {
-    if (scheduledEnd && scheduledEnd !== savedEnd) update((d) => moveSeasonEnd(d, scheduledEnd, now), undefined, { auto: true });
+    if (!scheduledEnd || scheduledEnd === savedEnd) return;
+    // Wait for this launch's first sync: another device has often made the move already, and moving first would
+    // turn its pull into a "which copy" prompt.
+    if (!sync.settled) return;
+    // Which packs this moves depends on when it runs, so it's a real change that syncs. The exception is a fresh
+    // install, which has nothing to move: stamping it would make a new device ask which copy to keep when it joins.
+    update((d) => moveSeasonEnd(d, scheduledEnd, now), undefined, { auto: !state.updatedAt && state.packs.length === 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scheduledEnd, savedEnd]);
+  }, [scheduledEnd, savedEnd, sync.settled]);
 
   const pageRef = useRef<HTMLDivElement>(null);
   /** Direction the next tab change should slide in from, set by go() and used once the new tab has rendered. */
