@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { newId, useStore } from '../store';
 import { REALM_KLASH_CURRENCY, levelLabel, maxFusion, moveSeasonEnd, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
 import { CardThumb, ConfirmButton, fmt, useDeviceChoice, useNow } from '../ui';
@@ -243,6 +243,20 @@ function SeasonBar() {
   const events = useEvents();
   const end = seasonEnd(state.realmKlashSeasonEnd, now);
   const scheduled = scheduledSeasonEnd(events, now);
+  /**
+   * What's typed in the date box. Desktop browsers fire a change per keystroke, each a full date, and moving the
+   * season's packs to every in-between date would strand them; so the date applies on leaving the box or Enter.
+   */
+  const [draft, setDraft] = useState<string | null>(null);
+  // Once the schedule covers the season, its date wins and the box is gone, so a leftover draft is dropped.
+  const commit = () => {
+    if (!scheduled && draft && draft !== end && !isNaN(new Date(draft).getTime())) update((d) => moveSeasonEnd(d, draft, now), 'Changed the Realm Klash season end');
+    setDraft(null);
+  };
+  // Leaving Packs (a swipe after picking a date) can remove the box without a blur, so apply the draft then too.
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+  useEffect(() => () => commitRef.current(), []);
   if (!end && !scheduled && !state.packs.some((p) => p.currencyId === REALM_KLASH_CURRENCY)) return null;
   const seasonalNow = state.packs.filter((p) => p.season && p.endsAt === end).length;
   const leaving = `${seasonalNow} seasonal item${seasonalNow === 1 ? '' : 's'} leave${seasonalNow === 1 ? 's' : ''} then.`;
@@ -264,7 +278,13 @@ function SeasonBar() {
         {/* A date doesn't need the full width of a desktop page. */}
         <label className={`${field} flex-1 min-w-0 md:flex-none md:w-[18rem]`}>
           <span>Realm Klash season ends</span>
-          <input type="datetime-local" value={end ?? ''} onChange={(e) => e.target.value && update((d) => moveSeasonEnd(d, e.target.value, now))} />
+          <input
+            type="datetime-local"
+            value={(scheduled ? null : draft) ?? end ?? ''}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => e.key === 'Enter' && commit()}
+          />
         </label>
         {end && (
           <ConfirmButton

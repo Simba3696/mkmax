@@ -509,10 +509,17 @@ export function seasonEnd(saved: string | null | undefined, now: Date): string |
 /**
  * Change the current season's end (a corrected timer, or a season that ended early). Every seasonal pack that
  * was ending with it moves too; packs from earlier seasons keep their dates. Mutates the state.
+ *
+ * `weekEnds` are the current season's earlier week ends, when the schedule knows them. The schedule can add a week
+ * to a season after the saved end has passed, and that season's items still end on the saved date rather than the
+ * 2-week guess, so a saved end on one of those week ends moves them too. Only an exact week end counts: a date typed
+ * by hand, or set with Ended early, a little after the real changeover belongs to the season before.
  */
-export function moveSeasonEnd(s: AppState, to: string, now: Date) {
+export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: string[]) {
   const from = seasonEnd(s.realmKlashSeasonEnd, now);
-  if (from) for (const p of s.packs) if (p.season && p.endsAt === from) p.endsAt = to;
+  const saved = s.realmKlashSeasonEnd;
+  const extended = saved && weekEnds?.includes(saved) ? saved : null;
+  for (const p of s.packs) if (p.season && p.endsAt && (p.endsAt === from || p.endsAt === extended)) p.endsAt = to;
   s.realmKlashSeasonEnd = to;
 }
 

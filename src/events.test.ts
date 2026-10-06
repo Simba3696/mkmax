@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
-import { challengeFor, currencyFor, packFromShop, scheduledSeasonEnd, shopSuggestions, titleCase, packName, fixPackNames, type EventSchedule } from './events';
+import { challengeFor, currencyFor, packFromShop, scheduledSeason, scheduledSeasonEnd, shopSuggestions, titleCase, packName, fixPackNames, type EventSchedule } from './events';
 import { toLocalInput } from './engine';
 
 const NOW = new Date('2026-09-28T17:00:00Z');
@@ -67,5 +67,16 @@ describe('event schedule', () => {
     expect(scheduledSeasonEnd(events, NOW)).toBe(local('2026-09-30T16:00:00Z'));
     expect(scheduledSeasonEnd(events, new Date('2026-10-01T00:00:00Z'))).toBe(local('2026-10-14T16:00:00Z'));
     expect(scheduledSeasonEnd(events, new Date('2026-11-01T00:00:00Z'))).toBeNull();
+  });
+
+  it('gives the season start and earlier week ends from its back-to-back weeks', () => {
+    // In Kold's second week, the season still started with the first.
+    expect(scheduledSeason(events, new Date('2026-10-08T00:00:00Z'))).toEqual({
+      start: local('2026-09-30T16:00:00Z'),
+      end: local('2026-10-14T16:00:00Z'),
+      weekEnds: [local('2026-10-07T16:00:00Z')],
+    });
+    // In the first week there are no earlier week ends.
+    expect(scheduledSeason(events, NOW)).toMatchObject({ start: local('2026-09-23T16:00:00Z'), weekEnds: [] });
   });
 });

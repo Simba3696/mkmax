@@ -187,16 +187,27 @@ export function challengeWhen(ch: TimedEvent, now: Date) {
 // ---------- Realm Klash seasons ----------
 
 /**
- * The current season's end from the schedule. The site lists seasons a week at a time ("Circle of Shadow 2",
- * then "Kold" twice), so back-to-back weeks with the same name (ignoring a trailing week number) are one season.
- * Null if the schedule doesn't cover now.
+ * The current season from the schedule, in local time. The site lists seasons a week at a time ("Circle of
+ * Shadow 2", then "Kold" twice), so back-to-back weeks with the same name (ignoring a trailing week number) are one
+ * season. `weekEnds` are the ends of its weeks before the current one: where an earlier copy of the schedule, with
+ * fewer weeks, would have said the season ends. Null if the schedule doesn't cover now.
  */
-export function scheduledSeasonEnd(events: EventSchedule | null, now: Date): string | null {
+export function scheduledSeason(events: EventSchedule | null, now: Date): { start: string; end: string; weekEnds: string[] } | null {
   const weeks = (events?.seasons ?? []).filter((s) => s.start && s.end).sort((a, b) => a.start!.localeCompare(b.start!));
   const base = (n: string) => n.replace(/\s+\d+$/, '').toLowerCase();
   const i = weeks.findIndex((w) => new Date(w.start!) <= now && new Date(w.end!) > now);
   if (i < 0) return null;
+  const same = (j: number) => base(weeks[j].name) === base(weeks[i].name);
+  let start = weeks[i].start!;
+  const weekEnds: string[] = [];
+  for (let j = i - 1; j >= 0 && weeks[j].end === start && same(j); j--) {
+    weekEnds.push(localOrNull(start)!);
+    start = weeks[j].start!;
+  }
   let end = weeks[i].end!;
-  for (let j = i + 1; j < weeks.length && weeks[j].start === end && base(weeks[j].name) === base(weeks[i].name); j++) end = weeks[j].end!;
-  return localOrNull(end);
+  for (let j = i + 1; j < weeks.length && weeks[j].start === end && same(j); j++) end = weeks[j].end!;
+  return { start: localOrNull(start)!, end: localOrNull(end)!, weekEnds };
 }
+
+/** The current season's end from the schedule (see scheduledSeason). */
+export const scheduledSeasonEnd = (events: EventSchedule | null, now: Date) => scheduledSeason(events, now)?.end ?? null;
