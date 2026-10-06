@@ -83,7 +83,7 @@ export default function App() {
       (items) => {
         if (cancelled) return;
         const updates = catalogImageUpdates(state.cards, new Map(state.rarities.map((r) => [r.id, r])), items);
-        if (updates.size) update((d) => d.cards.forEach((c) => Object.assign(c, updates.get(c.id) ?? {})));
+        if (updates.size) update((d) => d.cards.forEach((c) => Object.assign(c, updates.get(c.id) ?? {})), undefined, { auto: true });
       },
       () => {}, // offline or no catalog: Find images still works later
     );
@@ -98,7 +98,7 @@ export default function App() {
   const scheduledEnd = scheduledSeasonEnd(events, now);
   const savedEnd = seasonEnd(state.realmKlashSeasonEnd, now);
   useEffect(() => {
-    if (scheduledEnd && scheduledEnd !== savedEnd) update((d) => moveSeasonEnd(d, scheduledEnd, now));
+    if (scheduledEnd && scheduledEnd !== savedEnd) update((d) => moveSeasonEnd(d, scheduledEnd, now), undefined, { auto: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduledEnd, savedEnd]);
 

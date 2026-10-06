@@ -19,6 +19,8 @@ const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'limitedBoost', label: 'Limited-time pack urgency', help: 'The planner prefers limited-time packs by this factor over permanent packs, which you can buy later.' },
 ];
 
+const KIND_LABEL: Record<RarityRule['kind'], string> = { character: 'Character', equipment: 'Equipment', kameo: 'Kameo' };
+
 /** Kard steps from the threshold to the rarity's top level (through ascension), as fusion-number indexes. */
 const kardSteps = (r: RarityRule) => Array.from({ length: Math.max(0, r.dupesPerLevel.length - (r.fusionUpThreshold ?? 0)) }, (_, k) => (r.fusionUpThreshold ?? 0) + k);
 
@@ -51,6 +53,23 @@ export default function SettingsView() {
     } catch (e) {
       setMsg(`Import failed: ${(e as Error).message}`);
     }
+  }
+
+  /**
+   * Kameos only need owning, so a Kameo rarity has no fusion steps (normalize enforces it on load). Applying that
+   * here removes the rarity's owned cards now, with Undo, rather than silently on the next load.
+   */
+  function setKind(ri: number, kind: RarityRule['kind']) {
+    const r = state.rarities[ri];
+    update(
+      (d) => {
+        const dr = d.rarities[ri];
+        dr.kind = kind;
+        if (kind === 'kameo') dr.dupesPerLevel = [];
+        else if (dr.dupesPerLevel.length === 0) dr.dupesPerLevel = Array(dr.fusionMax).fill(1);
+      },
+      `Changed ${r.label} to ${KIND_LABEL[kind]}`,
+    );
   }
 
   return (
@@ -109,7 +128,7 @@ export default function SettingsView() {
                   </label>
                   <label className={field}>
                     <span>Kind</span>
-                    <select value={r.kind} onChange={(e) => update((d) => void (d.rarities[ri].kind = e.target.value as RarityRule['kind']))}>
+                    <select value={r.kind} onChange={(e) => setKind(ri, e.target.value as RarityRule['kind'])}>
                       <option value="character">Character</option>
                       <option value="equipment">Equipment</option>
                       <option value="kameo">Kameo (only need one copy)</option>

@@ -77,7 +77,7 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
 
 Until you have at least one card and one pack, the Plan shows only a **Get started** checklist and the Wallet boxes. Steps 1 and 2 are crossed out once done. **Cards**, **Packs** and **Settings** in it are links.
 
-- Step 3 still says "Souls, Koins and Fusion Up Kards". Ignore the Koins: MK Max doesn't track them. Enter the currencies the Wallet shows (Souls, Blood Rubies and Dragon Krystals to begin with).
+- Step 3 asks for your currency balances and Fusion Up Kards, in the Wallet just below.
 - Its last line points you to Settings to load "your OneNote data". That means the author's own card list, not yours; new users want the sample data or their own cards. See [Data](#data).
 
 ### What a working plan looks like
@@ -438,8 +438,8 @@ Settings has, in order: **Sync between devices**, **Fusion rules**, **Currencies
 
 Sync keeps your devices on the same data through a secret gist on your GitHub account, so you need a GitHub account.
 
-- **Connecting:** go to Settings → Sync between devices and paste a classic GitHub token that has only the `gist` scope ([create one](https://github.com/settings/tokens/new?scopes=gist&description=MK%20Max%20sync); the link pre-fills it). A classic token starts with `ghp_`, even though the box's placeholder shows `github_pat_…`. Do this once on each device. Your data is saved as `mkmax-data.json` in a secret gist named "MK Max sync data".
-- **The first time:** if there's no gist yet, it creates one with this device's data. Otherwise the device usually shows the "which copy" prompt, even a brand-new one: the app saves the Realm Klash season end from the event schedule by itself, which counts as a change. On a new device ("This device: 0 cards"), pick **Use the other device's data**; keeping this device's data would replace your gist with an empty copy. The copy you don't pick is replaced. So connect a new device before entering anything on it.
+- **Connecting:** go to Settings → Sync between devices and paste a classic GitHub token that has only the `gist` scope ([create one](https://github.com/settings/tokens/new?scopes=gist&description=MK%20Max%20sync); the link pre-fills it). A classic token starts with `ghp_`. Do this once on each device. Your data is saved as `mkmax-data.json` in a secret gist named "MK Max sync data".
+- **The first time:** if there's no gist yet, it creates one with this device's data. If there is one, a device with no cards or packs simply downloads it. A device that already has its own cards or packs asks which copy to keep, and the copy you don't pick is replaced. So connect a new device before entering anything on it.
 - **When it syncs:** it uploads a moment after each change and downloads when the app opens or comes back to the foreground. It also checks every 2 minutes and when the device comes back online.
 - **If both devices changed data** since they last synced, the app asks which copy to keep. The prompt shows each copy's card count and when it changed. Nothing is merged, and sync waits until you choose.
 - **Errors:** "GitHub rejected the token…" means the token is wrong or has expired; make a new one. "GitHub error 404" or "403" usually means the token is missing the gist scope. A message about "an old version of MK Max" means another device is running an old build: close MK Max on your other devices and open it again.
@@ -455,7 +455,7 @@ One box per rarity:
 - **Fusion Up Kards usable from:** the level where kards start. **No kards for this rarity** hides the kard costs. Uncommon gear has no kards unless you pick a level here and fill in its **Fusion Up Kards per step**, which start at 0.
 - **Track until:** **Max**, or **Kard threshold** (F3). Switching to the threshold removes cards already at F3 or above, with a brief Undo.
 - **Highest fusion:** the last F level; levels past it are ascension (A1, A2, …).
-- **Kind:** Character, Equipment or **Kameo (only need one copy)**. It decides the Kameo weight, whether cards can be gear, whether they have a **Goal** control (equipment only), and which sources a card can pick. Kameo means only owning one counts. Switching a rarity to Kameo removes its owned cards the next time the app opens, with no Undo.
+- **Kind:** Character, Equipment or **Kameo (only need one copy)**. It decides the Kameo weight, whether cards can be gear, whether they have a **Goal** control (equipment only), and which sources a card can pick. Kameo means only owning one counts. Switching a rarity to Kameo removes the cards of that rarity you already own straight away, with Undo. Switching it back gives it 1 duplicate per level up to its **Highest fusion**, which you can then edit.
 - **Has guest cards:** shows the Guest checkbox on that rarity's cards. Unticking it only hides the checkbox, and it turns itself back on the next time the app loads while any card of that rarity is still a guest.
 - **Color:** the rarity's color on badges and thumbnails.
 - **Duplicates per step**, with **+ Level** and **− Level**. **− Level** removes cards that are now at or past the new top level, with a brief Undo.
@@ -551,6 +551,8 @@ The bottom of Settings shows which version you have and when it was built, for e
 - Re-reads the event schedule when you come back after an hour or more.
 - Updates countdowns every minute.
 - Removes cards already at their goal when it loads.
+
+The art and the season end don't count as changes for sync: every device works them out by itself, so they never make two devices ask which copy to keep.
 
 ## When something looks wrong
 

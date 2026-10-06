@@ -128,7 +128,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
           <li className={state.packs.length ? done : undefined}>
             Add the packs in the store right now, with the odds from each pack's info screen, in <a onClick={() => goto('packs')}>Packs</a>.
           </li>
-          <li>Enter your Souls, Koins and Fusion Up Kards below. The plan will show up here.</li>
+          <li>Enter your currency balances and Fusion Up Kards below. The plan will show up here.</li>
         </ol>
         <p className={note}>
           Or go to <a onClick={() => goto('settings')}>Settings</a> to load your OneNote data or the sample data.
