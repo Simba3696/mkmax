@@ -330,7 +330,7 @@ Tap **+ Add pack** (or **Edit** on a pack).
 
 ### In the shop
 
-**In the shop** lists packs from MK Mobile Base's event schedule that are on sale or coming up and aren't in the app yet. It hides itself when there's nothing to suggest.
+**In the shop** lists packs from MK Mobile Base's event schedule that are on sale or coming up and aren't in the app yet. It hides itself when there's nothing to suggest. Its note says which day's schedule it's from.
 
 - **Add** opens the pack editor with the name, currency, cost, purchase limit and dates filled in, in your local time. You enter the drop rates.
 - **Cards per purchase always comes in as 1**, so fix it for packs that give several cards.
@@ -346,7 +346,7 @@ The box at the top of Packs shows when the current Realm Klash season ends. It a
 
 Realm Klash seasons last 2 weeks. Each season the Blood Ruby store swaps its characters, Kameos and Kameo packs, but the Realm Klash gear stays.
 
-- **When MK Mobile Base's event schedule covers the current season**, its end date is used instead of your date and the 2-week guess, and seasonal items move to it by themselves. This includes a season the schedule extends by a week after your saved end has passed: if your saved end was the end of that season's earlier week, its items move from there to the new end. The box then shows that date and can't be edited. With sync on, the move waits until the app has tried to sync after opening, since another device may have made it already.
+- **When MK Mobile Base's event schedule covers the current season**, its end date is used instead of your date and the 2-week guess, and seasonal items move to it by themselves. This includes a season the schedule extends by a week after your saved end has passed: if your saved end was the end of that season's earlier week, its items move from there to the new end. The box then shows that date, and which day's schedule it's from, and can't be edited. With sync on, the move waits until the app has tried to sync after opening, since another device may have made it already.
 - **Otherwise**, enter the season's end from the in-game timer once. After that the app assumes each new season ends 2 weeks after the last one, so seasonal items get that end date, count as limited-time in the planner, and show up as expired when the season is over.
 - **If the timer turns out to be different**, change the date here and every item from that season moves with it. The new date applies when you leave the box, press Enter or leave Packs, with Undo. You can also change it on any seasonal item, where it applies when you save the pack, with Undo. Saving moves the season only if you changed that date.
 - **Seasons sometimes end early**, for example a short in-between season while an app update is delayed. When that happens, tap **Ended early** (two taps, with Undo): that season's items expire now, and the next season is assumed to end 2 weeks later until you enter its real end date.
@@ -539,7 +539,7 @@ The bottom of Settings shows which version you have and when it was built, for e
 ### Offline
 
 - **Works offline:** everything you've entered, the plan, and logging purchases.
-- The event schedule falls back to the last copy the app fetched. Card art you've already seen is kept (up to 500 images, for 90 days).
+- The event schedule falls back to the last copy the app fetched, also when the connection is so slow it hasn't loaded in 4 seconds. Card art you've already seen is kept (up to 500 images, for 90 days).
 - **Needs a connection:** new card art, **Find images** and sync. Sync catches up when you're back online.
 
 ### Updates
@@ -582,7 +582,7 @@ The art doesn't count as a change for sync: every device adds the same art by it
 
 **A card disappeared.** It reached its goal, or was already at its goal when the app loaded, a backup was imported or a sync came in. Once the Undo bar has gone, add it again, along with its place in any packs. Changing **Track until** or **− Level** in Fusion rules can also remove cards.
 
-**The schedule is wrong, or a pack is missing.** Edit the pack, or add it with **+ Add pack**. The season box can't be overridden while the schedule covers the season. Times from the schedule are shown in your local time.
+**The schedule is wrong, or a pack is missing.** Check the schedule's date in the season box or **In the shop**: MK Mobile Base sometimes takes a few days to catch up, and if the date is much older than that, the daily refresh has stopped. Edit the pack, or add it with **+ Add pack**. The season box can't be overridden while the schedule covers the season. Times from the schedule are shown in your local time.
 
 **I tapped Not needed by mistake.** Only the Undo bar brings it back.
 

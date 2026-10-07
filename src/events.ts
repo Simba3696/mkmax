@@ -85,6 +85,15 @@ export function useEvents() {
   return events;
 }
 
+/**
+ * "Oct 7": when MK Mobile Base last captured the schedule, or when the deploy downloaded it. Shown next to
+ * anything from the schedule, since the site's capture can lag by days and the daily refresh can stop (GitHub
+ * pauses it after 60 days without commits), and nothing else would tell the user it's out of date.
+ */
+export function scheduleDate(events: EventSchedule) {
+  return new Date(events.capturedAt ?? events.fetchedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 const localOrNull = (iso: string | null) => (iso ? toLocalInput(new Date(iso)) : null);
 const endsAfter = (e: { end: string | null }, now: Date) => !e.end || new Date(e.end) > now;
 

@@ -28,7 +28,11 @@ function rarityOf(item) {
 
 const catalog = [];
 for (const [category, kind] of [['characters', 'character'], ['equipment', 'equipment'], ['kameos', 'kameo']]) {
-  for (const item of await fetchAll(category)) {
+  const items = await fetchAll(category);
+  // An empty category means the API has changed; failing keeps the deployed catalog rather than shipping one
+  // without card art or rarities.
+  if (!items.length) throw new Error(`${category}: no items`);
+  for (const item of items) {
     // Kameo titles read "Baraka - Klassic Kameo"; drop the suffix so names match cards like "Baraka, Klassic".
     const name = kind === 'kameo' ? item.title.replace(/\s*Kameo$/i, '') : item.title;
     catalog.push({ kind, name, rarity: rarityOf(item), slug: item.slug, image: item.image_thumb_2x_url ?? item.image_url });

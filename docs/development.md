@@ -35,7 +35,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/classes.ts` | Shared Tailwind class sets (`card`, `row`, `btn`, `form` and so on) |
 | `src/ui.tsx` | Shared components: `Modal` (with a `wide` option), `Chip`, `CardThumb`, `RarityBadge`, `NumInput`, `ConfirmButton`, `FoldCard`, `useDeviceChoice` (per-device settings like sort order) |
 | `src/views/` | One component per tab, plus the pack editor and sync panel |
-| `scripts/` | Build-time fetchers for the catalog and the event schedule |
+| `scripts/` | Build-time fetchers for the catalog and the event schedule; `schedule.mjs` turns the schedule into `events.json` and is tested |
 | `public/` | Icons, and the bundled catalog and schedule |
 
 ## Saved data and migrations
@@ -47,6 +47,8 @@ The saved state carries a `version`. When the shape or meaning of saved data cha
 ## Hosting
 
 Pushing to `main` runs `.github/workflows/deploy.yml`, which tests and builds the app, then publishes it to GitHub Pages at `https://<user>.github.io/<repo>/`. In the repo settings, set **Pages → Source** to **GitHub Actions** first. On the free plan, Pages needs a public repo.
+
+The workflow also runs every day at 17:30 UTC to refresh the catalog and the event schedule. If either refresh fails, it warns and deploys the copy that's live again (`PAGES_URL` in the workflow), so check the run's warnings when the app's schedule date stops moving. GitHub turns off a public repo's scheduled workflows after 60 days without commits. The workflow then stops running, even on a push, and the schedule stops updating. To turn it back on, open the repo's **Actions** tab, pick **Deploy to GitHub Pages** and choose **Enable workflow**.
 
 ## Styling
 
