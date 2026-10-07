@@ -31,7 +31,7 @@ Two constraints shape this:
 ```mermaid
 flowchart TB
   Views["views/*.tsx, App.tsx<br/>(React: tabs, editors, panels)"]
-  Store["store.tsx<br/>(state, undo, persistence, sync loop)"]
+  Store["store.tsx, syncLoop.ts<br/>(state, undo, persistence, sync loop)"]
   Engine["engine.ts<br/>(pure: scoring, planner, kard plan, forecasts)"]
   Data["normalize.ts, defaults.ts, types.ts<br/>(save shape and migrations)"]
   Ext["events.ts, catalog.ts, wiki.ts, sync.ts<br/>(external data)"]
@@ -88,7 +88,7 @@ stateDiagram-v2
   Pull --> Idle: normalize() then replace
 ```
 
-`decideSync` in `sync.ts` compares each side's `updatedAt` with `baseUpdatedAt`, the stamp both last agreed on. When both sides moved but hold the same data apart from the stamp (each device moved the season end by itself), `sameData` makes it a no-op and both stamps count as agreed. While a conflict waits for the user, background syncs hold off, and a sync that ends in a conflict or an error doesn't reschedule itself; the regular pulls retry. Keeping this device's copy first re-reads the gist: if the other device pushed again while the prompt was up, the prompt shows that copy instead. Otherwise it restamps the kept copy above both copies (the outdated branch does the same), so the other device pulls it, or asks if it has changed since, rather than overwriting it with its own next edit. A sync that finishes after the user disconnected changes nothing. It's last-writer-wins with conflict detection, not a merge: the data is small and edited by one person, so asking which copy to keep is simpler and safer than merging fields.
+The loop itself is `SyncLoop` in `syncLoop.ts`, plain TypeScript with GitHub, the state and timers passed in; `store.tsx` wires it to React. `decideSync` in `sync.ts` compares each side's `updatedAt` with `baseUpdatedAt`, the stamp both last agreed on. When both sides moved but hold the same data apart from the stamp (each device moved the season end by itself), `sameData` makes it a no-op and both stamps count as agreed. While a conflict waits for the user, background syncs hold off, and a sync that ends in a conflict or an error doesn't reschedule itself; the regular pulls retry. Keeping this device's copy first re-reads the gist: if the other device pushed again while the prompt was up, the prompt shows that copy instead. Otherwise it restamps the kept copy above both copies (the outdated branch does the same), so the other device pulls it, or asks if it has changed since, rather than overwriting it with its own next edit. A sync that finishes after the user disconnected changes nothing. It's last-writer-wins with conflict detection, not a merge: the data is small and edited by one person, so asking which copy to keep is simpler and safer than merging fields.
 
 ## Offline and updates
 
@@ -102,4 +102,4 @@ Styles are Tailwind CSS v4 utilities, built at compile time by `@tailwindcss/vit
 
 ## Testing
 
-Vitest covers the pure modules: the engine, migrations via `normalize`, sync decisions, the list parser, catalog and event name matching. Views have no tests; they're thin over the engine and are checked by running the app. CI runs lint and tests before every deploy.
+Vitest covers the pure modules: the engine, migrations via `normalize`, sync decisions, the sync loop (two devices against a fake gist, with requests held open to edit or disconnect mid-sync), the list parser, catalog and event name matching. Views have no tests; they're thin over the engine and are checked by running the app. CI runs lint and tests before every deploy.

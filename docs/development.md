@@ -25,7 +25,8 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/engine.ts` | Scoring, the purchase planner, pack ranking and the Fusion Up Kard plan |
 | `src/normalize.ts` | Save-file migrations (`AppState.version`) |
 | `src/store.tsx` | App state, undo, and localStorage persistence |
-| `src/sync.ts` | GitHub Gist sync |
+| `src/sync.ts` | GitHub Gist sync: the API calls and which copy wins |
+| `src/syncLoop.ts` | When to pull, push or ask, around requests that can overlap edits and disconnects |
 | `src/catalog.ts`, `src/wiki.ts` | Card art and rarity lookups (MK Mobile Base, MK Mobile wiki) |
 | `src/events.ts` | Event schedule: shop packs, Elder challenges, Realm Klash seasons |
 | `src/cardList.ts` | The **Paste a list…** parser |
