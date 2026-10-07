@@ -10,7 +10,12 @@ export const DIAMOND_KARD_COSTS = [0, 0, 0, 1, 2, 3, 4, 5, 7, 10];
 const kardCosts = () => [...DIAMOND_KARD_COSTS];
 /** Epic and Rare gear kards per step from F3 (from the game): 1, 3, 5, 7, 9, 12, 15. */
 export const GEAR_KARD_COSTS = [0, 0, 0, 1, 3, 5, 7, 9, 12, 15];
-/** Gold ascension (F10→A1 … A9→A10) takes kards too. Costs unconfirmed: each step repeats F9→F10 until checked. */
+/**
+ * Fusion Up Kards for each Gold ascension step, F10→A1 … A9→A10, in place of the step's duplicate (from the game).
+ * Each step also takes Ascension Kards (1, 1, 2, 2, 3, 3, 3, 4, 4, 5), which aren't tracked.
+ */
+export const ASCENSION_KARD_COSTS = [10, 11, 12, 13, 15, 22, 24, 26, 28, 30];
+/** Kards for a step past any known table (a custom rarity's extra levels): the same as F9→F10. */
 export const ASCENSION_KARD_COST = 10;
 
 export const defaultWeights: Weights = {
@@ -29,7 +34,7 @@ export function defaultRarities(): RarityRule[] {
     // First copy is F0, then 1 dupe per level to F10 (11 copies).
     { id: 'diamond', label: 'Diamond', kind: 'character', color: '#7fd8ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: kardCosts() },
     // F0..F10 then A1..A10 (set each card's own cap to A5 or A10). Gold has guests too (Jason Voorhees, Slasher).
-    { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(20), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: [...kardCosts(), ...Array(10).fill(ASCENSION_KARD_COST)] },
+    { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(20), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: [...kardCosts(), ...ASCENSION_KARD_COSTS] },
     // Equipment colors match the game: Epic purple, Rare blue, Uncommon green.
     // Only tracked until F3 (4 copies from scratch); Fusion Up Kards finish them. Realm Klash gear is Epic too,
     // but those cards override the goal to max because they're bought outright.
@@ -46,7 +51,7 @@ export function defaultRarities(): RarityRule[] {
 
 export function defaultState(): AppState {
   return {
-    version: 12,
+    version: 13,
     rarities: defaultRarities(),
     currencies: [
       { id: 'souls', name: 'Souls', balance: 0 },

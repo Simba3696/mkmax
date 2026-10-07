@@ -1,6 +1,6 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
 import type { AppState, Card, RarityRule } from './types';
-import { ASCENSION_KARD_COST, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
+import { ASCENSION_KARD_COST, ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
 import { REALM_KLASH_CURRENCY, pruneDone } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
 import { fixPackNames } from './events';
@@ -97,7 +97,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 12,
+    version: 13,
     rarities: s.rarities?.length
       ? s.rarities.map((r) => ({
           ...r,
@@ -150,6 +150,15 @@ export function normalize(input: unknown): AppState {
     for (const r of out.rarities) {
       if ((r.id === 'epic' || r.id === 'rare') && same(r.kardsPerLevel, DIAMOND_KARD_COSTS)) r.kardsPerLevel = [...GEAR_KARD_COSTS];
       if (r.id === 'kameo-diamond' || r.id === 'kameo-gold') r.hasGuests = true;
+    }
+  }
+  // Version 13 swaps in the game's Gold ascension kard costs (10, 11, 12, 13, 15, 22, 24, 26, 28, 30) where the save
+  // still has the flat 10 a step they started as. Done once, so later edits stick.
+  if (version < 13) {
+    const gold = out.rarities.find((r) => r.id === 'gold');
+    const ascension = gold?.kardsPerLevel.slice(10) ?? [];
+    if (gold && ascension.length > 0 && ascension.every((k) => k === ASCENSION_KARD_COST)) {
+      gold.kardsPerLevel = [...gold.kardsPerLevel.slice(0, 10), ...ascension.map((_, i) => ASCENSION_KARD_COSTS[i] ?? ASCENSION_KARD_COST)];
     }
   }
   pruneDone(out);
