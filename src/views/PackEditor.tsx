@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { newId, useStore } from '../store';
 import { LevelOptions, Modal, NumInput, useNow } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
-import { REALM_KLASH_CURRENCY, levelLabel, moveSeasonEnd, seasonEnd, suggestSeason } from '../engine';
+import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, isSeasonal, levelLabel, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
 import { initialSource } from '../challenges';
+import { scheduledSeasonEnd, useEvents } from '../events';
 import type { Card, Pack, RarityRule } from '../types';
 
 /** A line of inputs: a drop's card and chance, or the pool and new-card controls. */
@@ -128,15 +129,30 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   const [poolSize, setPoolSize] = useState<number | null>(null);
   const [newCard, setNewCard] = useState({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0 });
   const now = useNow();
-  const currentSeasonEnd = seasonEnd(state.realmKlashSeasonEnd, now);
-  const [seasonDraft, setSeasonDraft] = useState(currentSeasonEnd);
+  const events = useEvents();
+  // While the schedule covers the season its date is used and can't be changed here, as in the season box.
+  const scheduled = scheduledSeasonEnd(events, now);
+  const currentSeasonEnd = scheduled ?? seasonEnd(state.realmKlashSeasonEnd, now);
+  // What's typed in Season ends; undefined until the user changes it, so a season move synced in meanwhile shows
+  // here and saving doesn't move the season back.
+  const [seasonEdit, setSeasonEdit] = useState<string | null>();
+  const seasonDraft = editorSeasonEnd(scheduled, seasonEdit, currentSeasonEnd);
+  // The pack as it would be saved: Already bought and the end date as they are now, unless changed here.
+  const [changed, setChanged] = useState<{ purchased?: boolean; endsAt?: boolean }>({});
+  const base = editedPack(p, state.packs.find((x) => x.id === p.id), changed);
   // Blood Ruby characters, Kameos and Kameo packs leave with the season; unless the user said otherwise, guess from the item.
-  const seasonal = p.currencyId === REALM_KLASH_CURRENCY && (p.season ?? suggestSeason(p, state));
-  // A seasonal pack gets the season's end, unless it's from an earlier season that has already ended.
-  const pastSeason = !!p.endsAt && p.endsAt !== currentSeasonEnd && new Date(p.endsAt) <= now;
-  const endsAt = seasonal && seasonDraft && !pastSeason ? seasonDraft : p.endsAt;
+  const seasonal = isSeasonal(base, state);
+  const pastSeason = fromEndedSeason(base, seasonDraft, now);
+  const startSeasonEnd = base.startsAt ? scheduledSeasonEnd(events, new Date(base.startsAt)) : null;
+  const endsAt = packEndOnSave(base, seasonal, seasonDraft, now, startSeasonEnd);
+  // An item that starts after this season ends, e.g. next season's character entered ahead of time.
+  const nextSeason = seasonal && !pastSeason && !!seasonDraft && endsAt !== seasonDraft;
+  const showDate = (t: string) => new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
-  const set = <K extends keyof Pack>(k: K, v: Pack[K]) => setP((x) => ({ ...x, [k]: v }));
+  const set = <K extends keyof Pack>(k: K, v: Pack[K]) => {
+    setP((x) => ({ ...x, [k]: v }));
+    if (k === 'purchased' || k === 'endsAt') setChanged((c) => ({ ...c, [k]: true }));
+  };
   const setDrop = (i: number, patch: Partial<Pack['drops'][number]>) =>
     setP((x) => ({ ...x, drops: x.drops.map((d, j) => (j === i ? { ...d, ...patch } : d)) }));
   const totalChance = p.drops.reduce((a, d) => a + d.chance, 0);
@@ -160,20 +176,13 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   }
 
   // The pool's total is shared by every item in it, not only the ones picked, so each card gets total ÷ pool size.
-  const poolCount = Math.max(poolSize ?? 0, poolPicked.size);
-  const poolEach = poolPicked.size && poolTotal ? +(poolTotal / poolCount).toFixed(4) : 0;
+  const poolEach = poolShare(poolTotal, poolSize, poolPicked.size);
   // A card already listed (e.g. its own 1.5% line) can also be in the pool: the chances add up.
   const poolUpdates = p.drops.filter((d) => poolPicked.has(d.cardId));
 
   function addPool() {
     if (!poolEach) return;
-    setP((x) => ({
-      ...x,
-      drops: [
-        ...x.drops.map((d) => (poolPicked.has(d.cardId) ? { ...d, chance: +(d.chance + poolEach).toFixed(4) } : d)),
-        ...[...poolPicked].filter((id) => !x.drops.some((d) => d.cardId === id)).map((cardId) => ({ cardId, chance: poolEach })),
-      ],
-    }));
+    setP((x) => ({ ...x, drops: withPool(x.drops, poolPicked, poolEach) }));
     setPoolPicked(new Set());
     setPoolSize(null);
     setPoolOpen(false);
@@ -181,16 +190,10 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
 
   function save() {
     if (errors.length) return;
-    update((d) => {
-      const i = d.packs.findIndex((x) => x.id === p.id);
-      const clean: Pack = { ...p, name: p.name.trim(), endsAt };
-      if (p.currencyId === REALM_KLASH_CURRENCY) clean.season = seasonal;
-      else delete clean.season;
-      if (i >= 0) d.packs[i] = clean;
-      else d.packs.push(clean);
-      // A corrected season end moves every pack that was ending with the old one.
-      if (seasonal && seasonDraft && seasonDraft !== currentSeasonEnd) moveSeasonEnd(d, seasonDraft, now);
-    });
+    // A corrected season end moves every pack that was ending with the old one, but only when it was changed here.
+    const moveTo = seasonMoveOnSave({ seasonal, pastSeason, scheduled, edited: seasonEdit, currentEnd: currentSeasonEnd });
+    const name = p.name.trim();
+    update((d) => savePack(d, { ...base, endsAt }, moveTo, now), moveTo ? `Saved ${name} and changed the season end` : `Saved ${name}`);
     onClose();
   }
 
@@ -242,7 +245,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
         </label>
         <label className={field}>
           <span>Already bought</span>
-          <NumInput value={p.purchased} min={0} step={1} onChange={(v) => set('purchased', v ?? 0)} />
+          <NumInput value={base.purchased} min={0} step={1} onChange={(v) => set('purchased', v ?? 0)} />
         </label>
         <label className={field}>
           <span>Starts (blank = now)</span>
@@ -254,23 +257,31 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
             Leaves when the Realm Klash season ends (characters, Kameos and Kameo packs rotate every 2 weeks; the gear stays)
           </label>
         )}
-        {seasonal && !pastSeason ? (
+        {seasonal && !pastSeason && scheduled ? (
+          <div className={field}>
+            <span>Season ends</span>
+            <b className="text-fg text-[0.95rem]">{showDate(scheduled)}</b>
+          </div>
+        ) : seasonal && !pastSeason ? (
           <label className={field}>
             <span>Season ends</span>
-            <input type="datetime-local" value={seasonDraft ?? ''} onChange={(e) => setSeasonDraft(e.target.value || null)} />
+            <input type="datetime-local" value={seasonDraft ?? ''} onChange={(e) => setSeasonEdit(e.target.value || null)} />
           </label>
         ) : (
           <label className={field}>
             <span>Ends (blank = permanent)</span>
-            <input type="datetime-local" value={p.endsAt ?? ''} onChange={(e) => set('endsAt', e.target.value || null)} />
+            <input type="datetime-local" value={base.endsAt ?? ''} onChange={(e) => set('endsAt', e.target.value || null)} />
           </label>
         )}
       </div>
       {seasonal && !pastSeason && (
         <p className="text-muted text-small lg:max-w-[75ch]">
-          {seasonDraft
-            ? 'Shared by every seasonal Blood Ruby item. After it passes, the next season is assumed to end 2 weeks later.'
-            : 'Enter when this season ends (from the in-game timer). You only need to do this once; later seasons follow every 2 weeks.'}
+          {scheduled
+            ? "Shared by every seasonal Blood Ruby item. Date from MK Mobile Base's event schedule."
+            : seasonDraft
+              ? 'Shared by every seasonal Blood Ruby item. After it passes, the next season is assumed to end 2 weeks later.'
+              : 'Enter when this season ends (from the in-game timer). You only need to do this once; later seasons follow every 2 weeks.'}
+          {nextSeason && endsAt && ` This item starts after that, so it leaves when its own season ends: ${showDate(endsAt)}.`}
         </p>
       )}
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  ascensionCaps, buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, recordPurchase, seasonEnd, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, copiesAtFusion, editedPack, editorSeasonEnd, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEndOnSave, packEV, packStatus, poolShare, pruneDone, recordPurchase, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
 import { kardTable, normalize } from './normalize';
 import { daysFromNow } from './ui';
@@ -380,6 +380,17 @@ describe('buying from the plan', () => {
     expect(recordPurchase(s, 'p', -1)).toBe(false);
   });
 
+  it('gives back exactly what a buy took when the balance was too low for it', () => {
+    const s = setup([card('a', F(2))], [pack('p', [{ cardId: 'a', chance: 50 }], { cost: 400 })], (s) => (s.currencies[0].balance = 200));
+    recordPurchase(s, 'p', 1);
+    expect(s.currencies[0].balance).toBe(-200);
+    // The planner has nothing to spend, as at 0.
+    const plan = buildPlan(buildCtx(s), NOW).currencies[0];
+    expect([plan.startBalance, plan.spent, plan.buys.length, plan.saveFor?.shortBy]).toEqual([0, 0, 0, 400]);
+    recordPurchase(s, 'p', -1);
+    expect(s.currencies[0].balance).toBe(200);
+  });
+
   it("leaves a random pack's cards to the pull step", () => {
     const s = setup([card('a', F(2))], [pack('p', [{ cardId: 'a', chance: 50 }])], (s) => (s.currencies[0].balance = 100));
     recordPurchase(s, 'p', 1);
@@ -402,6 +413,7 @@ describe('buying from the plan', () => {
       { cardId: 'ball', total: 1500, days: 14 },
     ]);
     expect(gearForecast(gear, 0, undefined).map((g) => g.days)).toEqual([null, null]);
+    expect(gearForecast(gear, -300, 65)).toEqual(gearForecast(gear, 0, 65));
   });
 
   it('adds the year to forecast dates outside this year', () => {
@@ -480,6 +492,36 @@ describe('Realm Klash seasons', () => {
     expect(s.packs[0].endsAt).toBe('2026-01-10T11:00');
   });
 
+  it('keeps an item entered ahead in the season it starts in when the current season moves', () => {
+    const end = '2026-01-12T20:00';
+    const ahead = () => {
+      const s = setup([], [], (s) => (s.realmKlashSeasonEnd = end));
+      // Next season's character, and one starting partway through the season after.
+      for (const p of [pack('next', [], { currencyId: 'blood-rubies', startsAt: end }), pack('later', [], { currencyId: 'blood-rubies', startsAt: '2026-01-30T10:00' })])
+        savePack(s, { ...p, endsAt: packEndOnSave(p, true, end, NOW) }, null, NOW);
+      expect(s.packs.map((p) => p.endsAt)).toEqual(['2026-01-26T20:00', '2026-02-09T20:00']);
+      return s;
+    };
+    const dates = (s: AppState) => s.packs.map((p) => [p.startsAt, p.endsAt]);
+    // A corrected timer: the changeover moves a day, and so does next season.
+    const fixed = ahead();
+    moveSeasonEnd(fixed, '2026-01-13T20:00', NOW);
+    expect(dates(fixed)).toEqual([['2026-01-13T20:00', '2026-01-27T20:00'], ['2026-01-30T10:00', '2026-02-10T20:00']]);
+    // Ended early: next season starts now and runs 2 weeks.
+    const early = ahead();
+    moveSeasonEnd(early, '2026-01-10T11:59', NOW);
+    expect(dates(early)).toEqual([['2026-01-10T11:59', '2026-01-24T11:59'], ['2026-01-30T10:00', '2026-02-07T11:59']]);
+    // A later move still finds them: moving the corrected timer back puts them back.
+    moveSeasonEnd(fixed, end, NOW);
+    expect(dates(fixed)).toEqual([[end, '2026-01-26T20:00'], ['2026-01-30T10:00', '2026-02-09T20:00']]);
+  });
+
+  it('moves an item entered ahead when the schedule extends the season after its saved end passed', () => {
+    const s = setup([], [pack('next', [], { season: true, startsAt: '2026-01-10T11:00', endsAt: '2026-01-24T11:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
+    moveSeasonEnd(s, '2026-01-17T11:00', NOW, ['2026-01-10T11:00']);
+    expect([s.packs[0].startsAt, s.packs[0].endsAt]).toEqual(['2026-01-17T11:00', '2026-01-31T11:00']);
+  });
+
   it('assumes Blood Ruby characters, Kameos and Kameo packs rotate, but not the gear', () => {
     const s = setup([card('hero', F(2)), card('gear', F(5), { rarityId: 'epic', goal: 'max' }), card('kameo', 0, { rarityId: 'kameo-gold' })]);
     const item = (cardId: string) => pack(cardId, [{ cardId, chance: 100 }], { currencyId: 'blood-rubies', store: true });
@@ -488,5 +530,89 @@ describe('Realm Klash seasons', () => {
     expect(suggestSeason(item('gear'), s)).toBe(false);
     expect(suggestSeason(pack('kameo pack', [], { currencyId: 'blood-rubies' }), s)).toBe(true);
     expect(suggestSeason(pack('souls pack', []), s)).toBe(false);
+  });
+});
+
+describe('saving a pack from the editor', () => {
+  const rk = (id: string, extra: Partial<Pack> = {}) => pack(id, [], { currencyId: 'blood-rubies', ...extra });
+
+  it('keeps a purchase or season move made while the editor was open, unless that field was changed', () => {
+    const opened = pack('p', [], { purchased: 1, endsAt: '2026-01-12T20:00' });
+    const live = { ...opened, purchased: 2, endsAt: '2026-01-11T20:00' };
+    expect(editedPack({ ...opened, cost: 50 }, live, {})).toMatchObject({ cost: 50, purchased: 2, endsAt: '2026-01-11T20:00' });
+    expect(editedPack({ ...opened, purchased: 5, endsAt: null }, live, { purchased: true, endsAt: true })).toMatchObject({ purchased: 5, endsAt: null });
+    // Set back to what it was when the editor opened, it's still the user's choice.
+    expect(editedPack(opened, live, { purchased: true }).purchased).toBe(1);
+    // New packs, and ones deleted meanwhile, are saved as entered.
+    expect(editedPack(opened, undefined, {}).purchased).toBe(1);
+  });
+
+  it('gives a seasonal pack the current season end, and an ended season or a non-seasonal pack keeps its own', () => {
+    const end = '2026-01-12T20:00';
+    expect(packEndOnSave(rk('now'), true, end, NOW)).toBe(end);
+    expect(packEndOnSave(rk('old', { endsAt: '2025-12-29T20:00' }), true, end, NOW)).toBe('2025-12-29T20:00');
+    expect(packEndOnSave(rk('gear', { endsAt: null }), false, end, NOW)).toBeNull();
+    // No season end entered yet: it stays as it is.
+    expect(packEndOnSave(rk('now', { endsAt: null }), true, null, NOW)).toBeNull();
+  });
+
+  it('gives an item that starts after this season the end of the season it starts in', () => {
+    const end = '2026-01-12T20:00';
+    expect(packEndOnSave(rk('next', { startsAt: end }), true, end, NOW)).toBe('2026-01-26T20:00');
+    expect(packEndOnSave(rk('later', { startsAt: '2026-01-30T10:00' }), true, end, NOW)).toBe('2026-02-09T20:00');
+    // The schedule's date when it lists that season.
+    expect(packEndOnSave(rk('next', { startsAt: end }), true, end, NOW, '2026-01-19T20:00')).toBe('2026-01-19T20:00');
+    // Starting during this season: it still ends with this one.
+    expect(packEndOnSave(rk('soon', { startsAt: '2026-01-11T10:00' }), true, end, NOW)).toBe(end);
+  });
+
+  it("shows the season end synced in until the field is changed, and the schedule's while it sets the season", () => {
+    expect(editorSeasonEnd(null, undefined, '2026-01-13T20:00')).toBe('2026-01-13T20:00');
+    expect(editorSeasonEnd(null, '2026-01-14T20:00', '2026-01-13T20:00')).toBe('2026-01-14T20:00');
+    expect(editorSeasonEnd(null, '', '2026-01-13T20:00')).toBe('');
+    expect(editorSeasonEnd('2026-01-15T20:00', '2026-01-14T20:00', '2026-01-13T20:00')).toBe('2026-01-15T20:00');
+  });
+
+  it('moves the season on save only to a valid date changed in the editor', () => {
+    const o = { seasonal: true, pastSeason: false, scheduled: null, edited: '2026-01-14T20:00', currentEnd: '2026-01-12T20:00' };
+    expect(seasonMoveOnSave(o)).toBe('2026-01-14T20:00');
+    // Untouched, even after a move synced in while the editor was open.
+    expect(seasonMoveOnSave({ ...o, edited: undefined, currentEnd: '2026-01-13T20:00' })).toBeNull();
+    expect(seasonMoveOnSave({ ...o, edited: '2026-01-12T20:00' })).toBeNull();
+    expect(seasonMoveOnSave({ ...o, scheduled: '2026-01-12T20:00' })).toBeNull();
+    expect(seasonMoveOnSave({ ...o, pastSeason: true })).toBeNull();
+    expect(seasonMoveOnSave({ ...o, seasonal: false })).toBeNull();
+    expect(seasonMoveOnSave({ ...o, edited: '' })).toBeNull();
+    expect(seasonMoveOnSave({ ...o, edited: '2026-13-45T20:00' })).toBeNull();
+  });
+
+  it('adds or replaces the pack, and moves the season only when told to', () => {
+    const end = '2026-01-12T20:00';
+    const s = setup([], [rk('a', { season: true, endsAt: end }), rk('b', { season: true, endsAt: end })], (s) => (s.realmKlashSeasonEnd = end));
+    savePack(s, { ...rk('a', { season: true, endsAt: end }), name: '  A  ', cost: 50 }, null, NOW);
+    expect([s.packs[0].name, s.packs[0].cost, s.packs[1].endsAt, s.realmKlashSeasonEnd]).toEqual(['A', 50, end, end]);
+    savePack(s, rk('c', { endsAt: end }), '2026-01-13T20:00', NOW);
+    expect(s.packs.map((p) => [p.id, p.season, p.endsAt])).toEqual([
+      ['a', true, '2026-01-13T20:00'],
+      ['b', true, '2026-01-13T20:00'],
+      ['c', true, '2026-01-13T20:00'],
+    ]);
+    expect(s.realmKlashSeasonEnd).toBe('2026-01-13T20:00');
+    // A pack moved off Blood Rubies loses its season flag.
+    savePack(s, { ...s.packs[0], currencyId: 'souls' }, null, NOW);
+    expect(s.packs[0].season).toBeUndefined();
+  });
+
+  it('splits an even pool, adding a share to cards already listed', () => {
+    expect(poolShare(9, 6, 2)).toBe(1.5);
+    expect(poolShare(9, null, 3)).toBe(3); // blank size: the picked cards are the whole pool
+    expect(poolShare(9, 2, 3)).toBe(3); // never fewer items than picked
+    expect(poolShare(null, 6, 2)).toBe(0);
+    expect(poolShare(9, 6, 0)).toBe(0);
+    expect(addPool([{ cardId: 'a', chance: 1.5 }, { cardId: 'x', chance: 2 }], ['a', 'b'], 1.5)).toEqual([
+      { cardId: 'a', chance: 3 },
+      { cardId: 'x', chance: 2 },
+      { cardId: 'b', chance: 1.5 },
+    ]);
   });
 });

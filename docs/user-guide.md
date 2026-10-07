@@ -146,7 +146,7 @@ Tap a card's heading on Plan (Wallet, What to buy, Pack ranking and so on) or Se
 
 ### Pop-ups
 
-Pop-ups (like the pack editor) sit above the rest of the app and scroll on their own, so the buttons at the bottom can always be reached. Tapping outside one doesn't close it, so a stray tap can't throw away a half-entered pack; use ✕ or Cancel. The Escape key also closes one without saving. Saving a pack has no Undo.
+Pop-ups (like the pack editor) sit above the rest of the app and scroll on their own, so the buttons at the bottom can always be reached. Tapping outside one doesn't close it, so a stray tap can't throw away a half-entered pack; use ✕ or Cancel. The Escape key also closes one without saving. Saving a pack has Undo.
 
 ### Two-tap buttons
 
@@ -157,7 +157,7 @@ Pop-ups (like the pack editor) sit above the rest of the app and scroll on their
 After a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
 
 - The bar has **Undo** and ✕ (to close it).
-- It also appears for hiding a shop pack ("Hid …"), pasting a list ("Added N cards, updated M"), switching cards to MK Mobile Base's rarity ("rarity change for N cards") and ending a Realm Klash season early.
+- It also appears for saving a pack ("Saved …"), hiding a shop pack ("Hid …"), pasting a list ("Added N cards, updated M"), switching cards to MK Mobile Base's rarity ("rarity change for N cards") and ending a Realm Klash season early.
 - Only the latest change can be undone.
 - Undo puts back the whole app as it was, so anything else you changed while the bar was up (like a balance) is undone too.
 - **Import backup**, **Load sample data**, **Erase everything** and a sync download clear the bar and can't be undone.
@@ -283,10 +283,11 @@ With no packs, the tab says "No packs yet."
 
 ### Logging a purchase
 
-On Packs, tap **I bought one**. This deducts the cost, and a store item also levels up its card. For random packs, tap + on each card you pulled. **−1** removes one purchase and refunds its cost. To find a pack quickly, tap it in the Plan (under **What to buy** or **Pack ranking**); Packs opens scrolled to it, with it highlighted.
+On Packs, tap **I bought one**. This deducts the cost, and a store item also levels up its card. For random packs, tap + on each card you pulled. **−1** removes one purchase and refunds its cost, so it puts the balance back exactly as it was. To find a pack quickly, tap it in the Plan (under **What to buy** or **Pack ranking**); Packs opens scrolled to it, with it highlighted.
 
 - The buttons show only on **Available now** packs.
 - **I bought one** is greyed out once the purchase limit is reached.
+- **I bought one** works even when your balance is lower than the cost, since the balance you typed may be out of date. The balance then goes below 0 until you type in the real one.
 - **−1** on a store item also takes a copy off its card.
 - After buying a random pack, **What did you pull?** opens: "Tap + for each copy you got." Cards you don't track can be ignored. **Done** closes it, and so does **−1**.
 
@@ -300,10 +301,10 @@ Tap **+ Add pack** (or **Edit** on a pack).
 - **Cost:** the price of one purchase. It must be more than 0.
 - **Cards per purchase:** how many cards one buy gives. Each card is one roll, so a wrong number scales the pack's value directly.
 - **Purchase limit:** blank means unlimited. Copy the in-game limit; the plan never plans past it.
-- **Already bought:** for purchases made before you added the pack. Changing it doesn't touch balances or cards.
+- **Already bought:** for purchases made before you added the pack. Changing it doesn't touch balances or cards. A purchase logged while the editor is open, on this device or another one, is kept when you save, unless you changed this box.
 - **Starts (blank = now):** a start date still ahead puts the pack under **Coming up**. The plan can save for it, but you can't log a purchase until it starts.
 - **Ends (blank = permanent):** an end date makes it a limited-time pack, which gets the urgency boost (1.25× by default), a countdown and the ending-soon badge.
-- **Leaves when the Realm Klash season ends** and **Season ends** (Blood Rubies only): see [Realm Klash seasons](#realm-klash-season-box). When you add a Blood Ruby item or pack, the checkbox is ticked for everything except gear, and except a permanent Blood Ruby pack added from **In the shop** (one the schedule gives no end date, like the Kameo summon packs). A seasonal pack saved before any season date is entered stays permanent. A pack from a season that has already ended shows the normal **Ends** field.
+- **Leaves when the Realm Klash season ends** and **Season ends** (Blood Rubies only): see [Realm Klash seasons](#realm-klash-season-box). When you add a Blood Ruby item or pack, the checkbox is ticked for everything except gear, and except a permanent Blood Ruby pack added from **In the shop** (one the schedule gives no end date, like the Kameo summon packs). A seasonal pack saved before any season date is entered stays permanent. A pack from a season that has already ended shows the normal **Ends** field. While the event schedule sets the season end, the editor shows that date and it can't be changed. An item that starts after the current season ends, like next season's character entered early, leaves when the season it starts in ends, and the editor shows that date under the field. It keeps to that season when the current season's end changes: correcting the timer, **Ended early** or a schedule extension moves its end by the same amount, and an item that starts right as the season changes over starts at the new changeover.
 - **Drop chances:** type the chance per card, per roll, as a percent. List only cards you track; the rest of the pool doesn't matter. **Total listed** turns red over 100%, which usually means a typo or a group rate typed on every card (use an even pool for those). It doesn't stop you saving.
 - **Item** (store items): one card picker, with no %.
 
@@ -347,7 +348,7 @@ Realm Klash seasons last 2 weeks. Each season the Blood Ruby store swaps its cha
 
 - **When MK Mobile Base's event schedule covers the current season**, its end date is used instead of your date and the 2-week guess, and seasonal items move to it by themselves. This includes a season the schedule extends by a week after your saved end has passed: if your saved end was the end of that season's earlier week, its items move from there to the new end. The box then shows that date and can't be edited. With sync on, the move waits until the app has tried to sync after opening, since another device may have made it already.
 - **Otherwise**, enter the season's end from the in-game timer once. After that the app assumes each new season ends 2 weeks after the last one, so seasonal items get that end date, count as limited-time in the planner, and show up as expired when the season is over.
-- **If the timer turns out to be different**, change the date here and every item from that season moves with it. The new date applies when you leave the box, press Enter or leave Packs, with Undo. You can also change it on any seasonal item, where it applies when you save the pack.
+- **If the timer turns out to be different**, change the date here and every item from that season moves with it. The new date applies when you leave the box, press Enter or leave Packs, with Undo. You can also change it on any seasonal item, where it applies when you save the pack, with Undo. Saving moves the season only if you changed that date.
 - **Seasons sometimes end early**, for example a short in-between season while an app update is delayed. When that happens, tap **Ended early** (two taps, with Undo): that season's items expire now, and the next season is assumed to end 2 weeks later until you enter its real end date.
 - "N seasonal items leave then" counts the seasonal packs ending on that date.
 
@@ -356,6 +357,7 @@ Realm Klash seasons last 2 weeks. Each season the Blood Ruby store swaps its cha
 ### Wallet
 
 - Balances are edited only here. Clearing a box saves 0, and changes have no Undo.
+- A balance below 0 means you logged a purchase it didn't cover. The plan counts it as 0; type in your real balance.
 - Purchases you log come off the balance automatically. Income doesn't, so update your balances after playing.
 - Kard boxes:
   - Diamond and Gold always show.

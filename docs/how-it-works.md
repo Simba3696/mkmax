@@ -37,7 +37,7 @@ A pack's value is the expected value of its drops (rolls × chance), added up ac
 
 **When the gear is maxed.** The app adds up the rubies every remaining copy costs, in gear order (each copy at its cheapest store item), and takes off your current balance. At the Blood Ruby daily income from Settings → Currencies (65 by default), the Blood Rubies part of the Plan's **What to buy** says when the whole set is maxed, and Settings → **Blood Ruby gear order** shows a date for each piece. Dates outside this year include the year. Season rewards and other rubies aren't predicted; once you enter them in the Wallet, the dates move closer. Store purchase limits aren't counted either, since a limit that runs out this season may reset in the next.
 
-The planner works on each currency's balance separately. It keeps buying the affordable pack with the best value per cost, and updates your expected progress after each buy so repeat buys are worth less. Limited-time packs get the `limitedBoost` urgency factor. Every weight and fusion table can be edited in Settings.
+The planner works on each currency's balance separately, counting a balance below 0 (a logged purchase the typed balance didn't cover) as 0. It keeps buying the affordable pack with the best value per cost, and updates your expected progress after each buy so repeat buys are worth less. Limited-time packs get the `limitedBoost` urgency factor. Every weight and fusion table can be edited in Settings.
 
 ## Event schedule
 
