@@ -154,6 +154,20 @@ export function Modal({ title, onClose, wide, children }: { title: string; onClo
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+  // Read while rendering: by the time an effect runs, a field inside has already taken focus with autoFocus.
+  const [opener] = useState(() => document.activeElement);
+  // Keep Tab and screen readers inside the pop-up (it sits outside #root), and on close put focus back where it was,
+  // so the next Tab carries on from the pack you were on rather than the top of the page.
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (root) root.inert = true;
+    return () => {
+      if (root) root.inert = false;
+      // Only once the pop-up is gone and focus fell to <body>; StrictMode's rehearsal cleanup leaves it in the form.
+      const lost = !document.activeElement || document.activeElement === document.body;
+      if (lost && opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    };
+  }, [opener]);
   // Rendered on <body>, outside the scrolling content, so the tab bar can't end up on top of it (iOS keeps
   // fixed elements inside a touch-scrolling container in that container's layer).
   return createPortal(
@@ -163,7 +177,7 @@ export function Modal({ title, onClose, wide, children }: { title: string; onClo
       className="fixed inset-0 z-10 flex justify-center items-start overflow-y-auto overscroll-contain bg-black/70 px-2 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]"
     >
       {/* my-auto centres it on tall screens and collapses to the top once it's taller than the screen. */}
-      <div className={`w-full max-w-[640px] ${wide ? 'lg:max-w-[920px]' : ''} md:my-auto bg-panel border border-line rounded-modal p-4`} role="dialog" aria-label={title}>
+      <div className={`w-full max-w-[640px] ${wide ? 'lg:max-w-[920px]' : ''} md:my-auto bg-panel border border-line rounded-modal p-4`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="flex justify-between items-center mb-[0.6rem]">
           <h2 className="m-0">{title}</h2>
           <button className={btn.ghost} onClick={onClose} aria-label="Close">
