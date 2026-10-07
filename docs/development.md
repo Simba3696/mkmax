@@ -23,6 +23,9 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | Path | What's in it |
 |---|---|
 | `src/engine.ts` | Scoring, the purchase planner, pack ranking and the Fusion Up Kard plan |
+| `src/types.ts` | The saved data's shape (`AppState`) |
+| `src/defaults.ts` | Built-in rarities and their Fusion Up Kard costs, default weights, a new install's data and the sample data |
+| `src/challenges.ts` | The hand-kept list of Elder challenge characters, and the retired challenges whose Kameos now come from packs |
 | `src/normalize.ts` | Save-file migrations (`AppState.version`) |
 | `src/store.tsx` | App state, undo, and localStorage persistence |
 | `src/storage.ts` | Reading the save at startup, and keeping a copy of one that can't be read |

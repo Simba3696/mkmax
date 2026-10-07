@@ -33,7 +33,7 @@ flowchart TB
   Views["views/*.tsx, App.tsx<br/>(React: tabs, editors, panels)"]
   Store["store.tsx, storage.ts, syncLoop.ts<br/>(state, undo, persistence, sync loop)"]
   Engine["engine.ts<br/>(pure: scoring, planner, kard plan, forecasts, purchases, pack saving)"]
-  Data["normalize.ts, defaults.ts, types.ts<br/>(save shape and migrations)"]
+  Data["normalize.ts, defaults.ts, challenges.ts, types.ts<br/>(save shape, migrations and built-in game data)"]
   Ext["events.ts, catalog.ts, wiki.ts, sync.ts<br/>(external data)"]
   Views --> Store
   Views --> Engine

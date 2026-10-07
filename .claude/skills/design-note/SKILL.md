@@ -10,7 +10,7 @@ A design note is a plan in the conversation, not a file in the repo. Keep it to 
 ## High level
 
 - **Problem.** What the user sees or can't do today, in their words.
-- **Approach.** The change in two or three sentences, and which layers it touches: views, store, engine, normalize, external data (`events.ts`, `catalog.ts`, `wiki.ts`, `sync.ts`), build scripts, CI.
+- **Approach.** The change in two or three sentences, and which layers it touches: views, store (`store.tsx`, `syncLoop.ts`), engine, normalize, external data (`events.ts`, `catalog.ts`, `wiki.ts`, `sync.ts`), build scripts, CI.
 - **Alternatives.** One or two you considered and why not. Prefer the option with less new state.
 - **Game rules.** Which rules in `AGENTS.md` this relies on or bends. If it needs a fact about the game that isn't written down, ask the user; don't guess.
 
