@@ -43,12 +43,17 @@ function GoalSelect({ rule, value, onChange }: { rule: RarityRule; value: Card['
   // Only equipment switches between "F3, Kards finish it" and buying to max; characters are always maxed.
   if (rule.kind !== 'equipment' || rule.fusionUpThreshold == null) return null;
   const current = value ?? rule.goal;
+  const max = levelLabel(rule, maxFusion(rule));
+  // A stored Max marks Realm Klash gear (see isRealmKlashGear) even once the rarity's own goal is Max too, which
+  // happens to gear set to Max before its Track until was. Say so, and offer the plain Max that clears the mark.
+  const stuck = value === 'max' && rule.goal === 'max';
   return (
     <label className={check}>
       Goal
-      <select value={current} onChange={(e) => onChange(e.target.value === rule.goal ? undefined : (e.target.value as Card['goal']))}>
+      <select value={current} onChange={(e) => onChange(e.target.value === rule.goal || e.target.value === 'plain' ? undefined : (e.target.value as Card['goal']))}>
         <option value="threshold">F{rule.fusionUpThreshold} (Kards finish it)</option>
-        <option value="max">Max ({levelLabel(rule, maxFusion(rule))})</option>
+        <option value="max">{`Max (${max}${value === 'max' || rule.goal === 'threshold' ? ', Realm Klash gear' : ''})`}</option>
+        {stuck && <option value="plain">{`Max (${max})`}</option>}
       </select>
     </label>
   );

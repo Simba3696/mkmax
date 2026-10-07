@@ -86,6 +86,12 @@ export interface KardPlan {
   assignments: KardAssignment[];
   /** Kards the plan couldn't use (not enough for any remaining step). */
   left: number;
+  /** Cards that could take kards: at the threshold or higher, short of their goal, and not Realm Klash gear. */
+  cards: number;
+  /** Cheapest next step among those cards before any kards are spent, so "not enough kards" can name it. */
+  cheapest: number | null;
+  /** Realm Klash gear at the threshold or higher and short of its goal, left out of `cards`. */
+  realmKlash: number;
 }
 
 export interface Ctx {
@@ -128,8 +134,9 @@ export function kardCost(rule: RarityRule, level: number): number | null {
 /**
  * Spend each rarity's Fusion Up Kards one fusion step at a time. Costs rise steeply (a Diamond's F9→F10 costs
  * 10 kards, F3→F4 costs 1), and every step saves one pack copy, so the next kard always goes to the cheapest
- * step available, weighted up for guest cards. Ties go to the card closest to max. Kards work from the
- * threshold (F3) up, through fusion and on into Gold ascension. Realm Klash gear gets none.
+ * step available, weighted up for guest cards. Ties go to the card with the fewest steps left to its goal, so a
+ * card gets finished before another is started (opening a Gold ascension also takes Ascension Kards, untracked).
+ * Kards work from the threshold (F3) up, through fusion and on into Gold ascension. Realm Klash gear gets none.
  */
 function allocateKards(state: AppState) {
   const kardCopies = new Map<string, number>();
@@ -138,9 +145,13 @@ function allocateKards(state: AppState) {
     const thr = thresholdLevel(rule);
     if (thr == null || rule.fusionUpKards <= 0) continue;
     const cap = (c: Card) => targetLevel(c, rule);
-    const cards = state.cards.filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c) && !isRealmKlashGear(state, c));
+    const open = state.cards.filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c));
+    const cards = open.filter((c) => !isRealmKlashGear(state, c));
+    const costs = cards.map((c) => kardCost(rule, c.fusion)).filter((k): k is number => k != null);
     const level = new Map(cards.map((c) => [c.id, c.fusion]));
     const spent = new Map<string, number>();
+    const stepsLeft = (c: Card) => cap(c) - level.get(c.id)!;
+    const closer = (a: Card, b: Card) => stepsLeft(a) < stepsLeft(b) || (stepsLeft(a) === stepsLeft(b) && level.get(a.id)! > level.get(b.id)!);
     let left = rule.fusionUpKards;
     for (;;) {
       let best: { card: Card; cost: number; score: number } | null = null;
@@ -150,7 +161,7 @@ function allocateKards(state: AppState) {
         const cost = kardCost(rule, lvl);
         if (cost == null || cost > left) continue;
         const score = cardWeight(state, c) / cost;
-        if (!best || score > best.score + 1e-9 || (Math.abs(score - best.score) <= 1e-9 && lvl > level.get(best.card.id)!)) best = { card: c, cost, score };
+        if (!best || score > best.score + 1e-9 || (Math.abs(score - best.score) <= 1e-9 && closer(c, best.card))) best = { card: c, cost, score };
       }
       if (!best) break;
       level.set(best.card.id, level.get(best.card.id)! + 1);
@@ -165,7 +176,7 @@ function allocateKards(state: AppState) {
       kardCopies.set(c.id, copiesAtFusion(rule, to) - copiesAtFusion(rule, c.fusion));
     }
     assignments.sort((a, b) => b.to - a.to || b.kards - a.kards);
-    kardPlan.set(rule.id, { assignments, left });
+    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash: open.length - cards.length });
   }
   return { kardCopies, kardPlan };
 }

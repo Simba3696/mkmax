@@ -5,7 +5,7 @@ import { CardThumb, ConfirmButton, fmt, useDeviceChoice, useNow } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
 import PackEditor from './PackEditor';
-import { packFromShop, packName, scheduleDate, scheduledSeasonEnd, shopSuggestions, useEvents } from '../events';
+import { lastRun, packFromShop, packName, scheduleDate, scheduledSeasonEnd, shopSuggestions, useEvents } from '../events';
 import type { Pack } from '../types';
 
 const SORTS = ['ending', 'currency'] as const;
@@ -96,7 +96,8 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
     if (!p.store) setPulling(delta > 0 ? p.id : null);
   };
 
-  const duplicate = (p: Pack) => setEditing({ ...structuredClone(p), id: newId(), name: `${p.name} (rerun)`, purchased: 0, startsAt: null, endsAt: null });
+  // The rerun keeps the name, so In the shop still recognises the pack once the old run is cleared.
+  const duplicate = (p: Pack) => setEditing({ ...structuredClone(p), id: newId(), purchased: 0, startsAt: null, endsAt: null });
 
   // In the grid, cards in a row stretch to the tallest one and a spacer pushes their buttons to the bottom, so a row of
   // packs lines up whatever the length of each drop list.
@@ -327,7 +328,8 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
       {open && (
         <>
           <p className={`${note} md:max-w-[90ch]`}>
-            From MK Mobile Base's event schedule of {scheduleDate(events)}. It doesn't have drop rates, so <b>Add</b> fills in the rest and you enter the odds for cards you need.
+            From MK Mobile Base's event schedule of {scheduleDate(events)}. It doesn't have drop rates, so <b>Add</b> fills in the rest and you enter the odds for cards you need.{' '}
+            <b>Rerun</b> shows for a pack you still have under Expired, and copies its odds.
             Packs with nothing you need: <b>Not needed</b> hides them for good.
           </p>
           {/* Two columns from xl (1280px), where each column is wide enough for a one-line title; there every row gets its
@@ -335,6 +337,7 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
           <div className="xl:grid xl:grid-cols-2 xl:gap-x-8">
             {packs.map((sp) => {
               const upcoming = sp.start && new Date(sp.start) > now;
+              const last = lastRun(sp, state, now);
               return (
                 <div key={sp.name} className={`${row} items-center xl:border-t xl:border-line`}>
                   {sp.image && <img className={thumb} src={sp.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 44, height: 44 }} />}
@@ -346,7 +349,13 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
                       {upcoming ? ` · starts ${when(sp.start)}` : sp.end ? ` · ends ${when(sp.end)}` : ' · permanent'}
                     </div>
                   </div>
-                  <button onClick={() => onAdd(packFromShop(sp, state, newId()))}>Add</button>
+                  {last ? (
+                    <button onClick={() => onAdd(packFromShop(sp, state, newId(), last))} title="Adds it again with the odds from its expired run">
+                      Rerun
+                    </button>
+                  ) : (
+                    <button onClick={() => onAdd(packFromShop(sp, state, newId()))}>Add</button>
+                  )}
                   <button
                     className={btn.ghost}
                     onClick={() => update((d) => void (d.dismissedShopPacks = [...(d.dismissedShopPacks ?? []), sp.name]), `Hid ${packName(sp)}`)}
