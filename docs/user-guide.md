@@ -157,7 +157,7 @@ Pop-ups (like the pack editor) sit above the rest of the app and scroll on their
 After a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
 
 - The bar has **Undo** and ✕ (to close it).
-- It also appears for saving a pack ("Saved …"), hiding a shop pack ("Hid …"), pasting a list ("Added N cards, updated M"), switching cards to MK Mobile Base's rarity ("rarity change for N cards") and ending a Realm Klash season early.
+- It also appears for saving a pack ("Saved …"), hiding a shop pack ("Hid …"), pasting a list ("Added N cards, updated M"), switching cards to MK Mobile Base's rarity ("rarity change for N cards"), ending a Realm Klash season early, removing a rarity or currency, **Reset weights**, and turning a rarity's kards off while it tracks to the kard threshold.
 - Only the latest change can be undone.
 - Undo puts back the whole app as it was, so anything else you changed while the bar was up (like a balance) is undone too.
 - **Import backup**, **Load sample data**, **Erase everything** and a sync download clear the bar and can't be undone.
@@ -455,15 +455,15 @@ Sync keeps your devices on the same data through a secret gist on your GitHub ac
 One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gold Kameo, show only **Name**, **Kind**, **Has guest cards**, **Color** and **Remove**, since a Kameo has no fusion steps. The others have:
 
 - **Name:** renaming changes the label. **Paste a list…** uses the new name for headings and details.
-- **Fusion Up Kards usable from:** the level where kards start. **No kards for this rarity** hides the kard costs. Uncommon gear has no kards unless you pick a level here and fill in its **Fusion Up Kards per step**, which start at 0.
+- **Fusion Up Kards usable from:** the level where kards start. **No kards for this rarity** hides the kard costs. With no kards there's no threshold to stop at, so a rarity set to track until the kard threshold switches to **Max**, with Undo. Picking a level again leaves it on Max. An older save that still tracks to the kard threshold with no kards switches to Max once, when it loads. Uncommon gear has no kards unless you pick a level here and fill in its **Fusion Up Kards per step**, which start at 0.
 - **Track until:** **Max**, or **Kard threshold** (F3). Switching to the threshold removes cards already at F3 or above, with a brief Undo.
 - **Highest fusion:** the last F level; levels past it are ascension (A1, A2, …).
 - **Kind:** Character, Equipment or **Kameo (only need one copy)**. It decides the Kameo weight, whether cards can be gear, whether they have a **Goal** control (equipment only), and which sources a card can pick. Kameo means only owning one counts. Switching a rarity to Kameo removes the cards of that rarity you already own straight away, with Undo. It also turns off its kards (and clears its kard count) and hides its fusion settings, since a Kameo has no fusion steps. Switching it back gives it 1 duplicate per level up to F10, which you can then edit.
 - **Has guest cards:** shows the Guest checkbox on that rarity's cards. Unticking it only hides the checkbox, and it turns itself back on the next time the app loads while any card of that rarity is still a guest.
 - **Color:** the rarity's color on badges and thumbnails.
-- **Duplicates per step**, with **+ Level** and **− Level**. **− Level** removes cards that are now at or past the new top level, with a brief Undo.
+- **Duplicates per step**, with **+ Level** and **− Level**. When the rarity has kards, the new step gets a kard cost straight away (usually 10, or 0 for Uncommon gear), which you can change under **Fusion Up Kards per step**. **− Level** removes cards that are now at or past the new top level, with a brief Undo.
 - **Fusion Up Kards per step:** 0 means kards can't do that step.
-- **Remove:** greyed out while any card uses the rarity. It has no confirm and no Undo.
+- **Remove:** greyed out while any card uses the rarity. It has no confirm, but has Undo.
 
 **+ Rarity** adds a new one.
 
@@ -471,9 +471,9 @@ One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gol
 
 - Each currency has a name and a per-day number: roughly how much you get each day. With it, the plan says when you can afford what it's saving for.
 - Balances live in the Plan's Wallet, not here.
-- **✕** is greyed out while a pack uses the currency. Removing one has no Undo.
+- **✕** is greyed out while a pack uses the currency. Removing one has Undo, which also brings back its balance and per-day number.
 - **+ Currency** adds one.
-- Only the Blood Rubies currency the app came with gets the Realm Klash gear handling. Renaming it is fine, but deleting it and adding a new one loses that.
+- Only the Blood Rubies currency the app came with gets the Realm Klash gear handling. Renaming it is fine, but deleting it and adding a new one loses that, so use Undo if you remove it by mistake.
 - The plan works through currencies in this order: Souls, Blood Rubies, Dragon Krystals, then any you add. There's no way to reorder them.
 
 ### Blood Ruby gear order
@@ -495,12 +495,12 @@ Every card is being maxed, so all cards count the same. These weights only decid
 | Close-to-max bonus | 0.5 | Extra value as a card nears max (0.5 = +50% at max). |
 | Limited-time pack urgency | 1.25 | Prefers packs with an end date. Used in What to buy only. |
 
-An emptied box saves 0. **Reset weights** puts the defaults back, with no confirm and no Undo.
+An emptied box saves 0. **Reset weights** puts the defaults back, with no confirm, but with Undo.
 
 ### Data
 
 - **Export backup** downloads `mkmax-backup-YYYY-MM-DD.json`. The date is in UTC, so a backup made late in the evening or early in the morning can carry the next or previous day. It doesn't include the sync token, folded cards or sort choices.
-- **Import backup** replaces everything with the file, with no confirm and no Undo. Older files are upgraded, and any card already at its goal is removed. With sync on, it's uploaded. A backup made by a newer version of MK Max isn't imported: the app looks for the update instead, so pull down to refresh, or close MK Max and open it again, then import it. A problem shows as "Import failed: …". Picking the same file twice in a row may do nothing.
+- **Import backup** replaces everything with the file, with no confirm and no Undo. Older files are upgraded, and any card already at its goal is removed. With sync on, it's uploaded. A backup made by a newer version of MK Max isn't imported: the app looks for the update instead, so pull down to refresh, or close MK Max and open it again, then import it. A problem shows as "Import failed: …". Picking the same file again imports it again, so you can go back to a backup you just imported. A file with no rarities gets the built-in ones.
 - **Load sample data** loads the made-up set described in [Trying it with sample data](#trying-it-with-sample-data).
 - **Erase everything** puts the app back to a fresh install, with no Undo. With sync on, the empty data is uploaded, so every connected device is erased. To reset just one device, disconnect it first (or export a backup). Folded cards, sort choices and the token stay.
 - **Download unreadable data** and **Discard it** show only when the saved data couldn't be read. See [Where your data lives](#where-your-data-lives).

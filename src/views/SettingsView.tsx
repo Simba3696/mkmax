@@ -50,6 +50,7 @@ export default function SettingsView() {
   }
 
   async function importData(file: File) {
+    setMsg(null);
     try {
       const data = JSON.parse(await file.text());
       // This build would save it in its older format and sync that, and the newer build would rerun its one-time
@@ -99,7 +100,7 @@ export default function SettingsView() {
       <div className="2xl:col-start-2 2xl:row-[1/-1]">
         <FoldCard id="settings-fusion" title="Fusion rules">
           <p className={`${note} md:max-w-[75ch]`}>
-            Your first copy of a card is F0. Each step below is the number of duplicates needed for the next level. One Fusion Up Kard counts as +1 fusion level.
+            Your first copy of a card is F0. Each step below is the number of duplicates needed for the next level. Fusion Up Kards per step is how many kards each level costs from the kard threshold up.
           </p>
           {/*
             Two columns of rarities from lg, where each still gets room for a few form columns. CSS columns rather than a grid: the editors differ a lot in height (ascension levels), and columns
@@ -122,14 +123,22 @@ export default function SettingsView() {
                           <span>Fusion Up Kards usable from</span>
                           <select
                             value={r.fusionUpThreshold ?? ''}
-                            onChange={(e) =>
-                              update((d) => {
-                                const dr = d.rarities[ri];
-                                dr.fusionUpThreshold = e.target.value ? Number(e.target.value) : null;
-                                // Fill in missing costs now, as the next load would, so the plan doesn't change on a reload.
-                                dr.kardsPerLevel = kardTable(dr);
-                              })
-                            }
+                            onChange={(e) => {
+                              const threshold = e.target.value ? Number(e.target.value) : null;
+                              // With no kards there's no threshold to stop at, so the planner tracks to max. Saying so in
+                              // Track until, with Undo, rather than leaving it on a threshold that no longer applies.
+                              const toMax = threshold == null && r.goal === 'threshold';
+                              update(
+                                (d) => {
+                                  const dr = d.rarities[ri];
+                                  dr.fusionUpThreshold = threshold;
+                                  if (toMax) dr.goal = 'max';
+                                  // Fill in missing costs now, as the next load would, so the plan doesn't change on a reload.
+                                  dr.kardsPerLevel = kardTable(dr);
+                                },
+                                toMax ? `${r.label} now tracks to max` : undefined,
+                              );
+                            }}
                           >
                             <option value="">No kards for this rarity</option>
                             {Array.from({ length: r.fusionMax }, (_, i) => (
@@ -192,7 +201,18 @@ export default function SettingsView() {
                       <span className={`${note} lg:flex-1 lg:min-w-0`}>Kameos only need one copy, so there are no fusion steps.</span>
                     ) : (
                       <>
-                        <button onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.push(1))}>+ Level</button>
+                        <button
+                          onClick={() =>
+                            update((d) => {
+                              const dr = d.rarities[ri];
+                              dr.dupesPerLevel.push(1);
+                              // Give the new step its kard cost now, as the next load would, so the plan doesn't change on a reload.
+                              dr.kardsPerLevel = kardTable(dr);
+                            })
+                          }
+                        >
+                          + Level
+                        </button>
                         <button disabled={r.dupesPerLevel.length <= 1} onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.pop())}>
                           − Level
                         </button>
@@ -206,7 +226,7 @@ export default function SettingsView() {
                       className={btn.ghost}
                       disabled={state.cards.some((c) => c.rarityId === r.id)}
                       title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : 'Remove rarity'}
-                      onClick={() => update((d) => void d.rarities.splice(ri, 1))}
+                      onClick={() => update((d) => void d.rarities.splice(ri, 1), `Removed ${r.label}`)}
                     >
                       Remove
                     </button>
@@ -271,7 +291,7 @@ export default function SettingsView() {
                   placeholder="per day"
                   onChange={(v) => update((d) => void (v == null || v <= 0 ? delete d.currencies[i].perDay : (d.currencies[i].perDay = v)))}
                 />
-                <button className={btn.ghost} disabled={used} title={used ? 'Used by a pack' : 'Remove'} onClick={() => update((d) => void d.currencies.splice(i, 1))}>
+                <button className={btn.ghost} disabled={used} title={used ? 'Used by a pack' : 'Remove'} onClick={() => update((d) => void d.currencies.splice(i, 1), `Removed ${c.name}`)}>
                   ✕
                 </button>
               </div>
@@ -299,7 +319,7 @@ export default function SettingsView() {
             </label>
           ))}
         </div>
-        <button onClick={() => update((d) => void (d.weights = structuredClone(defaultWeights)))}>Reset weights</button>
+        <button onClick={() => update((d) => void (d.weights = structuredClone(defaultWeights)), 'Reset weights')}>Reset weights</button>
       </FoldCard>
 
       <FoldCard id="settings-data" title="Data">
@@ -321,7 +341,18 @@ export default function SettingsView() {
             Export backup
           </button>
           <button onClick={() => fileRef.current?.click()}>Import backup</button>
-          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              // Cleared so picking the same file again (to roll back to it) still fires a change.
+              e.target.value = '';
+              if (file) void importData(file);
+            }}
+          />
           <ConfirmButton label="Load sample data" onConfirm={() => (replace(sampleState()), setMsg('Sample data loaded.'))} />
           <ConfirmButton label="Erase everything" onConfirm={() => (replace(defaultState()), setMsg('All data erased.'))} />
         </div>

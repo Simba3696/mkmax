@@ -83,6 +83,10 @@ export function normalize(input: unknown): AppState {
     throw new Error('Not an MK Max save file');
   }
   const version = (s.version as number | undefined) ?? 1;
+  // A hand-made or trimmed file with no rarities gets the built-in ones before the upgrades run. Afterwards would
+  // be too late: the Kameo and Uncommon upgrades add their rarities to the empty list, leaving the cards' Diamond,
+  // Gold and gear rarities missing.
+  if (!s.rarities?.length) s = { ...s, rarities: defaultRarities() };
   if (version < 2) s = migrateV1(s);
   s = migrateLegacyFields(s);
   // Kameos: version 3 added one Kameo rarity, version 4 splits it into Diamond and Gold. Both are added once, so
@@ -97,20 +101,18 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 13,
-    rarities: s.rarities?.length
-      ? s.rarities.map((r) => ({
-          ...r,
-          // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
-          // app on newer data, gave them a step, so owning a Kameo stopped counting as done.
-          ...(r.kind === 'kameo' && { dupesPerLevel: [] }),
-          fusionMax: r.fusionMax ?? 10,
-          goal: r.goal ?? 'max',
-          // A rarity with a guest-flagged card has guests, whatever an older save said (Gold used to default to none).
-          hasGuests: (r.hasGuests ?? r.id === 'diamond') || (s.cards ?? []).some((c) => c.rarityId === r.id && c.guest),
-          kardsPerLevel: kardTable(r),
-        }))
-      : base.rarities,
+    version: 14,
+    rarities: s.rarities!.map((r) => ({
+      ...r,
+      // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
+      // app on newer data, gave them a step, so owning a Kameo stopped counting as done.
+      ...(r.kind === 'kameo' && { dupesPerLevel: [] }),
+      fusionMax: r.fusionMax ?? 10,
+      goal: r.goal ?? 'max',
+      // A rarity with a guest-flagged card has guests, whatever an older save said (Gold used to default to none).
+      hasGuests: (r.hasGuests ?? r.id === 'diamond') || (s.cards ?? []).some((c) => c.rarityId === r.id && c.guest),
+      kardsPerLevel: kardTable(r),
+    })),
     currencies: s.currencies?.length ? s.currencies : base.currencies,
     cards: s.cards!,
     packs: s.packs!,
@@ -161,6 +163,10 @@ export function normalize(input: unknown): AppState {
       gold.kardsPerLevel = [...gold.kardsPerLevel.slice(0, 10), ...ascension.map((_, i) => ASCENSION_KARD_COSTS[i] ?? ASCENSION_KARD_COST)];
     }
   }
+  // Version 14 switches rarities that track to the kard threshold but have no kards to max, which is what the planner
+  // already does with them. Turning kards off now does this itself; older saves kept the threshold, so picking a kard
+  // level again capped and removed their cards. Done once, as later saves can't get into that state.
+  if (version < 14) for (const r of out.rarities) if (r.fusionUpThreshold == null && r.goal === 'threshold') r.goal = 'max';
   pruneDone(out);
   return out;
 }

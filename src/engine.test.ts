@@ -155,6 +155,13 @@ describe('save migration', () => {
     const s = normalize(v1);
     expect(s.version).toBe(defaultState().version);
     expect(s.cards.map((c) => [c.fusion, c.maxLevel])).toEqual([[3, 16], [0, undefined]]);
+    expect(s.rarities.map((r) => r.id)).toEqual(defaultState().rarities.map((r) => r.id));
+  });
+
+  it('gives a file with no rarities the built-in ones, not just the ones later upgrades add', () => {
+    const s = normalize({ cards: [card('a', F(2)), card('g', F(2), { rarityId: 'gold' })], packs: [] });
+    expect(s.rarities.map((r) => r.id)).toEqual(defaultState().rarities.map((r) => r.id));
+    expect(normalize({ ...defaultState(), rarities: [] }).rarities).toEqual(defaultState().rarities);
   });
 
   it('adds the Kameo rarity to older saves once', () => {
@@ -241,6 +248,16 @@ describe('phases', () => {
     expect(normalize(deleted).rarities.some((r) => r.id === 'uncommon')).toBe(false);
   });
 
+  it('costs an added level the same in Settings as after a reload', () => {
+    const gold = structuredClone(rules().get('gold')!);
+    gold.dupesPerLevel.push(1); // + Level
+    const costs = kardTable(gold);
+    expect(costs).toHaveLength(21);
+    expect(costs.at(-1)).toBe(10);
+    expect(kardTable({ ...gold, kardsPerLevel: costs })).toEqual(costs);
+    expect(normalize({ ...defaultState(), rarities: [{ ...gold, kardsPerLevel: costs }] }).rarities[0].kardsPerLevel).toEqual(costs);
+  });
+
   it('starts kard costs at 0 when kards are turned on for a built-in rarity that has none, like Uncommon gear', () => {
     const uncommon = { ...defaultState().rarities.find((r) => r.id === 'uncommon')!, fusionUpThreshold: 3 };
     expect(kardTable(uncommon)).toEqual(Array(10).fill(0));
@@ -275,6 +292,23 @@ describe('phases', () => {
     const flat = structuredClone(defaultState());
     flat.rarities.find((r) => r.id === 'gold')!.kardsPerLevel = [...DIAMOND_KARD_COSTS, ...Array(10).fill(10)];
     expect(normalize(flat).rarities.find((r) => r.id === 'gold')?.kardsPerLevel.slice(10)).toEqual(Array(10).fill(10));
+  });
+
+  it('switches a rarity with no kards from the kard threshold to max once, so picking a kard level keeps its cards', () => {
+    const old = structuredClone({ ...defaultState(), version: 13 });
+    const epic = old.rarities.find((r) => r.id === 'epic')!;
+    epic.fusionUpThreshold = null;
+    old.cards = [{ id: 'e1', name: 'Epic Relic', rarityId: 'epic', fusion: F(5), guest: false }];
+    const out = normalize(old);
+    expect(out.rarities.find((r) => r.id === 'epic')?.goal).toBe('max');
+    expect(out.rarities.find((r) => r.id === 'rare')?.goal).toBe('threshold');
+    // With kards back on, the card is still tracked to max rather than capped at F3 and removed.
+    out.rarities.find((r) => r.id === 'epic')!.fusionUpThreshold = 3;
+    expect(targetLevel(out.cards[0], out.rarities.find((r) => r.id === 'epic')!)).toBe(F(10));
+    // A save already on version 14 isn't changed again.
+    const current = structuredClone(defaultState());
+    current.rarities.find((r) => r.id === 'epic')!.fusionUpThreshold = null;
+    expect(normalize(current).rarities.find((r) => r.id === 'epic')?.goal).toBe('threshold');
   });
 
   it('gives Epic and Rare gear their kard costs and Kameos guests once, keeping edited tables', () => {
