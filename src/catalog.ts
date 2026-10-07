@@ -80,3 +80,16 @@ export function catalogImageUpdates(cards: Card[], rules: Map<string, RarityRule
   }
   return out;
 }
+
+/**
+ * Cards whose rarity MK Mobile Base gives differently, with the app rarity it gives. Only rarities of the card's own
+ * kind count, so a Kameo is never moved to a character rarity. A rarity the user chose to keep isn't offered again,
+ * unless the site later gives yet another one.
+ */
+export function rarityMismatches(cards: Card[], rules: Map<string, RarityRule>, items: CatalogItem[]) {
+  return cards.flatMap((card) => {
+    const hit = findInCatalog(card, rules.get(card.rarityId), items);
+    const to = hit && appRarityId(hit, rules.values());
+    return to && to !== card.rarityId && to !== card.keptRarity ? [{ card, to }] : [];
+  });
+}

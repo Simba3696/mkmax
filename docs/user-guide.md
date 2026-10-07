@@ -186,8 +186,8 @@ Two buttons at the top switch between your card list and the [Tower gear](#tower
 - **Goal** (Epic and Rare gear): **F3 (Kards finish it)** or **Max (F10)**. Max is how Realm Klash gear is tracked, and the Kard plan skips it.
 - **Max** (Gold): **F10 (no ascension)**, **A5** or **A10**. Diamond has no Max, since it stops at F10.
 - **Guest card:** shown only when the rarity has guests. It's unticked again after each add.
-- **Source** (equipment): **From packs/store**, **Krypt gear** or **Tower gear**. A tower name can only come from a pasted list. Gold Kameos on the challenge list are tagged **Elder challenge** automatically.
-- **Add:** clears Name, level and Guest, and keeps Rarity, Goal, Max and Source for the next card. Adding one card has no Undo; delete it instead.
+- **Source** (equipment): **From packs/store**, **Krypt gear** or **Tower gear**. Tower gear adds a **Tower** box for the tower's name, which files the card under that tower on [Tower gear](#tower-gear). Gold Kameos on the challenge list are tagged **Elder challenge** automatically.
+- **Add:** clears Name, level and Guest, and keeps Rarity, Goal, Max, Source and Tower for the next card. Adding one card has no Undo; delete it instead.
 
 For Epic and Rare gear the form says it's "tracked only until F3. After that, your Fusion Up Kards can max it."
 
@@ -207,12 +207,13 @@ Man in Control - Epic - Krypt Gear - Unowned
 - **A heading line** that's just a rarity's full name (`Gold Kameo`, `Diamond Kameo`, `Epic Equip`) switches the rarity for the plain names after it, so a list copied from notes with headings and `-----` underlines works as-is. A heading must be the full name: a bare `Epic` line becomes a card called "Epic".
 - **Details** go after ` - ` (an en or em dash works too), in any order:
   - Rarity: `Epic`, `Rare`, `Gold` and so on. Kameo rarities need their full name.
-  - Where it comes from: `Krypt Gear`, or a tower name like `Lin Kuei Tower`, which tags it as tower gear and remembers the tower.
+  - Where it comes from: `Krypt Gear`, or a tower name like `Lin Kuei Tower`, which tags it as tower gear and remembers the tower. Only gear can have one: a character or Kameo line with a Krypt or tower source is refused.
   - Level: `F2`, `A3` (ascension), or `Unowned`, `Not owned`, `None` or `New` for not owned.
+- **Bullets and numbers** at the start of a line (`- `, `• `, `* `, `1. `, `1) `) are dropped, so a bulleted list from a notes app pastes with clean names.
 - **Cards already in the app** get the new level and source instead of being added twice. They only match a card of the same rarity, and a pasted level can lower a card's level.
 - Pasted cards are never guests, and pasted Gold cards get **Max** A10. Set both on the card afterwards where needed.
 
-Under the box it shows what it will do: "New: …" by rarity, "updating N already listed", and "skipping N already listed" for cards with nothing to change or listed twice. Lines it can't use are listed with the reason and left out: Common gear, a level past the max, a line with details but no rarity, or a part it doesn't recognise. The button reads **Add N, update M**. **Cancel** closes the box and keeps the text. Undo takes the whole batch back out.
+Under the box it shows what it will do: "New: …" by rarity, "updating N already listed", and "skipping N already listed" for cards with nothing to change or listed twice. Lines it can't use are listed with the reason and left out: Common gear, a level past the max, a line with details but no rarity, a Krypt or tower source on a card that isn't gear, or a part it doesn't recognise. The button reads **Add N, update M**. **Cancel** closes the box and keeps the text. Undo takes the whole batch back out.
 
 ### Search, filters and sort
 
@@ -228,15 +229,16 @@ Under the box it shows what it will do: "New: …" by rarity, "updating N alread
 - **Chips:**
   - The rarity.
   - **guest**.
-  - The source (krypt, tower or Elder challenge), plus the tower name. A tower name stays if you change the source.
+  - **site says** a rarity, on a card where you chose **Keep mine** in the rarity check. Tap it to have the card checked again (with Undo); if MK Mobile Base still disagrees, it's listed with the rarity fixes again.
+  - The source (krypt, tower or Elder challenge), plus the tower name for tower gear.
   - Challenge dates: "challenge on now, until …" or "challenge Sep 30 – Oct 7". No chip means the event schedule doesn't list that challenge right now.
   - **N to F3**, while the card is below F3 and its goal is higher.
   - **N to** the goal, orange when the goal is F3, grey otherwise. Kameos show **Not owned yet**.
   - **kards give N**: shown once you have kards in the Wallet and the Kard plan gives some to this card.
 - **− and +** move one level (one copy). + stops at the rarity's top level. Reaching the goal deletes the card, with Undo. Other level changes have no Undo.
-- **Tap the name** to rename the card. It saves as you type, with no Undo. Renaming doesn't change an Elder challenge tag.
+- **Tap the name** to rename the card. It saves as you type, with no Undo, except that an empty box isn't saved. Spaces at either end are trimmed when you finish, and if you leave the box empty, the card gets back the name it had when you tapped it. While you rename it, the card stays listed even if the new name no longer matches the search. A card that has no name (from an older version or another device) shows **Unnamed**, which you can tap to name it. Renaming doesn't change an Elder challenge tag.
 - **Goal**, **Max** and **Guest**, as in Add card.
-- **Source:** you can change a card's source on the card itself. Equipment has From packs/store, Krypt gear and Tower gear; Kameos have From packs/store and Elder challenge; characters have none.
+- **Source:** you can change a card's source on the card itself. Equipment has From packs/store, Krypt gear and Tower gear; Kameos have From packs/store and Elder challenge; characters have none. Tower gear also has a **Tower** box for the tower's name, which saves as you type. Changing the source clears the tower name. A character or Kameo that an older pasted list tagged as Krypt or tower gear shows that source marked "not for this rarity", so you can set it back to From packs/store.
 - **Image:** paste an image URL. Lookups never replace a working URL you pasted. If a pasted image stops loading, **Find images** may replace it. When the art came from MK Mobile Base or the wiki, a link opens the page it came from. Clearing the box on a card MK Mobile Base has brings its art back.
 - **Delete** (two taps) removes the card and takes it out of every drop list, with Undo. Unlike removal at the goal, it keeps a store item that only sold that card, which is left with no item.
 
@@ -244,17 +246,16 @@ With no cards, or none that match, the list says "No cards match."
 
 ### Find images and rarity fixes
 
-You usually don't need it: cards MK Mobile Base has get their art by themselves. **Find images (N)** shows only while some card still needs art (none yet, or an image that doesn't load), and looks it up on MK Mobile Base, then the MK Mobile wiki. It never replaces images you pasted unless they fail to load. "N not found online" means you'll need to paste a URL on those cards. More in [How it works](how-it-works.md#card-images).
+You usually don't need it: cards MK Mobile Base has get their art by themselves. **Find images (N)** shows only while some card still needs art (none yet, or an image that doesn't load), and looks it up on MK Mobile Base, then the MK Mobile wiki. It never replaces images you pasted unless they fail to load. "N not found online" means you'll need to paste a URL on those cards. If the wiki can't be reached, the art MK Mobile Base had is still saved, and the message says how many cards weren't looked up on the wiki, so you can try again later. More in [How it works](how-it-works.md#card-images).
 
-It also lists cards whose rarity MK Mobile Base gives differently (for example a Kameo added under the wrong tier). **Use the site's rarity** switches them, with Undo. **Keep mine** hides the list until the next time you run Find images. It only compares within the same kind, so a Kameo is never switched to a character rarity.
-
-The rarity check only runs with Find images, so it's only there while some card still needs art. A card MK Mobile Base has usually gets its art straight away, even under the wrong tier, so check the rarity when you add a card.
+Cards also lists cards whose rarity MK Mobile Base gives differently, for example a Kameo added under the wrong tier, or Epic gear that's really Rare. The check runs each time you open Cards, whether or not any card needs art. Each card has its own buttons: **Use the site's** switches that card to the site's rarity, and **Keep mine** keeps yours. With more than one card listed, **Use the site's for all** and **Keep mine for all** do the whole list at once. Both have Undo. A Kameo moved into Gold Kameo is tagged **Elder challenge** if it's on the challenge list (unless it already has a source), and one moved out of it loses that tag. A card you keep isn't listed again (on any synced device) unless MK Mobile Base later gives yet another rarity; instead it shows a **site says** chip, which you can tap to have it checked again. It only compares within the same kind, so a Kameo is never switched to a character rarity.
 
 ### Tower gear
 
-Cards → Tower gear lists every card tagged as tower gear, grouped by the tower it drops from (the tower name from a pasted list), with the towers that have the most gear left first. Each card shows how many copies it still needs, and you can change its level there. Maxed gear leaves the list like any other card.
+Cards → Tower gear lists every card tagged as tower gear, grouped by the tower it drops from (the card's **Tower** box, or the tower name from a pasted list), with the towers that have the most gear left first. Each card shows how many copies it still needs, and you can change its level there. Maxed gear leaves the list like any other card.
 
-- Gear tagged as tower gear with no tower name goes under "Tower not named", at the end. Paste it again with its rarity and tower, like `Kori Blade - Epic - Lin Kuei Tower`, to file it. The rarity has to be there (a line with details but no rarity is refused), and it only updates a card of that same rarity.
+- Gear tagged as tower gear with no tower name goes under "Tower not named", at the end. Type the tower's name in the card's **Tower** box on Cards to file it, or paste it again with its rarity and tower, like `Kori Blade - Epic - Lin Kuei Tower`. The rarity has to be there (a line with details but no rarity is refused), and it only updates a card of that same rarity.
+- Tower names are grouped ignoring capitals, so "Lin kuei tower" goes under "Lin Kuei Tower".
 - "N left" counts cards, not copies.
 - Epic and Rare gear count copies only to F3, unless their goal is Max.
 - There's no delete, goal or source control here; use the card on Cards.
@@ -516,7 +517,7 @@ The bottom of Settings shows which version you have and when it was built, for e
 - **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Not every Gold card ascends. Ascension came to some Gold cards in one update (up to A5) and to others in a later one (up to A10), so each card's **Max** is F10 (no ascension), A5 or A10. Neither MK Mobile Base nor the wiki records which cap a card has, so set it on the card; new Gold cards start at A10. Any other saved cap shows as "not a real cap" so it's easy to spot and fix. Fusion Up Kards work on ascension steps too, in place of the duplicate. Each step also takes Ascension Kards (1, 1, 2, 2, 3, 3, 3, 4, 4, 5 from F10→A1 to A9→A10), a separate premium item from season passes. MK Max doesn't track them: ascend whenever you have one, then raise the card here. The Fusion Up Kard cost of each ascension step comes from the game (see [How it works](how-it-works.md#scoring)). Saves that still had the old guess of 10 a step got the real costs once; costs you'd changed yourself were kept.
 - **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase, and no Fusion Up Kards are planned for it.
 - **Uncommon** (green) gear is tracked to max (F10), since it's farmed and maxed through tower runs. It has no Fusion Up Kards unless you turn them on in Settings → Fusion rules and enter the kard cost of each step. Tag it as tower gear and it shows under its tower on Cards → Tower gear.
-- **Kameos** (Diamond and Gold) fuse to F10 in the game, but here you only track the ones you don't own yet. Add them under **Diamond Kameo** or **Gold Kameo**. Check the tier when you add one. **Find images** can offer to switch a wrong tier to MK Mobile Base's, but only while some card still needs art, and a Kameo MK Mobile Base has usually gets its art straight away. When you get one, tap **+** and it's done, so it leaves the list (with Undo). Kameos sold in the Realm Klash store, or Kameo packs, go in as store items or packs like anything else.
+- **Kameos** (Diamond and Gold) fuse to F10 in the game, but here you only track the ones you don't own yet. Add them under **Diamond Kameo** or **Gold Kameo**. Cards offers to switch a wrong tier to MK Mobile Base's (see [Find images and rarity fixes](#find-images-and-rarity-fixes)). When you get one, tap **+** and it's done, so it leaves the list (with Undo). Kameos sold in the Realm Klash store, or Kameo packs, go in as store items or packs like anything else.
 - **Challenge Kameos:** the Gold Kameo of a challenge character (for example Kotal Kahn, Dark Lord) is earned by finishing that character's Elder challenge when it comes around as an event. These Kameos are tagged **Elder challenge**. The app has a list of the Gold challenge characters (from the MK Mobile wiki's Challenge Mode page), and any Gold Kameo you add that matches it is tagged automatically. Only the Gold Kameo rarity is tagged, and the name match ignores word order. You can change a card's source on the card itself, and removing the tag sticks. Challenges that no longer run are kept out of the list. When a challenge Kameo's challenge is on or coming up, its card shows the dates and the Plan lists it under **Elder challenges**.
 - **Krypt and tower gear, and challenge Kameos** are tagged with their source. They're tracked, but only planned for when a pack you've entered actually drops them.
 - **Done cards are removed:** when a card reaches its goal, the app deletes it. It's also removed from any pack drop lists, and a store item that only sold that card is deleted too. The goal is max for Diamond, the card's own ascension cap for Gold, F3 for Rare and Epic unless the card's **Goal** is Max (like the Realm Klash gear), F10 for Uncommon, and owning one for Kameos. Right after this happens you can use **Undo**. Any card that's already at its goal is removed when the app loads, when you import a backup, or when a sync brings one in.

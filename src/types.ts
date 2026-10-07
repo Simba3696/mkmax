@@ -52,6 +52,8 @@ export interface Card {
   wikiTitle?: string;
   /** Page the image was found on (mkmobilebase.com or the wiki); unset for a pasted URL. */
   imagePage?: string;
+  /** The rarity MK Mobile Base lists for this card that the user chose not to use ("Keep mine"), so it isn't offered again. */
+  keptRarity?: string;
   notes?: string;
 }
 

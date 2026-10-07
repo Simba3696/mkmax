@@ -35,3 +35,17 @@ export function isChallengeKameo(card: Pick<Card, 'name' | 'rarityId'>, rules: R
 /** The source a newly added card starts with: challenge for a challenge Kameo, otherwise none. */
 export const initialSource = (card: Pick<Card, 'name' | 'rarityId'>, rules: RarityRule[]): Card['source'] =>
   isChallengeKameo(card, rules) ? 'challenge' : undefined;
+
+/**
+ * Moves a card to the rarity MK Mobile Base gives it. The Elder challenge tag goes with the Gold Kameo tier: a
+ * challenge Kameo moved into it gets the tag unless it already has a source, and one moved out of it loses the tag.
+ * A rarity kept earlier is dropped, since the card now has the site's.
+ */
+export function applyRarityFix(card: Card, to: string, rules: RarityRule[]) {
+  const wasChallenge = isChallengeKameo(card, rules);
+  card.rarityId = to;
+  delete card.keptRarity;
+  const isChallenge = isChallengeKameo(card, rules);
+  if (isChallenge && !wasChallenge && !card.source) card.source = 'challenge';
+  if (wasChallenge && !isChallenge && card.source === 'challenge') delete card.source;
+}

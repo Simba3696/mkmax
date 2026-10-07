@@ -55,7 +55,8 @@ function parseLevel(word: string, rule: RarityRule | undefined): number | null {
  * One card per line. A line can be just a name ("Jade, Lizard"), or a name followed by " - " parts in any order:
  * rarity ("Epic"), where it comes from ("Krypt Gear", or a tower name like "Kold Tower"), and level ("F2",
  * "Unowned"). A line that's only a rarity's name (e.g. "Gold Kameo") switches the rarity for the lines after it,
- * so lists copied from notes with headings work as-is. Underline rows ("-----") and blank lines are skipped.
+ * so lists copied from notes with headings work as-is. Underline rows ("-----") and blank lines are skipped, and a
+ * leading bullet or number is dropped.
  */
 export function parseCardList(text: string, rarities: RarityRule[], startRarityId: string, existing: Card[]): ParsedList {
   const byKey = new Map(existing.map((c) => [`${c.rarityId}|${nameKey(c.name)}`, c]));
@@ -63,8 +64,10 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
   let headingRarityId = startRarityId;
   const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [] };
   for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim().replace(/\s+/g, ' ');
-    if (!line || /^[-=_*\s]+$/.test(line)) continue;
+    const trimmed = raw.trim().replace(/\s+/g, ' ');
+    if (!trimmed || /^[-=_*\s]+$/.test(trimmed)) continue;
+    // Lists copied from notes often have bullets or numbers ("- Jade, Lizard", "2. Kori Blade"), which aren't part of the name.
+    const line = trimmed.replace(/^(?:[-–—*•·]|\d+[.)])\s+/, '');
     const [name, ...parts] = line.split(/\s+[-–—]\s+/);
     if (parts.length === 0) {
       const heading = findRarity(line.replace(/:$/, ''), rarities);
@@ -95,6 +98,8 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     const rule = rarities.find((r) => r.id === rarityId);
     const fusion = levelWord == null ? undefined : parseLevel(levelWord, rule)!;
     if (!problem && rule && fusion != null && fusion > maxFusion(rule)) problem = `${levelWord} is past this rarity’s max`;
+    // Only gear is tracked as Krypt or tower gear. A character or Kameo tagged that way would drop out of the plan.
+    if (!problem && rule && source && rule.kind !== 'equipment') problem = 'Only gear comes from the Krypt or a tower';
     if (problem) {
       out.problems.push({ line, reason: problem });
       continue;

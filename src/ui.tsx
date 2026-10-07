@@ -264,7 +264,14 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
 /** Chip text for where a card comes from besides packs. */
 export const SOURCE_LABELS: Record<NonNullable<Card['source']>, string> = { krypt: 'krypt', tower: 'tower', challenge: 'Elder challenge' };
 
-/** A small rounded label: time left, guest, source, plan phase. */
-export function Chip({ tone = 'plain', children }: { tone?: ChipTone; children: ReactNode }) {
-  return <span className={`inline-block text-tiny py-[2px] px-[7px] rounded-full border whitespace-nowrap mr-[4px] ${chipTone[tone]}`}>{children}</span>;
+/** A small rounded label: time left, guest, source, plan phase. With onClick it's a button that looks the same. */
+export function Chip({ tone = 'plain', children, onClick, title }: { tone?: ChipTone; children: ReactNode; onClick?: () => void; title?: string }) {
+  const look = `inline-block text-tiny py-[2px] px-[7px] rounded-full border whitespace-nowrap mr-[4px] ${chipTone[tone]}`;
+  if (!onClick) return <span className={look} title={title}>{children}</span>;
+  // min-h-0 undoes the base button's 38px minimum, so it sits in a line of chips at their height.
+  return (
+    <button className={`${look} min-h-0 md:hover:underline`} onClick={onClick} title={title}>
+      {children}
+    </button>
+  );
 }
