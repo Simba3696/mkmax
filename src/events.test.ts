@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
-import { challengeFor, currencyFor, packFromShop, scheduledSeason, scheduledSeasonEnd, shopSuggestions, titleCase, packName, fixPackNames, type EventSchedule } from './events';
+import { challengeFor, currencyFor, packFromShop, scheduleDate, scheduledSeason, scheduledSeasonEnd, shopSuggestions, titleCase, packName, fixPackNames, type EventSchedule } from './events';
 import { toLocalInput } from './engine';
 
 const NOW = new Date('2026-09-28T17:00:00Z');
@@ -18,6 +18,8 @@ const events: EventSchedule = {
     { name: "D'VORAH Venomous", start: '2026-09-23T16:00:00Z', end: '2026-09-30T16:00:00Z' },
     { name: 'TRIBORG Sub-Zero (LK-52O)', start: '2026-09-30T16:00:00Z', end: '2026-10-07T16:00:00Z' },
   ],
+  // The site drops a week once it's over, so later in a season its earlier weeks are here only because
+  // scripts/fetch-events.mjs keeps them from the deployed copy (see scripts/schedule.test.mjs).
   seasons: [
     { name: 'Circle of Shadow 2', start: '2026-09-23T16:00:00Z', end: '2026-09-30T16:00:00Z' },
     { name: 'Kold', start: '2026-09-30T16:00:00Z', end: '2026-10-07T16:00:00Z' },
@@ -78,5 +80,11 @@ describe('event schedule', () => {
     });
     // In the first week there are no earlier week ends.
     expect(scheduledSeason(events, NOW)).toMatchObject({ start: local('2026-09-23T16:00:00Z'), weekEnds: [] });
+  });
+
+  it('dates the schedule by when the site captured it, or else when it was downloaded', () => {
+    const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    expect(scheduleDate(events)).toBe(day('2026-09-24T00:00:00Z'));
+    expect(scheduleDate({ ...events, capturedAt: null })).toBe(day('2026-09-28T00:00:00Z'));
   });
 });

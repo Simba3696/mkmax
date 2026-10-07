@@ -5,7 +5,7 @@ import { CardThumb, ConfirmButton, fmt, useDeviceChoice, useNow } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
 import PackEditor from './PackEditor';
-import { packFromShop, packName, scheduledSeasonEnd, shopSuggestions, useEvents } from '../events';
+import { packFromShop, packName, scheduleDate, scheduledSeasonEnd, shopSuggestions, useEvents } from '../events';
 import type { Pack } from '../types';
 
 const SORTS = ['ending', 'currency'] as const;
@@ -260,7 +260,7 @@ function SeasonBar() {
   if (!end && !scheduled && !state.packs.some((p) => p.currencyId === REALM_KLASH_CURRENCY)) return null;
   const seasonalNow = state.packs.filter((p) => p.season && p.endsAt === end).length;
   const leaving = `${seasonalNow} seasonal item${seasonalNow === 1 ? '' : 's'} leave${seasonalNow === 1 ? 's' : ''} then.`;
-  if (scheduled) {
+  if (scheduled && events) {
     return (
       <div className={card}>
         <div className={`${row} items-center`}>
@@ -268,7 +268,9 @@ function SeasonBar() {
           <span className={`${grow} md:flex-none`}>Realm Klash season ends</span>
           <b>{new Date(scheduled).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</b>
         </div>
-        <p className={note}>{leaving} Date from MK Mobile Base's event schedule, refreshed daily.</p>
+        <p className={note}>
+          {leaving} Date from MK Mobile Base's event schedule of {scheduleDate(events)}.
+        </p>
       </div>
     );
   }
@@ -325,7 +327,7 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
       {open && (
         <>
           <p className={`${note} md:max-w-[90ch]`}>
-            From MK Mobile Base's event schedule. It doesn't have drop rates, so <b>Add</b> fills in the rest and you enter the odds for cards you need.
+            From MK Mobile Base's event schedule of {scheduleDate(events)}. It doesn't have drop rates, so <b>Add</b> fills in the rest and you enter the odds for cards you need.
             Packs with nothing you need: <b>Not needed</b> hides them for good.
           </p>
           {/* Two columns from xl (1280px), where each column is wide enough for a one-line title; there every row gets its

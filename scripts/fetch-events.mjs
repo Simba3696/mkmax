@@ -1,50 +1,47 @@
 // Downloads MK Mobile Base's event schedule (its copy of mkmobileevent.com) into public/events.json: shop packs,
 // challenges and Realm Klash seasons, with dates as ISO strings. The site doesn't allow cross-site requests, so
 // the app reads this file instead. Run by the deploy workflow (daily and on every push), or: npm run events
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { parseSchedule, withPastSeasons } from './schedule.mjs';
 
 const API = 'https://mkmobilebase.com/api/events/schedule';
 const HEADERS = { Accept: 'application/json', 'User-Agent': 'mkmax events (https://github.com/Simba3696/mkmax)' };
+/** The deployed app; the workflow sets PAGES_URL. */
+const LIVE = `${process.env.PAGES_URL ?? 'https://simba3696.github.io/mkmax'}/events.json`;
+const FILE = new URL('../public/events.json', import.meta.url);
 
 const res = await fetch(API, { headers: HEADERS });
 if (!res.ok) throw new Error(`events: HTTP ${res.status}`);
 const schedule = await res.json();
+const { packs, challenges, seasons } = parseSchedule(schedule);
 
-/** "September 23, 2026, 16:00 UTC" → ISO; "Permanent" or blank → null. */
-function date(text) {
-  if (!text || /permanent/i.test(text)) return null;
-  const t = new Date(text.replace(/,\s*(\d{1,2}:\d{2})\s*UTC$/i, ' $1 UTC'));
-  return isNaN(t.getTime()) ? null : t.toISOString();
+/** A copy of events.json, or null if it can't be read. Past seasons are taken from it. */
+async function earlierCopy(load, what) {
+  try {
+    return await load();
+  } catch (e) {
+    console.warn(`events: couldn't read the ${what} copy (${e.message})`);
+    return null;
+  }
 }
-
-const field = (record, label) => record.fields?.find((f) => f.label === label)?.value ?? null;
-const section = (pageId, title) =>
-  schedule.pages?.find((p) => p.id === pageId)?.sections?.find((s) => s.title === title)?.records ?? [];
-
-const packs = section('packs', 'Available Packs').map((r) => {
-  const price = /^([\d,]+)\s+(.+)$/.exec(field(r, 'Price') ?? '');
-  const limit = /^(\d+)/.exec(field(r, 'Limit') ?? '');
-  return {
-    name: r.name,
-    start: date(field(r, 'Start')),
-    end: date(field(r, 'End')),
-    cost: price ? Number(price[1].replace(/,/g, '')) : null,
-    currency: price ? price[2] : null,
-    limit: limit ? Number(limit[1]) : null,
-    image: r.image ?? null,
-  };
-});
-
-const timed = (pageId, titles, nameField) =>
-  titles.flatMap((t) => section(pageId, t)).map((r) => ({ name: field(r, nameField) ?? r.name, start: date(field(r, 'Start')), end: date(field(r, 'End')) }));
-
-const pageIdOf = (title) => schedule.pages?.find((p) => p.sections?.some((s) => s.title === title))?.id;
-const challenges = timed('challenges', ['Current Challenges', 'Upcoming Challenges'], 'Character');
-const seasonPage = pageIdOf('Current Season');
-const seasons = seasonPage ? timed(seasonPage, ['Current Season', 'Upcoming Seasons'], 'Rewards Type') : [];
+// The deployed copy has the weeks this script kept on its last run; the local one (the committed copy in CI)
+// covers a first deploy, or a live site that can't be reached.
+const live = await earlierCopy(async () => {
+  const r = await fetch(LIVE, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}, 'live');
+const local = await earlierCopy(() => JSON.parse(readFileSync(FILE, 'utf8')), 'local');
+const allSeasons = withPastSeasons(seasons, [live, local].flatMap((e) => e?.seasons ?? []), new Date());
 
 writeFileSync(
-  new URL('../public/events.json', import.meta.url),
-  JSON.stringify({ source: 'https://mkmobilebase.com/en/events', fetchedAt: new Date().toISOString(), capturedAt: schedule.capturedAt ?? null, packs, challenges, seasons }, null, 1) + '\n',
+  FILE,
+  JSON.stringify(
+    { source: 'https://mkmobilebase.com/en/events', fetchedAt: new Date().toISOString(), capturedAt: schedule.capturedAt ?? null, packs, challenges, seasons: allSeasons },
+    null,
+    1,
+  ) + '\n',
 );
-console.log(`events: ${packs.length} packs, ${challenges.length} challenges, ${seasons.length} seasons (captured ${schedule.capturedAt})`);
+console.log(
+  `events: ${packs.length} packs, ${challenges.length} challenges, ${seasons.length} seasons and ${allSeasons.length - seasons.length} past weeks (captured ${schedule.capturedAt})`,
+);

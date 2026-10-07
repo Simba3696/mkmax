@@ -23,7 +23,7 @@ flowchart LR
 
 Two constraints shape this:
 
-- **MK Mobile Base doesn't allow cross-origin requests**, so the browser can't call it. CI fetches the catalog and the event schedule at build time and ships them as static JSON. The committed copies are the fallback when the site is down.
+- **MK Mobile Base doesn't allow cross-origin requests**, so the browser can't call it. CI fetches the catalog and the event schedule at build time and ships them as static JSON. When the site is down or its data looks wrong, the deploy ships the copies that are live again, or the committed ones if those can't be downloaded. The schedule script also reads the live `events.json` to keep Realm Klash weeks the site has dropped.
 - **No server to run or pay for.** Personal data stays on the device; sync goes through a gist the user owns, using their own token.
 
 ## Layers
@@ -96,7 +96,7 @@ The loop itself is `SyncLoop` in `syncLoop.ts`, plain TypeScript with GitHub, th
 
 ## Offline and updates
 
-`vite-plugin-pwa` precaches the app shell. `main.tsx` asks for persistent storage (`navigator.storage.persist()`) at startup, since without sync localStorage is the only copy of the data and browsers may clear it. `events.json` is network-first (it changes daily) and card art from MK Mobile Base and the wiki is cache-first for 90 days. The build stamps the short commit id and date into `__APP_VERSION__`, shown at the bottom of Settings. Pull to refresh checks for a new service worker and reloads into it.
+`vite-plugin-pwa` precaches the app shell. `main.tsx` asks for persistent storage (`navigator.storage.persist()`) at startup, since without sync localStorage is the only copy of the data and browsers may clear it. `events.json` is network-first (it changes daily), falling back to the cached copy after 4 seconds on a connection that hangs, and card art from MK Mobile Base and the wiki is cache-first for 90 days. The build stamps the short commit id and date into `__APP_VERSION__`, shown at the bottom of Settings. Pull to refresh checks for a new service worker and reloads into it.
 
 ## Styling and layout
 
@@ -106,4 +106,4 @@ Styles are Tailwind CSS v4 utilities, built at compile time by `@tailwindcss/vit
 
 ## Testing
 
-Vitest covers the pure modules: the engine, migrations via `normalize`, sync decisions, the sync loop (two devices against a fake gist, with requests held open to edit or disconnect mid-sync), the list parser, catalog and event name matching. Views have no tests; they're thin over the engine and are checked by running the app. CI runs lint and tests before every deploy.
+Vitest covers the pure modules: the engine, migrations via `normalize`, sync decisions, the sync loop (two devices against a fake gist, with requests held open to edit or disconnect mid-sync), the list parser, catalog and event name matching, and the schedule script's parsing and season carry-over (`scripts/schedule.test.mjs`). Views have no tests; they're thin over the engine and are checked by running the app. CI runs lint and tests before every deploy.

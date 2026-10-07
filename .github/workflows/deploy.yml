@@ -22,6 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # The deployed app's address and path, from GitHub Pages itself. github.event.repository isn't set on the
+      # daily scheduled run, so building them from it pointed that run at the wrong site. The event schedule
+      # refresh keeps past Realm Klash weeks from the live events.json, and both refreshes fall back to the live
+      # copies when MK Mobile Base fails.
+      - id: pages
+        uses: actions/configure-pages@v5
+      - run: |
+          echo "PAGES_URL=${{ steps.pages.outputs.base_url }}" >> "$GITHUB_ENV"
+          echo "BASE_PATH=${{ steps.pages.outputs.base_path }}/" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -29,14 +38,25 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
-      # Refresh the MK Mobile Base catalog (names, rarities, card art). If the site is down, the committed copy is used.
-      - run: npm run catalog || echo "::warning::Catalog refresh failed; deploying the committed public/catalog.json"
+      # Refresh the MK Mobile Base catalog (names, rarities, card art). If the site is down or its data looks wrong,
+      # the script fails and the copy that's live now is deployed again. The committed copy only changes when
+      # someone commits it, so it's used only if the live one can't be downloaded either.
+      - run: |
+          npm run catalog && exit 0
+          echo "::warning::Catalog refresh failed; deploying the live catalog.json again"
+          curl -fsS --max-time 60 "$PAGES_URL/catalog.json" -o "$RUNNER_TEMP/catalog.json" &&
+            jq -e '.items | length > 0' "$RUNNER_TEMP/catalog.json" > /dev/null &&
+            mv "$RUNNER_TEMP/catalog.json" public/catalog.json ||
+            echo "::warning::Couldn't download the live catalog.json either; deploying the committed one"
       # Same for MK Mobile Base's event schedule (shop packs, challenges, Realm Klash seasons).
-      - run: npm run events || echo "::warning::Event schedule refresh failed; deploying the committed public/events.json"
+      - run: |
+          npm run events && exit 0
+          echo "::warning::Event schedule refresh failed; deploying the live events.json again"
+          curl -fsS --max-time 60 "$PAGES_URL/events.json" -o "$RUNNER_TEMP/events.json" &&
+            jq -e '.packs | length > 0' "$RUNNER_TEMP/events.json" > /dev/null &&
+            mv "$RUNNER_TEMP/events.json" public/events.json ||
+            echo "::warning::Couldn't download the live events.json either; deploying the committed one"
       - run: npm run build
-        env:
-          BASE_PATH: /${{ github.event.repository.name }}/
-      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
