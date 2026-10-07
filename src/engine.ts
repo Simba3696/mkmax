@@ -527,10 +527,11 @@ export function seasonEnd(saved: string | null | undefined, now: Date): string |
  * Change the current season's end (a corrected timer, or a season that ended early). Every seasonal pack that
  * was ending with it moves too; packs from earlier seasons keep their dates. Mutates the state.
  *
- * An item entered ahead for a later season (see packEndOnSave) ends 2 weeks at a time after the changeover it was
- * saved against, so it moves with that changeover to stay in the season it starts in. Left on its old date it would
- * expire while still in the store, and no later move would find it. One that starts right at the changeover opens
- * the next season, so it starts at the new one.
+ * An item entered ahead for a later season (see packEndOnSave) starts once the season it was saved against is over,
+ * so it moves with that changeover to stay in the season it starts in, and its end becomes the 2-week guess from the
+ * new changeover. Left on its old date it would expire while still in the store, and no later move would find it.
+ * Any end counts, not just the 2-week guess, since the schedule may have dated its season. One that starts right at
+ * the changeover opens the next season, so it starts at the new one.
  *
  * `weekEnds` are the current season's earlier week ends, when the schedule knows them. The schedule can add a week
  * to a season after the saved end has passed, and that season's items still end on the saved date rather than the
@@ -545,7 +546,7 @@ export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: str
   for (const p of s.packs) {
     if (!p.season || !p.endsAt) continue;
     const start = p.startsAt;
-    const ahead = start && changeovers.find((c) => start >= c && p.endsAt === seasonEnd(c, new Date(start)));
+    const ahead = start && changeovers.find((c) => start >= c);
     if (ahead) {
       if (start === ahead) p.startsAt = to;
       p.endsAt = seasonEnd(to, new Date(p.startsAt!));
@@ -583,12 +584,17 @@ export function editedPack(draft: Pack, live: Pack | undefined, changed: { purch
 /**
  * The end date a pack is saved with. A seasonal pack ends with the current season (`currentEnd`), except one from a
  * season that has already ended, which keeps its date, and one that starts once the current season is over, which
- * ends with the season it starts in: `startSeasonEnd` when the schedule lists that season, otherwise 2 weeks at a
- * time. Other packs, and seasonal ones before any season end is known, keep their own end.
+ * ends with the season it starts in (`startSeason`, from scheduledSeason, when the schedule lists it). That's the
+ * schedule's end when a different season is listed after it, and otherwise 2 weeks at a time, or the schedule's end
+ * if that's later: the site lists only the next week, so a season that starts next week shows as one week long. Other
+ * packs, and seasonal ones before any season end is known, keep their own end.
  */
-export function packEndOnSave(pack: Pack, seasonal: boolean, currentEnd: string | null, now: Date, startSeasonEnd?: string | null) {
+export function packEndOnSave(pack: Pack, seasonal: boolean, currentEnd: string | null, now: Date, startSeason?: { end: string; complete: boolean } | null) {
   if (!seasonal || !currentEnd || fromEndedSeason(pack, currentEnd, now)) return pack.endsAt;
-  if (pack.startsAt && pack.startsAt >= currentEnd) return startSeasonEnd ?? seasonEnd(currentEnd, new Date(pack.startsAt));
+  if (pack.startsAt && pack.startsAt >= currentEnd) {
+    const guess = seasonEnd(currentEnd, new Date(pack.startsAt))!;
+    return startSeason && (startSeason.complete || startSeason.end > guess) ? startSeason.end : guess;
+  }
   return currentEnd;
 }
 

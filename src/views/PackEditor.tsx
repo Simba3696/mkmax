@@ -4,7 +4,7 @@ import { LevelOptions, Modal, NumInput, useNow } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
 import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, isSeasonal, levelLabel, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
 import { initialSource } from '../challenges';
-import { scheduledSeasonEnd, useEvents } from '../events';
+import { scheduledSeason, scheduledSeasonEnd, useEvents } from '../events';
 import type { Card, Pack, RarityRule } from '../types';
 
 /** A line of inputs: a drop's card and chance, or the pool and new-card controls. */
@@ -143,8 +143,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   // Blood Ruby characters, Kameos and Kameo packs leave with the season; unless the user said otherwise, guess from the item.
   const seasonal = isSeasonal(base, state);
   const pastSeason = fromEndedSeason(base, seasonDraft, now);
-  const startSeasonEnd = base.startsAt ? scheduledSeasonEnd(events, new Date(base.startsAt)) : null;
-  const endsAt = packEndOnSave(base, seasonal, seasonDraft, now, startSeasonEnd);
+  const startSeason = base.startsAt ? scheduledSeason(events, new Date(base.startsAt)) : null;
+  const endsAt = packEndOnSave(base, seasonal, seasonDraft, now, startSeason);
   // An item that starts after this season ends, e.g. next season's character entered ahead of time.
   const nextSeason = seasonal && !pastSeason && !!seasonDraft && endsAt !== seasonDraft;
   const showDate = (t: string) => new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });

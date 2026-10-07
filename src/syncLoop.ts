@@ -83,7 +83,9 @@ export class SyncLoop {
 
   /**
    * Neither pull nor push until this device runs the newer build; the regular pulls check again. It doesn't look for
-   * the update itself: that reloads the app straight away, which would throw away an open pack editor.
+   * the update itself, since finding it reloads the app. The reload waits for pop-ups and the Undo bar (see
+   * appUpdate.ts), but not for what's half typed on the page, like the Add card form or a card being renamed, and a
+   * background sync can land at any moment.
    */
   private waitForNewerApp() {
     this.deps.onStatus({ kind: 'error', message: NEWER_MESSAGE });

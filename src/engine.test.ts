@@ -641,6 +641,13 @@ describe('Realm Klash seasons', () => {
     expect(dates(fixed)).toEqual([[end, '2026-01-26T20:00'], ['2026-01-30T10:00', '2026-02-09T20:00']]);
   });
 
+  it('moves an item entered ahead whose end came from the schedule', () => {
+    // Next season was listed as one week, then the current season was extended a week.
+    const s = setup([], [pack('next', [], { season: true, startsAt: '2026-01-12T20:00', endsAt: '2026-01-19T20:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-12T20:00'));
+    moveSeasonEnd(s, '2026-01-19T20:00', NOW);
+    expect([s.packs[0].startsAt, s.packs[0].endsAt]).toEqual(['2026-01-19T20:00', '2026-02-02T20:00']);
+  });
+
   it('moves an item entered ahead when the schedule extends the season after its saved end passed', () => {
     const s = setup([], [pack('next', [], { season: true, startsAt: '2026-01-10T11:00', endsAt: '2026-01-24T11:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
     moveSeasonEnd(s, '2026-01-17T11:00', NOW, ['2026-01-10T11:00']);
@@ -685,8 +692,11 @@ describe('saving a pack from the editor', () => {
     const end = '2026-01-12T20:00';
     expect(packEndOnSave(rk('next', { startsAt: end }), true, end, NOW)).toBe('2026-01-26T20:00');
     expect(packEndOnSave(rk('later', { startsAt: '2026-01-30T10:00' }), true, end, NOW)).toBe('2026-02-09T20:00');
-    // The schedule's date when it lists that season.
-    expect(packEndOnSave(rk('next', { startsAt: end }), true, end, NOW, '2026-01-19T20:00')).toBe('2026-01-19T20:00');
+    // The schedule's date when it lists that whole season, even a one-week season.
+    expect(packEndOnSave(rk('next', { startsAt: end }), true, end, NOW, { end: '2026-01-19T20:00', complete: true })).toBe('2026-01-19T20:00');
+    // The site lists only next season's first week: that's not its end, so it gets 2 weeks, or longer if listed.
+    expect(packEndOnSave(rk('next', { startsAt: end }), true, end, NOW, { end: '2026-01-19T20:00', complete: false })).toBe('2026-01-26T20:00');
+    expect(packEndOnSave(rk('next', { startsAt: end }), true, end, NOW, { end: '2026-02-02T20:00', complete: false })).toBe('2026-02-02T20:00');
     // Starting during this season: it still ends with this one.
     expect(packEndOnSave(rk('soon', { startsAt: '2026-01-11T10:00' }), true, end, NOW)).toBe(end);
   });

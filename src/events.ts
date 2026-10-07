@@ -219,9 +219,11 @@ export function challengeWhen(ch: TimedEvent, now: Date) {
  * The current season from the schedule, in local time. The site lists seasons a week at a time ("Circle of
  * Shadow 2", then "Kold" twice), so back-to-back weeks with the same name (ignoring a trailing week number) are one
  * season. `weekEnds` are the ends of its weeks before the current one: where an earlier copy of the schedule, with
- * fewer weeks, would have said the season ends. Null if the schedule doesn't cover now.
+ * fewer weeks, would have said the season ends. `complete` is whether a different season is listed after it: the
+ * site lists only the current and next week, so a later season may have only its first week listed yet, and its
+ * `end` is then just where that week ends. Null if the schedule doesn't cover now.
  */
-export function scheduledSeason(events: EventSchedule | null, now: Date): { start: string; end: string; weekEnds: string[] } | null {
+export function scheduledSeason(events: EventSchedule | null, now: Date): { start: string; end: string; weekEnds: string[]; complete: boolean } | null {
   const weeks = (events?.seasons ?? []).filter((s) => s.start && s.end).sort((a, b) => a.start!.localeCompare(b.start!));
   const base = (n: string) => n.replace(/\s+\d+$/, '').toLowerCase();
   const i = weeks.findIndex((w) => new Date(w.start!) <= now && new Date(w.end!) > now);
@@ -234,8 +236,9 @@ export function scheduledSeason(events: EventSchedule | null, now: Date): { star
     start = weeks[j].start!;
   }
   let end = weeks[i].end!;
-  for (let j = i + 1; j < weeks.length && weeks[j].start === end && same(j); j++) end = weeks[j].end!;
-  return { start: localOrNull(start)!, end: localOrNull(end)!, weekEnds };
+  let j = i + 1;
+  for (; j < weeks.length && weeks[j].start === end && same(j); j++) end = weeks[j].end!;
+  return { start: localOrNull(start)!, end: localOrNull(end)!, weekEnds, complete: j < weeks.length && !same(j) };
 }
 
 /** The current season's end from the schedule (see scheduledSeason). */

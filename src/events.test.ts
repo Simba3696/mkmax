@@ -98,9 +98,19 @@ describe('event schedule', () => {
       start: local('2026-09-30T16:00:00Z'),
       end: local('2026-10-14T16:00:00Z'),
       weekEnds: [local('2026-10-07T16:00:00Z')],
+      complete: false,
     });
     // In the first week there are no earlier week ends.
     expect(scheduledSeason(events, NOW)).toMatchObject({ start: local('2026-09-23T16:00:00Z'), weekEnds: [] });
+  });
+
+  it("knows a season's end only once a different season is listed after it", () => {
+    // Circle of Shadow 2 is followed by Kold, so it's complete; nothing is listed after Kold yet.
+    expect(scheduledSeason(events, NOW)?.complete).toBe(true);
+    // The site lists only the next week, so next season shows just its first week until the second is listed.
+    const firstWeek = { ...events, seasons: [...events.seasons, { name: 'Shaolin', start: '2026-10-14T16:00:00Z', end: '2026-10-21T16:00:00Z' }] };
+    expect(scheduledSeason(firstWeek, new Date('2026-10-14T16:00:00Z'))).toMatchObject({ end: local('2026-10-21T16:00:00Z'), complete: false });
+    expect(scheduledSeason(firstWeek, new Date('2026-10-08T00:00:00Z'))?.complete).toBe(true);
   });
 
   it('dates the schedule by when the site captured it, or else when it was downloaded', () => {

@@ -70,6 +70,7 @@ describe('event schedule script', () => {
       start: local('2026-09-30T16:00:00Z'),
       end: local('2026-10-14T16:00:00Z'),
       weekEnds: [local('2026-10-07T16:00:00Z')],
+      complete: true,
     });
   });
 
