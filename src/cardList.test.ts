@@ -58,4 +58,22 @@ describe('pasted card lists', () => {
       '"Soon" isn’t a rarity, source or level',
     ]);
   });
+
+  it('drops bullets and numbers from the start of a line', () => {
+    const text = 'Gold Kameo\n- Jade, Lizard\n• Baraka, Klassic\n* Smoke, Klassic\n2. Kitana, Mournful\n3) Geras, MK1\n– Kori Blade - Epic - F2';
+    expect(parseCardList(text, rarities, 'diamond', []).cards).toEqual([
+      { name: 'Jade, Lizard', rarityId: 'kameo-gold' },
+      { name: 'Baraka, Klassic', rarityId: 'kameo-gold' },
+      { name: 'Smoke, Klassic', rarityId: 'kameo-gold' },
+      { name: 'Kitana, Mournful', rarityId: 'kameo-gold' },
+      { name: 'Geras, MK1', rarityId: 'kameo-gold' },
+      { name: 'Kori Blade', rarityId: 'epic', fusion: 3 },
+    ]);
+  });
+
+  it('tags only gear as Krypt or tower gear', () => {
+    const r = parseCardList('Scorpion, Klassic - Gold - Krypt\nJade, Lizard - Gold Kameo - Tower\nKori Blade - Epic - Krypt', rarities, 'diamond', []);
+    expect(r.cards).toEqual([{ name: 'Kori Blade', rarityId: 'epic', source: 'krypt' }]);
+    expect(r.problems.map((p) => p.reason)).toEqual(['Only gear comes from the Krypt or a tower', 'Only gear comes from the Krypt or a tower']);
+  });
 });

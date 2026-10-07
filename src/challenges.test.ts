@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isChallengeKameo } from './challenges';
+import { applyRarityFix, isChallengeKameo } from './challenges';
 import { buildCtx, packEV } from './engine';
 import { defaultState } from './defaults';
 import { normalize } from './normalize';
@@ -39,5 +39,37 @@ describe('challenge Kameos', () => {
   it('untags a retired challenge Kameo once, when the save is upgraded', () => {
     const v6 = { ...defaultState(), version: 6, cards: [kameo('Ermac, Klassic', 'kameo-gold', { source: 'challenge' }), kameo('Kotal Kahn, Dark Lord', 'kameo-gold', { source: 'challenge' })] };
     expect(normalize(v6).cards.map((c) => c.source)).toEqual([undefined, 'challenge']);
+  });
+
+  describe('moving a Kameo to the site rarity', () => {
+    const rules = defaultState().rarities;
+    const moved = (card: Card, to: string) => {
+      applyRarityFix(card, to, rules);
+      return card;
+    };
+
+    it('tags a challenge Kameo moved into Gold Kameo', () => {
+      expect(moved(kameo('Kotal Kahn, Dark Lord', 'kameo-diamond'), 'kameo-gold')).toMatchObject({ rarityId: 'kameo-gold', source: 'challenge' });
+    });
+
+    it('untags one moved out of Gold Kameo', () => {
+      const card = moved(kameo('Kotal Kahn, Dark Lord', 'kameo-gold', { source: 'challenge' }), 'kameo-diamond');
+      expect(card.rarityId).toBe('kameo-diamond');
+      expect(card.source).toBeUndefined();
+    });
+
+    it('leaves a Kameo that is not on the challenge list untagged', () => {
+      expect(moved(kameo('Jade, Lizard', 'kameo-diamond'), 'kameo-gold').source).toBeUndefined();
+    });
+
+    it('keeps a source the Kameo already has', () => {
+      // An older paste could tag a Kameo as Krypt gear; that stays until the user clears it.
+      expect(moved(kameo('Kotal Kahn, Dark Lord', 'kameo-diamond', { source: 'krypt' }), 'kameo-gold').source).toBe('krypt');
+      expect(moved(kameo('Kotal Kahn, Dark Lord', 'kameo-gold', { source: 'krypt' }), 'kameo-diamond').source).toBe('krypt');
+    });
+
+    it('forgets a rarity kept earlier', () => {
+      expect(moved(kameo('Jade, Lizard', 'kameo-diamond', { keptRarity: 'kameo-gold' }), 'kameo-gold').keptRarity).toBeUndefined();
+    });
   });
 });

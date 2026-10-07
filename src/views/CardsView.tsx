@@ -1,31 +1,36 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
 import { ascensionCaps, buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice, useNow } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
-import { appRarityId, catalogPageUrl, findInCatalog, loadCatalog, wantsCatalogImage } from '../catalog';
+import { catalogPageUrl, findInCatalog, loadCatalog, rarityMismatches, wantsCatalogImage, type CatalogItem } from '../catalog';
 import { parseCardList } from '../cardList';
-import { initialSource } from '../challenges';
+import { applyRarityFix, initialSource } from '../challenges';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Card, RarityRule } from '../types';
 
 type Source = NonNullable<Card['source']> | '';
 
-/** Gear can come from the Krypt or a tower; Kameos from an Elder challenge. */
+const SOURCE_NAMES: Record<NonNullable<Card['source']>, string> = { krypt: 'Krypt gear', tower: 'Tower gear', challenge: 'Elder challenge' };
+const SOURCES_BY_KIND: Record<RarityRule['kind'], NonNullable<Card['source']>[]> = { equipment: ['krypt', 'tower'], kameo: ['challenge'], character: [] };
+
+/**
+ * Gear can come from the Krypt or a tower; Kameos from an Elder challenge. A source the card's kind can't have (an
+ * older paste could tag a character as Krypt gear) is still listed, so it can be cleared.
+ */
 function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; value: Card['source']; onChange: (v: Card['source']) => void }) {
+  const options = SOURCES_BY_KIND[kind];
   return (
     <select value={value ?? ''} onChange={(e) => onChange((e.target.value as Source) || undefined)} aria-label="Source">
       <option value="">From packs/store</option>
-      {kind === 'equipment' ? (
-        <>
-          <option value="krypt">Krypt gear</option>
-          <option value="tower">Tower gear</option>
-        </>
-      ) : (
-        <option value="challenge">Elder challenge</option>
-      )}
+      {value && !options.includes(value) && <option value={value}>{SOURCE_NAMES[value]} (not for this rarity)</option>}
+      {options.map((v) => (
+        <option key={v} value={v}>
+          {SOURCE_NAMES[v]}
+        </option>
+      ))}
     </select>
   );
 }
@@ -183,11 +188,25 @@ function CardList() {
   const [q, setQ] = useState('');
   const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all');
   const [sortBy, setSortBy] = useDeviceChoice('mkmax:cardSort', CARD_SORTS);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  /**
+   * The card being renamed, its name before (which comes back if the name is cleared) and what's in the box. A blank
+   * box isn't saved, so a card never syncs with no name.
+   */
+  const [renaming, setRenaming] = useState<{ id: string; was: string; text: string } | null>(null);
   const [imageEditId, setImageEditId] = useState<string | null>(null);
   const [imgStatus, setImgStatus] = useState<{ busy: boolean; msg: string } | null>(null);
-  /** Cards whose rarity disagrees with mkmobilebase, from the last Find images run. */
-  const [rarityFixes, setRarityFixes] = useState<{ cardId: string; name: string; from: string; to: string }[]>([]);
+  // Cards get their art as soon as they're added, even under the wrong rarity, so the rarity check runs whenever
+  // the catalog is at hand rather than only from Find images.
+  const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    loadCatalog().then(
+      (items) => !cancelled && setCatalog(items),
+      () => {}, // offline: Find images tries again
+    );
+    return () => void (cancelled = true);
+  }, []);
+  const rarityFixes = useMemo(() => (catalog ? rarityMismatches(state.cards, ctx.rules, catalog) : []), [catalog, state.cards, ctx.rules]);
   const [draft, setDraft] = useState<Omit<Card, 'id'>>({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0, maxLevel: null, guest: false });
 
   const draftRule = ctx.rules.get(draft.rarityId) ?? state.rarities[0];
@@ -201,6 +220,7 @@ function CardList() {
     setImgStatus({ busy: true, msg: 'Checking the MK Mobile Base catalog…' });
     try {
       const items = await loadCatalog();
+      setCatalog(items);
       const found = new Map<string, Pick<Card, 'imageUrl' | 'wikiTitle' | 'imagePage'>>();
       for (const c of missingImages) {
         const hit = findInCatalog(c, ctx.rules.get(c.rarityId), items);
@@ -208,9 +228,15 @@ function CardList() {
       }
       // Anything the catalog doesn't have: fall back to the wiki (only for cards with no working image).
       const rest = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl)));
+      // A wiki that's down or offline still leaves the catalog's art to save.
+      let wikiError: string | undefined;
       if (rest.length) {
-        const fromWiki = await findCardImages(rest, ctx.rules, (msg) => setImgStatus({ busy: true, msg }));
-        for (const [id, m] of fromWiki) found.set(id, { ...m, imagePage: wikiUrl(m.wikiTitle) });
+        try {
+          const fromWiki = await findCardImages(rest, ctx.rules, (msg) => setImgStatus({ busy: true, msg }));
+          for (const [id, m] of fromWiki) found.set(id, { ...m, imagePage: wikiUrl(m.wikiTitle) });
+        } catch (e) {
+          wikiError = (e as Error).message;
+        }
       }
       // Older wiki images the catalog couldn't improve on: remember they were checked so they stop counting.
       const keep = missingImages.filter((c) => !found.has(c.id) && c.imageUrl && !brokenUrls.has(c.imageUrl) && c.wikiTitle);
@@ -221,32 +247,44 @@ function CardList() {
           else if (keep.some((k) => k.id === c.id)) c.imagePage = wikiUrl(c.wikiTitle!);
         }
       });
-      setRarityFixes(
-        state.cards.flatMap((c) => {
-          const hit = findInCatalog(c, ctx.rules.get(c.rarityId), items);
-          // appRarityId stays within the card's kind: a "Diamond" Kameo on the site maps to Diamond Kameo, not Diamond.
-          const to = hit && appRarityId(hit, ctx.rules.values());
-          return to && to !== c.rarityId
-            ? [{ cardId: c.id, name: c.name, from: ctx.rules.get(c.rarityId)?.label ?? c.rarityId, to }]
-            : [];
-        }),
-      );
       const left = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl))).length;
-      setImgStatus({ busy: false, msg: `Updated ${found.size} of ${missingImages.length}.${left ? ` ${left} not found online: open "Image" on those cards to paste a URL.` : ''}` });
+      const leftMsg = !left
+        ? ''
+        : wikiError
+          ? ` Couldn't reach the MK Mobile wiki (${wikiError}), so ${left} weren't looked up there. Try again later.`
+          : ` ${left} not found online: open "Image" on those cards to paste a URL.`;
+      setImgStatus({ busy: false, msg: `Updated ${found.size} of ${missingImages.length}.${leftMsg}` });
     } catch (e) {
       setImgStatus({ busy: false, msg: `Couldn't look up images: ${(e as Error).message}` });
     }
   }
 
-  function applyRarityFixes() {
+  const cardCount = (n: number) => `${n} card${n === 1 ? '' : 's'}`;
+  const whichCards = (fixes: typeof rarityFixes) => (fixes.length === 1 ? fixes[0].card.name : cardCount(fixes.length));
+  function applyRarityFixes(fixes: typeof rarityFixes) {
     update((d) => {
-      for (const f of rarityFixes) {
-        const c = d.cards.find((x) => x.id === f.cardId);
-        if (c) c.rarityId = f.to;
+      for (const f of fixes) {
+        const c = d.cards.find((x) => x.id === f.card.id);
+        if (c) applyRarityFix(c, f.to, d.rarities);
       }
-    }, `rarity change for ${rarityFixes.length} card${rarityFixes.length === 1 ? '' : 's'}`);
-    setRarityFixes([]);
+    }, `Changed the rarity of ${whichCards(fixes)}`);
   }
+
+  function keepRarities(fixes: typeof rarityFixes) {
+    update((d) => {
+      for (const f of fixes) {
+        const c = d.cards.find((x) => x.id === f.card.id);
+        if (c) c.keptRarity = f.to;
+      }
+    }, `Kept your rarity for ${whichCards(fixes)}`);
+  }
+
+  // Brings a kept card back into the rarity check, in case Keep mine was the wrong choice.
+  const askRarityAgain = (c: Card) =>
+    update((d) => {
+      const x = d.cards.find((y) => y.id === c.id);
+      if (x) delete x.keptRarity;
+    }, `Asking about ${c.name}'s rarity again`);
 
   const patch = (id: string, p: Partial<Card>) =>
     update((d) => {
@@ -254,9 +292,22 @@ function CardList() {
       if (c) Object.assign(c, p);
     });
 
+  function rename(c: Card, text: string) {
+    setRenaming({ id: c.id, was: renaming?.was ?? c.name, text });
+    if (text.trim()) patch(c.id, { name: text });
+  }
+
+  // A cleared name goes back to the name it had, so there's always something to tap to rename the card again.
+  function finishRename(c: Card) {
+    const name = renaming?.text.trim() || renaming?.was.trim() || c.name;
+    if (name !== c.name) patch(c.id, { name });
+    setRenaming(null);
+  }
+
   function add() {
     if (!draft.name.trim()) return;
     const isEquip = draftRule?.kind === 'equipment';
+    const tower = isEquip && draft.source === 'tower' ? draft.sourceNote?.trim() : undefined;
     update((d) =>
       void d.cards.push({
         id: newId(),
@@ -264,6 +315,7 @@ function CardList() {
         name: draft.name.trim(),
         guest: !!draftRule?.hasGuests && draft.guest,
         source: isEquip ? draft.source : initialSource(draft, d.rarities),
+        sourceNote: tower || undefined,
       }),
     );
     setDraft({ ...draft, name: '', fusion: 0, guest: false });
@@ -275,7 +327,8 @@ function CardList() {
   // "kind:equipment" etc. groups every rarity of that kind (Diamond + Gold characters, all gear, both Kameo tiers).
   const inRarity = (c: Card, value: string) => value === 'all' || c.rarityId === value || value === `kind:${state.rarities.find((r) => r.id === c.rarityId)?.kind}`;
   const inSource = (c: Card, value: Source | 'all') => value === 'all' || (c.source ?? '') === value;
-  const matchesSearch = (c: Card) => !q || c.name.toLowerCase().includes(q.toLowerCase());
+  // The card being renamed stays listed even if its new name no longer matches the search.
+  const matchesSearch = (c: Card) => !q || c.id === renaming?.id || c.name.toLowerCase().includes(q.toLowerCase());
   // Each filter option shows how many cards it would list, given the search and the other filter.
   const rarityCount = (value: string) => state.cards.filter((c) => matchesSearch(c) && inSource(c, sourceFilter) && inRarity(c, value)).length;
   const sourceCount = (value: Source | 'all') => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, value)).length;
@@ -324,7 +377,13 @@ function CardList() {
           {draftRule?.kind === 'equipment' && (
             <label className={field}>
               <span>Source</span>
-              <SourceSelect kind="equipment" value={draft.source} onChange={(v) => setDraft({ ...draft, source: v })} />
+              <SourceSelect kind="equipment" value={draft.source} onChange={(v) => setDraft({ ...draft, source: v, sourceNote: undefined })} />
+            </label>
+          )}
+          {draftRule?.kind === 'equipment' && draft.source === 'tower' && (
+            <label className={field}>
+              <span>Tower</span>
+              <input value={draft.sourceNote ?? ''} placeholder="e.g. Lin Kuei Tower" onChange={(e) => setDraft({ ...draft, sourceNote: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
             </label>
           )}
           <button className={`${btn.primary} md:-col-end-1`} onClick={add} disabled={!draft.name.trim()}>
@@ -380,19 +439,27 @@ function CardList() {
           <p>MK Mobile Base lists a different rarity for {rarityFixes.length === 1 ? 'this card' : 'these cards'}:</p>
           <ul className="list-disc pl-[40px] my-[1em] text-small">
             {rarityFixes.map((f) => (
-              <li key={f.cardId}>
-                {f.name}: {f.from} here, <b>{ctx.rules.get(f.to)?.label ?? f.to}</b> on the site
+              <li key={f.card.id} className="mb-[0.3rem]">
+                {f.card.name}: {ctx.rules.get(f.card.rarityId)?.label ?? f.card.rarityId} here, <b>{ctx.rules.get(f.to)?.label ?? f.to}</b> on the site{' '}
+                <span className="inline-flex flex-wrap gap-[0.4rem] align-middle">
+                  <button onClick={() => applyRarityFixes([f])}>Use the site's</button>
+                  <button className={btn.ghost} onClick={() => keepRarities([f])}>
+                    Keep mine
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
-          <div className={actions}>
-            <button className={btn.primary} onClick={applyRarityFixes}>
-              Use the site's rarity
-            </button>
-            <button className={btn.ghost} onClick={() => setRarityFixes([])}>
-              Keep mine
-            </button>
-          </div>
+          {rarityFixes.length > 1 && (
+            <div className={actions}>
+              <button className={btn.primary} onClick={() => applyRarityFixes(rarityFixes)}>
+                Use the site's for all
+              </button>
+              <button className={btn.ghost} onClick={() => keepRarities(rarityFixes)}>
+                Keep mine for all
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -412,17 +479,23 @@ function CardList() {
               <div className={`${row} items-center`}>
                 <CardThumb card={c} rule={rule} />
                 <div className={grow}>
-                  {editingId === c.id ? (
-                    <input value={c.name} autoFocus onChange={(e) => patch(c.id, { name: e.target.value })} onBlur={() => setEditingId(null)} onKeyDown={(e) => e.key === 'Enter' && setEditingId(null)} />
+                  {renaming?.id === c.id ? (
+                    <input value={renaming.text} autoFocus onChange={(e) => rename(c, e.target.value)} onBlur={() => finishRename(c)} onKeyDown={(e) => e.key === 'Enter' && finishRename(c)} />
                   ) : (
-                    <div className={`${rowTitle} hover:underline decoration-muted underline-offset-2 md:cursor-pointer`} onClick={() => setEditingId(c.id)} title="Tap to rename">
-                      {c.name}
+                    <div className={`${rowTitle} hover:underline decoration-muted underline-offset-2 md:cursor-pointer`} onClick={() => setRenaming({ id: c.id, was: c.name, text: c.name })} title="Tap to rename">
+                      {/* A card synced or saved with no name still needs something to tap. */}
+                      {c.name.trim() || <span className="text-muted italic">Unnamed</span>}
                     </div>
                   )}
                   <div className="text-small">
                     <RarityBadge rule={rule} />
                     {c.guest && <Chip tone="guest">guest</Chip>}
-                    {c.source && <Chip tone="source">{SOURCE_LABELS[c.source]}{c.sourceNote && `: ${c.sourceNote}`}</Chip>}
+                    {c.keptRarity && c.keptRarity !== c.rarityId && (
+                      <Chip tone="muted" onClick={() => askRarityAgain(c)} title="You kept your rarity. Tap to be asked about the site's again.">
+                        site says {ctx.rules.get(c.keptRarity)?.label ?? c.keptRarity}
+                      </Chip>
+                    )}
+                    {c.source && <Chip tone="source">{SOURCE_LABELS[c.source]}{c.source === 'tower' && c.sourceNote && `: ${c.sourceNote}`}</Chip>}
                     {c.source === 'challenge' && (() => {
                       const ch = challengeFor(c, events, now);
                       return ch && <Chip tone="limited">challenge {challengeWhen(ch, now)}</Chip>;
@@ -454,7 +527,17 @@ function CardList() {
                     Guest
                   </label>
                 )}
-                {rule.kind !== 'character' && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v })} />}
+                {(rule.kind !== 'character' || c.source) && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v, sourceNote: undefined })} />}
+                {c.source === 'tower' && (
+                  <input
+                    className="w-[11rem]"
+                    value={c.sourceNote ?? ''}
+                    placeholder="Tower name"
+                    aria-label="Tower"
+                    onChange={(e) => patch(c.id, { sourceNote: e.target.value || undefined })}
+                    onBlur={(e) => e.target.value !== e.target.value.trim() && patch(c.id, { sourceNote: e.target.value.trim() || undefined })}
+                  />
+                )}
                 <button className={btn.ghost} onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
                   Image
                 </button>

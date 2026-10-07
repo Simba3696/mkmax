@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appRarityId, catalogImageUpdates, findInCatalog, nameKey, type CatalogItem } from './catalog';
+import { appRarityId, catalogImageUpdates, findInCatalog, nameKey, rarityMismatches, type CatalogItem } from './catalog';
 import { defaultState } from './defaults';
 import type { Card } from './types';
 
@@ -71,3 +71,23 @@ describe('automatic catalog art', () => {
   });
 });
 
+
+describe('rarity check', () => {
+  it("lists cards whose rarity the site gives differently, whether or not they have art", () => {
+    const cards: Card[] = [
+      { ...card('Man in the Sky', 'epic'), imageUrl: 'Man in the Sky.webp', imagePage: 'https://mkmobilebase.com/x' },
+      card('Cassie Cage, Covert Ops', 'kameo-diamond'),
+      card('Scorpion, MKII Movie', 'diamond'), // right already
+      card('Unknown Card', 'gold'), // not in the catalog
+    ];
+    expect(rarityMismatches(cards, rules, ITEMS).map((m) => [m.card.name, m.to])).toEqual([
+      ['Man in the Sky', 'rare'],
+      ['Cassie Cage, Covert Ops', 'kameo-gold'],
+    ]);
+  });
+
+  it('leaves out a rarity the user kept, until the site gives another one', () => {
+    expect(rarityMismatches([{ ...card('Man in the Sky', 'epic'), keptRarity: 'rare' }], rules, ITEMS)).toEqual([]);
+    expect(rarityMismatches([{ ...card('Man in the Sky', 'epic'), keptRarity: 'uncommon' }], rules, ITEMS).map((m) => m.to)).toEqual(['rare']);
+  });
+});
