@@ -32,7 +32,7 @@ Two constraints shape this:
 flowchart TB
   Views["views/*.tsx, App.tsx<br/>(React: tabs, editors, panels)"]
   Store["store.tsx, storage.ts, syncLoop.ts<br/>(state, undo, persistence, sync loop)"]
-  Engine["engine.ts<br/>(pure: scoring, planner, kard plan, forecasts)"]
+  Engine["engine.ts<br/>(pure: scoring, planner, kard plan, forecasts, purchases, pack saving)"]
   Data["normalize.ts, defaults.ts, types.ts<br/>(save shape and migrations)"]
   Ext["events.ts, catalog.ts, wiki.ts, sync.ts<br/>(external data)"]
   Views --> Store
@@ -44,7 +44,7 @@ flowchart TB
   Data --> Engine
 ```
 
-- **`engine.ts` is plain TypeScript with no React and no I/O.** It takes an `AppState` and a `now` and returns plans. That's what makes the planner unit-testable (`engine.test.ts` is the biggest test file) and lets scripts reuse it. Keep it that way: anything that needs the clock, the network or the DOM belongs in a view, the store or an `Ext` module, and gets passed in.
+- **`engine.ts` is plain TypeScript with no React and no I/O.** It takes an `AppState` and a `now` and returns plans. That's what makes the planner unit-testable (`engine.test.ts` is the biggest test file) and lets scripts reuse it. Keep it that way: anything that needs the clock, the network or the DOM belongs in a view, the store or an `Ext` module, and gets passed in. It also holds the rules views apply when they change data, like logging a purchase (`recordPurchase`) and saving a pack from the editor (`editedPack`, `packEndOnSave`, `editorSeasonEnd`, `seasonMoveOnSave`, `savePack`, `addPool`), so those are tested too. The editor works on a copy of the pack, so `editedPack` lays its changes over the pack as it is when saved: Already bought and the end date keep a purchase or season move that landed meanwhile.
 - **`store.tsx` owns the single `AppState`.** Every change goes through `update(recipe, undoLabel?)`, which clones the state, applies the recipe, removes finished cards (`pruneDone`), stamps `updatedAt` (with `SyncLoop.nextStamp`, so the stamp is always after this device's last one and the last agreed one, whatever the clock says), saves to localStorage and schedules a sync push. Changes the app makes by itself that every device derives the same way (catalog art) pass `{ auto: true }`, which saves them without stamping or pushing, so they can't cause sync conflicts. The season-end move from the schedule is a normal change, since which packs it moves depends on when it runs, except on a fresh install (no stamp, no packs): stamping that would make a new device's first sync a conflict instead of a pull. It waits for `sync.settled` (this launch's first sync attempt has finished, whatever the outcome) so it usually runs on the other devices' latest data.
 - **Views derive everything else on render**: `buildCtx(state)` then `buildPlan(ctx, now)`. Nothing derived is stored, so there's no cache to invalidate.
 

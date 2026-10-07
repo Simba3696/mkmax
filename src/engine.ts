@@ -1,4 +1,4 @@
-import type { AppState, Card, Pack, RarityRule } from './types';
+import type { AppState, Card, DropEntry, Pack, RarityRule } from './types';
 
 // ---------- Fusion math ----------
 // Levels are stored as "copy levels": 0 = not owned, 1 = first copy (F0), 2 = F1, … fusionMax + 1 = F10,
@@ -353,7 +353,9 @@ export function buildPlan(ctx: Ctx, now: Date): Plan {
     const packs = available.filter((x) => x.pack.currencyId === cur.id);
     const bought = new Map<string, number>();
     const buyEv = new Map<string, number>();
-    let budget = cur.balance;
+    // Below 0 only after logging a buy the typed balance didn't cover (see recordPurchase): there's nothing to spend.
+    const balance = Math.max(0, cur.balance);
+    let budget = balance;
     const score = (p: Pack) => (packEV(ctx, p, gained) / p.cost) * (p.endsAt ? boost : 1);
     const buy = (p: Pack) => {
       buyEv.set(p.id, (buyEv.get(p.id) ?? 0) + packEV(ctx, p, gained));
@@ -418,7 +420,7 @@ export function buildPlan(ctx: Ctx, now: Date): Plan {
       }))
       .sort((a, b) => gearRank(a.pack) - gearRank(b.pack) || urgency(a.pack) - urgency(b.pack));
 
-    return { currencyId: cur.id, startBalance: cur.balance, spent: cur.balance - budget, buys, saveFor };
+    return { currencyId: cur.id, startBalance: balance, spent: balance - budget, buys, saveFor };
   });
 
   return { currencies, expectedGains: gained };
@@ -435,6 +437,7 @@ export function daysToAfford(shortBy: number, perDay: number | undefined) {
  * now). Null days without a daily income. Rewards that land later only bring the dates closer.
  */
 export function gearForecast(gear: GearStep[], balance: number, perDay: number | undefined) {
+  balance = Math.max(0, balance);
   let total = 0;
   return gear.map((g) => {
     total += g.need * Math.min(...g.items.map((p) => p.cost));
@@ -471,13 +474,16 @@ export function stepCard(d: AppState, cardId: string, delta: 1 | -1) {
  * Buy (delta 1) or take back (delta -1) one purchase of a pack: counts it, moves the cost out of (or back into)
  * the balance, and for a store item, which always gives its card, levels that card. Random packs leave the
  * cards to the "What did you pull?" step. Returns false when there's nothing to take back.
+ *
+ * A buy the balance doesn't cover takes it below 0 rather than stopping at 0: the typed balance was out of date,
+ * and -1 (for a mis-tap) has to give back exactly what the buy took. The planner counts a negative balance as 0.
  */
 export function recordPurchase(d: AppState, packId: string, delta: 1 | -1) {
   const pack = d.packs.find((x) => x.id === packId);
   if (!pack || (delta < 0 && pack.purchased <= 0)) return false;
   pack.purchased += delta;
   const cur = d.currencies.find((c) => c.id === pack.currencyId);
-  if (cur) cur.balance = Math.max(0, cur.balance - delta * pack.cost);
+  if (cur) cur.balance -= delta * pack.cost;
   if (pack.store && pack.drops[0]) stepCard(d, pack.drops[0].cardId, delta);
   return true;
 }
@@ -510,6 +516,11 @@ export function seasonEnd(saved: string | null | undefined, now: Date): string |
  * Change the current season's end (a corrected timer, or a season that ended early). Every seasonal pack that
  * was ending with it moves too; packs from earlier seasons keep their dates. Mutates the state.
  *
+ * An item entered ahead for a later season (see packEndOnSave) ends 2 weeks at a time after the changeover it was
+ * saved against, so it moves with that changeover to stay in the season it starts in. Left on its old date it would
+ * expire while still in the store, and no later move would find it. One that starts right at the changeover opens
+ * the next season, so it starts at the new one.
+ *
  * `weekEnds` are the current season's earlier week ends, when the schedule knows them. The schedule can add a week
  * to a season after the saved end has passed, and that season's items still end on the saved date rather than the
  * 2-week guess, so a saved end on one of those week ends moves them too. Only an exact week end counts: a date typed
@@ -519,7 +530,16 @@ export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: str
   const from = seasonEnd(s.realmKlashSeasonEnd, now);
   const saved = s.realmKlashSeasonEnd;
   const extended = saved && weekEnds?.includes(saved) ? saved : null;
-  for (const p of s.packs) if (p.season && p.endsAt && (p.endsAt === from || p.endsAt === extended)) p.endsAt = to;
+  const changeovers = [from, extended].filter((c): c is string => !!c);
+  for (const p of s.packs) {
+    if (!p.season || !p.endsAt) continue;
+    const start = p.startsAt;
+    const ahead = start && changeovers.find((c) => start >= c && p.endsAt === seasonEnd(c, new Date(start)));
+    if (ahead) {
+      if (start === ahead) p.startsAt = to;
+      p.endsAt = seasonEnd(to, new Date(p.startsAt!));
+    } else if (changeovers.includes(p.endsAt)) p.endsAt = to;
+  }
   s.realmKlashSeasonEnd = to;
 }
 
@@ -528,6 +548,82 @@ export function suggestSeason(pack: Pack, state: AppState) {
   if (pack.currencyId !== REALM_KLASH_CURRENCY) return false;
   const card = pack.store && state.cards.find((c) => c.id === pack.drops[0]?.cardId);
   return !(card && state.rarities.find((r) => r.id === card.rarityId)?.kind === 'equipment');
+}
+
+/** Whether a pack leaves with the Realm Klash season: as the user set it, or else as suggestSeason guesses. */
+export const isSeasonal = (pack: Pack, state: AppState) => pack.currencyId === REALM_KLASH_CURRENCY && (pack.season ?? suggestSeason(pack, state));
+
+/** A seasonal pack from a season that has already ended, which keeps its own date rather than the current season's. */
+export const fromEndedSeason = (pack: Pack, currentEnd: string | null, now: Date) => !!pack.endsAt && pack.endsAt !== currentEnd && new Date(pack.endsAt) <= now;
+
+// ---------- Saving a pack from the editor ----------
+
+/**
+ * The pack the editor saves: its draft laid over the pack as it is now (`live`, undefined for a pack that isn't saved
+ * yet). The editor works on a copy taken when it opened, and a purchase or a season move can land while it's open (on
+ * this device, or synced from another), so Already bought and the end date keep their current values unless they
+ * were `changed` in the editor.
+ */
+export function editedPack(draft: Pack, live: Pack | undefined, changed: { purchased?: boolean; endsAt?: boolean }): Pack {
+  if (!live) return draft;
+  return { ...draft, purchased: changed.purchased ? draft.purchased : live.purchased, endsAt: changed.endsAt ? draft.endsAt : live.endsAt };
+}
+
+/**
+ * The end date a pack is saved with. A seasonal pack ends with the current season (`currentEnd`), except one from a
+ * season that has already ended, which keeps its date, and one that starts once the current season is over, which
+ * ends with the season it starts in: `startSeasonEnd` when the schedule lists that season, otherwise 2 weeks at a
+ * time. Other packs, and seasonal ones before any season end is known, keep their own end.
+ */
+export function packEndOnSave(pack: Pack, seasonal: boolean, currentEnd: string | null, now: Date, startSeasonEnd?: string | null) {
+  if (!seasonal || !currentEnd || fromEndedSeason(pack, currentEnd, now)) return pack.endsAt;
+  if (pack.startsAt && pack.startsAt >= currentEnd) return startSeasonEnd ?? seasonEnd(currentEnd, new Date(pack.startsAt));
+  return currentEnd;
+}
+
+/**
+ * The season end the editor shows: the schedule's while it covers the season, otherwise what was typed (`edited`),
+ * or the current end until the field is changed, so a season move synced in while the editor is open shows there.
+ */
+export const editorSeasonEnd = (scheduled: string | null, edited: string | null | undefined, currentEnd: string | null) =>
+  scheduled ?? (edited === undefined ? currentEnd : edited);
+
+/**
+ * The date saving the editor moves the season to, or null. Only a date changed in the editor (`edited`, undefined
+ * while untouched) moves it, so saving doesn't undo a move made meanwhile; never while the schedule sets the season,
+ * for a pack from a season that has already ended, or to a date that isn't valid.
+ */
+export function seasonMoveOnSave(o: { seasonal: boolean; pastSeason: boolean; scheduled: string | null; edited: string | null | undefined; currentEnd: string | null }) {
+  const { edited } = o;
+  return o.seasonal && !o.pastSeason && !o.scheduled && edited && edited !== o.currentEnd && !isNaN(new Date(edited).getTime()) ? edited : null;
+}
+
+/**
+ * Save an edited pack (already through editedPack and packEndOnSave), adding it if it's new. `moveSeasonTo` comes
+ * from seasonMoveOnSave: every pack ending with the current season moves to it (see moveSeasonEnd). Mutates the state.
+ */
+export function savePack(d: AppState, pack: Pack, moveSeasonTo: string | null, now: Date) {
+  const clean: Pack = { ...pack, name: pack.name.trim() };
+  if (clean.currencyId === REALM_KLASH_CURRENCY) clean.season = isSeasonal(clean, d);
+  else delete clean.season;
+  const i = d.packs.findIndex((x) => x.id === clean.id);
+  if (i >= 0) d.packs[i] = clean;
+  else d.packs.push(clean);
+  if (moveSeasonTo) moveSeasonEnd(d, moveSeasonTo, now);
+}
+
+/** Each card's share of an even pool: its total ÷ every item in the pool, which is at least the cards picked. */
+export function poolShare(total: number | null, poolSize: number | null, picked: number) {
+  return picked && total ? +(total / Math.max(poolSize ?? 0, picked)).toFixed(4) : 0;
+}
+
+/** Drops with an even pool added: a card already listed (e.g. its own 1.5% line) gets its share on top of its chance. */
+export function addPool(drops: DropEntry[], picked: Iterable<string>, each: number): DropEntry[] {
+  const ids = new Set(picked);
+  return [
+    ...drops.map((d) => (ids.has(d.cardId) ? { ...d, chance: +(d.chance + each).toFixed(4) } : d)),
+    ...[...ids].filter((id) => !drops.some((d) => d.cardId === id)).map((cardId) => ({ cardId, chance: each })),
+  ];
 }
 
 /** Sort key: soonest-ending first, permanent packs last. */
