@@ -31,7 +31,7 @@ Two constraints shape this:
 ```mermaid
 flowchart TB
   Views["views/*.tsx, App.tsx<br/>(React: tabs, editors, panels)"]
-  Store["store.tsx, syncLoop.ts<br/>(state, undo, persistence, sync loop)"]
+  Store["store.tsx, storage.ts, syncLoop.ts<br/>(state, undo, persistence, sync loop)"]
   Engine["engine.ts<br/>(pure: scoring, planner, kard plan, forecasts)"]
   Data["normalize.ts, defaults.ts, types.ts<br/>(save shape and migrations)"]
   Ext["events.ts, catalog.ts, wiki.ts, sync.ts<br/>(external data)"]
@@ -45,12 +45,12 @@ flowchart TB
 ```
 
 - **`engine.ts` is plain TypeScript with no React and no I/O.** It takes an `AppState` and a `now` and returns plans. That's what makes the planner unit-testable (`engine.test.ts` is the biggest test file) and lets scripts reuse it. Keep it that way: anything that needs the clock, the network or the DOM belongs in a view, the store or an `Ext` module, and gets passed in.
-- **`store.tsx` owns the single `AppState`.** Every change goes through `update(recipe, undoLabel?)`, which clones the state, applies the recipe, removes finished cards (`pruneDone`), stamps `updatedAt`, saves to localStorage and schedules a sync push. Changes the app makes by itself that every device derives the same way (catalog art) pass `{ auto: true }`, which saves them without stamping or pushing, so they can't cause sync conflicts. The season-end move from the schedule is a normal change, since which packs it moves depends on when it runs, except on a fresh install (no stamp, no packs): stamping that would make a new device's first sync a conflict instead of a pull. It waits for `sync.settled` (this launch's first sync attempt has finished, whatever the outcome) so it usually runs on the other devices' latest data.
+- **`store.tsx` owns the single `AppState`.** Every change goes through `update(recipe, undoLabel?)`, which clones the state, applies the recipe, removes finished cards (`pruneDone`), stamps `updatedAt` (with `SyncLoop.nextStamp`, so the stamp is always after this device's last one and the last agreed one, whatever the clock says), saves to localStorage and schedules a sync push. Changes the app makes by itself that every device derives the same way (catalog art) pass `{ auto: true }`, which saves them without stamping or pushing, so they can't cause sync conflicts. The season-end move from the schedule is a normal change, since which packs it moves depends on when it runs, except on a fresh install (no stamp, no packs): stamping that would make a new device's first sync a conflict instead of a pull. It waits for `sync.settled` (this launch's first sync attempt has finished, whatever the outcome) so it usually runs on the other devices' latest data.
 - **Views derive everything else on render**: `buildCtx(state)` then `buildPlan(ctx, now)`. Nothing derived is stored, so there's no cache to invalidate.
 
 ## State model
 
-One JSON document, `AppState` in `types.ts`: rarities (fusion and kard tables), currencies, cards, packs, weights, and a few lists (gear order, dismissed shop packs). It's saved whole to localStorage under `mkmax:v1` and synced whole to the gist.
+One JSON document, `AppState` in `types.ts`: rarities (fusion and kard tables), currencies, cards, packs, weights, and a few lists (gear order, dismissed shop packs). It's saved whole to localStorage under `mkmax:v1` and synced whole to the gist. If that save can't be read at startup, `load()` in `storage.ts` copies it to `mkmax:v1:unreadable` before the fresh state is saved over it, and resets the sync `baseUpdatedAt` to 0 so the first sync pulls the gist's copy rather than counting the empty state as agreed. Settings → Data offers the copy as a download until the user discards it.
 
 Decisions worth knowing:
 
@@ -80,19 +80,23 @@ stateDiagram-v2
   Decide --> Pull: only remote changed
   Decide --> Conflict: both changed since base, to different data
   Decide --> Outdated: remote saved by a build from before 2026-09-28
+  Decide --> Newer: remote saved in a newer version than this build's
   Decide --> Idle: neither changed, or both made the same change
   Conflict --> Push: user keeps mine
   Conflict --> Pull: user keeps theirs
   Outdated --> Push: overwrite and show an error
+  Newer --> Idle: change nothing and show an error
+  Decide --> Unreadable: this build's normalize() throws on the remote
+  Unreadable --> Idle: change nothing and show an error
   Push --> Idle
   Pull --> Idle: normalize() then replace
 ```
 
-The loop itself is `SyncLoop` in `syncLoop.ts`, plain TypeScript with GitHub, the state and timers passed in; `store.tsx` wires it to React. `decideSync` in `sync.ts` compares each side's `updatedAt` with `baseUpdatedAt`, the stamp both last agreed on. When both sides moved but hold the same data apart from the stamp (each device moved the season end by itself), `sameData` makes it a no-op and both stamps count as agreed. While a conflict waits for the user, background syncs hold off, and a sync that ends in a conflict or an error doesn't reschedule itself; the regular pulls retry. Keeping this device's copy first re-reads the gist: if the other device pushed again while the prompt was up, the prompt shows that copy instead. Otherwise it restamps the kept copy above both copies (the outdated branch does the same), so the other device pulls it, or asks if it has changed since, rather than overwriting it with its own next edit. A sync that finishes after the user disconnected changes nothing. It's last-writer-wins with conflict detection, not a merge: the data is small and edited by one person, so asking which copy to keep is simpler and safer than merging fields.
+The loop itself is `SyncLoop` in `syncLoop.ts`, plain TypeScript with GitHub, the state and timers passed in; `store.tsx` wires it to React. `decideSync` in `sync.ts` compares each side's `updatedAt` with `baseUpdatedAt`, the stamp both last agreed on. When both sides moved but hold the same data apart from the stamp (each device moved the season end by itself), `sameData` makes it a no-op and both stamps count as agreed. While a conflict waits for the user, background syncs hold off, and a sync that ends in a conflict or an error doesn't reschedule itself; the regular pulls retry. Keeping this device's copy first re-reads the gist: if the other device pushed again while the prompt was up, the prompt shows that copy instead. Otherwise it restamps the kept copy above both copies (the outdated branch does the same), so the other device pulls it, or asks if it has changed since, rather than overwriting it with its own next edit. Data saved in a newer version than this build's is neither pulled nor pushed (an app left open across a deploy would otherwise save it back in its older format and drop fields, and the newer build would then rerun one-time migrations over the user's later changes); the loop shows an error and leaves the update to pull to refresh or a reopen, since finding it reloads the page straight away and would throw away an open pack editor. Import backup refuses such a file too. The same goes for a gist copy this build's `normalize()` throws on (`canRead`): pulling it would fail, and pushing or asking would let a device whose own save couldn't be read upload its fresh data over it, so the loop shows an error and waits for an update. If applying the gist's copy fails after Keep theirs anyway, it shows that error rather than leaving a prompt whose buttons do nothing. Edits are stamped with `nextStamp`, after both this device's own stamp and `baseUpdatedAt`: after a pull, the agreed stamp comes from the other device's clock, and a device whose clock runs behind would otherwise stamp its edits as older than it and never push them. A sync that finishes after the user disconnected changes nothing. It's last-writer-wins with conflict detection, not a merge: the data is small and edited by one person, so asking which copy to keep is simpler and safer than merging fields.
 
 ## Offline and updates
 
-`vite-plugin-pwa` precaches the app shell. `events.json` is network-first (it changes daily) and card art from MK Mobile Base and the wiki is cache-first for 90 days. The build stamps the short commit id and date into `__APP_VERSION__`, shown at the bottom of Settings. Pull to refresh checks for a new service worker and reloads into it.
+`vite-plugin-pwa` precaches the app shell. `main.tsx` asks for persistent storage (`navigator.storage.persist()`) at startup, since without sync localStorage is the only copy of the data and browsers may clear it. `events.json` is network-first (it changes daily) and card art from MK Mobile Base and the wiki is cache-first for 90 days. The build stamps the short commit id and date into `__APP_VERSION__`, shown at the bottom of Settings. Pull to refresh checks for a new service worker and reloads into it.
 
 ## Styling and layout
 

@@ -54,4 +54,11 @@ describe('decideSync', () => {
     expect(decideSync(old, at(20), 10)).toBe('outdated');
     expect(decideSync(old, at(10), 10)).toBe('outdated');
   });
+
+  it('neither pulls nor pushes data from a newer build, even if only this device changed', () => {
+    const newer = { ...at(30), version: at().version + 1 } as unknown as ReturnType<typeof at>;
+    expect(decideSync(newer, at(20), 10)).toBe('newer');
+    expect(decideSync(newer, at(40), 30)).toBe('newer');
+    expect(decideSync(at(30), at(10), 10)).toBe('pull'); // the same version is fine
+  });
 });

@@ -1,25 +1,13 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppState } from './types';
-import { defaultState } from './defaults';
 import { normalize } from './normalize';
 import { pruneDone } from './engine';
 import { findOrCreateGist, loadSyncConfig, readRemote, saveSyncConfig, writeRemote } from './sync';
 import { SyncLoop, type SyncStatus } from './syncLoop';
+import { discardUnreadable as removeUnreadable, load, loadUnreadable, save } from './storage';
 
 export { normalize };
 export type { SyncStatus };
-
-const KEY = 'mkmax:v1';
-
-function load(): AppState {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) return normalize(JSON.parse(raw));
-  } catch {
-    /* fall through to defaults */
-  }
-  return defaultState();
-}
 
 /**
  * Pass an undo label to offer "Undo <label>" for this change. `auto` marks a change the app makes by itself that
@@ -54,6 +42,9 @@ interface StoreApi {
   lastUndo: UndoEntry | null;
   undo: () => void;
   dismissUndo: () => void;
+  /** The saved data as it was when it couldn't be read, until the user discards it. */
+  unreadable: string | null;
+  discardUnreadable: () => void;
 }
 
 const Ctx = createContext<StoreApi | null>(null);
@@ -65,16 +56,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(load);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Read after load(), which keeps the copy.
+  const [unreadable, setUnreadable] = useState(loadUnreadable);
 
   const [lastUndo, setLastUndo] = useState<UndoEntry | null>(null);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(state));
-    } catch {
-      /* storage full or blocked; state still lives in memory */
-    }
-  }, [state]);
+  useEffect(() => save(state), [state]);
 
   const pushTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const setLocal = (s: AppState) => {
@@ -94,6 +81,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             setLocal(normalize(remote));
             // The snapshot predates the other device's changes; restoring it would silently drop them.
             setLastUndo(null);
+          },
+          canRead: (remote) => {
+            try {
+              // A copy, since normalize changes some of what it's given in place.
+              normalize(structuredClone(remote));
+              return true;
+            } catch {
+              return false;
+            }
           },
           setLocal,
           saveConfig: (cfg) => {
@@ -139,7 +135,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const draft = structuredClone(prev);
     recipe(draft);
     const removed = pruneDone(draft);
-    if (!opts?.auto) draft.updatedAt = Date.now();
+    if (!opts?.auto) draft.updatedAt = loop.nextStamp();
     stateRef.current = draft;
     setState(draft);
     const label = [undoLabel, removed.length > 0 && `${removed.join(', ')} ${removed.length > 1 ? 'are' : 'is'} maxed and removed`].filter(Boolean).join(' · ');
@@ -148,7 +144,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const replace = (s: AppState) => {
-    const next = { ...structuredClone(s), updatedAt: Date.now() };
+    const next = { ...structuredClone(s), updatedAt: loop.nextStamp() };
     pruneDone(next);
     stateRef.current = next;
     setState(next);
@@ -158,8 +154,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const undo = () => {
     if (!lastUndo) return;
-    // A fresh timestamp so sync treats the restored copy as this device's newest change.
-    setState({ ...lastUndo.prev, updatedAt: Date.now() });
+    // A fresh stamp so sync treats the restored copy as this device's newest change.
+    setLocal({ ...lastUndo.prev, updatedAt: loop.nextStamp() });
     setLastUndo(null);
     schedulePush();
   };
@@ -174,7 +170,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     settled,
   };
 
-  return <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: () => setLastUndo(null) }}>{children}</Ctx.Provider>;
+  const discardUnreadable = () => {
+    removeUnreadable();
+    setUnreadable(null);
+  };
+
+  return (
+    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: () => setLastUndo(null), unreadable, discardUnreadable }}>{children}</Ctx.Provider>
+  );
 }
 
 export function useStore() {

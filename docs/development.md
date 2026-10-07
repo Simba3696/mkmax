@@ -25,6 +25,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/engine.ts` | Scoring, the purchase planner, pack ranking and the Fusion Up Kard plan |
 | `src/normalize.ts` | Save-file migrations (`AppState.version`) |
 | `src/store.tsx` | App state, undo, and localStorage persistence |
+| `src/storage.ts` | Reading the save at startup, and keeping a copy of one that can't be read |
 | `src/sync.ts` | GitHub Gist sync: the API calls and which copy wins |
 | `src/syncLoop.ts` | When to pull, push or ask, around requests that can overlap edits and disconnects |
 | `src/catalog.ts`, `src/wiki.ts` | Card art and rarity lookups (MK Mobile Base, MK Mobile wiki) |
@@ -39,7 +40,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 
 ## Saved data and migrations
 
-The saved state carries a `version`. When the shape or meaning of saved data changes, bump the version in `src/types.ts`, `src/defaults.ts` and `src/normalize.ts`, and add a step to `normalize()` that runs once for older saves. A migration runs only once, so a change the user makes afterwards (deleting a rarity, removing a tag) sticks.
+The saved state carries a `version`. When the shape or meaning of saved data changes, bump the version in `src/types.ts`, `src/defaults.ts` and `src/normalize.ts`, and add a step to `normalize()` that runs once for older saves. A migration runs only once, so a change the user makes afterwards (deleting a rarity, removing a tag) sticks. Sync never pulls or pushes data saved in a higher version than the build's own, and Import backup refuses such a file, so a device still on the old build can't save new data back in the old format and make the migration run again.
 
 **Builds from before 2026-09-28.** Builds from before 12:30 that day (commit `19ef952`) treated newer saved data as the old F1-based format and raised every level by one when they synced. A card at F9 then reached F10 and was removed. Current builds never pull data from one of those builds (it's saved as version 2); they upload their own copy over it and show a sync error telling you to reopen MK Max on your other devices so they update. The same bug gave the Kameo rarities a fusion step, so owning a Kameo no longer counted as done; loading the app now takes that step back off.
 

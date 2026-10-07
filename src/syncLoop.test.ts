@@ -42,17 +42,21 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 let clock = 1000;
 const tick = () => (clock += 1000);
 
-function device(gist: FakeGist, state: AppState = defaultState(), cfg: SyncConfig | null = null) {
+/** A device on its own clock, `skew` ms ahead of the shared one (behind if negative). */
+function device(gist: FakeGist, state: AppState = defaultState(), cfg: SyncConfig | null = null, skew = 0) {
   const d = {
     state,
     status: { kind: 'off' } as SyncStatus,
     pushes: 0,
     settled: false,
-    /** An edit through the store: stamped with the current time. */
+    /** Whether this device's build can load a copy; the store's normalize throws on one it can't. */
+    readable: (_s: AppState) => true,
+    /** An edit through the store, a moment after the last one. */
     edit(recipe: (s: AppState) => void) {
+      tick();
       const next = structuredClone(d.state);
       recipe(next);
-      next.updatedAt = tick();
+      next.updatedAt = d.loop.nextStamp();
       d.state = next;
     },
     loop: null as unknown as SyncLoop,
@@ -67,14 +71,18 @@ function device(gist: FakeGist, state: AppState = defaultState(), cfg: SyncConfi
         return { gistId: 'g1', created: true };
       },
       getState: () => d.state,
-      applyRemote: (remote) => (d.state = structuredClone(remote)),
+      applyRemote: (remote) => {
+        if (!d.readable(remote)) throw new Error('Cannot read properties of undefined');
+        d.state = structuredClone(remote);
+      },
+      canRead: (remote) => d.readable(remote),
       setLocal: (s) => (d.state = s),
       saveConfig: () => {},
       onStatus: (s) => (d.status = s),
       onSettled: () => (d.settled = true),
       schedulePush: () => d.pushes++,
       cancelPush: () => {},
-      now: () => clock,
+      now: () => clock + skew,
     },
     cfg,
   );
@@ -85,12 +93,12 @@ const card = (id: string) => ({ id, name: id, rarityId: 'diamond', fusion: 1, gu
 const names = (s: AppState | null) => s?.cards.map((c) => c.name) ?? [];
 
 /** Two devices that have synced the same data. */
-async function pair() {
+async function pair(desktopSkew = 0) {
   const gist = new FakeGist();
   const phone = device(gist);
   phone.edit((s) => s.cards.push(card('Scorpion')));
   await phone.loop.connect('token');
-  const desktop = device(gist);
+  const desktop = device(gist, defaultState(), null, desktopSkew);
   await desktop.loop.connect('token');
   return { gist, phone, desktop };
 }
@@ -273,6 +281,60 @@ describe('sync loop', () => {
     expect(names(desktop.state)).toEqual(['Scorpion', 'Raiden']);
   });
 
+  it('uploads edits from a device whose clock is behind the other one’s', async () => {
+    const { gist, phone, desktop } = await pair(-5 * 60 * 1000);
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    await desktop.loop.syncNow();
+    // By the desktop's clock, this is before the phone's change it just pulled.
+    desktop.edit((s) => (s.currencies[0].balance = 777));
+    await desktop.loop.syncNow();
+    expect(gist.data?.currencies[0].balance).toBe(777);
+    // And the phone's next sync takes it rather than keeping its own copy.
+    await phone.loop.syncNow();
+    expect(phone.state.currencies[0].balance).toBe(777);
+    expect(names(phone.state)).toEqual(['Scorpion', 'Raiden']);
+  });
+
+  it('undoing or replacing data on a device whose clock is behind still counts as its newest change', async () => {
+    const { gist, phone, desktop } = await pair(-5 * 60 * 1000);
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    await desktop.loop.syncNow();
+    // What the store's undo, import and erase do: put a copy back with a new stamp.
+    desktop.state = { ...defaultState(), updatedAt: desktop.loop.nextStamp() };
+    await desktop.loop.syncNow();
+    expect(names(gist.data)).toEqual([]);
+  });
+
+  it('neither pulls nor pushes data from a newer build', async () => {
+    const { gist, phone, desktop } = await pair();
+    // The desktop, already on a newer build, pushes data saved in a newer version.
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    gist.data = { ...structuredClone(desktop.state), version: 99 } as unknown as AppState;
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    expect(phone.status.kind).toBe('error');
+    expect(names(phone.state)).toEqual(['Scorpion', 'Raiden']);
+    expect(names(gist.data)).toEqual(['Scorpion', 'Kitana']);
+    expect(gist.data!.version).toBe(99);
+    expect(phone.pushes).toBe(0);
+  });
+
+  it('keeping this device’s copy doesn’t overwrite data a newer build pushed while the prompt was open', async () => {
+    const { gist, phone, desktop } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    expect(desktop.status.kind).toBe('conflict');
+    gist.data = { ...structuredClone(gist.data!), version: 99, updatedAt: tick() } as unknown as AppState;
+    await desktop.loop.resolve('mine');
+    expect(desktop.status.kind).toBe('error');
+    expect(gist.data!.version).toBe(99);
+    expect(names(desktop.state)).toEqual(['Scorpion', 'Kitana']);
+  });
+
   it('overwrites data from an outdated build, stamped so the other device takes it once updated', async () => {
     const { gist, phone, desktop } = await pair();
     // The desktop, still on an old build, pushes data saved as version 2.
@@ -282,5 +344,54 @@ describe('sync loop', () => {
     expect(phone.status.kind).toBe('error');
     expect(names(gist.data)).toEqual(['Scorpion']);
     expect(gist.data!.updatedAt!).toBeGreaterThan(desktop.state.updatedAt!);
+  });
+
+  it('a device whose save couldn’t be read downloads the gist’s copy on its first sync', async () => {
+    const { gist } = await pair();
+    // What load() leaves behind: fresh data with no stamp, and nothing agreed with the gist.
+    const laptop = device(gist, defaultState(), { token: 'token', gistId: 'g1', baseUpdatedAt: 0 });
+    const writes = gist.writes;
+    await laptop.loop.syncNow();
+    expect(laptop.status.kind).toBe('idle');
+    expect(names(laptop.state)).toEqual(['Scorpion']);
+    expect(gist.writes).toBe(writes);
+    expect(laptop.pushes).toBe(0);
+  });
+
+  it('neither asks nor pushes while this build can’t read the gist’s copy', async () => {
+    const { gist } = await pair();
+    const laptop = device(gist, defaultState(), { token: 'token', gistId: 'g1', baseUpdatedAt: 0 });
+    laptop.readable = () => false;
+    await laptop.loop.syncNow();
+    expect(laptop.status).toEqual({ kind: 'error', message: expect.stringContaining('can’t read') });
+    // An edit on the fresh data would otherwise make this a conflict, where Keep mine uploads the fresh data.
+    laptop.edit((s) => (s.currencies[0].balance = 500));
+    const writes = gist.writes;
+    await laptop.loop.syncNow();
+    expect(laptop.status.kind).toBe('error');
+    expect(gist.writes).toBe(writes);
+    expect(names(gist.data)).toEqual(['Scorpion']);
+    // Once an update can read it, the user is asked as usual.
+    laptop.readable = () => true;
+    await laptop.loop.syncNow();
+    expect(laptop.status.kind).toBe('conflict');
+  });
+
+  it('keeping the other copy shows an error rather than getting stuck when it can’t be loaded', async () => {
+    const { gist, phone, desktop } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    expect(desktop.status.kind).toBe('conflict');
+    desktop.readable = () => false;
+    await desktop.loop.resolve('theirs');
+    expect(desktop.status.kind).toBe('error');
+    expect(names(desktop.state)).toEqual(['Scorpion', 'Kitana']);
+    expect(names(gist.data)).toEqual(['Scorpion', 'Raiden']);
+    // The next sync runs again instead of returning early on a prompt that's gone.
+    desktop.readable = () => true;
+    await desktop.loop.syncNow();
+    expect(desktop.status.kind).toBe('conflict');
   });
 });

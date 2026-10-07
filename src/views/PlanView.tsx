@@ -43,7 +43,7 @@ export function PackTiming({ pack, now }: { pack: Pack; now: Date }) {
 }
 
 export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'cards' | 'settings') => void; openPack: (id: string, pull?: boolean) => void }) {
-  const { state, update } = useStore();
+  const { state, update, unreadable } = useStore();
   const now = useNow();
   const ctx = useMemo(() => buildCtx(state), [state]);
   const plan = useMemo(() => buildPlan(ctx, now), [ctx, now]);
@@ -131,6 +131,11 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
           </li>
           <li>Enter your currency balances and Fusion Up Kards below. The plan will show up here.</li>
         </ol>
+        {unreadable != null && (
+          <p className={hint}>
+            The data saved in this browser couldn't be read, so MK Max started fresh. To download it, go to <a onClick={() => goto('settings')}>Settings</a> → Data.
+          </p>
+        )}
         <p className={note}>
           Or go to <a onClick={() => goto('settings')}>Settings</a> and load the sample data to try it out first.
         </p>

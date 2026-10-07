@@ -9,7 +9,8 @@ export function startServiceWorker() {
 
 /**
  * The browser only looks for a new version when the app starts, so an app left open would keep running the old
- * build. Pull to refresh calls this; if a new build is out, the app reloads into it.
+ * build. Pull to refresh calls this, and so does importing a backup from a newer build; if a new build is out, the app
+ * reloads into it. Sync doesn't, since the reload would throw away an open pack editor.
  */
 export function checkForAppUpdate(): Promise<unknown> {
   return registration?.update().catch(() => {}) ?? Promise.resolve();

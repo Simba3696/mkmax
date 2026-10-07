@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isChallengeKameo } from './challenges';
 import { buildCtx, packEV } from './engine';
 import { defaultState } from './defaults';
-import { normalize } from './store';
+import { normalize } from './normalize';
 import type { Card } from './types';
 
 const kameo = (name: string, rarityId = 'kameo-gold', extra: Partial<Card> = {}): Card => ({ id: name, name, rarityId, fusion: 0, guest: false, ...extra });
