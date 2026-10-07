@@ -17,6 +17,6 @@ Check, in this order:
 5. **Tests.** New engine or migration logic without a test.
 6. **Docs.** User-visible behaviour not described in `docs/`, or a structural change not reflected in `docs/architecture.md`.
 
-Run `npm run lint` and `npm test` and include any failures.
+Run `npm run lint`, `npm test` and `npm run build` and include any failures. The build is the only step that type-checks; Vitest doesn't.
 
 Report only real problems, most serious first. For each one give the file and line, what goes wrong, and a concrete scenario. If you're unsure whether something is a problem, say so. If there's nothing to report, say that in one line.
