@@ -48,6 +48,7 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: () 
     <div
       className="fixed left-1/2 -translate-x-1/2 z-[8] bottom-[calc(70px+env(safe-area-inset-bottom))] md:bottom-6 md:left-[calc(50%+44px)] lg:left-[calc(50%+110px)] w-[calc(100%-2rem)] max-w-[480px] flex items-center gap-[0.3rem] bg-panel-2 border border-line rounded-card py-[0.3rem] pr-[0.3rem] pl-[0.9rem] shadow-[0_4px_16px_rgba(0,0,0,0.6)] text-[0.9rem]"
       role="status"
+      data-undo
     >
       <span className="flex-1 min-w-0 truncate">{entry.label}</span>
       <button className={`${btn.ghost} text-gold font-bold`} onClick={onUndo}>
@@ -62,7 +63,8 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: () 
 
 export default function App() {
   const { state, update, sync, lastUndo, undo, dismissUndo } = useStore();
-  const [tab, setTab] = useState<TabId>(() => (location.hash.slice(1) as TabId) || 'plan');
+  // A mistyped or pasted link (#Packs, a docs anchor) opens Plan rather than a blank page with no tab selected.
+  const [tab, setTab] = useState<TabId>(() => TABS.find((t) => t.id === location.hash.slice(1))?.id ?? 'plan');
 
   // Give cards MK Mobile Base art automatically: new cards, cards synced in from another device, and cards still
   // carrying art from the old wiki lookup. Runs again only when that set of cards changes.

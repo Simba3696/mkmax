@@ -4,11 +4,15 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { execSync } from 'node:child_process';
 
-/** Short commit id shown in Settings, so you can tell whether a device has picked up the latest deploy. */
+/**
+ * Short commit id and commit date, shown in Settings so you can tell whether a device has picked up the latest deploy.
+ * The commit date rather than the build date: the daily schedule refresh rebuilds the same commit, and a date that
+ * changed every day would change the bundle with it, making every device download the app again and reload.
+ */
 function appVersion() {
-  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
   try {
-    return execSync('git rev-parse --short HEAD').toString().trim();
+    const id = process.env.GITHUB_SHA?.slice(0, 7) ?? execSync('git rev-parse --short HEAD').toString().trim();
+    return `${id} · ${execSync('git log -1 --format=%cs').toString().trim()}`;
   } catch {
     return 'dev';
   }
@@ -17,7 +21,7 @@ function appVersion() {
 export default defineConfig({
   // GitHub Pages serves the app from /<repo>/; the deploy workflow sets BASE_PATH.
   base: process.env.BASE_PATH ?? '/',
-  define: { __APP_VERSION__: JSON.stringify(`${appVersion()} · ${new Date().toISOString().slice(0, 10)}`) },
+  define: { __APP_VERSION__: JSON.stringify(appVersion()) },
   plugins: [
     react(),
     tailwindcss(),

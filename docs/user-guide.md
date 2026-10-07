@@ -31,7 +31,7 @@ To use it like a phone app, install it from your browser. It has no install butt
 Once installed, it's called **MK Max**, opens in its own window without the browser's bars, and uses a dark theme. Data is kept per browser (see [Where your data lives](#where-your-data-lives)), and on iPhone and iPad the home-screen app keeps its own copy apart from Safari. So install it before you enter much, or bring your data across with [sync](#sync-between-devices) or **Export backup** and **Import backup**.
 
 - Open it online the first time. After that it opens offline too; see [Offline](#offline).
-- It opens on **Plan**. Switching tabs puts `#plan`, `#packs`, `#cards` or `#settings` in the address, so a reload or a bookmark keeps your tab. Each tab opens scrolled to the top.
+- It opens on **Plan**. Switching tabs puts `#plan`, `#packs`, `#cards` or `#settings` in the address, so a reload or a bookmark keeps your tab. Any other address after the `#` opens Plan. Each tab opens scrolled to the top.
 
 ### What a new install already has
 
@@ -146,7 +146,7 @@ Tap a card's heading on Plan (Wallet, What to buy, Pack ranking and so on) or Se
 
 ### Pop-ups
 
-Pop-ups (like the pack editor) sit above the rest of the app and scroll on their own, so the buttons at the bottom can always be reached. Tapping outside one doesn't close it, so a stray tap can't throw away a half-entered pack; use ✕ or Cancel. The Escape key also closes one without saving. Saving a pack has Undo.
+Pop-ups (like the pack editor) sit above the rest of the app and scroll on their own, so the buttons at the bottom can always be reached. Tapping outside one doesn't close it, so a stray tap can't throw away a half-entered pack; use ✕ or Cancel. The Escape key also closes one without saving. With a keyboard, Tab stays inside the pop-up, and closing it puts you back on the button that opened it. Saving a pack has Undo.
 
 ### Two-tap buttons
 
@@ -508,7 +508,7 @@ An emptied box saves 0. **Reset weights** puts the defaults back, with no confir
 
 ### Version
 
-The bottom of Settings shows which version you have and when it was built, for example `Version 0ebc412 · 2026-09-27`. See [Updates](#updates).
+The bottom of Settings shows which version you have and the date of that change, for example `Version 0ebc412 · 2026-09-27`. It only changes when the app itself does: the daily event schedule refresh keeps the same version. See [Updates](#updates).
 
 ## What's tracked
 
@@ -546,6 +546,8 @@ The bottom of Settings shows which version you have and when it was built, for e
 ### Updates
 
 - An app left open only looks for a new version when you pull to refresh or import a backup from a newer version (or when it's fully closed and reopened). If one is out, the app reloads into it by itself.
+- If a pop-up such as the pack editor is open when a new version is found, the app waits and reloads once you close it, so nothing you've typed is lost. It also waits while the Undo bar is showing (up to 8 seconds), so you can still undo a save that closed the pop-up.
+- The daily event schedule refresh isn't a new version, so it doesn't reload the app.
 - Updates never change your data, apart from the one-time upgrade of older saves.
 - Settings shows which [version](#version) you have.
 
