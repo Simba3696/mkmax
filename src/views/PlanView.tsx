@@ -132,7 +132,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
           <li>Enter your currency balances and Fusion Up Kards below. The plan will show up here.</li>
         </ol>
         <p className={note}>
-          Or go to <a onClick={() => goto('settings')}>Settings</a> to load your OneNote data or the sample data.
+          Or go to <a onClick={() => goto('settings')}>Settings</a> and load the sample data to try it out first.
         </p>
         {wallet}
       </section>

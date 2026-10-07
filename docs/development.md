@@ -34,7 +34,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/ui.tsx` | Shared components: `Modal` (with a `wide` option), `Chip`, `CardThumb`, `RarityBadge`, `NumInput`, `ConfirmButton`, `FoldCard`, `useDeviceChoice` (per-device settings like sort order) |
 | `src/views/` | One component per tab, plus the pack editor and sync panel |
 | `scripts/` | Build-time fetchers for the catalog and the event schedule |
-| `public/` | Icons, the bundled catalog and schedule, and the OneNote starter data |
+| `public/` | Icons, and the bundled catalog and schedule |
 
 ## Saved data and migrations
 

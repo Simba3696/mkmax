@@ -5,7 +5,7 @@ description: Bump the MK Max save version and add a one-time migration. Use when
 
 # Save migration
 
-Saved data reaches the app from localStorage, backups, the gist and the starter data, and all of it goes through `normalize()` in `src/normalize.ts`. A migration runs once, gated on the version it was saved with, so anything the user changes afterwards sticks.
+Saved data reaches the app from localStorage, backups and the gist, and all of it goes through `normalize()` in `src/normalize.ts`. A migration runs once, gated on the version it was saved with, so anything the user changes afterwards sticks.
 
 ## Do you need one?
 

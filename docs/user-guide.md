@@ -14,7 +14,7 @@ How to use MK Max day to day, and what it tracks. For the maths behind the plan,
 - [What's tracked](#whats-tracked)
 - [Your data, offline use and updates](#your-data-offline-use-and-updates)
 - [When something looks wrong](#when-something-looks-wrong)
-- [Notes for older saves and the author's data](#notes-for-older-saves-and-the-authors-data)
+- [Notes for older saves](#notes-for-older-saves)
 
 ## Getting started
 
@@ -78,7 +78,7 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
 Until you have at least one card and one pack, the Plan shows only a **Get started** checklist and the Wallet boxes. Steps 1 and 2 are crossed out once done. **Cards**, **Packs** and **Settings** in it are links.
 
 - Step 3 asks for your currency balances and Fusion Up Kards, in the Wallet just below.
-- Its last line points you to Settings to load "your OneNote data". That means the author's own card list, not yours; new users want the sample data or their own cards. See [Data](#data).
+- Its last line points you to Settings to load the sample data and try the app first. See [Trying it with sample data](#trying-it-with-sample-data).
 
 ### What a working plan looks like
 
@@ -150,7 +150,7 @@ Pop-ups (like the pack editor) sit above the rest of the app and scroll on their
 
 ### Two-tap buttons
 
-**Delete**, **Clear expired**, **Ended early**, **Disconnect this device**, **Load OneNote data**, **Load sample data** and **Erase everything** need two taps. The first tap changes the button to **Tap again to confirm** for 3 seconds.
+**Delete**, **Clear expired**, **Ended early**, **Disconnect this device**, **Load sample data** and **Erase everything** need two taps. The first tap changes the button to **Tap again to confirm** for 3 seconds.
 
 ### Undo
 
@@ -160,7 +160,7 @@ After a purchase, deleting a pack or card, clearing expired packs, or a card bei
 - It also appears for hiding a shop pack ("Hid …"), pasting a list ("Added N cards, updated M"), switching cards to MK Mobile Base's rarity ("rarity change for N cards") and ending a Realm Klash season early.
 - Only the latest change can be undone.
 - Undo puts back the whole app as it was, so anything else you changed while the bar was up (like a balance) is undone too.
-- **Import backup**, **Load sample data**, **Load OneNote data**, **Erase everything** and a sync download clear the bar and can't be undone.
+- **Import backup**, **Load sample data**, **Erase everything** and a sync download clear the bar and can't be undone.
 - **−1** on a pack has no Undo bar of its own.
 - If a + in **What did you pull?** maxes a card, the bar then undoes only that tap.
 
@@ -498,7 +498,6 @@ An emptied box saves 0. **Reset weights** puts the defaults back, with no confir
 
 - **Export backup** downloads `mkmax-backup-YYYY-MM-DD.json`. The date is in UTC, so a backup made late in the evening or early in the morning can carry the next or previous day. It doesn't include the sync token, folded cards or sort choices.
 - **Import backup** replaces everything with the file, with no confirm and no Undo. Older files are upgraded, and any card already at its goal is removed. With sync on, it's uploaded. A problem shows as "Import failed: …". Picking the same file twice in a row may do nothing.
-- **Load OneNote data** loads the author's own card list, transcribed from a OneNote page. It replaces everything with no Undo, syncs, and needs a connection. See [Notes for older saves and the author's data](#notes-for-older-saves-and-the-authors-data).
 - **Load sample data** loads the made-up set described in [Trying it with sample data](#trying-it-with-sample-data).
 - **Erase everything** puts the app back to a fresh install, with no Undo. With sync on, the empty data is uploaded, so every connected device is erased. To reset just one device, disconnect it first (or export a backup). Folded cards, sort choices and the token stay.
 
@@ -536,7 +535,7 @@ The bottom of Settings shows which version you have and when it was built, for e
 
 - **Works offline:** everything you've entered, the plan, and logging purchases.
 - The event schedule falls back to the last copy the app fetched. Card art you've already seen is kept (up to 500 images, for 90 days).
-- **Needs a connection:** new card art, **Find images**, **Load OneNote data** and sync. Sync catches up when you're back online.
+- **Needs a connection:** new card art, **Find images** and sync. Sync catches up when you're back online.
 
 ### Updates
 
@@ -586,12 +585,11 @@ The art doesn't count as a change for sync: every device adds the same art by it
 
 **I lost my data.** See [Where your data lives](#where-your-data-lives). Import a backup, or connect sync to download the copy in your gist.
 
-## Notes for older saves and the author's data
+## Notes for older saves
 
-These notes are about changes to saved data over time and the author's starter file. You can skip them.
+These notes are about changes to saved data over time. You can skip them.
 
 - Older saves got the Uncommon rarity added once; if you delete it, it stays deleted.
 - When challenge tagging came in, Kameos already in the app were tagged once.
 - Challenges that no longer run are taken off the challenge list (so far Klassic Ermac, whose Kameo comes from packs now), and a Kameo tagged before its challenge was retired gets untagged once.
 - The older hand-kept per-tower counts were dropped.
-- **Starter data:** the author's starter data is transcribed from the OneNote "MK Mobile" page. To load it, use Settings → **Load OneNote data**, or open the app with `?starter` added to its address ([simba3696.github.io/mkmax/?starter](https://simba3696.github.io/mkmax/?starter)). The `?starter` link only loads the file when the app has no cards yet, so it never overwrites your progress.

@@ -56,7 +56,7 @@ Decisions worth knowing:
 
 - **Finished cards are deleted, not archived.** Reaching a goal removes the card, its drop entries and any store item that only sold it. Undo is the safety net. The app is a to-do list for maxing, not a collection record.
 - **Levels are stored as copy counts**: 0 = not owned, 1 = F0, 11 = F10, then ascension. `levelLabel` turns them into F/A labels. Version 1 stored F1 as the first copy, which is why `migrateV1` exists.
-- **Every load goes through `normalize()`**: localStorage, imports, sync pulls and the starter data. It runs each migration once, by `version`, so a later user edit (deleting a rarity, removing a tag) sticks. See [Development → Saved data and migrations](development.md#saved-data-and-migrations).
+- **Every load goes through `normalize()`**: localStorage, imports and sync pulls. It runs each migration once, by `version`, so a later user edit (deleting a rarity, removing a tag) sticks. See [Development → Saved data and migrations](development.md#saved-data-and-migrations).
 - **Per-device settings aren't in `AppState`.** Sort orders, folded cards and the sync token live in their own localStorage keys (`mkmax:cardSort`, `mkmax:packSort`, `mkmax:folded`, `mkmax:sync`), so they never sync or get exported.
 
 ## Planner (LLD)

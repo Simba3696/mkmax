@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { fetchStarterData, useStore, type SyncStatus, type UndoEntry } from './store';
+import { useStore, type SyncStatus, type UndoEntry } from './store';
 import { btn } from './classes';
 import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
@@ -61,18 +61,9 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: () 
 }
 
 export default function App() {
-  const { state, update, replace, sync, lastUndo, undo, dismissUndo } = useStore();
+  const { state, update, sync, lastUndo, undo, dismissUndo } = useStore();
   const [tab, setTab] = useState<TabId>(() => (location.hash.slice(1) as TabId) || 'plan');
 
-  // ?starter loads the OneNote starter data, but only into an empty app so it never overwrites real progress.
-  useEffect(() => {
-    const url = new URL(location.href);
-    if (!url.searchParams.has('starter')) return;
-    url.searchParams.delete('starter');
-    history.replaceState(null, '', url);
-    if (state.cards.length === 0) fetchStarterData().then(replace, (e) => console.error(e));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   // Give cards MK Mobile Base art automatically: new cards, cards synced in from another device, and cards still
   // carrying art from the old wiki lookup. Runs again only when that set of cards changes.
   const needsArt = state.cards.filter(wantsCatalogImage).map((c) => c.id).join(',');
