@@ -3,8 +3,10 @@ import { newId, normalize, useStore } from '../store';
 import { kardTable } from '../normalize';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
-import { actions, btn, check, field, form, grow, subpanel } from '../classes';
+import { actions, btn, check, field, form, grow, hint, subpanel } from '../classes';
 import { copiesTotal, fLevel, levelLabel, maxFusion } from '../engine';
+import { fromNewerApp } from '../sync';
+import { checkForAppUpdate } from '../appUpdate';
 import SyncPanel from './SyncPanel';
 import GearOrder from './GearOrder';
 import type { RarityRule, Weights } from '../types';
@@ -34,22 +36,30 @@ const levels = 'grid grid-cols-[repeat(auto-fill,minmax(70px,1fr))] gap-[0.4rem]
 const level = 'flex flex-col gap-[2px] [&_input]:w-full';
 
 export default function SettingsView() {
-  const { state, update, replace } = useStore();
+  const { state, update, replace, unreadable, discardUnreadable } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  function exportData() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  function download(text: string, name: string) {
+    const blob = new Blob([text], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `mkmax-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `${name}-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
 
   async function importData(file: File) {
     try {
-      replace(normalize(JSON.parse(await file.text())));
+      const data = JSON.parse(await file.text());
+      // This build would save it in its older format and sync that, and the newer build would rerun its one-time
+      // upgrades over it. Looking for the update reloads into it if it's out.
+      if (data && fromNewerApp(data)) {
+        setMsg('This backup is from a newer version of MK Max. Pull down to refresh, or close MK Max and open it again, then import it.');
+        void checkForAppUpdate();
+        return;
+      }
+      replace(normalize(data));
       setMsg('Backup imported.');
     } catch (e) {
       setMsg(`Import failed: ${(e as Error).message}`);
@@ -293,9 +303,21 @@ export default function SettingsView() {
       </FoldCard>
 
       <FoldCard id="settings-data" title="Data">
+        {unreadable != null && (
+          <div className={`${hint} mb-[0.6rem]`}>
+            <p>
+              The data saved in this browser couldn't be read, so MK Max started fresh. With sync on, the copy in your gist is downloaded instead. The
+              unreadable data is kept here until you discard it, so download it first.
+            </p>
+            <div className={actions}>
+              <button onClick={() => download(unreadable, 'mkmax-unreadable')}>Download unreadable data</button>
+              <ConfirmButton label="Discard it" className={btn.ghost} onConfirm={discardUnreadable} />
+            </div>
+          </div>
+        )}
         <p className={`${note} md:max-w-[75ch]`}>Your data is saved in this browser only. Export a backup now and then, or use one to move to another device.</p>
         <div className={actions}>
-          <button className={btn.primary} onClick={exportData}>
+          <button className={btn.primary} onClick={() => download(JSON.stringify(state, null, 2), 'mkmax-backup')}>
             Export backup
           </button>
           <button onClick={() => fileRef.current?.click()}>Import backup</button>

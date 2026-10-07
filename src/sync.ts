@@ -1,6 +1,7 @@
 // Cross-device sync through a secret GitHub Gist. Each device keeps its own token and the gist id
 // in localStorage (never in the synced data); the gist holds one JSON file with the app state.
 import type { AppState } from './types';
+import { defaultState } from './defaults';
 
 const CONFIG_KEY = 'mkmax:sync';
 const API = 'https://api.github.com';
@@ -100,15 +101,30 @@ export const fromOutdatedApp = (s: AppState) => ((s.version as number | undefine
 export const OUTDATED_MESSAGE =
   'Another device synced data from an old version of MK Max, which raises every level by one. This device’s copy was kept and uploaded over it. Close MK Max on your other devices and open it again to update them.';
 
+const VERSION = defaultState().version;
+
+/**
+ * Data saved by a newer build than this one. This build would save it back in its own older format, dropping what it
+ * doesn't know and making the newer build run its one-time upgrades again over settings the user changed since.
+ */
+export const fromNewerApp = (s: AppState) => ((s.version as number | undefined) ?? 1) > VERSION;
+
+export const NEWER_MESSAGE =
+  'Another device synced data from a newer version of MK Max, so this device won’t sync until it’s updated. Pull down to refresh, or close MK Max and open it again.';
+
+export const UNREADABLE_MESSAGE =
+  'This version of MK Max can’t read the data in your gist, so this device won’t sync until it’s updated. The gist’s copy is left as it is. Pull down to refresh later, or close MK Max and open it again.';
+
 /**
  * What a sync should do, given the gist's copy, this device's copy, and the version both last agreed on.
  * Only one side changed → that side wins; both changed → the user decides. Data from an outdated app is
- * replaced with this device's copy. Two copies that differ only in their stamp aren't a conflict: both devices
+ * replaced with this device's copy; data from a newer app is left alone, and so is this device's copy. Two copies that differ only in their stamp aren't a conflict: both devices
  * made the same change by themselves (like moving the Realm Klash season end from the schedule).
  */
-export function decideSync(remote: AppState | null, local: AppState, base: number): 'pull' | 'push' | 'conflict' | 'none' | 'outdated' {
+export function decideSync(remote: AppState | null, local: AppState, base: number): 'pull' | 'push' | 'conflict' | 'none' | 'outdated' | 'newer' {
   if (!remote) return 'push';
   if (fromOutdatedApp(remote)) return 'outdated';
+  if (fromNewerApp(remote)) return 'newer';
   const remoteMoved = stamp(remote) > base;
   const localMoved = stamp(local) > base;
   if (remoteMoved && localMoved) return stamp(remote) === stamp(local) || sameData(remote, local) ? 'none' : 'conflict';

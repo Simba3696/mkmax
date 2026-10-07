@@ -442,7 +442,8 @@ Sync keeps your devices on the same data through a secret gist on your GitHub ac
 - **The first time:** if there's no gist yet, it creates one with this device's data. If there is one, a device you haven't entered anything on yet simply downloads it. A device with changes of its own (cards, packs, balances or settings) asks which copy to keep, and the copy you don't pick is replaced. So connect a new device before entering anything on it.
 - **When it syncs:** it uploads a moment after each change and downloads when the app opens or comes back to the foreground. It also checks every 2 minutes and when the device comes back online.
 - **If both devices changed data** since they last synced, the app asks which copy to keep. It doesn't ask when both made the same change, like each moving the Realm Klash season end from the event schedule. The prompt shows each copy's card count and when it changed. Nothing is merged, and sync waits until you choose.
-- **Errors:** "GitHub rejected the token…" means the token is wrong or has expired; make a new one. "GitHub error 404" or "403" usually means the token is missing the gist scope. A message about "an old version of MK Max" means another device is running an old build: close MK Max on your other devices and open it again.
+- **Device clocks:** a change always counts as newer than the last data this device synced, even if its clock is behind the other device's, so it still uploads.
+- **Errors:** "GitHub rejected the token…" means the token is wrong or has expired; make a new one. "GitHub error 404" or "403" usually means the token is missing the gist scope. A message about "an old version of MK Max" means another device is running an old build: close MK Max on your other devices and open it again. A message about "a newer version of MK Max" means this device is the one running an old build: it neither downloads nor uploads until it's updated, so nothing gets saved back in the older format. To update it, pull down to refresh, or close MK Max and open it again. If you change anything on this device meanwhile, it asks which copy to keep once it's updated. A message that this version "can't read the data in your gist" means the same: this device leaves the gist alone, and doesn't ask which copy to keep, until an update can read it.
 - **Sync now** syncs straight away.
 - **Disconnect this device** (two taps) forgets the token on this device only. Your data and the gist stay, and other devices stay connected.
 - **Token storage:** the token is kept in this browser on each device. It's never part of the synced data or of exported backups.
@@ -497,9 +498,10 @@ An emptied box saves 0. **Reset weights** puts the defaults back, with no confir
 ### Data
 
 - **Export backup** downloads `mkmax-backup-YYYY-MM-DD.json`. The date is in UTC, so a backup made late in the evening or early in the morning can carry the next or previous day. It doesn't include the sync token, folded cards or sort choices.
-- **Import backup** replaces everything with the file, with no confirm and no Undo. Older files are upgraded, and any card already at its goal is removed. With sync on, it's uploaded. A problem shows as "Import failed: …". Picking the same file twice in a row may do nothing.
+- **Import backup** replaces everything with the file, with no confirm and no Undo. Older files are upgraded, and any card already at its goal is removed. With sync on, it's uploaded. A backup made by a newer version of MK Max isn't imported: the app looks for the update instead, so pull down to refresh, or close MK Max and open it again, then import it. A problem shows as "Import failed: …". Picking the same file twice in a row may do nothing.
 - **Load sample data** loads the made-up set described in [Trying it with sample data](#trying-it-with-sample-data).
 - **Erase everything** puts the app back to a fresh install, with no Undo. With sync on, the empty data is uploaded, so every connected device is erased. To reset just one device, disconnect it first (or export a backup). Folded cards, sort choices and the token stay.
+- **Download unreadable data** and **Discard it** show only when the saved data couldn't be read. See [Where your data lives](#where-your-data-lives).
 
 ### Version
 
@@ -525,9 +527,10 @@ The bottom of Settings shows which version you have and when it was built, for e
 
 - Your data is saved in this browser only. Each browser, browser profile and device has its own copy.
 - Clearing the site's data in the browser deletes it.
+- Browsers can also clear it by themselves: Safari does for a site used in a Safari tab that hasn't been opened for 7 days, and others may when the device runs low on space. The app asks the browser to keep its data, but the browser decides. Some browsers, such as Firefox, ask you whether to let MK Max store data in persistent storage; choosing **Allow** protects it from being cleared, and if you close the question without choosing, it asks again next time. Installing the app (see [Opening and installing](#opening-and-installing)) or turning on [sync](#sync-between-devices) protects against this.
 - If the browser won't let the app save (as in some private windows), changes are lost when the page closes, with no warning.
 - Two open tabs of the app overwrite each other's saves. Keep one open.
-- If the saved data can't be read, the app starts fresh.
+- If the saved data can't be read, the app starts fresh and keeps the unreadable copy. Settings → Data then offers **Download unreadable data** and **Discard it** (two taps), and the Get started card on Plan points there. With sync on, the app downloads your gist's copy instead of uploading the empty data over it. If this version can't read the gist's copy either, sync leaves it alone and waits for an update.
 - Settings → **Export backup** saves a copy, and [sync](#sync-between-devices) keeps your devices in step.
 - Folded cards, sort choices and the sync token are kept per device. They aren't in backups and don't sync.
 
@@ -539,7 +542,7 @@ The bottom of Settings shows which version you have and when it was built, for e
 
 ### Updates
 
-- An app left open only looks for a new version when you pull to refresh (or when it's fully closed and reopened). If one is out, the app reloads into it by itself.
+- An app left open only looks for a new version when you pull to refresh or import a backup from a newer version (or when it's fully closed and reopened). If one is out, the app reloads into it by itself.
 - Updates never change your data, apart from the one-time upgrade of older saves.
 - Settings shows which [version](#version) you have.
 
@@ -583,7 +586,7 @@ The art doesn't count as a change for sync: every device adds the same art by it
 
 **The sync pill says "Sync needs you" or "Sync error".** See [Sync between devices](#sync-between-devices).
 
-**I lost my data.** See [Where your data lives](#where-your-data-lives). Import a backup, or connect sync to download the copy in your gist.
+**I lost my data.** See [Where your data lives](#where-your-data-lives). Import a backup, or connect sync to download the copy in your gist. If Settings → Data says the saved data couldn't be read, download it there before you discard it.
 
 ## Notes for older saves
 

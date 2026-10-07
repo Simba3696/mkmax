@@ -3,8 +3,7 @@ import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState
 import {
   ascensionCaps, buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, recordPurchase, seasonEnd, suggestSeason, targetLevel,
 } from './engine';
-import { normalize } from './store';
-import { kardTable } from './normalize';
+import { kardTable, normalize } from './normalize';
 import { daysFromNow } from './ui';
 import type { AppState, Card, Pack } from './types';
 
