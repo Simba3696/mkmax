@@ -305,10 +305,3 @@ export function useStore() {
 }
 
 export const newId = () => crypto.randomUUID().slice(0, 8);
-
-/** Starter data transcribed from the OneNote "MK Mobile" page, served from public/. */
-export async function fetchStarterData(): Promise<AppState> {
-  const res = await fetch(`${import.meta.env.BASE_URL}onenote-import.json`);
-  if (!res.ok) throw new Error(`Starter data not found (${res.status})`);
-  return normalize(await res.json());
-}
