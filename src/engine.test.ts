@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
+import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
   ascensionCaps, buildCtx, buildPlan, copiesAtFusion, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEV, packStatus, pruneDone, recordPurchase, seasonEnd, suggestSeason, targetLevel,
 } from './engine';
@@ -225,9 +225,10 @@ describe('phases', () => {
   it("spends Gold kards on ascension too, up to the card's own cap", () => {
     const gold = rules().get('gold')!;
     expect(kardCost(gold, F(10))).toBe(10); // F10 → A1
-    expect(kardCost(gold, A(9))).toBe(10); // A9 → A10
+    expect(kardCost(gold, A(1))).toBe(11); // A1 → A2
+    expect(kardCost(gold, A(9))).toBe(30); // A9 → A10
     expect(kardCost(gold, A(10))).toBeNull(); // already A10
-    // 25 kards on a card capped at A2: F9→F10 (10), F10→A1 (10); A1→A2 (10) doesn't fit. 5 left over.
+    // 25 kards on a card capped at A2: F9→F10 (10), F10→A1 (10); A1→A2 (11) doesn't fit. 5 left over.
     const s = setup([card('g', F(9), { rarityId: 'gold', maxLevel: A(2) })], [], (s) => (s.rarities[1].fusionUpKards = 25));
     expect(buildCtx(s).kardPlan.get('gold')).toEqual({ assignments: [{ cardId: 'g', from: F(9), to: A(1), kards: 20 }], left: 5 });
   });
@@ -261,6 +262,20 @@ describe('phases', () => {
     expect(normalize(kept).currencies.map((c) => c.id)).toContain('time-krystals');
     const added = { ...defaultState(), currencies: [...defaultState().currencies, tk] };
     expect(normalize(added).currencies.map((c) => c.id)).toContain('time-krystals');
+  });
+
+  it('gives Gold ascension the game\'s kard costs once, keeping edited tables', () => {
+    const old = structuredClone({ ...defaultState(), version: 12 });
+    const gold = () => old.rarities.find((r) => r.id === 'gold')!;
+    gold().kardsPerLevel = [...DIAMOND_KARD_COSTS, ...Array(10).fill(10)];
+    expect(normalize(old).rarities.find((r) => r.id === 'gold')?.kardsPerLevel.slice(10)).toEqual(ASCENSION_KARD_COSTS);
+    // An edited table is left alone.
+    gold().kardsPerLevel[12] = 9;
+    expect(normalize(old).rarities.find((r) => r.id === 'gold')?.kardsPerLevel.slice(10, 13)).toEqual([10, 10, 9]);
+    // A save already on version 13 isn't changed again, even with flat costs.
+    const flat = structuredClone(defaultState());
+    flat.rarities.find((r) => r.id === 'gold')!.kardsPerLevel = [...DIAMOND_KARD_COSTS, ...Array(10).fill(10)];
+    expect(normalize(flat).rarities.find((r) => r.id === 'gold')?.kardsPerLevel.slice(10)).toEqual(Array(10).fill(10));
   });
 
   it('gives Epic and Rare gear their kard costs and Kameos guests once, keeping edited tables', () => {
