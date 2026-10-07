@@ -2,7 +2,7 @@
 // challenges and Realm Klash seasons. Pack drop rates aren't in it; the user still enters those.
 import { useEffect, useState } from 'react';
 import { nameKey } from './catalog';
-import { REALM_KLASH_CURRENCY, toLocalInput } from './engine';
+import { REALM_KLASH_CURRENCY, packStatus, toLocalInput } from './engine';
 import type { AppState, Card, Pack } from './types';
 
 export interface ShopPack {
@@ -151,30 +151,50 @@ export function fixPackNames(packs: Pack[]) {
   });
 }
 
-/** Shop packs still on sale or coming up that aren't already in the app (by name) or dismissed. */
+const sameName = (shop: ShopPack, name: string) => nameKey(name) === nameKey(shop.name) || nameKey(name) === nameKey(packName(shop));
+
+/**
+ * Whether a saved pack is this run of a shop pack: same name, and not over, or over only after this run began (a
+ * season ended early, or an end date typed early). One that ended before it began is an earlier run.
+ */
+const isThisRun = (shop: ShopPack, p: Pack, now: Date) =>
+  sameName(shop, p.name) && (packStatus(p, now) !== 'expired' || (!!shop.start && new Date(p.endsAt!) > new Date(shop.start)));
+
+/** Shop packs still on sale or coming up that aren't already in the app (by name, see isThisRun) or dismissed. */
 export function shopSuggestions(events: EventSchedule, state: AppState, now: Date) {
-  const have = new Set([...state.packs.map((p) => p.name), ...(state.dismissedShopPacks ?? [])].map(nameKey));
-  return events.packs.filter((p) => endsAfter(p, now) && !have.has(nameKey(p.name)) && !have.has(nameKey(packName(p))));
+  const hidden = new Set((state.dismissedShopPacks ?? []).map(nameKey));
+  return events.packs.filter(
+    (p) => endsAfter(p, now) && !hidden.has(nameKey(p.name)) && !hidden.has(nameKey(packName(p))) && !state.packs.some((saved) => isThisRun(p, saved, now)),
+  );
+}
+
+/** The latest earlier run of a shop pack that's still kept under Expired, if any: the shop pack is a rerun of it. */
+export function lastRun(shop: ShopPack, state: AppState, now: Date): Pack | undefined {
+  return state.packs
+    .filter((p) => sameName(shop, p.name) && !isThisRun(shop, p, now))
+    .sort((a, b) => (b.endsAt ?? '').localeCompare(a.endsAt ?? ''))[0];
 }
 
 /**
  * A new pack filled in from the site: everything but the drop rates. A permanent Blood Ruby pack (like the
- * Kameo summon packs) doesn't leave with the Realm Klash season.
+ * Kameo summon packs) doesn't leave with the Realm Klash season. A rerun (`last`, see lastRun) keeps the earlier
+ * run's name, drops and cards per purchase, which the site doesn't have.
  */
-export function packFromShop(shop: ShopPack, state: AppState, id: string): Pack {
+export function packFromShop(shop: ShopPack, state: AppState, id: string, last?: Pack): Pack {
   const currencyId = currencyFor(shop.currency, state.currencies) ?? state.currencies[0]?.id ?? '';
   return {
     id,
-    name: packName(shop),
+    name: last?.name ?? packName(shop),
     currencyId,
     ...(currencyId === REALM_KLASH_CURRENCY && !shop.end && { season: false }),
+    ...(last?.store && { store: true }),
     cost: shop.cost ?? 0,
-    rolls: 1,
+    rolls: last?.rolls ?? 1,
     maxPurchases: shop.limit,
     purchased: 0,
     startsAt: localOrNull(shop.start),
     endsAt: localOrNull(shop.end),
-    drops: [],
+    drops: last ? structuredClone(last.drops) : [],
   };
 }
 

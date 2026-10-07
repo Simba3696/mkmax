@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, copiesAtFusion, editedPack, editorSeasonEnd, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, levelLabel, moveSeasonEnd, packEndOnSave, packEV, packStatus, poolShare, pruneDone, recordPurchase, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, levelLabel, moveSeasonEnd, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
 import { kardTable, normalize } from './normalize';
 import { daysFromNow } from './ui';
@@ -225,7 +225,7 @@ describe('phases', () => {
     expect(kardCost(diamond, F(10))).toBeNull(); // already F10
     // 10 kards: exactly F9 → F10 when that's the only card.
     const s = setup([card('near', F(9))], [], (s) => (s.rarities[0].fusionUpKards = 10));
-    expect(buildCtx(s).kardPlan.get('diamond')).toEqual({ assignments: [{ cardId: 'near', from: F(9), to: F(10), kards: 10 }], left: 0 });
+    expect(buildCtx(s).kardPlan.get('diamond')).toEqual({ assignments: [{ cardId: 'near', from: F(9), to: F(10), kards: 10 }], left: 0, cards: 1, cheapest: 10, realmKlash: 0 });
   });
 
   it("spends Gold kards on ascension too, up to the card's own cap", () => {
@@ -236,7 +236,7 @@ describe('phases', () => {
     expect(kardCost(gold, A(10))).toBeNull(); // already A10
     // 25 kards on a card capped at A2: F9→F10 (10), F10→A1 (10); A1→A2 (11) doesn't fit. 5 left over.
     const s = setup([card('g', F(9), { rarityId: 'gold', maxLevel: A(2) })], [], (s) => (s.rarities[1].fusionUpKards = 25));
-    expect(buildCtx(s).kardPlan.get('gold')).toEqual({ assignments: [{ cardId: 'g', from: F(9), to: A(1), kards: 20 }], left: 5 });
+    expect(buildCtx(s).kardPlan.get('gold')).toEqual({ assignments: [{ cardId: 'g', from: F(9), to: A(1), kards: 20 }], left: 5, cards: 1, cheapest: 10, realmKlash: 0 });
   });
 
   it('adds Uncommon gear to older saves once, after Rare', () => {
@@ -352,7 +352,29 @@ describe('phases', () => {
         { cardId: 'far', from: F(4), to: F(5), kards: 2 },
       ],
       left: 1,
+      cards: 3,
+      cheapest: 2,
+      realmKlash: 0,
     });
+  });
+
+  it('breaks a kard tie toward the card with the fewest steps left to its goal', () => {
+    // F9→F10 and F10→A1 both cost 10 Gold kards. x is one step from its F10 cap; y is ten steps from A10.
+    const s = setup([card('y', F(10), { rarityId: 'gold' }), card('x', F(9), { rarityId: 'gold', maxLevel: F(10) })], [], (s) => (s.rarities[1].fusionUpKards = 10));
+    expect(buildCtx(s).kardPlan.get('gold')).toEqual({ assignments: [{ cardId: 'x', from: F(9), to: F(10), kards: 10 }], left: 0, cards: 2, cheapest: 10, realmKlash: 0 });
+  });
+
+  it('counts the cards kards could go to, so the plan can tell no card at F3 from too few kards', () => {
+    const s = setup([card('low', F(2)), card('rk', F(5), { rarityId: 'epic', goal: 'max' })], [], (s) => {
+      s.rarities[0].fusionUpKards = 30;
+      s.rarities.find((r) => r.id === 'epic')!.fusionUpKards = 30;
+    });
+    expect(buildCtx(s).kardPlan.get('diamond')).toEqual({ assignments: [], left: 30, cards: 0, cheapest: null, realmKlash: 0 });
+    expect(buildCtx(s).kardPlan.get('epic')).toEqual({ assignments: [], left: 30, cards: 0, cheapest: null, realmKlash: 1 }); // Realm Klash gear gets none
+    // A card at F9 with 5 kards: there's a card, just not enough kards for its 10-kard step, which the plan names.
+    s.cards = [card('near', F(9))];
+    s.rarities[0].fusionUpKards = 5;
+    expect(buildCtx(s).kardPlan.get('diamond')).toEqual({ assignments: [], left: 5, cards: 1, cheapest: 10, realmKlash: 0 });
   });
 });
 
@@ -372,6 +394,58 @@ describe('scoring', () => {
   it('ignores maxed cards', () => {
     const s = setup([card('m', F(10))], [pack('a', [{ cardId: 'm', chance: 50 }])]);
     expect(packEV(buildCtx(s), s.packs[0])).toBe(0);
+  });
+});
+
+describe('weights', () => {
+  it('counts guests up, Kameos down, and challenge Kameos down again', () => {
+    const s = setup([]);
+    expect(cardWeight(s, card('plain', 0))).toBe(1);
+    expect(cardWeight(s, card('guest', 0, { guest: true }))).toBe(1.5);
+    expect(cardWeight(s, card('kameo', 0, { rarityId: 'kameo-gold' }))).toBe(0.25);
+    expect(cardWeight(s, card('elder', 0, { rarityId: 'kameo-gold', guest: true, source: 'challenge' }))).toBeCloseTo(1.5 * 0.25 * 0.2);
+  });
+
+  it('treats equipment sold as a Blood Ruby store item as Realm Klash gear, whatever its goal', () => {
+    const gear = card('sash', F(5), { rarityId: 'epic' });
+    const item = pack('sash item', [{ cardId: 'sash', chance: 100 }], { currencyId: 'blood-rubies', store: true });
+    expect(isRealmKlashGear(setup([gear]), gear)).toBe(false);
+    expect(isRealmKlashGear(setup([gear], [item]), gear)).toBe(true);
+    expect(isRealmKlashGear(setup([gear], [{ ...item, currencyId: 'souls' }]), gear)).toBe(false);
+    // A character sold for Blood Rubies isn't gear.
+    const hero = card('hero', F(5));
+    expect(isRealmKlashGear(setup([hero], [{ ...item, drops: [{ cardId: 'hero', chance: 100 }] }]), hero)).toBe(false);
+  });
+});
+
+describe('pack ranking and targets', () => {
+  it('tells active, upcoming and expired packs apart', () => {
+    expect(packStatus(pack('p', [], { startsAt: '2026-01-11T00:00' }), NOW)).toBe('upcoming');
+    expect(packStatus(pack('p', [], { startsAt: '2026-01-11T00:00', endsAt: '2026-01-11T00:00' }), NOW)).toBe('upcoming');
+    expect(packStatus(pack('p', [], { startsAt: '2026-01-09T00:00', endsAt: '2026-01-09T00:00' }), NOW)).toBe('expired');
+    expect(packStatus(pack('p', [], { endsAt: '2026-01-10T12:00' }), NOW)).toBe('active'); // ends this minute
+    expect(packStatus(pack('p', [], { endsAt: '2026-01-10T11:59' }), NOW)).toBe('expired');
+  });
+
+  it('ranks packs by value per 1,000 currency, leaving expired ones out', () => {
+    const drops = [{ cardId: 'a', chance: 10 }];
+    const s = setup([card('a', F(5))], [
+      pack('dear', drops, { cost: 200 }),
+      pack('cheap', drops),
+      pack('gone', [{ cardId: 'a', chance: 50 }], { endsAt: '2026-01-01T00:00' }),
+      pack('next', drops, { startsAt: '2026-01-11T00:00' }),
+    ]);
+    const ranks = rankPacks(buildCtx(s), NOW);
+    expect(ranks.map((r) => [r.pack.id, r.status])).toEqual([['cheap', 'active'], ['next', 'upcoming'], ['dear', 'active']]);
+    expect(ranks[0].evPerK).toBeCloseTo(ranks[2].evPerK * 2);
+  });
+
+  it('leaves Krypt, tower and challenge cards out of the targets unless a current pack drops them', () => {
+    const s = setup(
+      [card('char', F(5)), card('krypt', F(5), { source: 'krypt' }), card('tower', F(5), { source: 'tower' }), card('sold', F(5), { source: 'krypt' })],
+      [pack('p', [{ cardId: 'sold', chance: 10 }]), pack('old', [{ cardId: 'tower', chance: 10 }], { endsAt: '2026-01-01T00:00' })],
+    );
+    expect(rankTargets(buildCtx(s), NOW).map((t) => [t.card.id, t.inPacks])).toEqual([['char', 0], ['sold', 1]]);
   });
 });
 
@@ -395,6 +469,23 @@ describe('planner', () => {
     ]);
     expect(souls.saveFor?.pack.id).toBe('perm');
     expect(souls.saveFor?.shortBy).toBe(50);
+  });
+
+  it("spends today's budget on a pack that hasn't started, as a Save for buy", () => {
+    const s = setup([card('a', F(5))], [pack('soon', [{ cardId: 'a', chance: 20 }], { startsAt: '2026-01-11T00:00', endsAt: '2026-01-14T00:00' })], (s) => (s.currencies[0].balance = 200));
+    const souls = buildPlan(buildCtx(s), NOW).currencies[0];
+    expect(souls.buys.map((b) => [b.pack.id, b.status, b.count])).toEqual([['soon', 'upcoming', 2]]);
+    expect(souls.spent).toBe(200);
+  });
+
+  it('lists buys soonest-ending first, permanent packs last', () => {
+    const drops = (cardId: string) => [{ cardId, chance: 10 }];
+    const s = setup(
+      [card('a', F(5)), card('b', F(5)), card('c', F(5))],
+      [pack('perm', drops('a')), pack('later', drops('b'), { endsAt: '2026-01-20T00:00', maxPurchases: 1 }), pack('sooner', drops('c'), { endsAt: '2026-01-12T00:00', maxPurchases: 1 })],
+      (s) => (s.currencies[0].balance = 300),
+    );
+    expect(buildPlan(buildCtx(s), NOW).currencies[0].buys.map((b) => b.pack.id)).toEqual(['sooner', 'later', 'perm']);
   });
 
   it('stops buying once expected copies would max the card', () => {

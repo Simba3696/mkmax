@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
-import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, cardGoal, daysToAfford, isRealmKlashGear, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
+import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, daysToAfford, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
 import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
@@ -86,14 +86,9 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
       </>
     );
   };
-  // Kard counts only matter where some card is taken past the threshold with kards. Realm Klash gear doesn't
-  // count: it's maxed with Blood Rubies.
-  const kardRarities = state.rarities.filter(
-    (r) =>
-      r.kind !== 'kameo' &&
-      r.fusionUpThreshold != null &&
-      (r.goal === 'max' || state.cards.some((c) => c.rarityId === r.id && cardGoal(c, r) === 'max' && !isRealmKlashGear(state, c))),
-  );
+  // Kard counts only matter where cards are taken past the threshold with kards, which is a rarity tracked to max.
+  // A gear card with its own Goal of Max doesn't count: that's Realm Klash gear, maxed with Blood Rubies.
+  const kardRarities = state.rarities.filter((r) => r.kind !== 'kameo' && r.fusionUpThreshold != null && r.goal === 'max');
 
   const wallet = (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-[0.6rem] md:items-end">
@@ -226,10 +221,15 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                     <RarityBadge rule={r} /> {r.fusionUpKards} kard{r.fusionUpKards === 1 ? '' : 's'}
                     {plan.assignments.length > 0 && <span className={note}> · uses {used}, {plan.left} left over</span>}
                   </h3>
-                  {plan.assignments.length === 0 ? (
+                  {plan.cards === 0 ? (
                     <p className={note}>
-                      Not enough kards for any step yet. Kards start at F{r.fusionUpThreshold}, and the cheapest step there costs{' '}
-                      {r.kardsPerLevel[r.fusionUpThreshold ?? 0] || '?'}.
+                      {plan.realmKlash > 0
+                        ? `No ${r.label} card at F${r.fusionUpThreshold} or higher that kards can go to yet, so these kards wait. Realm Klash gear gets none.`
+                        : `No ${r.label} card at F${r.fusionUpThreshold} or higher yet, so these kards wait.`}
+                    </p>
+                  ) : plan.assignments.length === 0 ? (
+                    <p className={note}>
+                      Not enough kards for any step yet{plan.cheapest != null ? `: the cheapest next step costs ${plan.cheapest}.` : '.'}
                     </p>
                   ) : (
                     plan.assignments.map((a) => (

@@ -70,7 +70,7 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
 4. **Optional extras, once:**
    - Each currency's daily income (Settings → Currencies).
    - **Guest** ticks on guest cards.
-   - Realm Klash gear: add each piece as Epic Equip with **Goal** set to **Max (F10)**, add it as a Blood Ruby **Store item**, then set the order in Settings → Blood Ruby gear order.
+   - Realm Klash gear: add each piece as Epic Equip with **Goal** set to **Max (F10, Realm Klash gear)**, add it as a Blood Ruby **Store item**, then set the order in Settings → Blood Ruby gear order.
    - The Realm Klash season end on Packs, only if the event schedule doesn't set it.
 
 ### The Get started card
@@ -183,7 +183,7 @@ Two buttons at the top switch between your card list and the [Tower gear](#tower
 - **Name:** use the card's full in-game name, character and variant ("Sub-Zero, Klassic" or "Klassic Sub-Zero": word order doesn't matter). Art lookup and Elder challenge tagging match on those words, so a missing or misspelled variant is what breaks them. Enter adds the card. **Add card** doesn't check for duplicates; **Paste a list…** does.
 - **Rarity:** the list and its order come from Settings → Fusion rules. It starts on the first one (Diamond) and stays on whatever you picked last. Changing it resets the level and Max. Which other fields show depends on the rarity's kind.
 - **Current level:** Not owned, F0 to F10, and A1 to A10 for Gold. It starts at Not owned and goes back to Not owned after each add, so set it for every owned card. Hidden for Kameos, which always start not owned. A card added already at its goal is removed straight away, with "… is maxed and removed" in the Undo bar.
-- **Goal** (Epic and Rare gear): **F3 (Kards finish it)** or **Max (F10)**. Max is how Realm Klash gear is tracked, and the Kard plan skips it.
+- **Goal** (Epic and Rare gear): **F3 (Kards finish it)** or **Max (F10, Realm Klash gear)**. Max is how Realm Klash gear is tracked, and the Kard plan skips it, so don't use it for Krypt or tower gear you'd finish with kards. To plan kards for a gear rarity, set its **Track until** to Max in Settings → Fusion rules instead; the Goal choices then read **F3 (Kards finish it)** and **Max (F10)**. A card you set to Max before that stays Realm Klash gear and still says so; pick the plain **Max (F10)** under it to let kards go to it.
 - **Max** (Gold): **F10 (no ascension)**, **A5** or **A10**. Diamond has no Max, since it stops at F10.
 - **Guest card:** shown only when the rarity has guests. It's unticked again after each add.
 - **Source** (equipment): **From packs/store**, **Krypt gear** or **Tower gear**. Tower gear adds a **Tower** box for the tower's name, which files the card under that tower on [Tower gear](#tower-gear). Gold Kameos on the challenge list are tagged **Elder challenge** automatically.
@@ -272,7 +272,7 @@ Packs are split into three sections:
 - **Coming up**: packs whose start date is still ahead.
 - **Expired (N)**: folded; tap it to see them.
 
-Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all. While an expired pack is kept, **In the shop** won't suggest a pack with that name.
+Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
 
 - **Sort** shows once you have 2 packs: **Ending soonest** (the default) or **Currency**, which groups each section's packs under a heading per currency, in the order they're listed in Settings. Sort choices are remembered on each device and aren't synced.
 - **Summary line**, for example "400 Souls · 3 cards per buy · bought 2/5" for a random pack, or "300 Blood Rubies · store item · bought 0/2" for a store item. 2/5 means 2 bought of a 5-purchase limit.
@@ -326,7 +326,7 @@ Tap **+ Add pack** (or **Edit** on a pack).
 ### Edit, Rerun, Delete
 
 - **Edit** opens the pack in the editor.
-- **Rerun** works on any pack. It opens a copy named "… (rerun)" with purchases at 0 and dates cleared, and keeps the original. Tap Rerun on a seasonal item that comes back to add it to the new season.
+- **Rerun** works on any pack. It opens a copy with the same name, purchases at 0 and dates cleared, and keeps the original. Tap Rerun on a seasonal item that comes back to add it to the new season.
 - **Delete** needs two taps and has Undo.
 
 ### In the shop
@@ -334,6 +334,7 @@ Tap **+ Add pack** (or **Edit** on a pack).
 **In the shop** lists packs from MK Mobile Base's event schedule that are on sale or coming up and aren't in the app yet. It hides itself when there's nothing to suggest. Its note says which day's schedule it's from.
 
 - **Add** opens the pack editor with the name, currency, cost, purchase limit and dates filled in, in your local time. You enter the drop rates.
+- **Rerun** shows instead of Add when you still have an earlier run of the pack under Expired. It fills in the same as Add, and also copies that run's name, drop rates, cards per purchase and store item setting. A pack that expired only after the shop's run began (a season you ended early, say) is the same run, so it isn't suggested.
 - **Cards per purchase always comes in as 1**, so fix it for packs that give several cards.
 - A pack the schedule has no price for comes in at cost 0, which you'll need to fix before saving.
 - **Not needed** hides a pack for good, and the hidden list syncs. The 8-second Undo is the only way to bring it back.
@@ -362,7 +363,7 @@ Realm Klash seasons last 2 weeks. Each season the Blood Ruby store swaps its cha
 - Purchases you log come off the balance automatically. Income doesn't, so update your balances after playing.
 - Kard boxes:
   - Diamond and Gold always show.
-  - Epic and Rare show once their **Track until** is Max in Settings → Fusion rules, or once a card of that rarity (other than Realm Klash gear) has its **Goal** set to Max. By default gear stops at F3 and you finish it with kards in the game yourself.
+  - Epic and Rare show once their **Track until** is Max in Settings → Fusion rules. By default gear stops at F3 and you finish it with kards in the game yourself. A card's own **Goal** of Max doesn't add the box: that marks it as Realm Klash gear, which gets no kards.
   - Uncommon shows once you turn its kards on in Settings → Fusion rules. Kameos have no kards.
   - The app never takes kards off. After fusing in the game, lower the count here and raise the card on Cards.
 
@@ -402,7 +403,8 @@ Hidden while every kard count is 0.
 
 - Each rarity shows its kards, "uses U, L left over", and rows like "F3 → **F6** (6 kards)".
 - Only cards at F3 or higher, below their goal, and not Realm Klash gear get kards.
-- "Not enough kards for any step yet" also shows when you have no card of that rarity at F3 or higher.
+- "No … card at F3 or higher yet, so these kards wait." means no card can take kards yet. When Realm Klash gear of that rarity is at F3 or higher, it reads "No … card at F3 or higher that kards can go to yet" and adds that Realm Klash gear gets none.
+- "Not enough kards for any step yet: the cheapest next step costs N." means a card can take kards, but even its cheapest next step costs more kards than you have.
 - It's advice only: nothing is applied to your cards.
 - The plan counts the copies kards would cover as worth less, so it buys packs for the rest.
 
@@ -579,7 +581,7 @@ The art doesn't count as a change for sync: every device adds the same art by it
 
 **A pack tops Pack ranking but isn't planned.** See [Pack ranking](#pack-ranking).
 
-**There's no Epic or Rare kard box.** See [Wallet](#wallet). Gear stops at F3 by default, and you finish it with kards in the game yourself. The box shows once that rarity's **Track until** is Max, or once one of its cards (other than Realm Klash gear) has its **Goal** set to Max.
+**There's no Epic or Rare kard box.** See [Wallet](#wallet). Gear stops at F3 by default, and you finish it with kards in the game yourself. The box shows once that rarity's **Track until** is Max in Settings → Fusion rules. Setting a card's **Goal** to Max doesn't do it: that marks the card as Realm Klash gear, which gets no kards. If you set Krypt or tower gear to Max before, its Goal still reads **Max (F10, Realm Klash gear)** after you switch Track until; pick **Max (F10)** under it so the Kard plan counts it.
 
 **I forgot to log purchases.** Tap **I bought one** for each (it takes off the cost). Or set **Already bought** in the editor (it doesn't touch balances) and fix the balance and card levels by hand. For a pull you logged by mistake, use − on Cards.
 

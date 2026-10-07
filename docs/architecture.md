@@ -63,7 +63,7 @@ Decisions worth knowing:
 
 `buildPlan` in `engine.ts`, run once per render of the Plan:
 
-1. **Kard allocation** (`allocateKards`, inside `buildCtx`). For each rarity, spend its Fusion Up Kards one step at a time on the step with the best `cardWeight / kardCost`, tie-breaking on the card closest to max. Realm Klash gear is excluded. The result is how many copies kards will supply per card, which the next step treats as worth less.
+1. **Kard allocation** (`allocateKards`, inside `buildCtx`). For each rarity, spend its Fusion Up Kards one step at a time on the step with the best `cardWeight / kardCost`, tie-breaking on the card with the fewest steps left to its goal. Realm Klash gear is excluded. The result is how many copies kards will supply per card, which the next step treats as worth less.
 2. **Copy value** (`copyValue`). The `g`-th extra copy of a card falls into a phase (unlock, to F3, normal, covered by kards, maxed) with its own multiplier, times the card's weight (guest, Kameo, challenge), times a closeness bonus. `gainValue` integrates this over fractional expected copies.
 3. **Blood Ruby gear first.** For Blood Rubies only, walk `gearQueue` in order and buy each piece's cheapest store item until the piece is maxed. If the next copy isn't affordable, stop and save for it; nothing else is bought with rubies.
 4. **Greedy per currency.** Repeatedly buy the affordable pack with the best `packEV / cost` (times `limitedBoost` if it has an end date), adding its expected copies to a shared `gained` map so later buys, in any currency, see diminishing returns. Stop when nothing affordable has positive value. The best pack you can't afford becomes `saveFor`.

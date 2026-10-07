@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
-import { challengeFor, currencyFor, packFromShop, scheduleDate, scheduledSeason, scheduledSeasonEnd, shopSuggestions, titleCase, packName, fixPackNames, type EventSchedule } from './events';
+import { challengeFor, currencyFor, lastRun, packFromShop, scheduleDate, scheduledSeason, scheduledSeasonEnd, shopSuggestions, titleCase, packName, fixPackNames, type EventSchedule } from './events';
 import { toLocalInput } from './engine';
 
 const NOW = new Date('2026-09-28T17:00:00Z');
@@ -52,6 +52,27 @@ describe('event schedule', () => {
     s.packs = [{ ...packFromShop(events.packs[0], s, 'x') }];
     s.dismissedShopPacks = ['MARTIAL ARTIST KOMBAT PACK'];
     expect(shopSuggestions(events, s, NOW).map((p) => p.name)).toEqual(['BLOODFIRE KAMEO SUMMON PACK']);
+  });
+
+  it('suggests a pack kept under Expired again, as a rerun with its name and odds', () => {
+    const s = defaultState();
+    const shop = events.packs[2];
+    const old = { ...packFromShop(shop, s, 'old'), name: 'Martial Artist kombat pack', rolls: 3, purchased: 4, drops: [{ cardId: 'c', chance: 5 }], startsAt: local('2026-08-01T16:00:00Z'), endsAt: local('2026-08-08T16:00:00Z') };
+    s.packs = [old];
+    const names = () => shopSuggestions(events, s, NOW).map((p) => p.name);
+    expect(names()).toContain(shop.name);
+    expect(lastRun(shop, s, NOW)?.id).toBe('old');
+    const rerun = packFromShop(shop, s, 'new', lastRun(shop, s, NOW));
+    expect(rerun).toMatchObject({ id: 'new', name: old.name, rolls: 3, drops: old.drops, purchased: 0, cost: 400, maxPurchases: 20, endsAt: local('2026-09-30T16:00:00Z') });
+    // Saved under the same name, the rerun isn't suggested again, and clearing the old run doesn't bring it back.
+    s.packs.push(rerun);
+    expect(names()).not.toContain(shop.name);
+    s.packs = [rerun];
+    expect(names()).not.toContain(shop.name);
+    // A run that ended only after this one began (a season ended early) is this run, not an earlier one.
+    s.packs = [{ ...old, endsAt: local('2026-09-25T16:00:00Z') }];
+    expect(names()).not.toContain(shop.name);
+    expect(lastRun(shop, s, NOW)).toBeUndefined();
   });
 
   it('fills in a pack from the shop, leaving permanent Blood Ruby packs out of the season', () => {

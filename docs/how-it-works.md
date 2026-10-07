@@ -29,7 +29,7 @@ Fusion Up Kards aren't one per level. Each step costs more, and each rarity (Dia
 
 Gold kards also cover ascension (F10→A1 up to A9→A10), up to each card's own A5 or A10 cap, standing in for the one duplicate each step takes. Ascension Kards, the separate premium item every step also needs, aren't tracked or planned. You can edit the costs in Settings → Fusion rules.
 
-Kards only work from F3 up. The Kard plan spends your kards one step at a time on the cheapest step available, because every step saves one pack copy no matter how much it costs. Guest cards count 1.5× and ties go to the card closest to max. It shows how many kards each card gets and how many are left over. The Wallet shows a kard count for each rarity that has cards past F3 still to go, so Epic kards show up once an Epic card other than Realm Klash gear has a max goal.
+Kards only work from F3 up. The Kard plan spends your kards one step at a time on the cheapest step available, because every step saves one pack copy no matter how much it costs. Guest cards count 1.5×, and ties go to the card with the fewest steps left to its goal, so one card is finished before another is started. It shows how many kards each card gets and how many are left over, or says when no card of that rarity can take kards yet, or names the cheapest next step when you don't have enough kards for it. The Wallet shows a kard count for each rarity tracked to max (Diamond and Gold by default, and Epic or Rare once their Track until is Max). A gear card's own max goal doesn't count: on Epic or Rare gear it means Realm Klash gear, which kards skip, even once the rarity's Track until is Max too.
 
 A pack's value is the expected value of its drops (rolls × chance), added up across the drop table.
 
@@ -45,7 +45,7 @@ MK Mobile Base keeps a copy of [mkmobileevent.com](https://mkmobileevent.com)'s 
 
 The app uses it for three things:
 
-- **In the shop** (Packs): packs on sale or coming up that you haven't added. **Add** opens the pack editor with the name, currency, cost, dates and limit filled in, so you only enter drop rates for the cards you need. **Not needed** hides a pack for good, for packs with none of your cards; this list syncs between devices. A permanent Blood Ruby pack (like the Kameo summon packs) isn't marked as leaving with the season.
+- **In the shop** (Packs): packs on sale or coming up that you haven't added. **Add** opens the pack editor with the name, currency, cost, dates and limit filled in, so you only enter drop rates for the cards you need. A pack you still have under Expired from an earlier run is suggested as a **Rerun**, which also copies that run's name and drop rates; one that expired after the shop's run began counts as the same run. **Not needed** hides a pack for good, for packs with none of your cards; this list syncs between devices. A permanent Blood Ruby pack (like the Kameo summon packs) isn't marked as leaving with the season.
 - **Elder challenge dates** for challenge Kameos you still need, on the card and in the Plan.
 - **The Realm Klash season end.** The site lists seasons a week at a time ("Circle of Shadow 2", then "Kold" twice), so back-to-back weeks with the same name count as one season. When a week is added after the saved end has passed, the season's items still on that end move to the new one.
 
