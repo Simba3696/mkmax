@@ -61,13 +61,18 @@ function GoalSelect({ rule, value, onChange }: { rule: RarityRule; value: Card['
 
 /**
  * Cap choices for rarities that ascend past their fusion levels. Gold cards stop at F10 (no ascension), A5 or
- * A10, depending on the card and which updates gave it ascension. Any other saved cap is still shown, flagged.
+ * A10, depending on the card and which updates gave it ascension. The game calls those caps Stage I and Stage II
+ * Ascension, and patch notes name characters by stage, so the options say both. Any other saved cap is still
+ * shown, flagged.
  */
 function CapSelect({ rule, value, onChange }: { rule: RarityRule; value: number | null | undefined; onChange: (v: number | null) => void }) {
   const max = maxFusion(rule);
   const caps = ascensionCaps(rule);
   if (caps.length < 2) return null;
   const current = value ?? max;
+  const top = fLevel(rule.fusionMax);
+  const label = (l: number) =>
+    l === top ? `${levelLabel(rule, l)} (no ascension)` : l === top + 5 ? `${levelLabel(rule, l)} (Stage I)` : l === top + 10 ? `${levelLabel(rule, l)} (Stage II)` : levelLabel(rule, l);
   return (
     <label className={check}>
       Max
@@ -75,7 +80,7 @@ function CapSelect({ rule, value, onChange }: { rule: RarityRule; value: number 
         {!caps.includes(current) && <option value={current}>{levelLabel(rule, current)} (not a real cap)</option>}
         {caps.map((l) => (
           <option key={l} value={l}>
-            {l === fLevel(rule.fusionMax) ? `${levelLabel(rule, l)} (no ascension)` : levelLabel(rule, l)}
+            {label(l)}
           </option>
         ))}
       </select>

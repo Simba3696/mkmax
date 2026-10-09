@@ -27,7 +27,7 @@ Fusion Up Kards aren't one per level. Each step costs more, and each rarity (Dia
 | Gold Fusion Up Kards | 10 | 11 | 12 | 13 | 15 | 22 | 24 | 26 | 28 | 30 | 191 |
 | Ascension Kards (not tracked) | 1 | 1 | 2 | 2 | 3 | 3 | 3 | 4 | 4 | 5 | 28 |
 
-Gold kards also cover ascension (F10→A1 up to A9→A10), up to each card's own A5 or A10 cap, standing in for the one duplicate each step takes. Ascension Kards, the separate premium item every step also needs, aren't tracked or planned. You can edit the costs in Settings → Fusion rules.
+Gold kards also cover ascension (F10→A1 up to A9→A10), up to each card's own A5 (Stage I) or A10 (Stage II) cap, standing in for the one duplicate each step takes. Ascension Kards, the separate premium item every step also needs, aren't tracked or planned. You can edit the costs in Settings → Fusion rules.
 
 Kards only work from F3 up. The Kard plan spends your kards one step at a time on the cheapest step available, because every step saves one pack copy no matter how much it costs. Guest cards count 1.5×, and ties go to the card with the fewest steps left to its goal, so one card is finished before another is started. It shows how many kards each card gets and how many are left over, or says when no card of that rarity can take kards yet, or names the cheapest next step when you don't have enough kards for it. The Wallet shows a kard count for each rarity tracked to max (Diamond and Gold by default, and Epic or Rare once their Track until is Max). A gear card's own max goal doesn't count: on Epic or Rare gear it means Realm Klash gear, which kards skip, even once the rarity's Track until is Max too.
 

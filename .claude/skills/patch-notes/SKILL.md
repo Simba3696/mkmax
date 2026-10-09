@@ -25,7 +25,7 @@ Go through the notes line by line. Every line lands in exactly one bucket.
 |---|---|---|
 | Fusion Up Kard costs changed | `DIAMOND_KARD_COSTS`, `GEAR_KARD_COSTS`, `ASCENSION_KARD_COSTS` in `src/defaults.ts` | Yes, once, only where the save still has the old default (see version 12 and 13 in `src/normalize.ts`) |
 | Duplicates per level, F levels or the F3 kard threshold changed | `defaultRarities()` in `src/defaults.ts`, `kardCost` and `targetLevel` in `src/engine.ts` | Yes |
-| New ascension caps (beyond F10, A5, A10) | `ascensionCaps` in `src/engine.ts`, the Max select in `src/views/CardsView.tsx` | Maybe, if saved caps change meaning |
+| A new ascension stage (beyond Stage I = A5 and Stage II = A10) | `ascensionCaps` in `src/engine.ts`, the Max select in `src/views/CardsView.tsx` | Maybe, if saved caps change meaning |
 | A new kind of card or rarity | `defaultRarities()` in `src/defaults.ts`, `RarityRule['kind']` in `src/types.ts` | Yes, added once so deleting it sticks (see version 6, Uncommon) |
 | New Gold Elder challenge characters | `CHALLENGE_CHARACTERS` in `src/challenges.ts` | No: new Gold Kameos are tagged when added. Tagging Kameos already in the app needs one |
 | A challenge taken out of rotation | `RETIRED_CHALLENGES` in `src/challenges.ts` | Yes, to untag those Kameos once (see version 7) |
@@ -59,7 +59,8 @@ Jade, Lizard
 - A line that's just a rarity's full name (`Gold Kameo`) sets the rarity for the plain names after it.
 - Cards already in the app get the new level and source instead of being added twice, but only within the same rarity.
 - Use the game's card names. Matching ignores word order and punctuation, so `Sub-Zero, Klassic` and `Klassic Sub-Zero` are the same card.
-- Paste a list can't change a card's rarity, goal or guest flag. For those, tell the user what to change on the card.
+- Paste a list can't change a card's rarity, goal, guest flag or **Max**. For those, tell the user what to change on the card.
+- **Characters made Stage I or Stage II ascendable** need their **Max** set on the card: Stage I is A5, Stage II is A10. List each one the user tracks, with the Max to pick.
 
 For bigger changes to their data, they can export a backup (Settings → Data → **Export backup**). Edit the file, and they import it back.
 
