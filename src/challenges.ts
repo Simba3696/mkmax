@@ -5,7 +5,7 @@
 import { nameKey } from './catalog';
 import type { Card, RarityRule } from './types';
 
-export const CHALLENGE_CHARACTERS = [
+const CHALLENGE_CHARACTERS = [
   "Baraka, Scourge", "Bo' Rai Cho, Dragon Breath", "D'Vorah, Venomous", 'Ermac, Pharaoh',
   'Erron Black, Gunslinger', 'Goro, Tigrar Fury', 'Jacqui Briggs, High Tech', 'Jacqui Briggs, Kosplay', 'Jade, Klassic',
   'Jason Voorhees, Unstoppable', 'Jax Briggs, Heavy Weapons', 'Johnny Cage, Kombat Cup', 'Kano, Klassic',
@@ -18,7 +18,7 @@ export const CHALLENGE_CHARACTERS = [
 ];
 
 /** Challenges taken out of rotation long ago (per the user), so their Kameos come from packs now. */
-export const RETIRED_CHALLENGES = ['Ermac, Klassic'];
+const RETIRED_CHALLENGES = ['Ermac, Klassic'];
 
 const KEYS = new Set(CHALLENGE_CHARACTERS.map(nameKey));
 const RETIRED = new Set(RETIRED_CHALLENGES.map(nameKey));

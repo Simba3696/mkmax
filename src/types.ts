@@ -1,5 +1,5 @@
 /** Kameos only need one copy: owning it is the goal. */
-export type Kind = 'character' | 'equipment' | 'kameo';
+type Kind = 'character' | 'equipment' | 'kameo';
 
 /** Fusion rules for one rarity (e.g. Diamond characters, Legendary equipment). */
 export interface RarityRule {
@@ -57,7 +57,7 @@ export interface Card {
   notes?: string;
 }
 
-export interface Currency {
+interface Currency {
   id: string;
   name: string;
   balance: number;

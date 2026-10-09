@@ -39,7 +39,7 @@ let fetchedAt = 0;
 const listeners = new Set<(e: EventSchedule) => void>();
 
 /** The schedule, fetched once and shared; refreshEvents() fetches it again. */
-export function loadEvents(): Promise<EventSchedule> {
+function loadEvents(): Promise<EventSchedule> {
   loaded ??= fetch(`${import.meta.env.BASE_URL}events.json`, { cache: 'no-cache' })
     .then((r) => {
       if (!r.ok) throw new Error(`events.json: HTTP ${r.status}`);
