@@ -236,6 +236,7 @@ Under the box it shows what it will do: "New: …" by rarity, "updating N alread
   - **N to** the goal, orange when the goal is F3, grey otherwise. Kameos show **Not owned yet**.
   - **kards give N**: shown once you have kards in the Wallet and the Kard plan gives some to this card.
 - **− and +** move one level (one copy). + stops at the rarity's top level. Reaching the goal deletes the card, with Undo. Other level changes have no Undo.
+- **Use N kards** fuses the card one level with Fusion Up Kards, as you just did in the game: it takes N kards off the Wallet and raises the card, with Undo. It shows only when kards can do the card's next step: the card is at F3 or higher, below its goal, not Realm Klash gear, and the Wallet has enough of that rarity's kards. For a Gold ascension step, the Ascension Kards it also takes in the game aren't tracked.
 - **Tap the name** to rename the card. It saves as you type, with no Undo, except that an empty box isn't saved. Spaces at either end are trimmed when you finish, and if you leave the box empty, the card gets back the name it had when you tapped it. While you rename it, the card stays listed even if the new name no longer matches the search. A card that has no name (from an older version or another device) shows **Unnamed**, which you can tap to name it. Renaming doesn't change an Elder challenge tag.
 - **Goal**, **Max** and **Guest**, as in Add card.
 - **Source:** you can change a card's source on the card itself. Equipment has From packs/store, Krypt gear and Tower gear; Kameos have From packs/store and Elder challenge; characters have none. Tower gear also has a **Tower** box for the tower's name, which saves as you type. Changing the source clears the tower name. A character or Kameo that an older pasted list tagged as Krypt or tower gear shows that source marked "not for this rarity", so you can set it back to From packs/store.
@@ -365,7 +366,7 @@ Realm Klash seasons last 2 weeks. Each season the Blood Ruby store swaps its cha
   - Diamond and Gold always show.
   - Epic and Rare show once their **Track until** is Max in Settings → Fusion rules. By default gear stops at F3 and you finish it with kards in the game yourself. A card's own **Goal** of Max doesn't add the box: that marks it as Realm Klash gear, which gets no kards.
   - Uncommon shows once you turn its kards on in Settings → Fusion rules. Kameos have no kards.
-  - The app never takes kards off. After fusing in the game, lower the count here and raise the card on Cards.
+  - After fusing with kards in the game, tap **Use N kards** on the card (or **Use** in the Fusion Up Kard plan) to take them off here and raise the card. Kards you use some other way, lower the count here yourself.
 
 ### What to buy
 
@@ -405,7 +406,7 @@ Hidden while every kard count is 0.
 - Only cards at F3 or higher, below their goal, and not Realm Klash gear get kards.
 - "No … card at F3 or higher yet, so these kards wait." means no card can take kards yet. When Realm Klash gear of that rarity is at F3 or higher, it reads "No … card at F3 or higher that kards can go to yet" and adds that Realm Klash gear gets none.
 - "Not enough kards for any step yet: the cheapest next step costs N." means a card can take kards, but even its cheapest next step costs more kards than you have.
-- It's advice only: nothing is applied to your cards.
+- **Use N** on a row fuses that card one level with kards from the Wallet, with Undo, the same as **Use N kards** on Cards. Tap it once per level you fuse in the game; the plan updates after each.
 - The plan counts the copies kards would cover as worth less, so it buys packs for the rest.
 
 How kards are shared out is in [How it works](how-it-works.md#scoring).
