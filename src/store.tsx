@@ -23,7 +23,7 @@ export interface UndoEntry {
   at: number;
 }
 
-export interface SyncApi {
+interface SyncApi {
   status: SyncStatus;
   connected: boolean;
   connect: (token: string) => Promise<void>;

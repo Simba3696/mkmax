@@ -11,7 +11,7 @@ const EDGE_PX = 24;
 const OUT_MS = 160;
 const IN_MS = 220;
 
-export const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 /** True if the touch began on something that needs horizontal drags itself: a field, a modal, or a sideways scroller. */
 function ownsHorizontalDrag(target: EventTarget | null) {

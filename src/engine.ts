@@ -74,7 +74,7 @@ export function pruneDone(s: AppState): string[] {
 
 // ---------- Context ----------
 
-export interface KardAssignment {
+interface KardAssignment {
   cardId: string;
   from: number;
   to: number;
@@ -82,7 +82,7 @@ export interface KardAssignment {
   kards: number;
 }
 
-export interface KardPlan {
+interface KardPlan {
   assignments: KardAssignment[];
   /** Kards the plan couldn't use (not enough for any remaining step). */
   left: number;
@@ -205,7 +205,7 @@ export function copyPhase(ctx: Ctx, card: Card, g = 0): Phase {
   return 'normal';
 }
 
-export function copyValue(ctx: Ctx, card: Card, g = 0): number {
+function copyValue(ctx: Ctx, card: Card, g = 0): number {
   const phase = copyPhase(ctx, card, g);
   if (phase === 'skip' || phase === 'maxed') return 0;
   const w = ctx.state.weights;
@@ -216,7 +216,7 @@ export function copyValue(ctx: Ctx, card: Card, g = 0): number {
 }
 
 /** Value of receiving `e` expected copies starting from `g` already gained (integrated across phase boundaries). */
-export function gainValue(ctx: Ctx, card: Card, g: number, e: number): number {
+function gainValue(ctx: Ctx, card: Card, g: number, e: number): number {
   const step = 0.05;
   let v = 0;
   for (let x = 0; x < e; x += step) {
@@ -234,14 +234,14 @@ export function packStatus(pack: Pack, now: Date): 'active' | 'upcoming' | 'expi
   return 'active';
 }
 
-export const purchasesLeft = (pack: Pack) =>
+const purchasesLeft = (pack: Pack) =>
   pack.maxPurchases == null ? Infinity : Math.max(0, pack.maxPurchases - pack.purchased);
 
 /** Expected copies of a drop per purchase. */
-export const expectedCopies = (pack: Pack, chance: number) => pack.rolls * (chance / 100);
+const expectedCopies = (pack: Pack, chance: number) => pack.rolls * (chance / 100);
 
 /** Chance of at least one copy of a drop per purchase. */
-export const chanceAtLeastOne = (pack: Pack, chance: number) => 1 - Math.pow(1 - chance / 100, pack.rolls);
+const chanceAtLeastOne = (pack: Pack, chance: number) => 1 - Math.pow(1 - chance / 100, pack.rolls);
 
 export function packEV(ctx: Ctx, pack: Pack, gained: Map<string, number> = new Map()): number {
   let v = 0;
@@ -284,7 +284,7 @@ export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
 
 // ---------- Budget planner ----------
 
-export interface PlannedBuy {
+interface PlannedBuy {
   pack: Pack;
   status: 'active' | 'upcoming';
   count: number;
@@ -310,7 +310,7 @@ export interface Plan {
 }
 
 /** Blood Ruby gear order, by name, for gear that isn't in the saved order yet. */
-export const DEFAULT_GEAR_ORDER = ['Shadow Sash', "Moloch's Ball and Chain", 'Devastator', 'Datusha, Bane of the Moroi', 'Bloody Tomahawk'];
+const DEFAULT_GEAR_ORDER = ['Shadow Sash', "Moloch's Ball and Chain", 'Devastator', 'Datusha, Bane of the Moroi', 'Bloody Tomahawk'];
 
 export interface GearStep {
   card: Card;
@@ -457,7 +457,7 @@ export function gearForecast(gear: GearStep[], balance: number, perDay: number |
 }
 
 /** How close to its end a planned pack counts as ending soon. */
-export const ENDING_SOON_MS = 24 * 3600000;
+const ENDING_SOON_MS = 24 * 3600000;
 
 /** Packs the plan says to buy now that end within ENDING_SOON_MS. */
 export function endingSoon(plan: Plan, now: Date): Pack[] {
@@ -531,7 +531,7 @@ export function recordPurchase(d: AppState, packId: string, delta: 1 | -1) {
 
 /** The Blood Ruby store's currency; its characters, Kameos and Kameo packs change every season. */
 export const REALM_KLASH_CURRENCY = 'blood-rubies';
-export const SEASON_DAYS = 14;
+const SEASON_DAYS = 14;
 
 /** A Date as a datetime-local string (local time, minutes). */
 export function toLocalInput(t: Date) {

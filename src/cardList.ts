@@ -3,7 +3,7 @@ import { nameKey } from './catalog';
 import { ascensionCaps, fLevel, levelLabel, maxFusion } from './engine';
 import type { Card, RarityRule } from './types';
 
-export interface ListedCard {
+interface ListedCard {
   name: string;
   rarityId: string;
   /** Stored level from the line (e.g. "F2" → 3, "Unowned" → 0); unset means not owned. */
@@ -14,7 +14,7 @@ export interface ListedCard {
   maxLevel?: number | null;
 }
 
-export interface CardUpdate {
+interface CardUpdate {
   cardId: string;
   name: string;
   patch: Partial<Pick<Card, 'fusion' | 'source' | 'sourceNote' | 'maxLevel'>>;

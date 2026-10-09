@@ -96,7 +96,7 @@ export const sameData = (a: AppState, b: AppState) => canonical({ ...a, updatedA
  * so a copy of one still open on another device raised every level by one when it pulled newer data, then
  * synced that back as version 2. Data saved as version 2 or lower is from one of those builds and never pulled.
  */
-export const fromOutdatedApp = (s: AppState) => ((s.version as number | undefined) ?? 1) <= 2;
+const fromOutdatedApp = (s: AppState) => ((s.version as number | undefined) ?? 1) <= 2;
 
 export const OUTDATED_MESSAGE =
   'Another device synced data from an old version of MK Max, which raises every level by one. This device’s copy was kept and uploaded over it. Close MK Max on your other devices and open it again to update them.';
