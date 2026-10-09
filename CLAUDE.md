@@ -27,3 +27,11 @@ Key routing rules:
 - Resume context → invoke /context-restore
 - Author a backlog-ready spec/issue → invoke /spec
 - MK Mobile patch notes → invoke /patch-notes
+
+## Health Stack
+
+- typecheck: npx tsc --noEmit
+- lint: npm run lint
+- test: npm test
+- deadcode: npx knip
+- gbrain: gbrain doctor --json

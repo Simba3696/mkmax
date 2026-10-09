@@ -10,6 +10,7 @@ npm run lint      # oxlint (correctness rules and React hooks rules)
 npm run build     # type-check and production build in dist/ (installable PWA)
 npm run catalog   # refresh public/catalog.json from MK Mobile Base
 npm run events    # refresh public/events.json from MK Mobile Base
+npx knip          # unused files, exports and dependencies (a dev tool; not run in CI)
 ```
 
 ## Linting
