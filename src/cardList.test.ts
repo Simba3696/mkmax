@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseCardList } from './cardList';
+import { pruneDone } from './engine';
 import { defaultState } from './defaults';
 import type { Card } from './types';
 
@@ -55,7 +56,7 @@ describe('pasted card lists', () => {
       'Common gear isn’t tracked',
       'F11 is past this rarity’s max',
       'No rarity (e.g. Epic, Rare)',
-      '"Soon" isn’t a rarity, source or level',
+      '"Soon" isn’t a rarity, source, level or stage',
     ]);
   });
 
@@ -75,5 +76,70 @@ describe('pasted card lists', () => {
     const r = parseCardList('Scorpion, Klassic - Gold - Krypt\nJade, Lizard - Gold Kameo - Tower\nKori Blade - Epic - Krypt', rarities, 'diamond', []);
     expect(r.cards).toEqual([{ name: 'Kori Blade', rarityId: 'epic', source: 'krypt' }]);
     expect(r.problems.map((p) => p.reason)).toEqual(['Only gear comes from the Krypt or a tower', 'Only gear comes from the Krypt or a tower']);
+  });
+
+  it('reads Stage I and Stage II as a Gold card\'s Max, and adds a missing card back at the cap below', () => {
+    const existing: Card[] = [
+      { id: 'k', name: 'Kenshi, Elder God', rarityId: 'gold', fusion: 8, guest: false, maxLevel: 11 },
+      { id: 's', name: 'Scorpion, Hanzo Hasashi', rarityId: 'gold', fusion: 13, guest: false, maxLevel: 16 },
+      { id: 'j', name: 'Jax, Onslaught', rarityId: 'gold', fusion: 18, guest: false },
+    ];
+    const text = [
+      'Kenshi, Elder God - Gold - Stage I', // still being fused: only its Max changes
+      'Scorpion, Hanzo Hasashi - Gold - Stage II', // at A2 of A5: Max goes to A10
+      'Goro, Tigrar Fury - Gold - Stage I', // not in the app, so maxed at F10 before the update
+      'Sub-Zero, Klassic - Gold - Stage II', // maxed at A5 before the update
+      'Kitana, Edenian Blood - Gold - Stage I - Unowned', // a level given wins
+      'Jax, Onslaught - Gold - Stage I', // already A7: lowering Max would delete it
+      'Jade, Klassic - Diamond - Stage I',
+    ].join('\n');
+    const r = parseCardList(text, rarities, 'diamond', existing);
+    expect(r.updates).toEqual([
+      { cardId: 'k', name: 'Kenshi, Elder God', patch: { maxLevel: 16 } },
+      { cardId: 's', name: 'Scorpion, Hanzo Hasashi', patch: { maxLevel: null } },
+    ]);
+    expect(r.cards).toEqual([
+      { name: 'Goro, Tigrar Fury', rarityId: 'gold', fusion: 11, maxLevel: 16 },
+      { name: 'Sub-Zero, Klassic', rarityId: 'gold', fusion: 16, maxLevel: null },
+      { name: 'Kitana, Edenian Blood', rarityId: 'gold', fusion: 0, maxLevel: 16 },
+    ]);
+    expect(r.problems.map((p) => p.reason)).toEqual(['Already A7, past Stage I’s A5', 'Diamond cards don’t have Stage I ascension']);
+  });
+
+  it('refuses a stage line for a card filed under another rarity, and keeps stage edge cases safe', () => {
+    const existing: Card[] = [
+      { id: 'k', name: 'Kenshi, Elder God', rarityId: 'diamond', fusion: 4, guest: false },
+      { id: 'g', name: 'Goro, Tigrar Fury', rarityId: 'gold', fusion: 8, guest: false },
+    ];
+    const text = [
+      'Kenshi, Elder God - Gold - Stage I', // filed as Diamond: not a missing (maxed) card
+      'Kitana, Edenian Blood - Gold - A7 - Stage I', // a level past the stage's Max
+      'Goro, Tigrar Fury - Gold - Stage I',
+      'Goro, Tigrar Fury - Gold - Stage II', // listed twice: the first line wins
+      'Jax, Onslaught - Stage I', // details with no rarity
+      'Sonya Blade, Klassic - Gold - Stage III',
+    ].join('\n');
+    const r = parseCardList(text, rarities, 'gold', existing);
+    expect(r.cards).toEqual([]);
+    expect(r.updates).toEqual([{ cardId: 'g', name: 'Goro, Tigrar Fury', patch: { maxLevel: 16 } }]);
+    expect(r.duplicates).toEqual(['Goro, Tigrar Fury']);
+    expect(r.problems.map((p) => p.reason)).toEqual([
+      'Listed as Diamond: change its rarity on the card first',
+      'A7 is past Stage I’s A5',
+      'No rarity (e.g. Epic, Rare)',
+      '"Stage III" isn’t a rarity, source, level or stage',
+    ]);
+  });
+
+  it('a stage paste keeps a card still being fused, and one exactly at the new Max is maxed', () => {
+    const s = defaultState();
+    s.cards = [
+      { id: 'g', name: 'Goro, Tigrar Fury', rarityId: 'gold', fusion: 8, guest: false },
+      { id: 'k', name: 'Kenshi, Elder God', rarityId: 'gold', fusion: 16, guest: false },
+    ];
+    const r = parseCardList('Goro, Tigrar Fury - Gold - Stage I\nKenshi, Elder God - Gold - Stage I', s.rarities, 'gold', s.cards);
+    for (const u of r.updates) Object.assign(s.cards.find((c) => c.id === u.cardId)!, u.patch);
+    expect(pruneDone(s)).toEqual(['Kenshi, Elder God']);
+    expect(s.cards.map((c) => [c.name, c.maxLevel])).toEqual([['Goro, Tigrar Fury', 16]]);
   });
 });
