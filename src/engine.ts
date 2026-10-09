@@ -482,6 +482,34 @@ export function stepCard(d: AppState, cardId: string, delta: 1 | -1) {
 }
 
 /**
+ * The Fusion Up Kards this card's next step would take from the Wallet now, or null when kards can't do it: below
+ * the threshold (F3), already at its goal, Realm Klash gear (bought to max, never kards), a step with no kard cost,
+ * or more kards than the Wallet holds.
+ */
+export function kardStep(state: AppState, cardId: string): number | null {
+  const card = state.cards.find((c) => c.id === cardId);
+  const rule = card && state.rarities.find((r) => r.id === card.rarityId);
+  if (!card || !rule || card.fusion >= targetLevel(card, rule) || isRealmKlashGear(state, card)) return null;
+  const cost = kardCost(rule, card.fusion);
+  return cost != null && cost <= rule.fusionUpKards ? cost : null;
+}
+
+/**
+ * Fuse a card one step with Fusion Up Kards, as done in the game: the kards come off the Wallet and the card goes
+ * up a level. Returns the kards used, or null when kardStep says the step isn't possible. Ascension steps also
+ * take Ascension Kards in the game, which aren't tracked.
+ */
+export function fuseWithKards(d: AppState, cardId: string): number | null {
+  const cost = kardStep(d, cardId);
+  const card = d.cards.find((c) => c.id === cardId);
+  const rule = card && d.rarities.find((r) => r.id === card.rarityId);
+  if (cost == null || !card || !rule) return null;
+  rule.fusionUpKards -= cost;
+  card.fusion += 1;
+  return cost;
+}
+
+/**
  * Buy (delta 1) or take back (delta -1) one purchase of a pack: counts it, moves the cost out of (or back into)
  * the balance, and for a store item, which always gives its card, levels that card. Random packs leave the
  * cards to the "What did you pull?" step. Returns false when there's nothing to take back.

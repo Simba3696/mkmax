@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, kardCost, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, levelLabel, moveSeasonEnd, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, levelLabel, moveSeasonEnd, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
 import { kardTable, normalize } from './normalize';
 import { daysFromNow } from './ui';
@@ -226,6 +226,29 @@ describe('phases', () => {
     // 10 kards: exactly F9 → F10 when that's the only card.
     const s = setup([card('near', F(9))], [], (s) => (s.rarities[0].fusionUpKards = 10));
     expect(buildCtx(s).kardPlan.get('diamond')).toEqual({ assignments: [{ cardId: 'near', from: F(9), to: F(10), kards: 10 }], left: 0, cards: 1, cheapest: 10, realmKlash: 0 });
+  });
+
+  it('uses Fusion Up Kards for one step: kards off the Wallet, the card up a level', () => {
+    const s = setup([card('d', F(3)), card('low', F(2)), card('gear', F(5), { rarityId: 'epic', goal: 'max' })], [], (s) => (s.rarities[0].fusionUpKards = 3));
+    expect(kardStep(s, 'd')).toBe(1); // F3 → F4
+    expect(fuseWithKards(s, 'd')).toBe(1);
+    expect(s.cards[0].fusion).toBe(F(4));
+    expect(s.rarities[0].fusionUpKards).toBe(2);
+    expect(kardStep(s, 'd')).toBe(2); // F4 → F5 takes the last 2
+    fuseWithKards(s, 'd');
+    expect(kardStep(s, 'd')).toBeNull(); // F5 → F6 costs 3, the Wallet is empty
+    expect(fuseWithKards(s, 'd')).toBeNull();
+    expect(s.cards[0].fusion).toBe(F(5));
+    expect(kardStep(s, 'low')).toBeNull(); // below F3
+    expect(kardStep(s, 'gear')).toBeNull(); // Realm Klash gear never takes kards
+  });
+
+  it("uses kards on a Gold ascension step, and not past the card's cap", () => {
+    const s = setup([card('g', F(10), { rarityId: 'gold', maxLevel: A(1) })], [], (s) => (s.rarities[1].fusionUpKards = 30));
+    expect(fuseWithKards(s, 'g')).toBe(10);
+    expect(s.cards[0].fusion).toBe(A(1));
+    expect(kardStep(s, 'g')).toBeNull(); // at its A1 cap
+    expect(s.rarities[1].fusionUpKards).toBe(20);
   });
 
   it("spends Gold kards on ascension too, up to the card's own cap", () => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
-import { ascensionCaps, buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
+import { ascensionCaps, buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, kardStep, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice, useNow } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -297,6 +297,11 @@ function CardList() {
       if (c) Object.assign(c, p);
     });
 
+  /** Fuse one level with Fusion Up Kards from the Wallet, as done in the game. */
+  function fuse(c: Card, cost: number) {
+    update((d) => void fuseWithKards(d, c.id), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${c.name}`);
+  }
+
   function rename(c: Card, text: string) {
     setRenaming({ id: c.id, was: renaming?.was ?? c.name, text });
     if (text.trim()) patch(c.id, { name: text });
@@ -479,6 +484,7 @@ function CardList() {
           const toThr = copiesToThreshold(c, rule);
           const toMax = copiesToMax(c, rule);
           const kards = ctx.kardCopies.get(c.id) ?? 0;
+          const kardCost = kardStep(state, c.id);
           return (
             <div key={c.id} className={`${surface} py-[0.7rem] px-[0.9rem] mb-[0.8rem] min-[1344px]:mb-0`}>
               <div className={`${row} items-center`}>
@@ -524,6 +530,11 @@ function CardList() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-[0.4rem] items-center mt-[0.3rem]">
+                {kardCost != null && (
+                  <button onClick={() => fuse(c, kardCost)} title="Fuse one level with Fusion Up Kards from the Wallet">
+                    Use {kardCost} kard{kardCost === 1 ? '' : 's'}
+                  </button>
+                )}
                 <GoalSelect rule={rule} value={c.goal} onChange={(v) => patch(c.id, { goal: v })} />
                 <CapSelect rule={rule} value={c.maxLevel} onChange={(v) => patch(c.id, { maxLevel: v })} />
                 {rule.hasGuests && (

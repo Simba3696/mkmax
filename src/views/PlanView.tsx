@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
-import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, daysToAfford, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
+import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, daysToAfford, fuseWithKards, kardStep, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
 import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
@@ -232,19 +232,32 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                       Not enough kards for any step yet{plan.cheapest != null ? `: the cheapest next step costs ${plan.cheapest}.` : '.'}
                     </p>
                   ) : (
-                    plan.assignments.map((a) => (
-                      <div key={a.cardId} className={planRow}>
-                        <span className={grow}>{ctx.cards.get(a.cardId)?.name}</span>
-                        <span>
-                          {levelLabel(r, a.from)} → <b>{levelLabel(r, a.to)}</b> <span className={note}>({a.kards} kard{a.kards === 1 ? '' : 's'})</span>
-                        </span>
-                      </div>
-                    ))
+                    plan.assignments.map((a) => {
+                      const name = ctx.cards.get(a.cardId)?.name;
+                      const cost = kardStep(state, a.cardId);
+                      return (
+                        <div key={a.cardId} className={planRow}>
+                          <span className={grow}>{name}</span>
+                          <span>
+                            {levelLabel(r, a.from)} → <b>{levelLabel(r, a.to)}</b> <span className={note}>({a.kards} kard{a.kards === 1 ? '' : 's'})</span>
+                          </span>
+                          {/* One step per tap, as kards are used in the game; the plan updates after each. */}
+                          {cost != null && (
+                            <button
+                              onClick={() => update((d) => void fuseWithKards(d, a.cardId), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${name}`)}
+                              title={`Fuse ${name} to ${levelLabel(r, a.from + 1)} with ${cost} kard${cost === 1 ? '' : 's'} from the Wallet`}
+                            >
+                              Use {cost}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               );
             })}
-            <p className={note}>Kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra.</p>
+            <p className={note}>Kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra. After fusing in the game, tap <b>Use</b> to take the kards off the Wallet and raise the card one level.</p>
           </FoldCard>
         )}
 
