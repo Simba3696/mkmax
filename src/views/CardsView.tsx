@@ -120,6 +120,7 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
             guest: false,
             source: c.source ?? initialSource(c, d.rarities),
             ...(c.sourceNote && { sourceNote: c.sourceNote }),
+            ...(c.maxLevel != null && { maxLevel: c.maxLevel }),
           }),
         ),
       );
@@ -136,7 +137,9 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
       <p className="text-muted text-small md:max-w-[80ch]">
         One card per line. A line can be just a name, like "Jade, Lizard", which goes in as not owned. Those use {startLabel} (the rarity picked above) until a
         line that's just a rarity name, like "Gold Kameo", switches it. A line can also add details after " - ": rarity, where it comes from and level, like
-        "Kori Blade - Epic - Lin Kuei Tower - F2" or "Man in Control - Epic - Krypt Gear - Unowned". Cards already in your list get the new level and source.
+        "Kori Blade - Epic - Lin Kuei Tower - F2" or "Man in Control - Epic - Krypt Gear - Unowned". Cards already in your list get the new level and source. When an
+        update makes Gold characters ascendable, add "Stage I" (Max A5) or "Stage II" (Max A10), like "Kenshi, Elder God - Gold - Stage I": a card not in your list
+        was maxed, so it comes back at the cap below with 5 copies to go.
       </p>
       <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
       <div className="text-small text-muted">

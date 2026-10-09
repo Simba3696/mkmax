@@ -1,6 +1,6 @@
 // Parses a pasted list of cards for bulk adding. Plain TS so it can be tested.
 import { nameKey } from './catalog';
-import { fLevel, maxFusion } from './engine';
+import { ascensionCaps, fLevel, levelLabel, maxFusion } from './engine';
 import type { Card, RarityRule } from './types';
 
 export interface ListedCard {
@@ -10,12 +10,14 @@ export interface ListedCard {
   fusion?: number;
   source?: Card['source'];
   sourceNote?: string;
+  /** The Max from a "Stage I" or "Stage II" part; null is the rarity's top level, as the Max select stores it. */
+  maxLevel?: number | null;
 }
 
 export interface CardUpdate {
   cardId: string;
   name: string;
-  patch: Partial<Pick<Card, 'fusion' | 'source' | 'sourceNote'>>;
+  patch: Partial<Pick<Card, 'fusion' | 'source' | 'sourceNote' | 'maxLevel'>>;
 }
 
 export interface ParsedList {
@@ -42,6 +44,12 @@ function findRarity(word: string, rarities: RarityRule[]) {
   );
 }
 
+/** "Stage I" → 1, "Stage II" → 2 (the game's names for ascending to A5 and to A10). Null if it isn't a stage. */
+function parseStage(word: string): 1 | 2 | null {
+  const m = /^stage\s*(ii|2|i|1)$/i.exec(word);
+  return m ? (/^(ii|2)$/i.test(m[1]) ? 2 : 1) : null;
+}
+
 /** "F2" → stored level 3, "A3" → past the top fusion, "Unowned" → 0. Null if it isn't a level. */
 function parseLevel(word: string, rule: RarityRule | undefined): number | null {
   if (/^(unowned|not owned|none|new)$/i.test(word)) return 0;
@@ -53,10 +61,11 @@ function parseLevel(word: string, rule: RarityRule | undefined): number | null {
 
 /**
  * One card per line. A line can be just a name ("Jade, Lizard"), or a name followed by " - " parts in any order:
- * rarity ("Epic"), where it comes from ("Krypt Gear", or a tower name like "Kold Tower"), and level ("F2",
- * "Unowned"). A line that's only a rarity's name (e.g. "Gold Kameo") switches the rarity for the lines after it,
- * so lists copied from notes with headings work as-is. Underline rows ("-----") and blank lines are skipped, and a
- * leading bullet or number is dropped.
+ * rarity ("Epic"), where it comes from ("Krypt Gear", or a tower name like "Kold Tower"), level ("F2",
+ * "Unowned"), and for Gold an ascension stage ("Stage I" is a Max of A5, "Stage II" A10). A line that's only a
+ * rarity's name (e.g. "Gold Kameo") switches the rarity for the lines after it, so lists copied from notes with
+ * headings work as-is. Underline rows ("-----") and blank lines are skipped, and a leading bullet or number is
+ * dropped.
  */
 export function parseCardList(text: string, rarities: RarityRule[], startRarityId: string, existing: Card[]): ParsedList {
   const byKey = new Map(existing.map((c) => [`${c.rarityId}|${nameKey(c.name)}`, c]));
@@ -81,6 +90,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     let levelWord: string | undefined;
     let source: Card['source'];
     let sourceNote: string | undefined;
+    let stage: 1 | 2 | null = null;
     let problem: string | undefined;
     for (const part of parts) {
       const untracked = UNTRACKED_GRADES[part.toLowerCase()];
@@ -90,7 +100,8 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       else if (/^krypt/i.test(part)) source = 'krypt';
       else if (/tower/i.test(part)) [source, sourceNote] = ['tower', part];
       else if (parseLevel(part, undefined) != null) levelWord = part;
-      else problem = `"${part}" isn’t a rarity, source or level`;
+      else if (parseStage(part)) stage = parseStage(part);
+      else problem = `"${part}" isn’t a rarity, source, level or stage`;
     }
     // Lines with details but no rarity are ambiguous (the heading rarity is for plain name lists).
     if (!problem && parts.length > 0 && !rarityId) problem = 'No rarity (e.g. Epic, Rare)';
@@ -100,6 +111,15 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     if (!problem && rule && fusion != null && fusion > maxFusion(rule)) problem = `${levelWord} is past this rarity’s max`;
     // Only gear is tracked as Krypt or tower gear. A character or Kameo tagged that way would drop out of the plan.
     if (!problem && rule && source && rule.kind !== 'equipment') problem = 'Only gear comes from the Krypt or a tower';
+    // A stage is a Max: Stage I ascends to A5, Stage II to A10 (stored as null when it's the rarity's top level).
+    let maxLevel: number | null | undefined;
+    if (!problem && rule && stage) {
+      const cap = fLevel(rule.fusionMax) + stage * 5;
+      if (ascensionCaps(rule).length < 2 || !ascensionCaps(rule).includes(cap)) problem = `${rule.label} cards don’t have Stage ${stage === 1 ? 'I' : 'II'} ascension`;
+      else maxLevel = cap === maxFusion(rule) ? null : cap;
+    }
+    const cap = maxLevel === undefined ? undefined : (maxLevel ?? maxFusion(rule!));
+    if (!problem && cap != null && fusion != null && fusion > cap) problem = `${levelWord} is past Stage ${stage === 1 ? 'I' : 'II'}’s ${levelLabel(rule!, cap)}`;
     if (problem) {
       out.problems.push({ line, reason: problem });
       continue;
@@ -113,14 +133,36 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     seen.add(key);
     const card = byKey.get(key);
     if (card) {
+      // Lowering the Max below the card's level would count it as maxed and delete it.
+      if (cap != null && (fusion ?? card.fusion) > cap) {
+        out.problems.push({ line, reason: `Already ${levelLabel(rule!, card.fusion)}, past Stage ${stage === 1 ? 'I' : 'II'}’s ${levelLabel(rule!, cap)}` });
+        continue;
+      }
       const patch: CardUpdate['patch'] = {};
       if (fusion != null && fusion !== card.fusion) patch.fusion = fusion;
       if (source && (source !== card.source || sourceNote !== card.sourceNote)) Object.assign(patch, { source, sourceNote });
+      if (maxLevel !== undefined && maxLevel !== (card.maxLevel ?? null)) patch.maxLevel = maxLevel;
       if (Object.keys(patch).length) out.updates.push({ cardId: card.id, name: card.name, patch });
       else out.duplicates.push(name);
       continue;
     }
-    out.cards.push({ name, rarityId, ...(fusion != null && { fusion }), ...(source && { source }), ...(sourceNote && { sourceNote }) });
+    // Every card still being maxed is in the app, so a Gold card made ascendable that isn't was maxed and removed:
+    // it comes back at the cap below its new stage (F10 for Stage I, A5 for Stage II), with 5 copies to go. The
+    // same name under another rarity means the card is still here, just filed wrong, so that's a problem instead.
+    const elsewhere = stage && fusion == null ? existing.find((c) => c.rarityId !== rarityId && nameKey(c.name) === nameKey(name)) : undefined;
+    if (elsewhere) {
+      out.problems.push({ line, reason: `Listed as ${rarities.find((r) => r.id === elsewhere.rarityId)?.label ?? elsewhere.rarityId}: change its rarity on the card first` });
+      continue;
+    }
+    const start = fusion ?? (stage ? fLevel(rule!.fusionMax) + (stage - 1) * 5 : undefined);
+    out.cards.push({
+      name,
+      rarityId,
+      ...(start != null && { fusion: start }),
+      ...(source && { source }),
+      ...(sourceNote && { sourceNote }),
+      ...(maxLevel !== undefined && { maxLevel }),
+    });
   }
   return out;
 }
