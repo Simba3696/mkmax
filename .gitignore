@@ -2,3 +2,7 @@ node_modules
 dist
 dev-dist
 *.local
+
+# GBrain machine-local files (ownership token, worktree pin)
+.gbrain-owner.json
+.gbrain-source
