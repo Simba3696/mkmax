@@ -49,7 +49,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId]);
-  /** Random pack just bought: show its drop list so pulled cards can be levelled up in place. */
+  /** Random pack just bought: show its drop list (a card search for a Kasket) so pulled cards can be levelled up in place. */
   const [pulling, setPullingPack] = useState<string | null>(focus?.pull ? focus.id : null);
   /** The card searched for in a Kasket's pull step (it gives one card, so a search beats listing its whole pool). */
   const [pulled, setPulled] = useState('');

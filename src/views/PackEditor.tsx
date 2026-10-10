@@ -228,7 +228,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
         <>
           <h3>Pool</h3>
           <p className="text-muted text-small lg:max-w-[75ch]">
-            {kasketRule ? kasketLine(kasketPool(ctx, p)) : 'Choose the rarity this Kasket gives.'} Its odds follow your cards: unlocking one takes it out of the pool, and
+            {/* kasketLine has no full stop: the pack list shows it on its own. */}
+            {kasketRule ? `${kasketLine(kasketPool(ctx, p))}.` : 'Choose the rarity this Kasket gives.'} Its odds follow your cards: unlocking one takes it out of the pool, and
             once you own every card it gives one you haven't maxed. The newest cards from the latest game update are left out.
           </p>
         </>

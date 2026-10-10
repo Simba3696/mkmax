@@ -244,15 +244,30 @@ const expectedCopies = (pack: Pack, chance: number) => pack.rolls * (chance / 10
 /** Chance of at least one copy of a drop per purchase. */
 const chanceAtLeastOne = (pack: Pack, chance: number) => 1 - Math.pow(1 - chance / 100, pack.rolls);
 
-/** Per ctx, each rarity's cards a Kasket can ever give. Kept because the planner asks for every Kasket on every pass. */
-const kasketCardsByCtx = new WeakMap<Ctx, Map<string, Card[]>>();
+/** A card a Kasket can give, with the copies it has (`owned`) and needs for its own max (`full`). */
+interface KasketCard {
+  card: Card;
+  owned: number;
+  full: number;
+}
 
-function kasketCards(ctx: Ctx, rarityId: string): Card[] {
+/**
+ * Per ctx, each rarity's cards a Kasket can ever give, with their copy counts worked out once: the planner asks for
+ * every Kasket on every pass, so the pool filters only compare numbers.
+ */
+const kasketCardsByCtx = new WeakMap<Ctx, Map<string, KasketCard[]>>();
+
+function kasketCards(ctx: Ctx, rule: RarityRule): KasketCard[] {
   let byRarity = kasketCardsByCtx.get(ctx);
   if (!byRarity) kasketCardsByCtx.set(ctx, (byRarity = new Map()));
-  let cards = byRarity.get(rarityId);
-  // Realm Klash gear is only sold for Blood Rubies; Kaskets never give it.
-  if (!cards) byRarity.set(rarityId, (cards = ctx.state.cards.filter((c) => c.rarityId === rarityId && !isKasketExcluded(c) && !isRealmKlashGear(ctx.state, c))));
+  let cards = byRarity.get(rule.id);
+  if (!cards) {
+    cards = ctx.state.cards
+      // Realm Klash gear is only sold for Blood Rubies; Kaskets never give it.
+      .filter((c) => c.rarityId === rule.id && !isKasketExcluded(c) && !isRealmKlashGear(ctx.state, c))
+      .map((card) => ({ card, owned: copiesAtFusion(rule, card.fusion), full: copiesAtFusion(rule, targetLevel(card, rule)) }));
+    byRarity.set(rule.id, cards);
+  }
   return cards;
 }
 
@@ -276,11 +291,11 @@ export function kasketPool(ctx: Ctx, pack: Pack, gained: Map<string, number> = n
   if (!rule) return { mode: 'none', cards: [] };
   // Kaskets give characters or gear; a Kameo rarity can only get here from an import, and isn't valued.
   if (rule.kind === 'kameo') return { mode: 'none', cards: [], rule };
-  const copies = (c: Card) => copiesAtFusion(rule, c.fusion) + (gained.get(c.id) ?? 0);
-  const eligible = kasketCards(ctx, rule.id);
-  const unowned = eligible.filter((c) => copies(c) < 1 - 1e-9);
+  const copies = (k: KasketCard) => k.owned + (gained.get(k.card.id) ?? 0);
+  const eligible = kasketCards(ctx, rule);
+  const unowned = eligible.filter((k) => copies(k) < 1 - 1e-9).map((k) => k.card);
   if (unowned.length) return { mode: 'new', cards: unowned, rule };
-  const unmaxed = rule.goal === 'max' ? eligible.filter((c) => copies(c) < copiesAtFusion(rule, targetLevel(c, rule)) - 1e-9) : [];
+  const unmaxed = rule.goal === 'max' ? eligible.filter((k) => copies(k) < k.full - 1e-9).map((k) => k.card) : [];
   return { mode: unmaxed.length ? 'unmaxed' : 'none', cards: unmaxed, rule };
 }
 
@@ -346,7 +361,11 @@ export interface PackRank {
   ev: number;
   /** EV per 1000 currency. */
   evPerK: number;
-  targets: { card: Card; value: number; pAtLeastOne: number; buysPerCopy: number }[];
+  /**
+   * `withinBuys`: a Kasket giving new cards never repeats one, so each card in its pool of N comes within N buys;
+   * buysPerCopy (which assumes repeats) would overstate it.
+   */
+  targets: { card: Card; value: number; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number }[];
 }
 
 export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
@@ -355,12 +374,14 @@ export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
     .filter((x): x is { pack: Pack; status: 'active' | 'upcoming' } => x.status !== 'expired')
     .map(({ pack, status }) => {
       const ev = packEV(ctx, pack);
+      const pool = pack.kasket ? kasketPool(ctx, pack) : undefined;
+      const withinBuys = pool?.mode === 'new' ? pool.cards.length : undefined;
       const targets = packDrops(ctx, pack)
         .map((d) => {
           const card = ctx.cards.get(d.cardId);
           if (!card) return null;
           const e = expectedCopies(pack, d.chance);
-          return { card, value: gainValue(ctx, card, 0, e), pAtLeastOne: chanceAtLeastOne(pack, d.chance), buysPerCopy: e > 0 ? 1 / e : Infinity };
+          return { card, value: gainValue(ctx, card, 0, e), pAtLeastOne: chanceAtLeastOne(pack, d.chance), buysPerCopy: e > 0 ? 1 / e : Infinity, ...(withinBuys && { withinBuys }) };
         })
         .filter((t): t is NonNullable<typeof t> => t != null && t.value > 0)
         .sort((a, b) => b.value - a.value);

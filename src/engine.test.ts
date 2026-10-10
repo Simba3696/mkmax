@@ -577,6 +577,23 @@ describe('kaskets', () => {
     expect(plan.expectedGains.get('owned')).toBeCloseTo(1 / 11);
   });
 
+  // Value: protects=the planner stops buying a Kasket of threshold gear once its planned buys own every piece;
+  // fails_when=packEV stops passing planned gains to the Kasket's pool; why_new=no planner test reaches a Kasket's 'none' pool; seam=none
+  it('stops planning a Kasket of threshold gear once its buys are expected to give every piece', () => {
+    const s = setup([card('e1', 0, { rarityId: 'epic' }), card('e2', 0, { rarityId: 'epic' })], [kasket('epic')], (s) => (s.currencies[0].balance = 1000));
+    expect(buildPlan(buildCtx(s), NOW).currencies[0].buys.map((b) => b.count)).toEqual([2]);
+  });
+
+  // Value: protects=a card the plan's earlier buys max leaves the Kasket's unmaxed pool, so the rest share its odds;
+  // fails_when=the unmaxed filter counts only saved levels, not planned gains; why_new=the switch test never maxes a card mid-plan; seam=none
+  it('takes a card the plan is expected to max out of the pool for later buys', () => {
+    const s = setup([card('near', F(9)), card('far', F(2))], [kasket('diamond')], (s) => (s.currencies[0].balance = 400));
+    const plan = buildPlan(buildCtx(s), NOW);
+    // Buys 1–2 split one copy each between the two; near is then at max, so buys 3–4 both go to far.
+    expect(plan.expectedGains.get('near')).toBeCloseTo(1);
+    expect(plan.expectedGains.get('far')).toBeCloseTo(3);
+  });
+
   it('never gives Realm Klash gear', () => {
     const s = setup(
       [card('sash', 0, { rarityId: 'epic', goal: 'max' }), card('sold', 0, { rarityId: 'epic' }), card('kunai', 0, { rarityId: 'epic' })],
@@ -615,6 +632,14 @@ describe('kaskets', () => {
     expect([...pull.first]).toEqual(['new']);
     // Its rarity removed: nothing to put first, and nothing hidden.
     expect(kasketPullCards(ctx, s.packs[1])).toEqual({ exclude: new Set(), first: new Set() });
+  });
+
+  it('says a Kasket of new cards gives each one within its pool size, not by repeat-based averages', () => {
+    const s = setup([card('a', 0), card('b', 0), card('c', 0), card('g', F(2), { rarityId: 'gold' })], [kasket('diamond', { id: 'kd' }), kasket('gold', { id: 'kg' })]);
+    const ranks = rankPacks(buildCtx(s), NOW);
+    expect(ranks.find((r) => r.pack.id === 'kd')!.targets.map((t) => t.withinBuys)).toEqual([3, 3, 3]);
+    // Once you own them all it gives unmaxed cards, which can repeat, so the usual average applies.
+    expect(ranks.find((r) => r.pack.id === 'kg')!.targets[0].withinBuys).toBeUndefined();
   });
 
   it("doesn't value a Kasket of a Kameo rarity", () => {
