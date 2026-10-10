@@ -64,7 +64,7 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
    - See [Cards tab](#cards-tab).
 2. **Packs.** Add the packs in the store, with the drop rates from each pack's in-game info screen.
    - Start from **In the shop** (the foldable card near the top of Packs, under the season box) → **Add**. It fills in the name, currency, cost, purchase limit and dates. You add the odds, fix **Cards per purchase** (it always comes in as 1), fix a cost of 0, and tick **Store item** for single-card store items. Kaskets come in ready, with no odds to add. In the shop doesn't show when the event schedule hasn't loaded or has nothing new to suggest. Otherwise use **+ Add pack**.
-   - A pack with no drop chances is worth nothing to the plan.
+   - A pack with no drop chances is worth nothing to the plan. Kaskets are the exception: the app works out their odds itself.
    - See [Entering a pack](#entering-a-pack-from-its-info-screen).
 3. **Wallet on the Plan.** Enter your currency balances and Fusion Up Kards in the Plan's Wallet card. The plan then shows what to buy. Only Diamond and Gold have kard boxes by default: gear stops at F3 and you finish it with kards in the game yourself. See [Wallet](#wallet).
 4. **Optional extras, once:**
