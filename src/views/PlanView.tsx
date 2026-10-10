@@ -335,7 +335,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                       </div>
                       {r.targets.slice(0, 3).map((t) => (
                         <div key={t.card.id} className={target}>
-                          {t.card.name}: {pct(t.pAtLeastOne)} per buy · {t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${fmt(t.buysPerCopy)} buys per copy`}
+                          {t.card.name}: {pct(t.pAtLeastOne)} per buy · {t.withinBuys === 1 ? 'yours next buy' : t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${fmt(t.buysPerCopy)} buys per copy`}
                         </div>
                       ))}
                       {r.targets.length === 0 && <div className={target}>Nothing you still need.</div>}

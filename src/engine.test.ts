@@ -640,6 +640,9 @@ describe('kaskets', () => {
     expect(ranks.find((r) => r.pack.id === 'kd')!.targets.map((t) => t.withinBuys)).toEqual([3, 3, 3]);
     // Once you own them all it gives unmaxed cards, which can repeat, so the usual average applies.
     expect(ranks.find((r) => r.pack.id === 'kg')!.targets[0].withinBuys).toBeUndefined();
+    // Two buys left can't promise all three cards.
+    s.packs[0] = { ...s.packs[0], maxPurchases: 5, purchased: 3 };
+    expect(rankPacks(buildCtx(s), NOW).find((r) => r.pack.id === 'kd')!.targets[0].withinBuys).toBeUndefined();
   });
 
   it("doesn't value a Kasket of a Kameo rarity", () => {

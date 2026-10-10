@@ -363,7 +363,7 @@ export interface PackRank {
   evPerK: number;
   /**
    * `withinBuys`: a Kasket giving new cards never repeats one, so each card in its pool of N comes within N buys;
-   * buysPerCopy (which assumes repeats) would overstate it.
+   * buysPerCopy (which assumes repeats) would overstate it. Left out when its purchase limit has fewer buys left.
    */
   targets: { card: Card; value: number; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number }[];
 }
@@ -375,7 +375,7 @@ export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
     .map(({ pack, status }) => {
       const ev = packEV(ctx, pack);
       const pool = pack.kasket ? kasketPool(ctx, pack) : undefined;
-      const withinBuys = pool?.mode === 'new' ? pool.cards.length : undefined;
+      const withinBuys = pool?.mode === 'new' && pool.cards.length <= purchasesLeft(pack) ? pool.cards.length : undefined;
       const targets = packDrops(ctx, pack)
         .map((d) => {
           const card = ctx.cards.get(d.cardId);

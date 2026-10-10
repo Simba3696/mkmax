@@ -445,7 +445,7 @@ Each currency lists its best 3 packs. **Show N more** lists the rest, and **Show
 
 - The percentage is efficiency: value per cost, where 100% is the best pack in that currency.
 - "value per buy" uses your cards as they are now.
-- Up to 3 cards are listed under each pack, as "card: p per buy · about b buys per copy". The chance is of at least one copy per buy, and buys per copy is an average, not a guarantee. A Kasket that still has cards you don't own says "yours within n buys" instead: it never gives the same card twice, so each of its n cards comes within n buys.
+- Up to 3 cards are listed under each pack, as "card: p per buy · about b buys per copy". The chance is of at least one copy per buy, and buys per copy is an average, not a guarantee. A Kasket that still has cards you don't own says "yours within n buys" instead ("yours next buy" for the last one): it never gives the same card twice, so each of its n cards comes within n buys. It only says so when its purchase limit leaves at least n buys.
 - Upcoming packs, sold-out packs and free packs still appear. "Nothing you still need." at 0% often means no drop rates were entered.
 
 **Why it differs from What to buy:** the ranking has no urgency boost, doesn't count repeat buys as worth less, and ignores purchase limits and your balance. So a pack at the top here may not be planned.
