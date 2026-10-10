@@ -1,3 +1,4 @@
+import { isKasketExcluded } from './kaskets';
 import type { AppState, Card, DropEntry, Pack, RarityRule } from './types';
 
 // ---------- Fusion math ----------
@@ -243,9 +244,110 @@ const expectedCopies = (pack: Pack, chance: number) => pack.rolls * (chance / 10
 /** Chance of at least one copy of a drop per purchase. */
 const chanceAtLeastOne = (pack: Pack, chance: number) => 1 - Math.pow(1 - chance / 100, pack.rolls);
 
+/** A card a Kasket can give, with the copies it has (`owned`) and needs for its own max (`full`). */
+interface KasketCard {
+  card: Card;
+  owned: number;
+  full: number;
+}
+
+/**
+ * Per ctx, each rarity's cards a Kasket can ever give, with their copy counts worked out once: the planner asks for
+ * every Kasket on every pass, so the pool filters only compare numbers.
+ */
+const kasketCardsByCtx = new WeakMap<Ctx, Map<string, KasketCard[]>>();
+
+function kasketCards(ctx: Ctx, rule: RarityRule): KasketCard[] {
+  let byRarity = kasketCardsByCtx.get(ctx);
+  if (!byRarity) kasketCardsByCtx.set(ctx, (byRarity = new Map()));
+  let cards = byRarity.get(rule.id);
+  if (!cards) {
+    cards = ctx.state.cards
+      // Realm Klash gear is only sold for Blood Rubies; Kaskets never give it.
+      .filter((c) => c.rarityId === rule.id && !isKasketExcluded(c) && !isRealmKlashGear(ctx.state, c))
+      .map((card) => ({ card, owned: copiesAtFusion(rule, card.fusion), full: copiesAtFusion(rule, targetLevel(card, rule)) }));
+    byRarity.set(rule.id, cards);
+  }
+  return cards;
+}
+
+export interface KasketPool {
+  /** 'new': cards you don't own; 'unmaxed': you own them all, so cards short of max; 'none': nothing it's valued for. */
+  mode: 'new' | 'unmaxed' | 'none';
+  cards: Card[];
+  /** The rarity it draws from; undefined when that rarity has been removed. */
+  rule?: RarityRule;
+}
+
+/**
+ * The cards a Kasket can give: its rarity's cards you don't own, minus the newest ones (isKasketExcluded). Once you
+ * own them all it gives cards short of max, but only for a rarity tracked to max: gear tracked to the kard threshold
+ * has its F3+ pieces deleted, so the app can't see most of what it would give and values it at 0. `gained` is the
+ * planner's expected copies so far: a card counts as owned once it's expected one copy, so after as many planned
+ * buys as there are new cards, the next one gives an unmaxed card, as in the game.
+ */
+export function kasketPool(ctx: Ctx, pack: Pack, gained: Map<string, number> = new Map()): KasketPool {
+  const rule = pack.kasket ? ctx.rules.get(pack.kasket) : undefined;
+  if (!rule) return { mode: 'none', cards: [] };
+  // Kaskets give characters or gear; a Kameo rarity can only get here from an import, and isn't valued.
+  if (rule.kind === 'kameo') return { mode: 'none', cards: [], rule };
+  const copies = (k: KasketCard) => k.owned + (gained.get(k.card.id) ?? 0);
+  const eligible = kasketCards(ctx, rule);
+  const unowned = eligible.filter((k) => copies(k) < 1 - 1e-9).map((k) => k.card);
+  if (unowned.length) return { mode: 'new', cards: unowned, rule };
+  const unmaxed = rule.goal === 'max' ? eligible.filter((k) => copies(k) < k.full - 1e-9).map((k) => k.card) : [];
+  return { mode: unmaxed.length ? 'unmaxed' : 'none', cards: unmaxed, rule };
+}
+
+/** A pack's drops: its saved list, or for a Kasket an even share of its current pool (one card per purchase). */
+export function packDrops(ctx: Ctx, pack: Pack, gained?: Map<string, number>): DropEntry[] {
+  if (!pack.kasket) return pack.drops;
+  const { cards } = kasketPool(ctx, pack, gained);
+  return cards.map((c) => ({ cardId: c.id, chance: 100 / cards.length }));
+}
+
+/**
+ * What a Kasket's pull search offers: every card of its rarity (`exclude` holds the rest), with the ones it can give
+ * right now `first`. The others stay findable because the model can be wrong, say the newest-cards list going stale
+ * at an update, and a pull you can't find can't be logged from the pack. With its rarity removed it offers every card.
+ */
+export function kasketPullCards(ctx: Ctx, pack: Pack) {
+  const pool = kasketPool(ctx, pack);
+  const rarityId = pool.rule?.id;
+  return {
+    exclude: new Set(rarityId ? ctx.state.cards.filter((c) => c.rarityId !== rarityId).map((c) => c.id) : []),
+    first: new Set(pool.cards.map((c) => c.id)),
+  };
+}
+
+/**
+ * A pack as a Kasket is kept: one card per purchase, no drops or store item of its own (its pool comes from the
+ * cards). An empty or null `kasket` means it isn't one: the editor uses '' while no rarity is chosen, and an import
+ * or synced save can carry null, since JSON has no undefined. Without this the planner would value such a pack by
+ * drops the screen hides.
+ */
+export function kasketShape(pack: Pack): Pack {
+  if (typeof pack.kasket !== 'string' || !pack.kasket) {
+    if (!('kasket' in pack)) return pack;
+    const out = { ...pack };
+    delete out.kasket;
+    return out;
+  }
+  if (!pack.store && pack.rolls === 1 && pack.drops.length === 0) return pack;
+  const out = { ...pack, rolls: 1, drops: [] };
+  delete out.store;
+  return out;
+}
+
+/** Remove a rarity and the Kaskets that draw from it, in one change so one Undo brings both back. Mutates the state. */
+export function removeRarity(d: AppState, id: string) {
+  d.rarities = d.rarities.filter((r) => r.id !== id);
+  d.packs = d.packs.filter((p) => p.kasket !== id);
+}
+
 export function packEV(ctx: Ctx, pack: Pack, gained: Map<string, number> = new Map()): number {
   let v = 0;
-  for (const d of pack.drops) {
+  for (const d of packDrops(ctx, pack, gained)) {
     const card = ctx.cards.get(d.cardId);
     if (!card) continue;
     v += gainValue(ctx, card, gained.get(card.id) ?? 0, expectedCopies(pack, d.chance));
@@ -259,7 +361,11 @@ export interface PackRank {
   ev: number;
   /** EV per 1000 currency. */
   evPerK: number;
-  targets: { card: Card; value: number; pAtLeastOne: number; buysPerCopy: number }[];
+  /**
+   * `withinBuys`: a Kasket giving new cards never repeats one, so each card in its pool of N comes within N buys;
+   * buysPerCopy (which assumes repeats) would overstate it. Left out when its purchase limit has fewer buys left.
+   */
+  targets: { card: Card; value: number; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number }[];
 }
 
 export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
@@ -268,12 +374,14 @@ export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
     .filter((x): x is { pack: Pack; status: 'active' | 'upcoming' } => x.status !== 'expired')
     .map(({ pack, status }) => {
       const ev = packEV(ctx, pack);
-      const targets = pack.drops
+      const pool = pack.kasket ? kasketPool(ctx, pack) : undefined;
+      const withinBuys = pool?.mode === 'new' && pool.cards.length <= purchasesLeft(pack) ? pool.cards.length : undefined;
+      const targets = packDrops(ctx, pack)
         .map((d) => {
           const card = ctx.cards.get(d.cardId);
           if (!card) return null;
           const e = expectedCopies(pack, d.chance);
-          return { card, value: gainValue(ctx, card, 0, e), pAtLeastOne: chanceAtLeastOne(pack, d.chance), buysPerCopy: e > 0 ? 1 / e : Infinity };
+          return { card, value: gainValue(ctx, card, 0, e), pAtLeastOne: chanceAtLeastOne(pack, d.chance), buysPerCopy: e > 0 ? 1 / e : Infinity, ...(withinBuys && { withinBuys }) };
         })
         .filter((t): t is NonNullable<typeof t> => t != null && t.value > 0)
         .sort((a, b) => b.value - a.value);
@@ -370,7 +478,8 @@ export function buildPlan(ctx: Ctx, now: Date): Plan {
     const score = (p: Pack) => (packEV(ctx, p, gained) / p.cost) * (p.endsAt ? boost : 1);
     const buy = (p: Pack) => {
       buyEv.set(p.id, (buyEv.get(p.id) ?? 0) + packEV(ctx, p, gained));
-      for (const d of p.drops) gained.set(d.cardId, (gained.get(d.cardId) ?? 0) + expectedCopies(p, d.chance));
+      // A Kasket's pool depends on what's gained so far, so it's worked out before this buy's copies are added.
+      for (const d of packDrops(ctx, p, gained)) gained.set(d.cardId, (gained.get(d.cardId) ?? 0) + expectedCopies(p, d.chance));
       bought.set(p.id, (bought.get(p.id) ?? 0) + 1);
       budget -= p.cost;
     };
@@ -648,7 +757,7 @@ export function seasonMoveOnSave(o: { seasonal: boolean; pastSeason: boolean; sc
  * from seasonMoveOnSave: every pack ending with the current season moves to it (see moveSeasonEnd). Mutates the state.
  */
 export function savePack(d: AppState, pack: Pack, moveSeasonTo: string | null, now: Date) {
-  const clean: Pack = { ...pack, name: pack.name.trim() };
+  const clean: Pack = kasketShape({ ...pack, name: pack.name.trim() });
   if (clean.currencyId === REALM_KLASH_CURRENCY) clean.season = isSeasonal(clean, d);
   else delete clean.season;
   const i = d.packs.findIndex((x) => x.id === clean.id);
@@ -689,7 +798,7 @@ export interface Target {
 
 /** Cards ranked by how valuable their next copy is. Krypt/tower gear not sold in any pack is left out. */
 export function rankTargets(ctx: Ctx, now: Date): Target[] {
-  const activePacks = ctx.state.packs.filter((p) => packStatus(p, now) !== 'expired');
+  const activeDrops = ctx.state.packs.filter((p) => packStatus(p, now) !== 'expired').map((p) => new Set(packDrops(ctx, p).map((d) => d.cardId)));
   return ctx.state.cards
     .map((card) => {
       const rule = ctx.rules.get(card.rarityId)!;
@@ -701,7 +810,7 @@ export function rankTargets(ctx: Ctx, now: Date): Target[] {
         copiesToMax: rule ? copiesToMax(card, rule) : 0,
         copiesToThreshold: rule ? copiesToThreshold(card, rule) : 0,
         kardCopies: ctx.kardCopies.get(card.id) ?? 0,
-        inPacks: activePacks.filter((p) => p.drops.some((d) => d.cardId === card.id)).length,
+        inPacks: activeDrops.filter((ids) => ids.has(card.id)).length,
       };
     })
     .filter((t) => t.value > 0 && !(t.card.source && t.inPacks === 0))

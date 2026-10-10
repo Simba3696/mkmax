@@ -16,7 +16,7 @@
 ## Features
 
 - **Purchase plan.** For each currency (Souls, Blood Rubies, Dragon Krystals, or any you add) it recommends what to buy, putting limited-time packs first, and tells you when to save for a pack that hasn't started yet. Tap a pack to jump to it, or log a purchase without leaving the plan. With a daily income set, it says when you'll afford what it's saving for.
-- **Pack ranking.** Compares packs by expected value per cost, showing your chance of each card you need per buy and about how many buys a copy takes.
+- **Pack ranking.** Compares packs by expected value per cost, showing your chance of each card you need per buy and about how many buys a copy takes. Kaskets are valued from the cards you don't own yet, so their odds update as you unlock cards.
 - **Fusion Up Kard plan.** Spends kards on the cheapest steps first, by rarity, through ascension for Gold cards.
 - **Blood Ruby gear order.** Maxes the Realm Klash gear one piece at a time, in an order you choose, before any other Blood Ruby buy, and forecasts the date each piece and the whole set will be maxed.
 - **Ending-soon badge.** The Packs tab, and the home-screen icon where the phone supports it, counts planned packs that end within a day.

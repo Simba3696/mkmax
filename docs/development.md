@@ -27,6 +27,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/types.ts` | The saved data's shape (`AppState`) |
 | `src/defaults.ts` | Built-in rarities and their Fusion Up Kard costs, default weights, a new install's data and the sample data |
 | `src/challenges.ts` | The hand-kept list of Elder challenge characters, and the retired challenges whose Kameos now come from packs |
+| `src/kaskets.ts` | The shop's Kaskets and their rarities, and the hand-kept list of newest cards Kaskets leave out (replaced each game update) |
 | `src/normalize.ts` | Save-file migrations (`AppState.version`) |
 | `src/store.tsx` | App state, undo, and localStorage persistence |
 | `src/storage.ts` | Reading the save at startup, and keeping a copy of one that can't be read |
@@ -37,8 +38,8 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/cardList.ts` | The **Paste a list…** parser |
 | `src/styles.css` | Tailwind theme tokens (`@theme`: colors, radii, text sizes) and the base styles for buttons, inputs and headings |
 | `src/classes.ts` | Shared Tailwind class sets (`card`, `row`, `btn`, `form` and so on) |
-| `src/ui.tsx` | Shared components: `Modal` (with a `wide` option), `Chip`, `CardThumb`, `RarityBadge`, `NumInput`, `ConfirmButton`, `FoldCard`, `useDeviceChoice` (per-device settings like sort order) |
-| `src/views/` | One component per tab, plus the pack editor and sync panel |
+| `src/ui.tsx` | Shared components: `Modal` (with a `wide` option), `Chip`, `CardThumb`, `RarityBadge`, `NumInput`, `ConfirmButton`, `FoldCard`, `useDeviceChoice` (per-device settings like sort order), and `kasketLine` (a Kasket's pool in words) |
+| `src/views/` | One component per tab, plus the pack editor, the card search (`CardPicker`, shared by the editor and a Kasket's pull step) and sync panel |
 | `scripts/` | Build-time fetchers for the catalog and the event schedule; `schedule.mjs` turns the schedule into `events.json` and is tested |
 | `public/` | Icons, and the bundled catalog and schedule |
 
