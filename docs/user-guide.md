@@ -294,7 +294,7 @@ On Packs, tap **I bought one**. This deducts the cost, and a store item also lev
 - **I bought one** works even when your balance is lower than the cost, since the balance you typed may be out of date. The balance then goes below 0 until you type in the real one.
 - **−1** on a store item also takes a copy off its card.
 - After buying a random pack, **What did you pull?** opens: "Tap + for each copy you got." Cards you don't track can be ignored. **Done** closes it, and so does **−1**.
-- After buying a Kasket, **What did you pull?** shows a search box instead of a list, since a Kasket gives one card: type part of the card's name, pick it, then tap +. It only finds cards the Kasket can give right now, or any card of its rarity when it has nothing left to give.
+- After buying a Kasket, **What did you pull?** shows a search box instead of a list, since a Kasket gives one card: type part of the card's name, pick it, then tap +. It finds any card of the Kasket's rarity, listing the ones it can give right now first, so a card the app didn't expect (after a game update, say) can still be logged here.
 
 ### Entering a pack from its info screen
 
@@ -302,7 +302,7 @@ Tap **+ Add pack** (or **Edit** on a pack).
 
 - **Name:** use the in-game name, so **In the shop** recognises it.
 - **Store item:** tick it for one guaranteed copy per purchase (for example the Realm Klash store). It keeps only the first drop, at 100%, and hides **Cards per purchase**. Unticking it leaves that 100% drop for you to fix. A Blood Ruby store item that sells equipment counts as Realm Klash gear.
-- **Kasket:** tick it for a Kasket, then pick its **Kasket rarity** (characters or gear; Kameos aren't offered). The rarity is filled in for the four shop Kaskets' names. A Kasket has no drop chances or **Cards per purchase** (it's always 1): the editor shows its pool instead. Ticking it unticks **Store item**, and the other way round. See [Kaskets](#kaskets).
+- **Kasket:** tick it for a Kasket, then pick its **Kasket rarity** (characters or gear; Kameos aren't offered). The rarity is filled in for the four shop Kaskets' names. A Kasket has no drop chances or **Cards per purchase** (it's always 1): the editor shows its pool instead. Any drop chances you'd typed stay while the editor is open, so unticking brings them back, but saving a Kasket clears them. Ticking it unticks **Store item**, and the other way round. See [Kaskets](#kaskets).
 - **Currency:** from Settings. Choosing Blood Rubies shows the season checkbox.
 - **Cost:** the price of one purchase. It must be more than 0.
 - **Cards per purchase:** how many cards one buy gives. Each card is one roll, so a wrong number scales the pack's value directly.
@@ -336,9 +336,9 @@ The shop's Kaskets (Kollector's Diamond Kasket, Kollector's Gold Kasket, Event E
 - **The pool** is that rarity's cards you don't own, guests and tower or Krypt gear included. Realm Klash gear is never in it: it's only sold for Blood Rubies. Each gets an even share: with 12 in the pool, 1 in 12.
 - **The newest cards** from the latest game update are left out. The list is kept in the app and changes with each update.
 - **Once you own them all**, a Kasket gives a card you haven't maxed, Gold cards still ascending included. That's only valued for rarities tracked to max: Epic and Rare gear stop at F3 here, so the app can't see most of what such a Kasket would give, and values it at 0. Set the rarity's **Track until** to Max in Settings and it's valued again.
-- **The line under the name** says which it is: "New card: 1 in 12 of the Diamond characters you don't own", "You own them all: 1 in 40 of your Diamond characters you haven't maxed", "You own every Epic gear piece it gives, so this isn't valued", or "Nothing left in this Kasket that MK Max tracks". A Kasket whose rarity was removed says so and isn't valued.
+- **The line under the name** says which it is: "New card: 1 in 12 of the Diamond characters you don't own" (or "the only Diamond character you don't own"), "You own them all: 1 in 40 of your Diamond characters you haven't maxed", "You own every Epic gear piece it gives, so this isn't valued", or "Nothing left in this Kasket that MK Max tracks". A Kasket whose rarity was removed says so and isn't valued.
 - **The plan** counts a card as unlocked once it expects you to have pulled one. So with 10 cards in the pool, the 11th Kasket it plans gives a card you haven't maxed, as in the game.
-- **Kaskets you entered by hand** under one of the four shop names, with an even pool, became Kaskets once, when this version of the app first loaded. One saved under another name keeps its odds: tick **Kasket** in its editor.
+- **Kaskets you entered by hand** under one of the four shop names (that's not a store item) became Kaskets once, when this version of the app first loaded, whatever odds or cards per purchase they had. One saved under another name keeps its odds: tick **Kasket** in its editor.
 
 ### Edit, Rerun, Delete
 
@@ -483,7 +483,7 @@ One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gol
 - **Color:** the rarity's color on badges and thumbnails.
 - **Duplicates per step**, with **+ Level** and **− Level**. When the rarity has kards, the new step gets a kard cost straight away (usually 10, or 0 for Uncommon gear), which you can change under **Fusion Up Kards per step**. **− Level** removes cards that are now at or past the new top level, with a brief Undo.
 - **Fusion Up Kards per step:** 0 means kards can't do that step.
-- **Remove:** greyed out while any card uses the rarity. It has no confirm, but has Undo. It also deletes the Kaskets that draw from that rarity, and Undo brings them back too.
+- **Remove:** greyed out while any card uses the rarity. It has no confirm, but has Undo. It also deletes the Kaskets that draw from that rarity (its tooltip and the Undo say how many), and Undo brings them back too.
 
 **+ Rarity** adds a new one.
 

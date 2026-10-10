@@ -22,6 +22,9 @@ const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'limitedBoost', label: 'Limited-time pack urgency', help: 'The planner prefers limited-time packs by this factor over permanent packs, which you can buy later.' },
 ];
 
+/** Removing a rarity also removes its Kaskets (removeRarity), so the button and its Undo say so. */
+const withKaskets = (text: string, kaskets: number) => (kaskets === 0 ? text : `${text} and its ${kaskets === 1 ? 'Kasket' : `${kaskets} Kaskets`}`);
+
 const KIND_LABEL: Record<RarityRule['kind'], string> = { character: 'Character', equipment: 'Equipment', kameo: 'Kameo' };
 
 /** Kard steps from the threshold to the rarity's top level (through ascension), as fusion-number indexes. */
@@ -225,8 +228,8 @@ export default function SettingsView() {
                     <button
                       className={btn.ghost}
                       disabled={state.cards.some((c) => c.rarityId === r.id)}
-                      title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : 'Remove rarity'}
-                      onClick={() => update((d) => removeRarity(d, r.id), `Removed ${r.label}`)}
+                      title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : withKaskets('Remove rarity', state.packs.filter((p) => p.kasket === r.id).length)}
+                      onClick={() => update((d) => removeRarity(d, r.id), withKaskets(`Removed ${r.label}`, state.packs.filter((p) => p.kasket === r.id).length))}
                     >
                       Remove
                     </button>

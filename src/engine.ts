@@ -244,6 +244,18 @@ const expectedCopies = (pack: Pack, chance: number) => pack.rolls * (chance / 10
 /** Chance of at least one copy of a drop per purchase. */
 const chanceAtLeastOne = (pack: Pack, chance: number) => 1 - Math.pow(1 - chance / 100, pack.rolls);
 
+/** Per ctx, each rarity's cards a Kasket can ever give. Kept because the planner asks for every Kasket on every pass. */
+const kasketCardsByCtx = new WeakMap<Ctx, Map<string, Card[]>>();
+
+function kasketCards(ctx: Ctx, rarityId: string): Card[] {
+  let byRarity = kasketCardsByCtx.get(ctx);
+  if (!byRarity) kasketCardsByCtx.set(ctx, (byRarity = new Map()));
+  let cards = byRarity.get(rarityId);
+  // Realm Klash gear is only sold for Blood Rubies; Kaskets never give it.
+  if (!cards) byRarity.set(rarityId, (cards = ctx.state.cards.filter((c) => c.rarityId === rarityId && !isKasketExcluded(c) && !isRealmKlashGear(ctx.state, c))));
+  return cards;
+}
+
 export interface KasketPool {
   /** 'new': cards you don't own; 'unmaxed': you own them all, so cards short of max; 'none': nothing it's valued for. */
   mode: 'new' | 'unmaxed' | 'none';
@@ -262,9 +274,10 @@ export interface KasketPool {
 export function kasketPool(ctx: Ctx, pack: Pack, gained: Map<string, number> = new Map()): KasketPool {
   const rule = pack.kasket ? ctx.rules.get(pack.kasket) : undefined;
   if (!rule) return { mode: 'none', cards: [] };
+  // Kaskets give characters or gear; a Kameo rarity can only get here from an import, and isn't valued.
+  if (rule.kind === 'kameo') return { mode: 'none', cards: [], rule };
   const copies = (c: Card) => copiesAtFusion(rule, c.fusion) + (gained.get(c.id) ?? 0);
-  // Realm Klash gear is only sold for Blood Rubies; Kaskets never give it.
-  const eligible = ctx.state.cards.filter((c) => c.rarityId === rule.id && !isKasketExcluded(c) && !isRealmKlashGear(ctx.state, c));
+  const eligible = kasketCards(ctx, rule.id);
   const unowned = eligible.filter((c) => copies(c) < 1 - 1e-9);
   if (unowned.length) return { mode: 'new', cards: unowned, rule };
   const unmaxed = rule.goal === 'max' ? eligible.filter((c) => copies(c) < copiesAtFusion(rule, targetLevel(c, rule)) - 1e-9) : [];
@@ -276,6 +289,39 @@ export function packDrops(ctx: Ctx, pack: Pack, gained?: Map<string, number>): D
   if (!pack.kasket) return pack.drops;
   const { cards } = kasketPool(ctx, pack, gained);
   return cards.map((c) => ({ cardId: c.id, chance: 100 / cards.length }));
+}
+
+/**
+ * What a Kasket's pull search offers: every card of its rarity (`exclude` holds the rest), with the ones it can give
+ * right now `first`. The others stay findable because the model can be wrong, say the newest-cards list going stale
+ * at an update, and a pull you can't find can't be logged from the pack. With its rarity removed it offers every card.
+ */
+export function kasketPullCards(ctx: Ctx, pack: Pack) {
+  const pool = kasketPool(ctx, pack);
+  const rarityId = pool.rule?.id;
+  return {
+    exclude: new Set(rarityId ? ctx.state.cards.filter((c) => c.rarityId !== rarityId).map((c) => c.id) : []),
+    first: new Set(pool.cards.map((c) => c.id)),
+  };
+}
+
+/**
+ * A pack as a Kasket is kept: one card per purchase, no drops or store item of its own (its pool comes from the
+ * cards). An empty or null `kasket` means it isn't one: the editor uses '' while no rarity is chosen, and an import
+ * or synced save can carry null, since JSON has no undefined. Without this the planner would value such a pack by
+ * drops the screen hides.
+ */
+export function kasketShape(pack: Pack): Pack {
+  if (typeof pack.kasket !== 'string' || !pack.kasket) {
+    if (!('kasket' in pack)) return pack;
+    const out = { ...pack };
+    delete out.kasket;
+    return out;
+  }
+  if (!pack.store && pack.rolls === 1 && pack.drops.length === 0) return pack;
+  const out = { ...pack, rolls: 1, drops: [] };
+  delete out.store;
+  return out;
 }
 
 /** Remove a rarity and the Kaskets that draw from it, in one change so one Undo brings both back. Mutates the state. */
@@ -690,7 +736,7 @@ export function seasonMoveOnSave(o: { seasonal: boolean; pastSeason: boolean; sc
  * from seasonMoveOnSave: every pack ending with the current season moves to it (see moveSeasonEnd). Mutates the state.
  */
 export function savePack(d: AppState, pack: Pack, moveSeasonTo: string | null, now: Date) {
-  const clean: Pack = { ...pack, name: pack.name.trim() };
+  const clean: Pack = kasketShape({ ...pack, name: pack.name.trim() });
   if (clean.currencyId === REALM_KLASH_CURRENCY) clean.season = isSeasonal(clean, d);
   else delete clean.season;
   const i = d.packs.findIndex((x) => x.id === clean.id);

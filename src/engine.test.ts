@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, kasketPool, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
 import { kardTable, normalize } from './normalize';
 import { daysFromNow, kasketLine } from './ui';
@@ -215,12 +215,32 @@ describe('save migration', () => {
         pack('kd', drops, { name: 'Kollector’s Diamond Kasket', rolls: 2 }),
         pack('ke', drops, { name: 'Event Epic Equipment Kasket', store: true }),
         pack('kp', drops, { name: 'Kombat Pack' }),
+        // Typed by hand: a straight apostrophe and other capitals still match; without the apostrophe it's another name.
+        pack('kg', drops, { name: "Kollector's gold kasket" }),
+        pack('kr', drops, { name: 'EVENT RARE EQUIPMENT KASKET' }),
+        pack('kn', drops, { name: 'Kollectors Diamond Kasket' }),
       ],
     };
     const s = normalize(v14);
-    expect(s.packs.map((p) => [p.id, p.kasket, p.drops.length, p.rolls])).toEqual([['kd', 'diamond', 0, 1], ['ke', undefined, 1, 1], ['kp', undefined, 1, 1]]);
+    expect(s.packs.map((p) => [p.id, p.kasket, p.drops.length, p.rolls])).toEqual([
+      ['kd', 'diamond', 0, 1], ['ke', undefined, 1, 1], ['kp', undefined, 1, 1], ['kg', 'gold', 0, 1], ['kr', 'rare', 0, 1], ['kn', undefined, 1, 1],
+    ]);
     // A version 15 save is left alone, so a pack unticked as a Kasket stays unticked.
-    expect(normalize({ ...v14, version: 15 }).packs.map((p) => p.kasket)).toEqual([undefined, undefined, undefined]);
+    expect(normalize({ ...v14, version: 15 }).packs.every((p) => p.kasket === undefined)).toBe(true);
+  });
+
+  it('keeps an imported Kasket at one card per purchase with no drops, and treats a null or empty rarity as no Kasket', () => {
+    const drops = [{ cardId: 'a', chance: 50 }];
+    const s = normalize({
+      ...defaultState(),
+      cards: [card('a', 0)],
+      packs: [pack('k', drops, { kasket: 'diamond', rolls: 5, store: true }), { ...pack('n', drops), kasket: null }, pack('e', drops, { kasket: '' })],
+    });
+    expect(s.packs[0]).toEqual(pack('k', [], { kasket: 'diamond' }));
+    expect(s.packs[0]).not.toHaveProperty('store');
+    expect(s.packs[1]).not.toHaveProperty('kasket');
+    expect(s.packs[2]).not.toHaveProperty('kasket');
+    expect(s.packs[1].drops).toEqual(drops);
   });
 });
 
@@ -576,12 +596,36 @@ describe('kaskets', () => {
       return kasketLine(kasketPool(buildCtx(s), s.packs[0]));
     };
     expect(line([card('a', 0), card('b', 0)], 'diamond')).toBe("New card: 1 in 2 of the Diamond characters you don't own");
-    expect(line([card('a', F(2), { rarityId: 'gold' })], 'gold')).toBe("You own them all: 1 in 1 of your Gold characters you haven't maxed");
+    expect(line([card('a', F(2), { rarityId: 'gold' }), card('b', F(4), { rarityId: 'gold' })], 'gold')).toBe("You own them all: 1 in 2 of your Gold characters you haven't maxed");
+    expect(line([card('a', 0)], 'diamond')).toBe("New card: the only Diamond character you don't own");
+    expect(line([card('a', F(2), { rarityId: 'gold' })], 'gold')).toBe("You own them all: your only Gold character you haven't maxed");
     expect(line([card('e', F(2), { rarityId: 'epic' }), card('x', 0, { rarityId: 'epic', name: 'Man in Control' })], 'epic')).toBe(
       "You own every Epic gear piece it gives, so this isn't valued",
     );
     expect(line([card('x', F(3), { name: 'Sub-Zero MK1' })], 'diamond')).toBe('Nothing left in this Kasket that MK Max tracks');
     expect(line([], 'gone')).toBe("This Kasket's rarity no longer exists, so it isn't valued");
+  });
+
+  it("offers every card of a Kasket's rarity in its pull search, the ones it can give first", () => {
+    const cards = [card('new', 0), card('owned', F(2)), card('newest', 0, { name: 'Sub-Zero MK1' }), card('g', 0, { rarityId: 'gold' })];
+    const s = setup(cards, [kasket('diamond'), kasket('gone')]);
+    const ctx = buildCtx(s);
+    const pull = kasketPullCards(ctx, s.packs[0]);
+    expect([...pull.exclude]).toEqual(['g']);
+    expect([...pull.first]).toEqual(['new']);
+    // Its rarity removed: nothing to put first, and nothing hidden.
+    expect(kasketPullCards(ctx, s.packs[1])).toEqual({ exclude: new Set(), first: new Set() });
+  });
+
+  it("doesn't value a Kasket of a Kameo rarity", () => {
+    const s = setup([card('k', 0, { rarityId: 'kameo-diamond' })], [kasket('kameo-diamond')]);
+    expect(kasketPool(buildCtx(s), s.packs[0])).toMatchObject({ mode: 'none', cards: [] });
+  });
+
+  it('saves a Kasket without the drops or cards per purchase typed before ticking it', () => {
+    const s = setup([card('a', 0)]);
+    savePack(s, pack('k', [{ cardId: 'a', chance: 40 }], { kasket: 'diamond', rolls: 3 }), null, NOW);
+    expect(s.packs[0]).toMatchObject({ kasket: 'diamond', rolls: 1, drops: [] });
   });
 
   it('removes the Kaskets of a removed rarity, leaving other packs', () => {

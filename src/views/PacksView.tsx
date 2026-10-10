@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, useStore } from '../store';
-import { REALM_KLASH_CURRENCY, buildCtx, kasketPool, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
+import { REALM_KLASH_CURRENCY, buildCtx, kasketPool, kasketPullCards, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
 import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice, useNow } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
@@ -124,17 +124,6 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
       </div>
     );
   };
-  /**
-   * Cards left out of a Kasket's pull search: the ones it can't give right now. With nothing in its pool (gear you own
-   * but still track to F3, say) a pull is still possible, so then it only leaves out other rarities, or nothing if its
-   * rarity has been removed.
-   */
-  const notInPool = (p: Pack) => {
-    const pool = kasketPool(ctx, p);
-    const can = pool.cards.length ? new Set(pool.cards.map((c) => c.id)) : null;
-    return new Set(state.cards.filter((c) => (can ? !can.has(c.id) : !!pool.rule && c.rarityId !== pool.rule.id)).map((c) => c.id));
-  };
-
   // The rerun keeps the name, so In the shop still recognises the pack once the old run is cleared.
   const duplicate = (p: Pack) => setEditing({ ...structuredClone(p), id: newId(), purchased: 0, startsAt: null, endsAt: null });
 
@@ -194,7 +183,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
           {p.kasket !== undefined ? (
             <>
               <div className={`${row} items-center`}>
-                <CardPicker value={pulled} exclude={notInPool(p)} onChange={setPulled} />
+                <CardPicker value={pulled} {...kasketPullCards(ctx, p)} onChange={setPulled} />
               </div>
               {pullRow(state.cards.find((c) => c.id === pulled))}
             </>

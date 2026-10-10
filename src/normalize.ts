@@ -1,7 +1,7 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
 import type { AppState, Card, RarityRule } from './types';
 import { ASCENSION_KARD_COST, ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
-import { REALM_KLASH_CURRENCY, pruneDone } from './engine';
+import { REALM_KLASH_CURRENCY, kasketShape, pruneDone } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
 import { fixPackNames } from './events';
 import { kasketFor } from './kaskets';
@@ -177,6 +177,9 @@ export function normalize(input: unknown): AppState {
       return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
     });
   }
+  // Every load, not once: an import or a save synced from another device can still give a Kasket drops, extra
+  // cards per purchase or a null rarity.
+  out.packs = out.packs.map(kasketShape);
   pruneDone(out);
   return out;
 }

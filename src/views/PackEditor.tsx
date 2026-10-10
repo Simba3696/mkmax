@@ -72,9 +72,9 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   const errors = [
     !p.name.trim() && 'Give the pack a name.',
     !(p.cost > 0) && 'Cost must be more than 0.',
-    !(p.rolls >= 1) && 'Cards per purchase must be at least 1.',
+    p.kasket === undefined && !(p.rolls >= 1) && 'Cards per purchase must be at least 1.',
     p.kasket !== undefined && !kasketRule && "Choose the Kasket's rarity.",
-    p.drops.some((d) => !d.cardId) && (p.store ? 'Choose the item being sold.' : 'Every drop row needs a card.'),
+    p.kasket === undefined && p.drops.some((d) => !d.cardId) && (p.store ? 'Choose the item being sold.' : 'Every drop row needs a card.'),
     p.startsAt && endsAt && p.startsAt >= endsAt && 'The end time must be after the start time.',
   ].filter(Boolean) as string[];
 
@@ -136,12 +136,9 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
           <input
             type="checkbox"
             checked={p.kasket !== undefined}
-            onChange={(e) =>
-              setP((x) =>
-                // A Kasket's drops are worked out from your cards, so it keeps none of its own.
-                e.target.checked ? { ...x, store: false, kasket: kasketFor(x.name) ?? '', rolls: 1, drops: [] } : { ...x, kasket: undefined },
-              )
-            }
+            // The drop list and cards per purchase stay while editing, so unticking brings them back; saving a
+            // Kasket drops them (savePack), as its odds are worked out from your cards.
+            onChange={(e) => setP((x) => (e.target.checked ? { ...x, store: false, kasket: kasketFor(x.name) ?? '' } : { ...x, kasket: undefined }))}
           />
           Kasket: each purchase gives one random card you don't own from one rarity
         </label>
