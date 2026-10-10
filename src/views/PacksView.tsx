@@ -1,12 +1,13 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, useStore } from '../store';
-import { REALM_KLASH_CURRENCY, levelLabel, maxFusion, moveSeasonEnd, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
-import { CardThumb, ConfirmButton, fmt, useDeviceChoice, useNow } from '../ui';
+import { REALM_KLASH_CURRENCY, buildCtx, kasketPool, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
+import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice, useNow } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
 import PackEditor from './PackEditor';
+import CardPicker from './CardPicker';
 import { lastRun, packFromShop, packName, scheduleDate, scheduledSeasonEnd, shopSuggestions, useEvents } from '../events';
-import type { Pack } from '../types';
+import type { Card, DropEntry, Pack } from '../types';
 
 const SORTS = ['ending', 'currency'] as const;
 /** Muted small print under titles and in help text. */
@@ -49,7 +50,14 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId]);
   /** Random pack just bought: show its drop list so pulled cards can be levelled up in place. */
-  const [pulling, setPulling] = useState<string | null>(focus?.pull ? focus.id : null);
+  const [pulling, setPullingPack] = useState<string | null>(focus?.pull ? focus.id : null);
+  /** The card searched for in a Kasket's pull step (it gives one card, so a search beats listing its whole pool). */
+  const [pulled, setPulled] = useState('');
+  const setPulling = (id: string | null) => {
+    setPullingPack(id);
+    setPulled('');
+  };
+  const ctx = useMemo(() => buildCtx(state), [state]);
   const rules = new Map(state.rarities.map((r) => [r.id, r]));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
   const cardName = (id: string) => state.cards.find((c) => c.id === id)?.name ?? '(deleted card)';
@@ -96,6 +104,37 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
     if (!p.store) setPulling(delta > 0 ? p.id : null);
   };
 
+  /** A pulled card's row in "What did you pull?": + and − step its level. */
+  const pullRow = (card: Card | undefined) => {
+    const rule = card && rules.get(card.rarityId);
+    if (!card || !rule) return null;
+    return (
+      <div key={card.id} className={`${row} items-center`}>
+        <CardThumb card={card} rule={rule} size={36} />
+        <span className={grow}>{card.name}</span>
+        <div className={stepper}>
+          <button onClick={() => update((s) => stepCard(s, card.id, -1))} disabled={card.fusion <= 0} aria-label="Remove a copy">
+            −
+          </button>
+          <span className={stepperVal}>{card.fusion === 0 ? '—' : levelLabel(rule, card.fusion)}</span>
+          <button onClick={() => update((s) => stepCard(s, card.id, 1))} disabled={card.fusion >= maxFusion(rule)} aria-label="Add a copy">
+            +
+          </button>
+        </div>
+      </div>
+    );
+  };
+  /**
+   * Cards left out of a Kasket's pull search: the ones it can't give right now. With nothing in its pool (gear you own
+   * but still track to F3, say) a pull is still possible, so then it only leaves out other rarities, or nothing if its
+   * rarity has been removed.
+   */
+  const notInPool = (p: Pack) => {
+    const pool = kasketPool(ctx, p);
+    const can = pool.cards.length ? new Set(pool.cards.map((c) => c.id)) : null;
+    return new Set(state.cards.filter((c) => (can ? !can.has(c.id) : !!pool.rule && c.rarityId !== pool.rule.id)).map((c) => c.id));
+  };
+
   // The rerun keeps the name, so In the shop still recognises the pack once the old run is cleared.
   const duplicate = (p: Pack) => setEditing({ ...structuredClone(p), id: newId(), purchased: 0, startsAt: null, endsAt: null });
 
@@ -119,7 +158,8 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         </div>
         <PackTiming pack={p} now={now} />
       </div>
-      <DropList pack={p} cardName={cardName} open={openDrops.has(p.id)} onToggle={() => toggleDrops(p.id)} />
+      {p.kasket !== undefined && <div className={`${note} mt-[0.4rem]`}>{kasketLine(kasketPool(ctx, p))}</div>}
+      <DropList pack={p} drops={packDrops(ctx, p)} cardName={cardName} open={openDrops.has(p.id)} onToggle={() => toggleDrops(p.id)} />
       <div className="hidden lg:block lg:flex-1" aria-hidden />
       <div className={actions}>
         {packStatus(p, now) === 'active' && (
@@ -146,28 +186,21 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
       {pulling === p.id && (
         <div className={subpanel}>
           <div className="text-small">
-            <b>What did you pull?</b> <span className="text-muted">Tap + for each copy you got. Cards you don't track can be ignored.</span>
+            <b>What did you pull?</b>{' '}
+            <span className="text-muted">
+              {p.kasket !== undefined ? 'Search for the card you got, then tap +.' : "Tap + for each copy you got. Cards you don't track can be ignored."}
+            </span>
           </div>
-          {p.drops.map((d) => {
-            const card = state.cards.find((c) => c.id === d.cardId);
-            const rule = card && rules.get(card.rarityId);
-            if (!card || !rule) return null;
-            return (
-              <div key={d.cardId} className={`${row} items-center`}>
-                <CardThumb card={card} rule={rule} size={36} />
-                <span className={grow}>{card.name}</span>
-                <div className={stepper}>
-                  <button onClick={() => update((s) => stepCard(s, card.id, -1))} disabled={card.fusion <= 0} aria-label="Remove a copy">
-                    −
-                  </button>
-                  <span className={stepperVal}>{card.fusion === 0 ? '—' : levelLabel(rule, card.fusion)}</span>
-                  <button onClick={() => update((s) => stepCard(s, card.id, 1))} disabled={card.fusion >= maxFusion(rule)} aria-label="Add a copy">
-                    +
-                  </button>
-                </div>
+          {p.kasket !== undefined ? (
+            <>
+              <div className={`${row} items-center`}>
+                <CardPicker value={pulled} exclude={notInPool(p)} onChange={setPulled} />
               </div>
-            );
-          })}
+              {pullRow(state.cards.find((c) => c.id === pulled))}
+            </>
+          ) : (
+            p.drops.map((d) => pullRow(state.cards.find((c) => c.id === d.cardId)))
+          )}
           <div className={actions}>
             <button className={btn.primary} onClick={() => setPulling(null)}>
               Done
@@ -373,22 +406,23 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
 }
 
 /** A pack's drop pills; a long list shows its first few and a pill to unfold the rest. */
-function DropList({ pack, cardName, open, onToggle }: { pack: Pack; cardName: (id: string) => string; open: boolean; onToggle: () => void }) {
-  const foldable = pack.drops.length > FOLD_DROPS_OVER;
-  const shown = foldable && !open ? pack.drops.slice(0, FOLDED_DROPS) : pack.drops;
+function DropList({ pack, drops, cardName, open, onToggle }: { pack: Pack; drops: DropEntry[]; cardName: (id: string) => string; open: boolean; onToggle: () => void }) {
+  const foldable = drops.length > FOLD_DROPS_OVER;
+  const shown = foldable && !open ? drops.slice(0, FOLDED_DROPS) : drops;
   return (
     <div className="flex flex-wrap gap-[0.3rem] mt-[0.4rem]">
       {shown.map((d, i) => (
         <span key={i} className={drop}>
-          {cardName(d.cardId)} <b>{d.chance}%</b>
+          {/* A Kasket's even share (100 ÷ pool size) is rarely a round number. */}
+          {cardName(d.cardId)} <b>{pack.kasket !== undefined ? +d.chance.toFixed(2) : d.chance}%</b>
         </span>
       ))}
       {foldable && (
         <button className={dropToggle} aria-expanded={open} onClick={onToggle}>
-          {open ? 'Show fewer' : `+${pack.drops.length - FOLDED_DROPS} more`}
+          {open ? 'Show fewer' : `+${drops.length - FOLDED_DROPS} more`}
         </button>
       )}
-      {pack.drops.length === 0 && <span className={note}>No drops entered yet.</span>}
+      {drops.length === 0 && pack.kasket === undefined && <span className={note}>No drops entered yet.</span>}
     </div>
   );
 }

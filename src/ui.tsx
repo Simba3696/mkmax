@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Card, RarityRule } from './types';
-import { levelLabel } from './engine';
+import { levelLabel, type KasketPool } from './engine';
 import { btn, card, chipTone, type ChipTone } from './classes';
 
 export function fmt(n: number) {
@@ -273,6 +273,24 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
       {armed ? 'Tap again to confirm' : label}
     </button>
   );
+}
+
+/** A Kasket's pool in words: how many cards share the odds, or why it isn't valued. */
+export function kasketLine(pool: KasketPool) {
+  const rule = pool.rule;
+  if (!rule) return "This Kasket's rarity no longer exists, so it isn't valued";
+  const label = rule.label.replace(/ Equip$/, ''); // "Epic Equip" reads as "Epic gear"
+  const [one, many] = {
+    character: [`${label} character`, `${label} characters`],
+    equipment: [`${label} gear piece`, `${label} gear`],
+    kameo: [label, `${label}s`],
+  }[rule.kind];
+  const n = pool.cards.length;
+  if (pool.mode === 'new') return `New card: 1 in ${n} of the ${many} you don't own`;
+  if (pool.mode === 'unmaxed') return `You own them all: 1 in ${n} of your ${many} you haven't maxed`;
+  // "It gives": the newest cards, which it leaves out, may still be unowned.
+  if (rule.goal !== 'max') return `You own every ${one} it gives, so this isn't valued`;
+  return 'Nothing left in this Kasket that MK Max tracks';
 }
 
 /** Chip text for where a card comes from besides packs. */

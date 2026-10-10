@@ -4,6 +4,7 @@ import { ASCENSION_KARD_COST, ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KAR
 import { REALM_KLASH_CURRENCY, pruneDone } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
 import { fixPackNames } from './events';
+import { kasketFor } from './kaskets';
 
 /**
  * Version 1 saves counted the first copy as F1; version 2 starts at F0. Shift owned levels up one,
@@ -101,7 +102,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 14,
+    version: 15,
     rarities: s.rarities!.map((r) => ({
       ...r,
       // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
@@ -167,6 +168,15 @@ export function normalize(input: unknown): AppState {
   // already does with them. Turning kards off now does this itself; older saves kept the threshold, so picking a kard
   // level again capped and removed their cards. Done once, as later saves can't get into that state.
   if (version < 14) for (const r of out.rarities) if (r.fusionUpThreshold == null && r.goal === 'threshold') r.goal = 'max';
+  // Version 15 turns Kaskets entered by hand (an even pool that went stale as cards were unlocked) into Kaskets,
+  // whose pool is worked out from the cards. Done once, so a pack the user later unticks as a Kasket stays unticked.
+  // gstack-shortcut(dec-609574da): only the four shop names convert, upgrade when a Kasket saved under another name is found still on even-pool odds
+  if (version < 15) {
+    out.packs = out.packs.map((p) => {
+      const kasket = !p.store && !p.kasket ? kasketFor(p.name) : undefined;
+      return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
+    });
+  }
   pruneDone(out);
   return out;
 }

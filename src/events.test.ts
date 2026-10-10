@@ -75,6 +75,15 @@ describe('event schedule', () => {
     expect(lastRun(shop, s, NOW)).toBeUndefined();
   });
 
+  it('adds a Kasket from the shop as a Kasket, even over an earlier run with drops of its own', () => {
+    const s = defaultState();
+    const shop = { name: 'KOLLECTOR’S GOLD KASKET', start: null, end: null, cost: 300, currency: 'Dragon Krystals', limit: null, image: null };
+    expect(packFromShop(shop, s, 'k')).toMatchObject({ name: 'Kollector’s Gold Kasket', kasket: 'gold', rolls: 1, drops: [], cost: 300 });
+    const old = { ...packFromShop(shop, s, 'old'), kasket: undefined, rolls: 3, drops: [{ cardId: 'c', chance: 5 }] };
+    expect(packFromShop(shop, s, 'new', old)).toMatchObject({ kasket: 'gold', rolls: 1, drops: [] });
+    expect(packFromShop(events.packs[2], s, 'p')).not.toHaveProperty('kasket');
+  });
+
   it('fills in a pack from the shop, leaving permanent Blood Ruby packs out of the season', () => {
     const s = defaultState();
     expect(packFromShop(events.packs[2], s, 'a')).toMatchObject({ name: 'Martial Artist Kombat Pack', currencyId: 'souls', cost: 400, maxPurchases: 20, endsAt: local('2026-09-30T16:00:00Z'), drops: [] });

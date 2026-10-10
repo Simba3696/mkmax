@@ -29,6 +29,8 @@ Go through the notes line by line. Every line lands in exactly one bucket.
 | A new kind of card or rarity | `defaultRarities()` in `src/defaults.ts`, `RarityRule['kind']` in `src/types.ts` | Yes, added once so deleting it sticks (see version 6, Uncommon) |
 | New Gold Elder challenge characters | `CHALLENGE_CHARACTERS` in `src/challenges.ts` | No: new Gold Kameos are tagged when added. Tagging Kameos already in the app needs one |
 | A challenge taken out of rotation | `RETIRED_CHALLENGES` in `src/challenges.ts` | Yes, to untag those Kameos once (see version 7) |
+| **Every update:** its newest characters and gear | Replace `KASKET_EXCLUDED` in `src/kaskets.ts` with them (Kaskets leave them out until the next update) and update its date comment. Ask the user which cards are newest if the notes don't say | No |
+| A new Kasket in the shop | `KASKET_RARITY` in `src/kaskets.ts` (its schedule name and rarity) | Only to convert Kaskets already entered by hand (see version 15) |
 | New Realm Klash gear, or a change to the gear | `DEFAULT_GEAR_ORDER` in `src/engine.ts` | No, unless saved gear order needs fixing |
 | Realm Klash season length changed | `SEASON_DAYS` in `src/engine.ts` | No |
 | A new currency | `defaultState()` in `src/defaults.ts`, `currencyFor` in `src/events.ts` | Yes, added once |

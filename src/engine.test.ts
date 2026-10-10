@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, levelLabel, moveSeasonEnd, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, kasketPool, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
 import { kardTable, normalize } from './normalize';
-import { daysFromNow } from './ui';
+import { daysFromNow, kasketLine } from './ui';
 import type { AppState, Card, Pack } from './types';
 
 const NOW = new Date('2026-01-10T12:00:00');
@@ -203,6 +203,24 @@ describe('save migration', () => {
     expect(s.cards).toEqual([expect.objectContaining({ id: 'sash', rarityId: 'epic', goal: 'max', fusion: F(7) })]);
     expect(s.cards[0]).not.toHaveProperty('tier');
     expect(s.weights).not.toHaveProperty('tier');
+  });
+
+  it('turns Kaskets entered by hand into Kaskets, once, leaving other packs', () => {
+    const drops = [{ cardId: 'a', chance: 2.5 }];
+    const v14 = {
+      ...defaultState(),
+      version: 14,
+      cards: [card('a', 0)],
+      packs: [
+        pack('kd', drops, { name: 'Kollector’s Diamond Kasket', rolls: 2 }),
+        pack('ke', drops, { name: 'Event Epic Equipment Kasket', store: true }),
+        pack('kp', drops, { name: 'Kombat Pack' }),
+      ],
+    };
+    const s = normalize(v14);
+    expect(s.packs.map((p) => [p.id, p.kasket, p.drops.length, p.rolls])).toEqual([['kd', 'diamond', 0, 1], ['ke', undefined, 1, 1], ['kp', undefined, 1, 1]]);
+    // A version 15 save is left alone, so a pack unticked as a Kasket stays unticked.
+    expect(normalize({ ...v14, version: 15 }).packs.map((p) => p.kasket)).toEqual([undefined, undefined, undefined]);
   });
 });
 
@@ -469,6 +487,108 @@ describe('pack ranking and targets', () => {
       [pack('p', [{ cardId: 'sold', chance: 10 }]), pack('old', [{ cardId: 'tower', chance: 10 }], { endsAt: '2026-01-01T00:00' })],
     );
     expect(rankTargets(buildCtx(s), NOW).map((t) => [t.card.id, t.inPacks])).toEqual([['char', 0], ['sold', 1]]);
+  });
+});
+
+describe('kaskets', () => {
+  const kasket = (rarity: string, extra: Partial<Pack> = {}) => pack('k', [], { kasket: rarity, ...extra });
+  const ids = (cards: Card[]) => cards.map((c) => c.id);
+
+  it("gives an even share of the cards you don't own, leaving out the newest from the latest update", () => {
+    const fresh = Array.from({ length: 9 }, (_, i) => card(`d${i}`, 0));
+    // The excluded cards spelled the way the user might type them: word order and MKII don't matter.
+    const excluded = [card('x1', 0, { name: 'MK1 Sub-Zero' }), card('x2', 0, { name: 'MKII Movie Scorpion' })];
+    const s = setup([...fresh, card('guest', 0, { guest: true }), ...excluded, card('owned', F(3))], [kasket('diamond')]);
+    const ctx = buildCtx(s);
+    const pool = kasketPool(ctx, s.packs[0]);
+    expect(pool.mode).toBe('new');
+    expect(ids(pool.cards)).toEqual([...ids(fresh), 'guest']);
+    expect(packDrops(ctx, s.packs[0]).every((d) => d.chance === 10)).toBe(true);
+    // Valued exactly like a pack listing those ten cards at 10% each.
+    const listed = pack('listed', pool.cards.map((c) => ({ cardId: c.id, chance: 10 })));
+    expect(packEV(ctx, s.packs[0])).toBeCloseTo(packEV(ctx, listed));
+    expect(rankPacks(ctx, NOW)[0].targets.map((t) => t.card.id).sort()).toEqual([...ids(fresh), 'guest'].sort());
+
+    // Unlocking one takes it out of the pool straight away.
+    s.cards[0].fusion = F(0);
+    const after = packDrops(buildCtx(s), s.packs[0]);
+    expect(after).toHaveLength(9);
+    expect(after[0].chance).toBeCloseTo(100 / 9);
+  });
+
+  it('gives cards short of max once you own them all, counting ascending Gold cards up to their cap', () => {
+    const s = setup(
+      [
+        card('ascending', A(2), { rarityId: 'gold', maxLevel: A(5) }),
+        card('fusing', F(5), { rarityId: 'gold' }),
+        card('capped', A(5), { rarityId: 'gold', maxLevel: A(5) }),
+        card('x', F(2), { rarityId: 'gold', name: 'Flame Forged Will' }),
+      ],
+      [kasket('gold')],
+    );
+    const pool = kasketPool(buildCtx(s), s.packs[0]);
+    expect(pool.mode).toBe('unmaxed');
+    expect(ids(pool.cards)).toEqual(['ascending', 'fusing']);
+  });
+
+  it("isn't valued once you own every piece of gear tracked only to the kard threshold, unless it's tracked to max", () => {
+    const s = setup([card('e1', F(2), { rarityId: 'epic' }), card('e2', F(1), { rarityId: 'epic' })], [kasket('epic')]);
+    expect(kasketPool(buildCtx(s), s.packs[0])).toMatchObject({ mode: 'none', cards: [] });
+    expect(packEV(buildCtx(s), s.packs[0])).toBe(0);
+    s.rarities.find((r) => r.id === 'epic')!.goal = 'max';
+    expect(ids(kasketPool(buildCtx(s), s.packs[0]).cards)).toEqual(['e1', 'e2']);
+  });
+
+  it("isn't valued when only excluded cards are left, or its rarity is gone", () => {
+    const s = setup([card('x1', F(4), { name: 'Sub-Zero MK1' }), card('x2', 0, { name: 'Scorpion MK2 Movie' })], [kasket('diamond'), kasket('gone', { id: 'k2' })]);
+    const ctx = buildCtx(s);
+    expect(kasketPool(ctx, s.packs[0])).toMatchObject({ mode: 'none', cards: [] });
+    expect(kasketPool(ctx, s.packs[1])).toEqual({ mode: 'none', cards: [] });
+    expect(packEV(ctx, s.packs[0]) + packEV(ctx, s.packs[1])).toBe(0);
+  });
+
+  it('switches the planner to unmaxed cards after as many buys as there are new ones', () => {
+    const fresh = Array.from({ length: 10 }, (_, i) => card(`d${i}`, 0));
+    const s = setup([...fresh, card('owned', F(3))], [kasket('diamond')], (s) => (s.currencies[0].balance = 1100));
+    const plan = buildPlan(buildCtx(s), NOW);
+    expect(plan.currencies[0].buys.map((b) => b.count)).toEqual([11]);
+    // Buys 1–10 each give one of the ten new cards; buy 11 shares one copy across all eleven cards you own by then.
+    expect(plan.expectedGains.get('d0')).toBeCloseTo(1 + 1 / 11);
+    expect(plan.expectedGains.get('owned')).toBeCloseTo(1 / 11);
+  });
+
+  it('never gives Realm Klash gear', () => {
+    const s = setup(
+      [card('sash', 0, { rarityId: 'epic', goal: 'max' }), card('sold', 0, { rarityId: 'epic' }), card('kunai', 0, { rarityId: 'epic' })],
+      [kasket('epic'), pack('store', [{ cardId: 'sold', chance: 100 }], { store: true, currencyId: 'blood-rubies' })],
+    );
+    expect(ids(kasketPool(buildCtx(s), s.packs[0]).cards)).toEqual(['kunai']);
+  });
+
+  it('puts gear only a Kasket gives in the priority targets', () => {
+    const s = setup([card('tower', 0, { rarityId: 'epic', source: 'tower' })], [kasket('epic')]);
+    expect(rankTargets(buildCtx(s), NOW).map((t) => [t.card.id, t.inPacks])).toEqual([['tower', 1]]);
+  });
+
+  it('says in words how many cards share the odds, or why it isn’t valued', () => {
+    const line = (cards: Card[], rarity: string) => {
+      const s = setup(cards, [kasket(rarity)]);
+      return kasketLine(kasketPool(buildCtx(s), s.packs[0]));
+    };
+    expect(line([card('a', 0), card('b', 0)], 'diamond')).toBe("New card: 1 in 2 of the Diamond characters you don't own");
+    expect(line([card('a', F(2), { rarityId: 'gold' })], 'gold')).toBe("You own them all: 1 in 1 of your Gold characters you haven't maxed");
+    expect(line([card('e', F(2), { rarityId: 'epic' }), card('x', 0, { rarityId: 'epic', name: 'Man in Control' })], 'epic')).toBe(
+      "You own every Epic gear piece it gives, so this isn't valued",
+    );
+    expect(line([card('x', F(3), { name: 'Sub-Zero MK1' })], 'diamond')).toBe('Nothing left in this Kasket that MK Max tracks');
+    expect(line([], 'gone')).toBe("This Kasket's rarity no longer exists, so it isn't valued");
+  });
+
+  it('removes the Kaskets of a removed rarity, leaving other packs', () => {
+    const s = setup([], [kasket('epic', { id: 'epic-k' }), kasket('diamond', { id: 'diamond-k' }), pack('p', [])]);
+    removeRarity(s, 'epic');
+    expect(s.rarities.map((r) => r.id)).not.toContain('epic');
+    expect(s.packs.map((p) => p.id)).toEqual(['diamond-k', 'p']);
   });
 });
 

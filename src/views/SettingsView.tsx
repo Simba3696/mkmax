@@ -4,7 +4,7 @@ import { kardTable } from '../normalize';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
 import { actions, btn, check, field, form, grow, hint, subpanel } from '../classes';
-import { copiesTotal, fLevel, levelLabel, maxFusion } from '../engine';
+import { copiesTotal, fLevel, levelLabel, maxFusion, removeRarity } from '../engine';
 import { fromNewerApp } from '../sync';
 import { checkForAppUpdate } from '../appUpdate';
 import SyncPanel from './SyncPanel';
@@ -226,7 +226,7 @@ export default function SettingsView() {
                       className={btn.ghost}
                       disabled={state.cards.some((c) => c.rarityId === r.id)}
                       title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : 'Remove rarity'}
-                      onClick={() => update((d) => void d.rarities.splice(ri, 1), `Removed ${r.label}`)}
+                      onClick={() => update((d) => removeRarity(d, r.id), `Removed ${r.label}`)}
                     >
                       Remove
                     </button>

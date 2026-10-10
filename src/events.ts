@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { nameKey } from './catalog';
 import { REALM_KLASH_CURRENCY, packStatus, toLocalInput } from './engine';
+import { kasketFor } from './kaskets';
 import type { AppState, Card, Pack } from './types';
 
 export interface ShopPack {
@@ -178,23 +179,27 @@ export function lastRun(shop: ShopPack, state: AppState, now: Date): Pack | unde
 /**
  * A new pack filled in from the site: everything but the drop rates. A permanent Blood Ruby pack (like the
  * Kameo summon packs) doesn't leave with the Realm Klash season. A rerun (`last`, see lastRun) keeps the earlier
- * run's name, drops and cards per purchase, which the site doesn't have.
+ * run's name, drops and cards per purchase, which the site doesn't have. A Kasket needs none of those: its pool is
+ * worked out from the cards, so it gets its rarity and one card per purchase whatever an earlier run had.
  */
 export function packFromShop(shop: ShopPack, state: AppState, id: string, last?: Pack): Pack {
   const currencyId = currencyFor(shop.currency, state.currencies) ?? state.currencies[0]?.id ?? '';
+  const kasket = kasketFor(packName(shop));
+  const copy = last && !kasket ? last : undefined;
   return {
     id,
     name: last?.name ?? packName(shop),
     currencyId,
     ...(currencyId === REALM_KLASH_CURRENCY && !shop.end && { season: false }),
-    ...(last?.store && { store: true }),
+    ...(copy?.store && { store: true }),
+    ...(kasket && { kasket }),
     cost: shop.cost ?? 0,
-    rolls: last?.rolls ?? 1,
+    rolls: copy?.rolls ?? 1,
     maxPurchases: shop.limit,
     purchased: 0,
     startsAt: localOrNull(shop.start),
     endsAt: localOrNull(shop.end),
-    drops: last ? structuredClone(last.drops) : [],
+    drops: copy ? structuredClone(copy.drops) : [],
   };
 }
 

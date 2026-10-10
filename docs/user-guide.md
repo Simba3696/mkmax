@@ -63,7 +63,7 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
    - For each Gold card, set **Max** to **F10 (no ascension)**, **A5 (Stage I)** or **A10 (Stage II)**, as the card shows in the game. New and pasted Gold cards start at A10, so a card that doesn't ascend will otherwise ask for 10 copies too many and is never removed at F10.
    - See [Cards tab](#cards-tab).
 2. **Packs.** Add the packs in the store, with the drop rates from each pack's in-game info screen.
-   - Start from **In the shop** (the foldable card near the top of Packs, under the season box) → **Add**. It fills in the name, currency, cost, purchase limit and dates. You add the odds, fix **Cards per purchase** (it always comes in as 1), fix a cost of 0, and tick **Store item** for single-card store items. In the shop doesn't show when the event schedule hasn't loaded or has nothing new to suggest. Otherwise use **+ Add pack**.
+   - Start from **In the shop** (the foldable card near the top of Packs, under the season box) → **Add**. It fills in the name, currency, cost, purchase limit and dates. You add the odds, fix **Cards per purchase** (it always comes in as 1), fix a cost of 0, and tick **Store item** for single-card store items. Kaskets come in ready, with no odds to add. In the shop doesn't show when the event schedule hasn't loaded or has nothing new to suggest. Otherwise use **+ Add pack**.
    - A pack with no drop chances is worth nothing to the plan.
    - See [Entering a pack](#entering-a-pack-from-its-info-screen).
 3. **Wallet on the Plan.** Enter your currency balances and Fusion Up Kards in the Plan's Wallet card. The plan then shows what to buy. Only Diamond and Gold have kard boxes by default: gear stops at F3 and you finish it with kards in the game yourself. See [Wallet](#wallet).
@@ -112,6 +112,7 @@ Each is explained under [Reading the Plan](#reading-the-plan).
 | **Store item, random pack** | A store item gives one guaranteed copy of a single card per purchase, so buying it levels the card. A random pack rolls a drop list, so you log what you pulled. |
 | **Chance, cards per purchase** | Chance is the % per roll, copied from the in-game info screen. Cards per purchase is how many rolls one buy gives. |
 | **Even pool** | One odds line shared by a group of cards ("X% for one of these"). |
+| **Kasket** | A shop pack that gives one random card of a rarity you don't own, or one you haven't maxed once you own them all. The app works out its odds from your cards. See [Kaskets](#kaskets). |
 | **Value, value per buy, efficiency** | Scores with no unit. See [Pack ranking](#pack-ranking). |
 | **Limited-time pack, permanent** | A limited-time pack has an end date. A permanent pack has none. |
 | **Buy, Save for, Next, Next best** | Lines in What to buy. See [What to buy](#what-to-buy). |
@@ -279,7 +280,7 @@ Expired packs are left out of the plan and Pack ranking. They stay until you cle
 - **Sort** shows once you have 2 packs: **Ending soonest** (the default) or **Currency**, which groups each section's packs under a heading per currency, in the order they're listed in Settings. Sort choices are remembered on each device and aren't synced.
 - **Summary line**, for example "400 Souls · 3 cards per buy · bought 2/5" for a random pack, or "300 Blood Rubies · store item · bought 0/2" for a store item. 2/5 means 2 bought of a 5-purchase limit.
 - **Timing chip**, the same one as on the Plan: blue "starts in …", gold "… left" (red under 24 hours), or grey "permanent" or "expired". Countdowns update every minute.
-- **Drop pills** show each card's chance per roll. "(deleted card)" means the card is gone from Cards. "No drops entered yet." means the pack has no odds.
+- **Drop pills** show each card's chance per roll. "(deleted card)" means the card is gone from Cards. "No drops entered yet." means the pack has no odds. A Kasket shows a line saying how many cards share its odds, and its pills list that pool (see [Kaskets](#kaskets)).
 - **Long drop lists:** a pack with more than 12 cards in its drop list shows the first 8 and a **+N more** pill. Tap it to see the rest, and **Show fewer** to fold it again. Lists start folded each time you open Packs.
 
 With no packs, the tab says "No packs yet."
@@ -293,6 +294,7 @@ On Packs, tap **I bought one**. This deducts the cost, and a store item also lev
 - **I bought one** works even when your balance is lower than the cost, since the balance you typed may be out of date. The balance then goes below 0 until you type in the real one.
 - **−1** on a store item also takes a copy off its card.
 - After buying a random pack, **What did you pull?** opens: "Tap + for each copy you got." Cards you don't track can be ignored. **Done** closes it, and so does **−1**.
+- After buying a Kasket, **What did you pull?** shows a search box instead of a list, since a Kasket gives one card: type part of the card's name, pick it, then tap +. It only finds cards the Kasket can give right now, or any card of its rarity when it has nothing left to give.
 
 ### Entering a pack from its info screen
 
@@ -300,6 +302,7 @@ Tap **+ Add pack** (or **Edit** on a pack).
 
 - **Name:** use the in-game name, so **In the shop** recognises it.
 - **Store item:** tick it for one guaranteed copy per purchase (for example the Realm Klash store). It keeps only the first drop, at 100%, and hides **Cards per purchase**. Unticking it leaves that 100% drop for you to fix. A Blood Ruby store item that sells equipment counts as Realm Klash gear.
+- **Kasket:** tick it for a Kasket, then pick its **Kasket rarity** (characters or gear; Kameos aren't offered). The rarity is filled in for the four shop Kaskets' names. A Kasket has no drop chances or **Cards per purchase** (it's always 1): the editor shows its pool instead. Ticking it unticks **Store item**, and the other way round. See [Kaskets](#kaskets).
 - **Currency:** from Settings. Choosing Blood Rubies shows the season checkbox.
 - **Cost:** the price of one purchase. It must be more than 0.
 - **Cards per purchase:** how many cards one buy gives. Each card is one roll, so a wrong number scales the pack's value directly.
@@ -322,8 +325,20 @@ Tap **+ Add pack** (or **Edit** on a pack).
 - "Give the pack a name."
 - "Cost must be more than 0."
 - "Cards per purchase must be at least 1."
+- "Choose the Kasket's rarity." (also when its rarity has since been removed)
 - "Every drop row needs a card." (for a store item, "Choose the item being sold.")
 - "The end time must be after the start time."
+
+### Kaskets
+
+The shop's Kaskets (Kollector's Diamond Kasket, Kollector's Gold Kasket, Event Epic Equipment Kasket and Event Rare Equipment Kasket) give one random card per purchase from one rarity. The app works out their odds from your cards every time, so unlocking a card changes them with nothing to edit.
+
+- **The pool** is that rarity's cards you don't own, guests and tower or Krypt gear included. Realm Klash gear is never in it: it's only sold for Blood Rubies. Each gets an even share: with 12 in the pool, 1 in 12.
+- **The newest cards** from the latest game update are left out. The list is kept in the app and changes with each update.
+- **Once you own them all**, a Kasket gives a card you haven't maxed, Gold cards still ascending included. That's only valued for rarities tracked to max: Epic and Rare gear stop at F3 here, so the app can't see most of what such a Kasket would give, and values it at 0. Set the rarity's **Track until** to Max in Settings and it's valued again.
+- **The line under the name** says which it is: "New card: 1 in 12 of the Diamond characters you don't own", "You own them all: 1 in 40 of your Diamond characters you haven't maxed", "You own every Epic gear piece it gives, so this isn't valued", or "Nothing left in this Kasket that MK Max tracks". A Kasket whose rarity was removed says so and isn't valued.
+- **The plan** counts a card as unlocked once it expects you to have pulled one. So with 10 cards in the pool, the 11th Kasket it plans gives a card you haven't maxed, as in the game.
+- **Kaskets you entered by hand** under one of the four shop names, with an even pool, became Kaskets once, when this version of the app first loaded. One saved under another name keeps its odds: tick **Kasket** in its editor.
 
 ### Edit, Rerun, Delete
 
@@ -335,8 +350,8 @@ Tap **+ Add pack** (or **Edit** on a pack).
 
 **In the shop** lists packs from MK Mobile Base's event schedule that are on sale or coming up and aren't in the app yet. It hides itself when there's nothing to suggest. Its note says which day's schedule it's from.
 
-- **Add** opens the pack editor with the name, currency, cost, purchase limit and dates filled in, in your local time. You enter the drop rates.
-- **Rerun** shows instead of Add when you still have an earlier run of the pack under Expired. It fills in the same as Add, and also copies that run's name, drop rates, cards per purchase and store item setting. A pack that expired only after the shop's run began (a season you ended early, say) is the same run, so it isn't suggested.
+- **Add** opens the pack editor with the name, currency, cost, purchase limit and dates filled in, in your local time. You enter the drop rates, except for Kaskets, which need none.
+- **Rerun** shows instead of Add when you still have an earlier run of the pack under Expired. It fills in the same as Add, and also copies that run's name, drop rates, cards per purchase and store item setting. A Kasket keeps only the name. A pack that expired only after the shop's run began (a season you ended early, say) is the same run, so it isn't suggested.
 - **Cards per purchase always comes in as 1**, so fix it for packs that give several cards.
 - A pack the schedule has no price for comes in at cost 0, which you'll need to fix before saving.
 - **Not needed** hides a pack for good, and the hidden list syncs. The 8-second Undo is the only way to bring it back.
@@ -422,7 +437,7 @@ The 10 cards whose next copy is worth most.
 
 - Each row shows guest and source chips, the level, "N to" the goal, "N to F3", and "not in any current pack" when no available or upcoming pack drops it.
 - The chip on the right says which kind of copy comes next: **Unlock**, **To Kard threshold**, **Fusion** or **Kards cover it**.
-- Krypt gear, tower gear and challenge Kameos that no current pack drops are left out.
+- Krypt gear, tower gear and challenge Kameos that no current pack drops are left out. A Kasket counts as dropping every card in its pool, so tower or Krypt gear you don't own shows up while an Epic or Rare Kasket can give it.
 
 ### Pack ranking
 
@@ -468,7 +483,7 @@ One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gol
 - **Color:** the rarity's color on badges and thumbnails.
 - **Duplicates per step**, with **+ Level** and **− Level**. When the rarity has kards, the new step gets a kard cost straight away (usually 10, or 0 for Uncommon gear), which you can change under **Fusion Up Kards per step**. **− Level** removes cards that are now at or past the new top level, with a brief Undo.
 - **Fusion Up Kards per step:** 0 means kards can't do that step.
-- **Remove:** greyed out while any card uses the rarity. It has no confirm, but has Undo.
+- **Remove:** greyed out while any card uses the rarity. It has no confirm, but has Undo. It also deletes the Kaskets that draw from that rarity, and Undo brings them back too.
 
 **+ Rarity** adds a new one.
 
@@ -605,3 +620,4 @@ These notes are about changes to saved data over time. You can skip them.
 - When challenge tagging came in, Kameos already in the app were tagged once.
 - Challenges that no longer run are taken off the challenge list (so far Klassic Ermac, whose Kameo comes from packs now), and a Kameo tagged before its challenge was retired gets untagged once.
 - The older hand-kept per-tower counts were dropped.
+- Kaskets entered by hand under one of the four shop names were turned into Kaskets once, so their odds now follow your cards.
