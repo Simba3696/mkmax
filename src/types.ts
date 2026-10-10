@@ -92,6 +92,11 @@ export interface Pack {
    * packs). Its endsAt is set to that season's end when saved. Realm Klash gear doesn't rotate, so it's false.
    */
   season?: boolean;
+  /**
+   * Kasket: one random card per purchase from this rarity (its id), worked out from your cards each time (engine
+   * kasketPool), so `drops` stays empty and `rolls` is 1.
+   */
+  kasket?: string;
   notes?: string;
 }
 
@@ -114,8 +119,8 @@ export interface Weights {
 }
 
 export interface AppState {
-  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. 8–9 = renamed packs and cards to the game's spelling. 10 = fixed "Kollector’S" pack names and gave Blood Rubies a daily income. 11 = removed Time Krystals (console-only) when unused. 12 = gave Epic and Rare gear their own kard costs and Kameos guests. 13 = gave Gold ascension the game's kard costs. 14 = switched rarities with no kards from the kard threshold to max. */
-  version: 14;
+  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. 8–9 = renamed packs and cards to the game's spelling. 10 = fixed "Kollector’S" pack names and gave Blood Rubies a daily income. 11 = removed Time Krystals (console-only) when unused. 12 = gave Epic and Rare gear their own kard costs and Kameos guests. 13 = gave Gold ascension the game's kard costs. 14 = switched rarities with no kards from the kard threshold to max. 15 = turned hand-made Kaskets into Kaskets. */
+  version: 15;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];

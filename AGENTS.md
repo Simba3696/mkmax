@@ -33,7 +33,8 @@ These aren't obvious from general game knowledge. Don't change them unless asked
 - The first copy is F0; each level takes one duplicate (F10 = 11 copies). Diamonds max at F10; Gold cards go on to a per-card ascension cap (F10, A5 or A10). The game calls A5 Stage I Ascension and A10 Stage II Ascension; updates move batches of characters to Stage I or Stage II.
 - Each ascension step also takes one duplicate (or Fusion Up Kards in its place), plus Ascension Kards (1, 1, 2, … per step). Ascension Kards are a scarce premium item from season passes and aren't tracked or planned; the user ascends whenever they get one.
 - Fusion Up Kards work only from F3 up, cost more per step (Diamond: 1, 2, 3, 4, 5, 7, 10), and each rarity has its own kards.
-- Rare and Epic gear is tracked only to F3; kards finish it. Realm Klash gear is Epic gear bought to max with Blood Rubies, one piece at a time in the user's order, before anything else Blood Rubies buy. Never plan kards on it.
+- Rare and Epic gear is tracked only to F3; kards finish it. Realm Klash gear is Epic gear bought to max with Blood Rubies, one piece at a time in the user's order, before anything else Blood Rubies buy. Never plan kards on it, and Kaskets never give it.
+- Kaskets give one random card of their rarity you don't own, minus the newest cards from the latest update; once you own them all, one you haven't maxed (below its own cap, so ascending Gold counts). Guests and tower or Krypt gear are in the pool.
 - Kameos only need owning. Elder challenge Kameos are weighted down because the challenge guarantees one.
 - Every card is wanted. Don't add priority tiers ("Must-have", "Skip"); the only reasons a copy is worth more are game mechanics.
 - Cards that reach their goal are deleted, not archived.
