@@ -85,16 +85,18 @@ interface KardAssignment {
 
 interface KardPlan {
   assignments: KardAssignment[];
-  /** Kards the plan couldn't use (not enough for any remaining step). */
+  /** Kards the plan couldn't use: not enough for any remaining character step, or, for gear, to finish the next piece. */
   left: number;
   /** Cards that could take kards: at the threshold or higher, short of their goal, and not Realm Klash gear. */
   cards: number;
-  /** Cheapest next step among those cards before any kards are spent, so "not enough kards" can name it. */
+  /** Cheapest next step among those cards before any kards are spent, so "not enough kards" can name it (characters only; gear names `next`). */
   cheapest: number | null;
   /** Realm Klash gear at the threshold or higher and short of its goal, left out of `cards`. */
   realmKlash: number;
   /** Gear only: the first piece the kards left can't finish, and all the kards it needs to reach its goal. */
   next?: { cardId: string; needs: number };
+  /** Gear only: pieces kards can't take all the way to their goal, because a step on the way has no kard cost. */
+  stuck?: string[];
 }
 
 export interface Ctx {
@@ -160,6 +162,8 @@ function allocateKards(state: AppState) {
     const closer = (a: Card, b: Card) => stepsLeft(a) < stepsLeft(b) || (stepsLeft(a) === stepsLeft(b) && level.get(a.id)! > level.get(b.id)!);
     let left = rule.fusionUpKards;
     let next: KardPlan['next'];
+    let stuck: string[] = [];
+    const finishOrder = new Map<string, number>();
     if (rule.kind === 'equipment') {
       // Kards to take a piece all the way to its goal; null when a step on the way can't be done with kards.
       const finishCost = (c: Card) => {
@@ -171,8 +175,9 @@ function allocateKards(state: AppState) {
         }
         return k;
       };
-      const queue = cards
-        .map((card) => ({ card, cost: finishCost(card) }))
+      const all = cards.map((card) => ({ card, cost: finishCost(card) }));
+      stuck = all.filter((x) => x.cost == null).map((x) => x.card.id);
+      const queue = all
         .filter((x): x is { card: Card; cost: number } => x.cost != null)
         .sort((a, b) => a.cost - b.cost || b.card.fusion - a.card.fusion || a.card.name.localeCompare(b.card.name));
       for (const { card, cost } of queue) {
@@ -183,6 +188,7 @@ function allocateKards(state: AppState) {
         }
         level.set(card.id, cap(card));
         spent.set(card.id, cost);
+        finishOrder.set(card.id, finishOrder.size);
         left -= cost;
       }
     } else for (;;) {
@@ -207,8 +213,10 @@ function allocateKards(state: AppState) {
       assignments.push({ cardId: c.id, from: c.fusion, to, kards: spent.get(c.id)! });
       kardCopies.set(c.id, copiesAtFusion(rule, to) - copiesAtFusion(rule, c.fusion));
     }
-    assignments.sort((a, b) => b.to - a.to || b.kards - a.kards);
-    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash: open.length - cards.length, ...(next && { next }) });
+    // Gear rows follow the finishing order (fewest kards first), so the top row is the piece to fuse first.
+    if (rule.kind === 'equipment') assignments.sort((a, b) => finishOrder.get(a.cardId)! - finishOrder.get(b.cardId)!);
+    else assignments.sort((a, b) => b.to - a.to || b.kards - a.kards);
+    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash: open.length - cards.length, ...(next && { next }), ...(stuck.length > 0 && { stuck }) });
   }
   return { kardCopies, kardPlan };
 }

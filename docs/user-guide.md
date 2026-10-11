@@ -58,7 +58,7 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
 1. **Cards first.** Add the cards you're working on and their current fusion level. **Paste a list…** adds many at once.
    - A pack's drop picker only lists cards already on Cards, so add cards before packs. (The pack editor can also add a card; see [Adding a card from the editor](#entering-a-pack-from-its-info-screen).)
    - Add every card you're still maxing. Add Kameos only if you don't own them yet. A pack is only worth what the cards you track in it are worth.
-   - Epic and Rare gear only needs adding while it's below F3, since kards finish it from there. Gear already at F3 or above is removed as soon as you add it, unless it's Realm Klash gear with **Goal** set to **Max**.
+   - Epic and Rare gear only needs adding while it's below F3, since kards finish it from there. Gear already at F3 or above is removed as soon as you add it, unless it's Realm Klash gear with **Goal** set to **Max**, or that rarity's **Track until** is Max in Settings → Fusion rules (then add every piece short of F10 so the Kard plan can finish it).
    - **Not owned** is its own level, below F0.
    - For each Gold card, set **Max** to **F10 (no ascension)**, **A5 (Stage I)** or **A10 (Stage II)**, as the card shows in the game. New and pasted Gold cards start at A10, so a card that doesn't ascend will otherwise ask for 10 copies too many and is never removed at F10.
    - See [Cards tab](#cards-tab).
@@ -421,10 +421,11 @@ Hidden while every kard count is 0.
 - Each rarity shows its kards, "uses U, L left over", and rows like "F3 → **F6** (6 kards)".
 - Only cards at F3 or higher, below their goal, and not Realm Klash gear get kards.
 - Characters get kards on their cheapest steps first. Gear gets them one piece at a time, all the way to its goal (F10), since its special effect only comes at F10: the piece needing fewest kards first, then the higher level, then alphabetical. Kards that can't finish the next piece wait for it.
-- "33 left: Dragon Mask needs 36 kards to reach F10 (3 more)." under the gear rows names the next piece and how many more kards finish it.
+- "Next: Dragon Mask needs 36 kards to reach F10, 3 more than you have left." under the gear rows names the next piece and how many more kards finish it.
 - "No … card at F3 or higher yet, so these kards wait." means no card can take kards yet. When Realm Klash gear of that rarity is at F3 or higher, it reads "No … card at F3 or higher that kards can go to yet" and adds that Realm Klash gear gets none.
 - "Not enough kards for any step yet: the cheapest next step costs N." means a card can take kards, but even its cheapest next step costs more kards than you have.
-- "Not enough to finish a piece yet: … needs N kards to reach F10 (M more)." is the gear version: you don't have enough to finish even the piece needing fewest kards, so none are spent.
+- "Not enough kards to finish a piece yet: … needs N to reach F10, M more than you have." is the gear version: you don't have enough to finish even the piece needing fewest kards, so none are spent.
+- "… can't reach F10 with kards: a step on the way has no kard cost in Settings → Fusion rules." means a gear step's kard cost is 0 or missing, so kards can never finish that piece. Enter the cost in Settings → Fusion rules.
 - **Use N** on a row fuses that card one level with kards from the Wallet, with Undo, the same as **Use N kards** on Cards. Tap it once per level you fuse in the game; the plan updates after each.
 - The plan counts the copies kards would cover as worth less, so it buys packs for the rest. For gear that's only the pieces it finishes.
 
