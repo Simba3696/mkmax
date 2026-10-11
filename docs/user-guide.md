@@ -58,7 +58,7 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
 1. **Cards first.** Add the cards you're working on and their current fusion level. **Paste a list…** adds many at once.
    - A pack's drop picker only lists cards already on Cards, so add cards before packs. (The pack editor can also add a card; see [Adding a card from the editor](#entering-a-pack-from-its-info-screen).)
    - Add every card you're still maxing. Add Kameos only if you don't own them yet. A pack is only worth what the cards you track in it are worth.
-   - Epic and Rare gear only needs adding while it's below F3, since kards finish it from there. Gear already at F3 or above is removed as soon as you add it, unless it's Realm Klash gear with **Goal** set to **Max**.
+   - Epic and Rare gear only needs adding while it's below F3, since kards finish it from there. Gear already at F3 or above is removed as soon as you add it, unless it's Realm Klash gear with **Goal** set to **Max**, or that rarity's **Track until** is Max in Settings → Fusion rules (then add every piece short of F10 so the Kard plan can finish it).
    - **Not owned** is its own level, below F0.
    - For each Gold card, set **Max** to **F10 (no ascension)**, **A5 (Stage I)** or **A10 (Stage II)**, as the card shows in the game. New and pasted Gold cards start at A10, so a card that doesn't ascend will otherwise ask for 10 copies too many and is never removed at F10.
    - See [Cards tab](#cards-tab).
@@ -66,11 +66,11 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
    - Start from **In the shop** (the foldable card near the top of Packs, under the season box) → **Add**. It fills in the name, currency, cost, purchase limit and dates. You add the odds, fix **Cards per purchase** (it always comes in as 1), fix a cost of 0, and tick **Store item** for single-card store items. Kaskets come in ready, with no odds to add. In the shop doesn't show when the event schedule hasn't loaded or has nothing new to suggest. Otherwise use **+ Add pack**.
    - A pack with no drop chances is worth nothing to the plan. Kaskets are the exception: the app works out their odds itself.
    - See [Entering a pack](#entering-a-pack-from-its-info-screen).
-3. **Wallet on the Plan.** Enter your currency balances and Fusion Up Kards in the Plan's Wallet card. The plan then shows what to buy. Only Diamond and Gold have kard boxes by default: gear stops at F3 and you finish it with kards in the game yourself. See [Wallet](#wallet).
+3. **Wallet on the Plan.** Enter your currency balances and Fusion Up Kards in the Plan's Wallet card. The plan then shows what to buy. Only Diamond and Gold have kard boxes by default: gear stops at F3 and you finish it with kards in the game yourself. To have the plan finish gear to F10, set Epic or Rare's **Track until** to Max in Settings → Fusion rules. See [Wallet](#wallet).
 4. **Optional extras, once:**
    - Each currency's daily income (Settings → Currencies).
    - **Guest** ticks on guest cards.
-   - Realm Klash gear: add each piece as Epic Equip with **Goal** set to **Max (F10, Realm Klash gear)**, add it as a Blood Ruby **Store item**, then set the order in Settings → Blood Ruby gear order.
+   - Realm Klash gear: add each piece as Epic Equip with **Goal** set to **Max (F10, Realm Klash gear)**, add it as a Blood Ruby **Store item**, then set the order in Settings → Blood Ruby gear order. Once Epic's **Track until** is Max, the Goal list has no separate Realm Klash choice, so add the Store item before you add the piece: the Store item is what keeps the Kard plan off it.
    - The Realm Klash season end on Packs, only if the event schedule doesn't set it.
 
 ### The Get started card
@@ -275,7 +275,7 @@ Packs are split into three sections:
 - **Coming up**: packs whose start date is still ahead.
 - **Expired (N)**: folded; tap it to see them.
 
-Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
+Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all, except Blood Ruby store items for gear you're still maxing, since those mark the piece as Realm Klash gear so the Kard plan leaves it alone. Delete one of those by hand once you no longer need it. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
 
 - **Sort** shows once you have 2 packs: **Ending soonest** (the default) or **Currency**, which groups each section's packs under a heading per currency, in the order they're listed in Settings. Sort choices are remembered on each device and aren't synced.
 - **Summary line**, for example "400 Souls · 3 cards per buy · bought 2/5" for a random pack, or "300 Blood Rubies · store item · bought 0/2" for a store item. 2/5 means 2 bought of a 5-purchase limit.
@@ -420,10 +420,14 @@ Hidden while every kard count is 0.
 
 - Each rarity shows its kards, "uses U, L left over", and rows like "F3 → **F6** (6 kards)".
 - Only cards at F3 or higher, below their goal, and not Realm Klash gear get kards.
+- Characters get kards on their cheapest steps first. Gear gets them one piece at a time, all the way to its goal (F10), since its special effect only comes at F10: the piece needing fewest kards first, then the higher level, then alphabetical. Kards that can't finish the next piece wait for it.
+- "Next: Dragon Mask needs 36 kards to reach F10, 3 more than you have left." under the gear rows names the next piece and how many more kards finish it.
 - "No … card at F3 or higher yet, so these kards wait." means no card can take kards yet. When Realm Klash gear of that rarity is at F3 or higher, it reads "No … card at F3 or higher that kards can go to yet" and adds that Realm Klash gear gets none.
 - "Not enough kards for any step yet: the cheapest next step costs N." means a card can take kards, but even its cheapest next step costs more kards than you have.
+- "Not enough kards to finish a piece yet: … needs N to reach F10, M more than you have." is the gear version: you don't have enough to finish even the piece needing fewest kards, so none are spent.
+- "… can't reach F10 with kards: a step on the way has no kard cost in Settings → Fusion rules." means a gear step's kard cost is 0 or missing, so kards can never finish that piece. Enter the cost in Settings → Fusion rules.
 - **Use N** on a row fuses that card one level with kards from the Wallet, with Undo, the same as **Use N kards** on Cards. Tap it once per level you fuse in the game; the plan updates after each.
-- The plan counts the copies kards would cover as worth less, so it buys packs for the rest.
+- The plan counts the copies kards would cover as worth less, so it buys packs for the rest. For gear that's only the pieces it finishes.
 
 How kards are shared out is in [How it works](how-it-works.md#scoring).
 
@@ -534,7 +538,7 @@ The bottom of Settings shows which version you have and the date of that change,
 - **Diamond** characters to F10.
 - **Guest** cards are Diamond, Gold or Kameo cards that only show up in packs during their event (Jason Voorhees only around Friday the 13th, for example), so they get extra weight. Tick **Guest** on the card; a rarity's Guest checkbox is controlled by **Has guest cards** in Settings, which is on for Diamond, Gold and both Kameos.
 - **Gold** characters through F10 and then ascension (A1–A10, 1 copy per level). Not every Gold card ascends. The game calls the two caps Stage I Ascension (up to A5) and Stage II Ascension (up to A10), and each update makes another batch of Gold characters Stage I or Stage II, so each card's **Max** is F10 (no ascension), A5 (Stage I) or A10 (Stage II). When an update makes one of your cards Stage II, raise its **Max** to A10. Neither MK Mobile Base nor the wiki records which cap a card has, so set it on the card; new Gold cards start at A10. Any other saved cap shows as "not a real cap" so it's easy to spot and fix. Fusion Up Kards work on ascension steps too, in place of the duplicate. Each step also takes Ascension Kards (1, 1, 2, 2, 3, 3, 3, 4, 4, 5 from F10→A1 to A9→A10), a separate premium item from season passes. MK Max doesn't track them: ascend whenever you have one, then raise the card here. The Fusion Up Kard cost of each ascension step comes from the game (see [How it works](how-it-works.md#scoring)). Saves that still had the old guess of 10 a step got the real costs once; costs you'd changed yourself were kept.
-- **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase, and no Fusion Up Kards are planned for it.
+- **Epic** (purple) and **Rare** (blue) equipment only until F3 (4 copies), because Fusion Up Kards finish them. A card's **Goal** setting can switch that to max, which is how the Realm Klash gear is tracked: it's Epic gear you buy outright with Blood Rubies, one guaranteed copy per store purchase, and no Fusion Up Kards are planned for it. To have the Kard plan finish Epic or Rare gear to F10 instead, set that rarity's **Track until** to Max in Settings → Fusion rules; its kards then finish one piece at a time (see [Fusion Up Kard plan](#fusion-up-kard-plan)).
 - **Uncommon** (green) gear is tracked to max (F10), since it's farmed and maxed through tower runs. It has no Fusion Up Kards unless you turn them on in Settings → Fusion rules and enter the kard cost of each step. Tag it as tower gear and it shows under its tower on Cards → Tower gear.
 - **Kameos** (Diamond and Gold) fuse to F10 in the game, but here you only track the ones you don't own yet. Add them under **Diamond Kameo** or **Gold Kameo**. Cards offers to switch a wrong tier to MK Mobile Base's (see [Find images and rarity fixes](#find-images-and-rarity-fixes)). When you get one, tap **+** and it's done, so it leaves the list (with Undo). Kameos sold in the Realm Klash store, or Kameo packs, go in as store items or packs like anything else.
 - **Challenge Kameos:** the Gold Kameo of a challenge character (for example Kotal Kahn, Dark Lord) is earned by finishing that character's Elder challenge when it comes around as an event. These Kameos are tagged **Elder challenge**. The app has a list of the Gold challenge characters (from the MK Mobile wiki's Challenge Mode page), and any Gold Kameo you add that matches it is tagged automatically. Only the Gold Kameo rarity is tagged, and the name match ignores word order. You can change a card's source on the card itself, and removing the tag sticks. Challenges that no longer run are kept out of the list. When a challenge Kameo's challenge is on or coming up, its card shows the dates and the Plan lists it under **Elder challenges**.

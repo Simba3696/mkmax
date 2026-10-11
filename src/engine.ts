@@ -85,14 +85,18 @@ interface KardAssignment {
 
 interface KardPlan {
   assignments: KardAssignment[];
-  /** Kards the plan couldn't use (not enough for any remaining step). */
+  /** Kards the plan couldn't use: not enough for any remaining character step, or, for gear, to finish the next piece. */
   left: number;
   /** Cards that could take kards: at the threshold or higher, short of their goal, and not Realm Klash gear. */
   cards: number;
-  /** Cheapest next step among those cards before any kards are spent, so "not enough kards" can name it. */
+  /** Cheapest next step among those cards before any kards are spent, so "not enough kards" can name it. Filled for gear too, but the Plan names `next` there instead. */
   cheapest: number | null;
   /** Realm Klash gear at the threshold or higher and short of its goal, left out of `cards`. */
   realmKlash: number;
+  /** Gear only: the first piece the kards left can't finish, and all the kards it needs to reach its goal. */
+  next?: { cardId: string; needs: number };
+  /** Gear only: pieces kards can't take all the way to their goal, because a step on the way has no kard cost. */
+  stuck?: string[];
 }
 
 export interface Ctx {
@@ -124,6 +128,19 @@ export function isRealmKlashGear(state: AppState, card: Card) {
   return card.goal === 'max' || state.packs.some((p) => p.store && p.currencyId === REALM_KLASH_CURRENCY && p.drops.some((d) => d.cardId === card.id));
 }
 
+/**
+ * Whether Clear expired keeps this pack: a Blood Ruby store item for gear you still have. Once a gear rarity's Track
+ * until is Max, the store item is the only thing marking a piece added after that as Realm Klash gear, so deleting it
+ * would let the Kard plan spend kards on the piece. Maxed cards are deleted, so any card still here is short of its goal.
+ */
+export function keepWhenExpired(state: AppState, pack: Pack) {
+  if (!pack.store || pack.currencyId !== REALM_KLASH_CURRENCY) return false;
+  return pack.drops.some((d) => {
+    const card = state.cards.find((c) => c.id === d.cardId);
+    return !!card && state.rarities.find((r) => r.id === card.rarityId)?.kind === 'equipment';
+  });
+}
+
 /** Fusion Up Kards needed to go from stored level `level` to the next one, or null if kards can't do that step. */
 export function kardCost(rule: RarityRule, level: number): number | null {
   const f = level - 1; // step index: F3→F4 is 3, and past fusionMax it's ascension (F10→A1 is 10)
@@ -138,6 +155,9 @@ export function kardCost(rule: RarityRule, level: number): number | null {
  * step available, weighted up for guest cards. Ties go to the card with the fewest steps left to its goal, so a
  * card gets finished before another is started (opening a Gold ascension also takes Ascension Kards, untracked).
  * Kards work from the threshold (F3) up, through fusion and on into Gold ascension. Realm Klash gear gets none.
+ * Gear is different: its special effect only comes at its goal (F10), so a part-fused piece is worth nothing
+ * extra. Its kards finish one piece at a time, the one needing fewest kards first, and what's left waits for the
+ * next piece rather than going part of the way.
  */
 function allocateKards(state: AppState) {
   const kardCopies = new Map<string, number>();
@@ -154,7 +174,37 @@ function allocateKards(state: AppState) {
     const stepsLeft = (c: Card) => cap(c) - level.get(c.id)!;
     const closer = (a: Card, b: Card) => stepsLeft(a) < stepsLeft(b) || (stepsLeft(a) === stepsLeft(b) && level.get(a.id)! > level.get(b.id)!);
     let left = rule.fusionUpKards;
-    for (;;) {
+    let next: KardPlan['next'];
+    let stuck: string[] = [];
+    const finishOrder = new Map<string, number>();
+    if (rule.kind === 'equipment') {
+      // Kards to take a piece all the way to its goal; null when a step on the way can't be done with kards.
+      const finishCost = (c: Card) => {
+        let k = 0;
+        for (let lvl = c.fusion; lvl < cap(c); lvl++) {
+          const step = kardCost(rule, lvl);
+          if (step == null) return null;
+          k += step;
+        }
+        return k;
+      };
+      const all = cards.map((card) => ({ card, cost: finishCost(card) }));
+      stuck = all.filter((x) => x.cost == null).map((x) => x.card.id);
+      const queue = all
+        .filter((x): x is { card: Card; cost: number } => x.cost != null)
+        .sort((a, b) => a.cost - b.cost || b.card.fusion - a.card.fusion || a.card.name.localeCompare(b.card.name));
+      for (const { card, cost } of queue) {
+        // Sorted cheapest first, so once one piece is out of reach every later one is too.
+        if (cost > left) {
+          next = { cardId: card.id, needs: cost };
+          break;
+        }
+        level.set(card.id, cap(card));
+        spent.set(card.id, cost);
+        finishOrder.set(card.id, finishOrder.size);
+        left -= cost;
+      }
+    } else for (;;) {
       let best: { card: Card; cost: number; score: number } | null = null;
       for (const c of cards) {
         const lvl = level.get(c.id)!;
@@ -176,8 +226,10 @@ function allocateKards(state: AppState) {
       assignments.push({ cardId: c.id, from: c.fusion, to, kards: spent.get(c.id)! });
       kardCopies.set(c.id, copiesAtFusion(rule, to) - copiesAtFusion(rule, c.fusion));
     }
-    assignments.sort((a, b) => b.to - a.to || b.kards - a.kards);
-    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash: open.length - cards.length });
+    // Gear rows follow the finishing order (fewest kards first), so the top row is the piece to fuse first.
+    if (rule.kind === 'equipment') assignments.sort((a, b) => finishOrder.get(a.cardId)! - finishOrder.get(b.cardId)!);
+    else assignments.sort((a, b) => b.to - a.to || b.kards - a.kards);
+    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash: open.length - cards.length, ...(next && { next }), ...(stuck.length > 0 && { stuck }) });
   }
   return { kardCopies, kardPlan };
 }

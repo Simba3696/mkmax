@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, useStore } from '../store';
-import { REALM_KLASH_CURRENCY, buildCtx, kasketPool, kasketPullCards, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
+import { REALM_KLASH_CURRENCY, buildCtx, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
 import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice, useNow } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
@@ -79,6 +79,8 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
   const groups = { active: [] as Pack[], upcoming: [] as Pack[], expired: [] as Pack[] };
   for (const p of state.packs) groups[packStatus(p, now)].push(p);
   for (const g of Object.values(groups)) g.sort((a, b) => (sortBy === 'currency' ? curIndex(a) - curIndex(b) : 0) || urgency(a) - urgency(b));
+  // Realm Klash gear store items stay even once expired, since they're what keeps kards off the piece (see keepWhenExpired).
+  const clearable = groups.expired.filter((p) => !keepWhenExpired(state, p));
   /**
    * A status group's packs, with a currency heading before each currency's packs when sorted by currency. Phones stack
    * them; wider screens lay the cards out in a grid (headings span it), so the heading and card are siblings rather
@@ -238,12 +240,14 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
           <button className={btn.ghost} onClick={() => setShowExpired(!showExpired)}>
             {showExpired ? '▾' : '▸'} Expired ({groups.expired.length})
           </button>
-          <ConfirmButton
-            label="Clear expired"
-            onConfirm={() =>
-              update((d) => void (d.packs = d.packs.filter((p) => packStatus(p, now) !== 'expired')), `Cleared ${groups.expired.length} expired packs`)
-            }
-          />
+          {clearable.length > 0 && (
+            <ConfirmButton
+              label="Clear expired"
+              onConfirm={() =>
+                update((d) => void (d.packs = d.packs.filter((p) => packStatus(p, now) !== 'expired' || keepWhenExpired(d, p))), `Cleared ${clearable.length} expired packs`)
+              }
+            />
+          )}
         </div>
       )}
       {showExpired && renderGroup(groups.expired)}
