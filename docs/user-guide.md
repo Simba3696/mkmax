@@ -70,7 +70,7 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
 4. **Optional extras, once:**
    - Each currency's daily income (Settings → Currencies).
    - **Guest** ticks on guest cards.
-   - Realm Klash gear: add each piece as Epic Equip with **Goal** set to **Max (F10, Realm Klash gear)**, add it as a Blood Ruby **Store item**, then set the order in Settings → Blood Ruby gear order.
+   - Realm Klash gear: add each piece as Epic Equip with **Goal** set to **Max (F10, Realm Klash gear)**, add it as a Blood Ruby **Store item**, then set the order in Settings → Blood Ruby gear order. Once Epic's **Track until** is Max, the Goal list has no separate Realm Klash choice, so add the Store item before you add the piece: the Store item is what keeps the Kard plan off it.
    - The Realm Klash season end on Packs, only if the event schedule doesn't set it.
 
 ### The Get started card

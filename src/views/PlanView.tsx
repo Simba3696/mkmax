@@ -215,6 +215,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
               const plan = ctx.kardPlan.get(r.id);
               if (r.fusionUpKards <= 0 || !plan) return null;
               const used = r.fusionUpKards - plan.left;
+              // gstack-shortcut(dec-d5e7646c-6cbc-4987-bd99-3beb59aba333): these gear lines are checked by browser QA only, upgrade when they move into a pure function in ui.tsx with table tests.
               // Gear: the next piece the leftover kards can't finish yet, and how many more it takes.
               const next = plan.next && ctx.cards.get(plan.next.cardId);
               const nextGoal = next && levelLabel(r, targetLevel(next, r));
