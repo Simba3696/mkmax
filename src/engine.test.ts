@@ -437,6 +437,55 @@ describe('phases', () => {
     s.rarities[0].fusionUpKards = 5;
     expect(buildCtx(s).kardPlan.get('diamond')).toEqual({ assignments: [], left: 5, cards: 1, cheapest: 10, realmKlash: 0 });
   });
+
+  describe('gear tracked to max', () => {
+    // Gear kards: F3→F4 1, then 3, 5, 7, 9, 12, F9→F10 15. Finishing costs 27 from F8, 36 from F7, 52 from F3.
+    const gear = (id: string, fusion: number, extra: Partial<Card> = {}) => card(id, fusion, { rarityId: 'epic', ...extra });
+    const epicPlan = (cards: Card[], kards: number) => {
+      const s = setup(cards, [], (s) => {
+        const epic = s.rarities.find((r) => r.id === 'epic')!;
+        epic.goal = 'max';
+        epic.fusionUpKards = kards;
+      });
+      const ctx = buildCtx(s);
+      return { ctx, plan: ctx.kardPlan.get('epic') };
+    };
+
+    it('finishes the piece needing fewest kards and keeps the rest for the next one', () => {
+      const { plan } = epicPlan([gear('f8', F(8)), gear('f7', F(7)), gear('f3', F(3))], 60);
+      expect(plan).toEqual({ assignments: [{ cardId: 'f8', from: F(8), to: F(10), kards: 27 }], left: 33, cards: 3, cheapest: 1, realmKlash: 0, next: { cardId: 'f7', needs: 36 } });
+    });
+
+    it('orders pieces by the kards they need, not by name', () => {
+      const { plan } = epicPlan([gear('alpha', F(8)), gear('zeta', F(9))], 20);
+      expect(plan?.assignments).toEqual([{ cardId: 'zeta', from: F(9), to: F(10), kards: 15 }]);
+      expect(plan?.next).toEqual({ cardId: 'alpha', needs: 27 });
+    });
+
+    it('breaks a tie alphabetically', () => {
+      const { plan } = epicPlan([gear('bravo', F(8)), gear('alpha', F(8))], 27);
+      expect(plan?.assignments).toEqual([{ cardId: 'alpha', from: F(8), to: F(10), kards: 27 }]);
+      expect(plan).toMatchObject({ left: 0, next: { cardId: 'bravo', needs: 27 } });
+    });
+
+    it("spends nothing when the kards can't finish any piece", () => {
+      const { plan } = epicPlan(['e3', 'e1', 'e5', 'e2', 'e4'].map((id) => gear(id, F(3))), 20);
+      expect(plan).toEqual({ assignments: [], left: 20, cards: 5, cheapest: 1, realmKlash: 0, next: { cardId: 'e1', needs: 52 } });
+    });
+
+    it("finishes a piece at its own cap when that's below F10", () => {
+      const { plan } = epicPlan([gear('capped', F(3), { maxLevel: F(5) })], 4);
+      expect(plan).toEqual({ assignments: [{ cardId: 'capped', from: F(3), to: F(5), kards: 4 }], left: 0, cards: 1, cheapest: 1, realmKlash: 0 });
+    });
+
+    it('counts only finished pieces as covered by kards', () => {
+      const { ctx } = epicPlan([gear('f8', F(8)), gear('f7', F(7))], 60);
+      expect(ctx.kardCopies.get('f8')).toBe(2);
+      expect(ctx.kardCopies.has('f7')).toBe(false);
+      expect(copyPhase(ctx, ctx.cards.get('f8')!)).toBe('kardCovered');
+      expect(copyPhase(ctx, ctx.cards.get('f7')!)).toBe('normal');
+    });
+  });
 });
 
 describe('scoring', () => {

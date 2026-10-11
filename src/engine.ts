@@ -93,6 +93,8 @@ interface KardPlan {
   cheapest: number | null;
   /** Realm Klash gear at the threshold or higher and short of its goal, left out of `cards`. */
   realmKlash: number;
+  /** Gear only: the first piece the kards left can't finish, and all the kards it needs to reach its goal. */
+  next?: { cardId: string; needs: number };
 }
 
 export interface Ctx {
@@ -138,6 +140,9 @@ export function kardCost(rule: RarityRule, level: number): number | null {
  * step available, weighted up for guest cards. Ties go to the card with the fewest steps left to its goal, so a
  * card gets finished before another is started (opening a Gold ascension also takes Ascension Kards, untracked).
  * Kards work from the threshold (F3) up, through fusion and on into Gold ascension. Realm Klash gear gets none.
+ * Gear is different: its special effect only comes at its goal (F10), so a part-fused piece is worth nothing
+ * extra. Its kards finish one piece at a time, the one needing fewest kards first, and what's left waits for the
+ * next piece rather than going part of the way.
  */
 function allocateKards(state: AppState) {
   const kardCopies = new Map<string, number>();
@@ -154,7 +159,33 @@ function allocateKards(state: AppState) {
     const stepsLeft = (c: Card) => cap(c) - level.get(c.id)!;
     const closer = (a: Card, b: Card) => stepsLeft(a) < stepsLeft(b) || (stepsLeft(a) === stepsLeft(b) && level.get(a.id)! > level.get(b.id)!);
     let left = rule.fusionUpKards;
-    for (;;) {
+    let next: KardPlan['next'];
+    if (rule.kind === 'equipment') {
+      // Kards to take a piece all the way to its goal; null when a step on the way can't be done with kards.
+      const finishCost = (c: Card) => {
+        let k = 0;
+        for (let lvl = c.fusion; lvl < cap(c); lvl++) {
+          const step = kardCost(rule, lvl);
+          if (step == null) return null;
+          k += step;
+        }
+        return k;
+      };
+      const queue = cards
+        .map((card) => ({ card, cost: finishCost(card) }))
+        .filter((x): x is { card: Card; cost: number } => x.cost != null)
+        .sort((a, b) => a.cost - b.cost || b.card.fusion - a.card.fusion || a.card.name.localeCompare(b.card.name));
+      for (const { card, cost } of queue) {
+        // Sorted cheapest first, so once one piece is out of reach every later one is too.
+        if (cost > left) {
+          next = { cardId: card.id, needs: cost };
+          break;
+        }
+        level.set(card.id, cap(card));
+        spent.set(card.id, cost);
+        left -= cost;
+      }
+    } else for (;;) {
       let best: { card: Card; cost: number; score: number } | null = null;
       for (const c of cards) {
         const lvl = level.get(c.id)!;
@@ -177,7 +208,7 @@ function allocateKards(state: AppState) {
       kardCopies.set(c.id, copiesAtFusion(rule, to) - copiesAtFusion(rule, c.fusion));
     }
     assignments.sort((a, b) => b.to - a.to || b.kards - a.kards);
-    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash: open.length - cards.length });
+    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash: open.length - cards.length, ...(next && { next }) });
   }
   return { kardCopies, kardPlan };
 }
