@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
 import { kardTable, normalize } from './normalize';
 import { daysFromNow, kasketLine } from './ui';
@@ -481,15 +481,27 @@ describe('phases', () => {
       expect(buildCtx(s).kardPlan.get('epic')).toEqual({ assignments: [{ cardId: 'f8', from: F(8), to: F(10), kards: 27 }], left: 3, cards: 1, cheapest: 12, realmKlash: 2 });
     });
 
-    it('breaks a tie alphabetically', () => {
-      const { plan } = epicPlan([gear('bravo', F(8)), gear('alpha', F(8))], 27);
-      expect(plan?.assignments).toEqual([{ cardId: 'alpha', from: F(8), to: F(10), kards: 27 }]);
-      expect(plan).toMatchObject({ left: 0, next: { cardId: 'bravo', needs: 27 } });
+    it('keeps Realm Klash gear store items when clearing expired packs', () => {
+      const s = setup([gear('rk', F(5)), card('d', F(4))]);
+      const item = (cardId: string, extra: Partial<Pack> = { currencyId: 'blood-rubies', store: true }) => pack(`${cardId} item`, [{ cardId, chance: 100 }], extra);
+      expect(keepWhenExpired(s, item('rk'))).toBe(true);
+      expect(keepWhenExpired(s, item('rk', {}))).toBe(false); // a Souls pack, not a Blood Ruby store item
+      expect(keepWhenExpired(s, item('d'))).toBe(false); // a character
+      expect(keepWhenExpired(s, item('gone'))).toBe(false); // the piece was maxed and deleted
+    });
+
+    // Ids sort the other way from names, so these fail if the tie-break uses ids or save order instead of names.
+    const tied = () => [gear('a', F(8), { name: 'Bravo' }), gear('b', F(8), { name: 'Alpha' })];
+
+    it('breaks a tie alphabetically by name', () => {
+      const { plan } = epicPlan(tied(), 27);
+      expect(plan?.assignments).toEqual([{ cardId: 'b', from: F(8), to: F(10), kards: 27 }]);
+      expect(plan).toMatchObject({ left: 0, next: { cardId: 'a', needs: 27 } });
     });
 
     it('lists tied finished pieces alphabetically, as they are finished', () => {
-      const { plan } = epicPlan([gear('bravo', F(8)), gear('alpha', F(8))], 54);
-      expect(plan?.assignments.map((a) => a.cardId)).toEqual(['alpha', 'bravo']);
+      const { plan } = epicPlan(tied(), 54);
+      expect(plan?.assignments.map((a) => a.cardId)).toEqual(['b', 'a']);
     });
 
     it('breaks a tie on kards needed by finishing the higher-level piece first', () => {

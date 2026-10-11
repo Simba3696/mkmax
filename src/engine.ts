@@ -89,7 +89,7 @@ interface KardPlan {
   left: number;
   /** Cards that could take kards: at the threshold or higher, short of their goal, and not Realm Klash gear. */
   cards: number;
-  /** Cheapest next step among those cards before any kards are spent, so "not enough kards" can name it (characters only; gear names `next`). */
+  /** Cheapest next step among those cards before any kards are spent, so "not enough kards" can name it. Filled for gear too, but the Plan names `next` there instead. */
   cheapest: number | null;
   /** Realm Klash gear at the threshold or higher and short of its goal, left out of `cards`. */
   realmKlash: number;
@@ -126,6 +126,19 @@ export function cardWeight(state: AppState, card: Card) {
 export function isRealmKlashGear(state: AppState, card: Card) {
   if (state.rarities.find((r) => r.id === card.rarityId)?.kind !== 'equipment') return false;
   return card.goal === 'max' || state.packs.some((p) => p.store && p.currencyId === REALM_KLASH_CURRENCY && p.drops.some((d) => d.cardId === card.id));
+}
+
+/**
+ * Whether Clear expired keeps this pack: a Blood Ruby store item for gear you still have. Once a gear rarity's Track
+ * until is Max, the store item is the only thing marking a piece added after that as Realm Klash gear, so deleting it
+ * would let the Kard plan spend kards on the piece. Maxed cards are deleted, so any card still here is short of its goal.
+ */
+export function keepWhenExpired(state: AppState, pack: Pack) {
+  if (!pack.store || pack.currencyId !== REALM_KLASH_CURRENCY) return false;
+  return pack.drops.some((d) => {
+    const card = state.cards.find((c) => c.id === d.cardId);
+    return !!card && state.rarities.find((r) => r.id === card.rarityId)?.kind === 'equipment';
+  });
 }
 
 /** Fusion Up Kards needed to go from stored level `level` to the next one, or null if kards can't do that step. */
