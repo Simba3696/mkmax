@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
-import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, daysToAfford, fuseWithKards, kardStep, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
+import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, daysToAfford, fuseWithKards, kardStep, levelLabel, rankPacks, rankTargets, recordPurchase, targetLevel, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
 import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
@@ -215,6 +215,19 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
               const plan = ctx.kardPlan.get(r.id);
               if (r.fusionUpKards <= 0 || !plan) return null;
               const used = r.fusionUpKards - plan.left;
+              // gstack-shortcut(dec-d5e7646c-6cbc-4987-bd99-3beb59aba333): these gear lines are checked by browser QA only, upgrade when they move into a pure function in ui.tsx with table tests.
+              // Gear: the next piece the leftover kards can't finish yet, and how many more it takes.
+              const next = plan.next && ctx.cards.get(plan.next.cardId);
+              const nextGoal = next && levelLabel(r, targetLevel(next, r));
+              const short = plan.next ? plan.next.needs - plan.left : 0;
+              // Gear a step of which has no kard cost: kards can never finish it, so say so rather than "not enough".
+              const stuck = plan.stuck?.map((id) => ctx.cards.get(id)).filter((c) => c != null) ?? [];
+              const stuckNote =
+                stuck.length === 0
+                  ? null
+                  : stuck.length === 1
+                    ? `${stuck[0].name} can't reach ${levelLabel(r, targetLevel(stuck[0], r))} with kards: a step on the way has no kard cost in Settings → Fusion rules.`
+                    : `${stuck[0].name} and ${stuck.length - 1} more can't reach their goal with kards: a step on the way has no kard cost in Settings → Fusion rules.`;
               return (
                 <div key={r.id}>
                   <h3>
@@ -228,11 +241,17 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                         : `No ${r.label} card at F${r.fusionUpThreshold} or higher yet, so these kards wait.`}
                     </p>
                   ) : plan.assignments.length === 0 ? (
-                    <p className={note}>
-                      Not enough kards for any step yet{plan.cheapest != null ? `: the cheapest next step costs ${plan.cheapest}.` : '.'}
-                    </p>
+                    <>
+                      <p className={note}>
+                        {next && plan.next
+                          ? `Not enough kards to finish a piece yet: ${next.name} needs ${plan.next.needs} to reach ${nextGoal}, ${short} more than you have.`
+                          : (stuckNote ?? `Not enough kards for any step yet${plan.cheapest != null ? `: the cheapest next step costs ${plan.cheapest}.` : '.'}`)}
+                      </p>
+                      {next && stuckNote && <p className={note}>{stuckNote}</p>}
+                    </>
                   ) : (
-                    plan.assignments.map((a) => {
+                    <>
+                    {plan.assignments.map((a) => {
                       const name = ctx.cards.get(a.cardId)?.name;
                       const cost = kardStep(state, a.cardId);
                       return (
@@ -252,12 +271,25 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                           )}
                         </div>
                       );
-                    })
+                    })}
+                    {next && plan.next && (
+                      <p className={note}>
+                        {`Next: ${next.name} needs ${plan.next.needs} kard${plan.next.needs === 1 ? '' : 's'} to reach ${nextGoal}${plan.left > 0 ? `, ${short} more than you have left` : ''}.`}
+                      </p>
+                    )}
+                    {stuckNote && <p className={note}>{stuckNote}</p>}
+                    </>
                   )}
                 </div>
               );
             })}
-            <p className={note}>Kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra. After fusing in the game, tap <b>Use</b> to take the kards off the Wallet and raise the card one level.</p>
+            <p className={note}>
+              {kardRarities.some((r) => r.kind !== 'equipment' && r.fusionUpKards > 0) &&
+                'Character kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra. '}
+              {kardRarities.some((r) => r.kind === 'equipment' && r.fusionUpKards > 0) &&
+                'Gear kards finish one piece at a time, the one needing fewest kards first, since gear only gets its special effect at F10. '}
+              After fusing in the game, tap <b>Use</b> to take the kards off the Wallet and raise the card one level.
+            </p>
           </FoldCard>
         )}
 

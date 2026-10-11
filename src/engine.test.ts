@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
 import { kardTable, normalize } from './normalize';
 import { daysFromNow, kasketLine } from './ui';
-import type { AppState, Card, Pack } from './types';
+import type { AppState, Card, Pack, RarityRule } from './types';
 
 const NOW = new Date('2026-01-10T12:00:00');
 /** Stored level for ascension An on a rarity whose fusion tops out at F10. */
@@ -436,6 +436,118 @@ describe('phases', () => {
     s.cards = [card('near', F(9))];
     s.rarities[0].fusionUpKards = 5;
     expect(buildCtx(s).kardPlan.get('diamond')).toEqual({ assignments: [], left: 5, cards: 1, cheapest: 10, realmKlash: 0 });
+  });
+
+  describe('gear tracked to max', () => {
+    // Gear kards: F3→F4 1, then 3, 5, 7, 9, 12, F9→F10 15. Finishing costs 27 from F8, 36 from F7, 52 from F3.
+    const gear = (id: string, fusion: number, extra: Partial<Card> = {}) => card(id, fusion, { rarityId: 'epic', ...extra });
+    const epicPlan = (cards: Card[], kards: number, tweak?: (epic: RarityRule) => void) => {
+      const s = setup(cards, [], (s) => {
+        const epic = s.rarities.find((r) => r.id === 'epic')!;
+        epic.goal = 'max';
+        epic.fusionUpKards = kards;
+        tweak?.(epic);
+      });
+      const ctx = buildCtx(s);
+      return { ctx, plan: ctx.kardPlan.get('epic') };
+    };
+
+    it('finishes the piece needing fewest kards and keeps the rest for the next one', () => {
+      const { plan } = epicPlan([gear('f8', F(8)), gear('f7', F(7)), gear('f3', F(3))], 60);
+      expect(plan).toEqual({ assignments: [{ cardId: 'f8', from: F(8), to: F(10), kards: 27 }], left: 33, cards: 3, cheapest: 1, realmKlash: 0, next: { cardId: 'f7', needs: 36 } });
+    });
+
+    it('lists finished pieces in the order to fuse them, fewest kards first', () => {
+      const { plan } = epicPlan([gear('f7', F(7)), gear('f9', F(9)), gear('f8', F(8))], 100);
+      expect(plan?.assignments.map((a) => a.cardId)).toEqual(['f9', 'f8', 'f7']);
+      expect(plan?.left).toBe(22);
+    });
+
+    it('orders pieces by the kards they need, not by name or level', () => {
+      // zulu needs 1 kard (F3 → its own cap F4), alpha needs 27 (F8 → F10). Name or level order would pick alpha.
+      const { plan } = epicPlan([gear('alpha', F(8)), gear('zulu', F(3), { maxLevel: F(4) })], 27);
+      expect(plan?.assignments).toEqual([{ cardId: 'zulu', from: F(3), to: F(4), kards: 1 }]);
+      expect(plan).toMatchObject({ left: 26, next: { cardId: 'alpha', needs: 27 } });
+    });
+
+    it('never plans kards on Realm Klash gear, even when it needs the fewest', () => {
+      // rk-mark was set to Max before Epic's Track until was; rk-store is sold for Blood Rubies. Both need 15, f8 needs 27.
+      const item = pack('rk item', [{ cardId: 'rk-store', chance: 100 }], { currencyId: 'blood-rubies', store: true });
+      const s = setup([gear('rk-mark', F(9), { goal: 'max' }), gear('rk-store', F(9)), gear('f8', F(8))], [item], (s) => {
+        const epic = s.rarities.find((r) => r.id === 'epic')!;
+        epic.goal = 'max';
+        epic.fusionUpKards = 30;
+      });
+      expect(buildCtx(s).kardPlan.get('epic')).toEqual({ assignments: [{ cardId: 'f8', from: F(8), to: F(10), kards: 27 }], left: 3, cards: 1, cheapest: 12, realmKlash: 2 });
+    });
+
+    it('keeps Realm Klash gear store items when clearing expired packs', () => {
+      const s = setup([gear('rk', F(5)), card('d', F(4))]);
+      const item = (cardId: string, extra: Partial<Pack> = { currencyId: 'blood-rubies', store: true }) => pack(`${cardId} item`, [{ cardId, chance: 100 }], extra);
+      expect(keepWhenExpired(s, item('rk'))).toBe(true);
+      expect(keepWhenExpired(s, item('rk', {}))).toBe(false); // a Souls pack, not a Blood Ruby store item
+      expect(keepWhenExpired(s, item('d'))).toBe(false); // a character
+      expect(keepWhenExpired(s, item('gone'))).toBe(false); // the piece was maxed and deleted
+    });
+
+    // Ids sort the other way from names, so these fail if the tie-break uses ids or save order instead of names.
+    const tied = () => [gear('a', F(8), { name: 'Bravo' }), gear('b', F(8), { name: 'Alpha' })];
+
+    it('breaks a tie alphabetically by name', () => {
+      const { plan } = epicPlan(tied(), 27);
+      expect(plan?.assignments).toEqual([{ cardId: 'b', from: F(8), to: F(10), kards: 27 }]);
+      expect(plan).toMatchObject({ left: 0, next: { cardId: 'a', needs: 27 } });
+    });
+
+    it('lists tied finished pieces alphabetically, as they are finished', () => {
+      const { plan } = epicPlan(tied(), 54);
+      expect(plan?.assignments.map((a) => a.cardId)).toEqual(['b', 'a']);
+    });
+
+    it('breaks a tie on kards needed by finishing the higher-level piece first', () => {
+      // Both need 9: F3→F6 is 1 + 3 + 5, F7→F8 is 9. Alphabetical order alone would pick 'alpha'.
+      const { plan } = epicPlan([gear('alpha', F(3), { maxLevel: F(6) }), gear('zulu', F(7), { maxLevel: F(8) })], 9);
+      expect(plan?.assignments).toEqual([{ cardId: 'zulu', from: F(7), to: F(8), kards: 9 }]);
+      expect(plan?.next).toEqual({ cardId: 'alpha', needs: 9 });
+    });
+
+    it("lists pieces kards can't finish because a step on the way has no kard cost", () => {
+      const plan = (kards: number) =>
+        epicPlan([gear('f8', F(8)), gear('capped', F(8), { maxLevel: F(9) })], kards, (epic) => {
+          epic.kardsPerLevel = epic.kardsPerLevel.map((k, f) => (f === 9 ? 0 : k)); // no kard cost for F9→F10
+        }).plan;
+      expect(plan(100)).toEqual({ assignments: [{ cardId: 'capped', from: F(8), to: F(9), kards: 12 }], left: 88, cards: 2, cheapest: 12, realmKlash: 0, stuck: ['f8'] });
+      // Value: protects=a plan carries both next and stuck, which the Plan card shows as two lines; fails_when=one of them is dropped when the other is set; why_new=no test had both at once; seam=none; no_claim=the Plan card's wording (checked by browser QA)
+      expect(plan(5)).toEqual({ assignments: [], left: 5, cards: 2, cheapest: 12, realmKlash: 0, next: { cardId: 'capped', needs: 12 }, stuck: ['f8'] });
+    });
+
+    it("spends nothing when the kards can't finish any piece", () => {
+      const { plan } = epicPlan(['e3', 'e1', 'e5', 'e2', 'e4'].map((id) => gear(id, F(3))), 20);
+      expect(plan).toEqual({ assignments: [], left: 20, cards: 5, cheapest: 1, realmKlash: 0, next: { cardId: 'e1', needs: 52 } });
+    });
+
+    it("finishes a piece at its own cap when that's below F10", () => {
+      const { plan } = epicPlan([gear('capped', F(3), { maxLevel: F(5) })], 4);
+      expect(plan).toEqual({ assignments: [{ cardId: 'capped', from: F(3), to: F(5), kards: 4 }], left: 0, cards: 1, cheapest: 1, realmKlash: 0 });
+    });
+
+    it('counts only finished pieces as covered by kards', () => {
+      const { ctx } = epicPlan([gear('f8', F(8)), gear('f7', F(7))], 60);
+      expect(ctx.kardCopies.get('f8')).toBe(2);
+      expect(ctx.kardCopies.has('f7')).toBe(false);
+      expect(copyPhase(ctx, ctx.cards.get('f8')!)).toBe('kardCovered');
+      expect(copyPhase(ctx, ctx.cards.get('f7')!)).toBe('normal');
+    });
+
+    // Value: protects=tapping Use step by step on the top gear row keeps that piece first and the kards left unchanged; fails_when=a part-fused piece is costed from F3 or loses its place; why_new=only browser QA covered Use on gear; seam=none; no_claim=the Use button and Undo in the Plan card (browser QA)
+    it('keeps the same piece first while it is fused one step at a time with Use', () => {
+      const { ctx } = epicPlan([gear('f8', F(8)), gear('f7', F(7))], 60);
+      const s = ctx.state;
+      expect(fuseWithKards(s, 'f8')).toBe(12); // F8 → F9
+      expect(buildCtx(s).kardPlan.get('epic')).toEqual({ assignments: [{ cardId: 'f8', from: F(9), to: F(10), kards: 15 }], left: 33, cards: 2, cheapest: 9, realmKlash: 0, next: { cardId: 'f7', needs: 36 } });
+      expect(fuseWithKards(s, 'f8')).toBe(15); // F9 → F10, finished
+      expect(buildCtx(s).kardPlan.get('epic')).toEqual({ assignments: [], left: 33, cards: 1, cheapest: 9, realmKlash: 0, next: { cardId: 'f7', needs: 36 } });
+    });
   });
 });
 
