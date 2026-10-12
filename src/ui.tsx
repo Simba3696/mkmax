@@ -31,7 +31,8 @@ export function useNow() {
     const t = setInterval(tick, 60000);
     // A phone can hold the app in the background for hours with timers paused; read the time again on return so
     // packs that ended meanwhile don't still count as on sale.
-    const onShow = () => document.visibilityState === 'visible' && tick();
+    // A quick app switch keeps the time it had, so it doesn't run the whole planner again.
+    const onShow = () => document.visibilityState === 'visible' && setNow((prev) => (Date.now() - prev.getTime() >= 30000 ? new Date() : prev));
     document.addEventListener('visibilitychange', onShow);
     return () => {
       clearInterval(t);

@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { newId, useStore } from '../store';
 import { usePlan } from '../planner';
 import { REALM_KLASH_CURRENCY, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
-import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice, useNow } from '../ui';
+import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
 import PackEditor from './PackEditor';
@@ -282,7 +282,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
  */
 function SeasonBar() {
   const { state, update } = useStore();
-  const now = useNow();
+  const { now } = usePlan();
   const events = useEvents();
   const end = seasonEnd(state.realmKlashSeasonEnd, now);
   const scheduled = scheduledSeasonEnd(events, now);
@@ -353,7 +353,7 @@ function SeasonBar() {
  */
 function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
   const { state, update } = useStore();
-  const now = useNow();
+  const { now } = usePlan();
   const events = useEvents();
   const [open, setOpen] = useState(true);
   if (!events) return null;

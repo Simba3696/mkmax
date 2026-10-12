@@ -100,8 +100,8 @@ export default function GearOrder() {
             </div>
           );
         })}
+        <Waiting names={waiting.map((c) => c.name)} />
       </div>
-      <Waiting names={waiting.map((c) => c.name)} />
     </FoldCard>
   );
 }
