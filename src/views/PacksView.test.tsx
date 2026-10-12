@@ -109,9 +109,10 @@ describe('Packs: logging a purchase', () => {
     expect(stamps).toHaveBeenCalledTimes(1);
   });
 
-  // Value: protects=logging a buy of a random pack still opens "What did you pull?"; fails_when=the pull step opens only
-  // for a buy the change didn't record (the flag is read wrong); why_new=review (testing); seam=none; no_claim=store items
-  it('opens "What did you pull?" after logging a random pack', () => {
+  // Value: protects=logging a buy of a random pack still opens "What did you pull?", and taking it back closes it;
+  // fails_when=the pull step opens only for a buy the change didn't record (the flag is read wrong), or a logged −1 no
+  // longer closes it; why_new=review (testing); seam=none; no_claim=store items
+  it('opens "What did you pull?" after logging a random pack, and closes it when the purchase is taken back', () => {
     render(
       <StoreProvider>
         <PlanProvider>
@@ -123,5 +124,9 @@ describe('Packs: logging a purchase', () => {
     fireEvent.click(screen.getByRole('button', { name: 'I bought one' }));
     expect(JSON.parse(localStorage.getItem('mkmax:v1')!).packs.find((p: Pack) => p.id === 'Live Pack').purchased).toBe(1);
     expect(screen.getByText('What did you pull?')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove one purchase' }));
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).packs.find((p: Pack) => p.id === 'Live Pack').purchased).toBe(0);
+    expect(screen.queryByText('What did you pull?')).toBeNull();
   });
 });

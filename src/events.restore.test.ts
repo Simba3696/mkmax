@@ -80,9 +80,9 @@ describe('event schedule on return', () => {
 
   // Regression: review of clock-and-gear-taps — one download that never finished stopped returns refreshing it
   // Found by /review on 2026-10-13
-  // Value: protects=a download stuck for half a minute no longer blocks the next return's; fails_when=the in-flight
-  // guard waits for a download that never settles; why_new=review (Red Team, adversarial); seam=fetch stubbed;
-  // no_claim=the browser's own request timeout
+  // Value: protects=a download stuck for half a minute, or started at a time the clock has since gone back past, no longer
+  // blocks the next return's; fails_when=the in-flight guard waits for a download that never settles, or a negative wait
+  // counts as busy; why_new=review (Red Team, adversarial); seam=fetch stubbed; no_claim=the browser's own request timeout
   it('starts a new download on return once a stuck one has had half a minute', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     at('16:00:00');
@@ -96,6 +96,11 @@ describe('event schedule on return', () => {
     at('16:00:40');
     back();
     expect(fetch).toHaveBeenCalledTimes(2);
+
+    // The device clock goes back while that one hangs: a download "started" in the future doesn't block the return.
+    at('15:00:00');
+    back();
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   // Value: protects=a failed older download doesn't cancel a newer one still running, and only the newest download's
@@ -132,5 +137,49 @@ describe('event schedule on return', () => {
     await a;
     await vi.waitFor(() => expect(result.current?.fetchedAt).not.toBe('newer'));
     expect(result.current?.fetchedAt).toBe('fast');
+  });
+
+  // Regression: /ship review of clock-and-gear-taps — a good download was dropped when a newer one then failed
+  // Found by /ship on 2026-10-13
+  // Value: protects=a download that finishes is shown unless a newer one has already been shown, even if the newer one
+  // then fails; fails_when=only the most recently started download may be shown, so a failing newer one leaves the old
+  // schedule; why_new=review (Red Team); seam=fetch stubbed; no_claim=the schedule's contents
+  it('keeps a download that worked when a newer one then fails', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    at('19:00:00');
+    const older = deferred();
+    const newer = deferred();
+    const fetch = vi.fn().mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+    vi.stubGlobal('fetch', fetch);
+    const { result } = renderHook(() => useEvents());
+    const a = refreshEvents();
+    const b = refreshEvents();
+    older.resolve(schedule('kept'));
+    await a;
+    newer.reject(new Error('offline'));
+    await b;
+    await vi.waitFor(() => expect(result.current?.fetchedAt).toBe('kept'));
+  });
+
+  // Value: protects=hiding the app, or a restore while hidden, never downloads the schedule, and the next return does
+  // once; fails_when=the visible check goes, so a download starts on hide and the in-flight guard then swallows the real
+  // return's refresh; why_new=review (testing); seam=fetch stubbed; no_claim=real browsers' event order
+  it('does not fetch the schedule while the app is hidden', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    at('20:00:00');
+    const fetch = vi.fn(async () => schedule('x'));
+    vi.stubGlobal('fetch', fetch);
+    await refreshEvents();
+    fetch.mockClear();
+    at('22:00:00');
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    back();
+    pageshow(true);
+    expect(fetch).not.toHaveBeenCalled();
+    visibility.mockReturnValue('visible');
+    back();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    visibility.mockRestore();
+    await refreshEvents();
   });
 });

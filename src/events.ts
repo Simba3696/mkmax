@@ -37,19 +37,25 @@ export interface EventSchedule {
 let loaded: Promise<EventSchedule> | null = null;
 let current: EventSchedule | null = null;
 let fetchedAt = 0;
+// Downloads are numbered as they start, so one that finishes late can't replace a newer schedule already shown.
+let started = 0;
+let shown = 0;
 const listeners = new Set<(e: EventSchedule) => void>();
 
 /** The schedule, fetched once and shared; refreshEvents() fetches it again. */
 function loadEvents(): Promise<EventSchedule> {
   if (loaded) return loaded;
+  const n = ++started;
   const load: Promise<EventSchedule> = fetch(`${import.meta.env.BASE_URL}events.json`, { cache: 'no-cache' })
     .then((r) => {
       if (!r.ok) throw new Error(`events.json: HTTP ${r.status}`);
       return r.json() as Promise<EventSchedule>;
     })
     .then((e) => {
-      // A download that a newer one has replaced (a pull to refresh while one was running) doesn't overwrite it.
-      if (loaded !== load) return e;
+      // A download a newer one has already replaced on screen (a pull to refresh while one was running) doesn't
+      // overwrite it. One that finishes first is still shown, in case the newer one fails.
+      if (n < shown) return e;
+      shown = n;
       current = e;
       fetchedAt = Date.now();
       listeners.forEach((l) => l(e));

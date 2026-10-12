@@ -17,10 +17,13 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   history.replaceState(null, '', '#');
 });
 
 const tab = (name: string) => screen.getByRole('button', { name });
+/** Half a second on, so a tap on the Cards tab counts as deliberate rather than the second half of a double tap. */
+const later = () => vi.setSystemTime(Date.now() + 600);
 
 describe('the MK MAX logo', () => {
   // Value: protects=the logo goes to the Plan from another tab and scrolls the Plan to the top; fails_when=home() goes
@@ -59,6 +62,7 @@ describe('the Cards tab', () => {
   // tab disagree, or Tower gear stays picked after leaving; why_new=new behaviour; seam=none; no_claim=the slide
   // animation (jsdom has no layout; scrollTo is a spy)
   it('switches between Cards and Tower gear when tapped again, and opens on Cards', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
     render(
       <StoreProvider>
         <PlanProvider>
@@ -79,6 +83,7 @@ describe('the Cards tab', () => {
     const scrollTo = vi.fn();
     root.scrollTo = scrollTo;
 
+    later();
     fireEvent.click(cardsTab());
     expect(pressed('Tower gear')).toBeTruthy();
     expect(towers()).toBeTruthy();
@@ -88,11 +93,73 @@ describe('the Cards tab', () => {
     expect(pressed('Cards')).toBeTruthy();
     expect(towers()).toBeNull();
 
-    // Left on Tower gear, Cards opens on the card list again, as it always has.
+    // Left on Tower gear, Cards opens on the card list again.
     fireEvent.click(cardsTab());
     fireEvent.click(nav.getByRole('button', { name: 'Packs' }));
+    later();
     fireEvent.click(cardsTab());
     expect(pressed('Cards')).toBeTruthy();
     expect(towers()).toBeNull();
+  });
+
+  // Value: protects=the page's Cards/Tower gear switch and a second tap on the tab change the same setting; fails_when=App
+  // hands CardsView a stale or no-op onSub, or the tab flips its own copy; why_new=the tab test never taps the page switch;
+  // seam=none; no_claim=the switch's look
+  it('switches back from Tower gear picked on the page when the tab is tapped again', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const nav = within(screen.getByRole('navigation', { name: 'Tabs' }));
+    const cardsTab = () => nav.getByRole('button', { name: 'Cards' });
+    const towers = () => screen.queryByText(/Tower gear is farmed, not bought/);
+    const pressed = (name: string) => screen.getByRole('button', { name, pressed: true });
+
+    fireEvent.click(cardsTab());
+    // jsdom has no scrolling; the tab's second tap scrolls to the top.
+    document.querySelector<HTMLElement>('[data-scroll-root]')!.scrollTo = vi.fn();
+    fireEvent.click(screen.getByRole('button', { name: 'Tower gear' }));
+    expect(pressed('Tower gear')).toBeTruthy();
+    expect(towers()).toBeTruthy();
+
+    later();
+    fireEvent.click(cardsTab());
+    expect(pressed('Cards')).toBeTruthy();
+    expect(towers()).toBeNull();
+  });
+
+  // Regression: /ship review of clock-and-gear-taps — a quick double tap on Cards from another tab landed on Tower gear
+  // Found by /ship on 2026-10-13
+  // Value: protects=a second tap within half a second of opening Cards is ignored, and the active tab says what its
+  // next tap does; fails_when=a double tap flips to Tower gear (dropping a half-typed card) or the description goes or
+  // names the wrong page; why_new=review (Red Team, design); seam=none; no_claim=real touch timing
+  it('ignores a tap that comes straight after opening Cards, and says what the next tap does', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const nav = within(screen.getByRole('navigation', { name: 'Tabs' }));
+    const cardsTab = () => nav.getByRole('button', { name: 'Cards' });
+    const towers = () => screen.queryByText(/Tower gear is farmed, not bought/);
+    document.querySelector<HTMLElement>('[data-scroll-root]')!.scrollTo = vi.fn();
+    expect(cardsTab().getAttribute('aria-description')).toBeNull();
+
+    fireEvent.click(cardsTab());
+    fireEvent.click(cardsTab());
+    expect(towers()).toBeNull();
+    expect(cardsTab().getAttribute('aria-description')).toBe('Tap again for Tower gear');
+
+    later();
+    fireEvent.click(cardsTab());
+    expect(towers()).toBeTruthy();
+    expect(cardsTab().getAttribute('aria-description')).toBe('Tap again for Cards');
   });
 });

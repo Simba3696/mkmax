@@ -127,6 +127,24 @@ describe('the shared clock', () => {
     expect(seen.at(-1)!.toISOString()).toBe(new Date('2026-10-12T15:01:00').toISOString());
   });
 
+  // Value: protects=back after half a minute away, the time isn't read again if the minute tick already read it moments
+  // ago; fails_when=the tick sets the time without moving the last-read time on, so the return reads again and the plan
+  // runs twice; why_new=no test lets a tick fire while away; seam=none; no_claim=real phones pausing timers
+  it('keeps the time the minute tick read while away when the app comes back', () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(new Date('2026-10-12T12:00:00'));
+    render(<Clock />);
+    const readings = () => new Set(seen).size;
+    act(() => vi.advanceTimersByTime(10000));
+    show('hidden');
+    // Away 55 seconds; the tick at 12:01:00 still runs and reads the time.
+    act(() => vi.advanceTimersByTime(55000));
+    expect(readings()).toBe(2);
+    show('visible');
+    expect(readings()).toBe(2);
+    expect(seen.at(-1)!.toISOString()).toBe(new Date('2026-10-12T12:01:00').toISOString());
+  });
+
   // Regression: review of clock-and-gear-taps — a restore sending both events read the time on the second one
   // Found by /review on 2026-10-13
   // Value: protects=a restore that sends both a visibility change and pageshow is one return, read at most once;

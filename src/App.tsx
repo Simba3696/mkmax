@@ -120,11 +120,17 @@ export default function App() {
     (soon ? navigator.setAppBadge(soon) : navigator.clearAppBadge()).catch(() => {});
   }, [soon]);
   // Cards and Tower gear share the Cards tab. Tapping the tab while on it switches between them; coming from another
-  // tab always opens the card list, as the tab did before it could switch.
+  // tab always opens the card list, the page people go to Cards for.
   const [cardsPage, setCardsPage] = useState<CardsPage>('cards');
+  // When Cards was last opened from another tab: a second tap within half a second is the end of a double tap, not a
+  // request for Tower gear, and switching then would throw away a half-typed card or pasted list.
+  const cardsOpenedAt = useRef(0);
   const go = (t: TabId) => {
     if (t === tab) return;
-    if (t === 'cards') setCardsPage('cards');
+    if (t === 'cards') {
+      setCardsPage('cards');
+      cardsOpenedAt.current = Date.now();
+    }
     enterDir.current = tabIndex(t) > tabIndex(tab) ? 1 : -1;
     setTab(t);
     history.replaceState(null, '', `#${t}`);
@@ -169,6 +175,7 @@ export default function App() {
           : 'text-muted md:hover:bg-panel md:hover:text-fg'
       }`}
       aria-current={tab === t.id ? 'page' : undefined}
+      aria-description={t.id === 'cards' && tab === 'cards' ? `Tap again for ${cardsPage === 'cards' ? 'Tower gear' : 'Cards'}` : undefined}
       onClick={() => (t.id === 'cards' && tab === 'cards' ? flipCards() : go(t.id))}
     >
       <span className={`flex relative ${tab === t.id ? 'text-red' : ''}`}>
@@ -186,6 +193,9 @@ export default function App() {
     </button>
   );
   const flipCards = () => {
+    // A negative gap means the device clock went back since: not a double tap.
+    const since = Date.now() - cardsOpenedAt.current;
+    if (since >= 0 && since < 500) return;
     setCardsPage((p) => (p === 'cards' ? 'towers' : 'cards'));
     scrollRoot()?.scrollTo({ top: 0 });
   };
