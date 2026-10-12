@@ -35,7 +35,7 @@ export interface PackFocus {
 export default function PacksView({ focus = null, onFocused }: { focus?: PackFocus | null; onFocused?: () => void }) {
   const focusId = focus?.id ?? null;
   const { state, update } = useStore();
-  const now = useNow();
+  const { now, ctx } = usePlan();
   const [editing, setEditing] = useState<Pack | 'new' | null>(null);
   const focusPack = focusId ? state.packs.find((p) => p.id === focusId) : undefined;
   const [showExpired, setShowExpired] = useState(() => !!focusPack && packStatus(focusPack, now) === 'expired');
@@ -58,7 +58,6 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
     setPullingPack(id);
     setPulled('');
   };
-  const { ctx } = usePlan();
   const rules = new Map(state.rarities.map((r) => [r.id, r]));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
   const cardName = (id: string) => state.cards.find((c) => c.id === id)?.name ?? '(deleted card)';
@@ -259,7 +258,8 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
                     cleared = d.packs.length - kept.length;
                     d.packs = kept;
                   },
-                  () => `Cleared ${cleared} expired pack${cleared === 1 ? '' : 's'}`,
+                  // Nothing to undo if a sync had already cleared them.
+                  () => (cleared ? `Cleared ${cleared} expired pack${cleared === 1 ? '' : 's'}` : ''),
                 );
               }}
             />

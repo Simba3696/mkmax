@@ -188,7 +188,7 @@ export default function App() {
       type="button"
       onClick={home}
       aria-label="MK MAX, go to the Plan"
-      className="inline-flex items-center gap-[0.45rem] bg-transparent border-transparent p-0 min-h-0 font-black tracking-[0.08em] text-[1.2rem]"
+      className="inline-flex items-center gap-[0.45rem] bg-transparent border-0 p-0 min-h-0 font-black tracking-[0.08em] text-[1.2rem]"
     >
       <img className="size-[26px]" src={`${import.meta.env.BASE_URL}logo-mark.svg`} alt="" />
       <span className="inline-flex gap-[0.45rem] md:max-lg:sr-only">

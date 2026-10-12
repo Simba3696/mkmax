@@ -540,10 +540,10 @@ export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
 
 /**
  * Realm Klash gear still to max that no Blood Ruby store item on sale now sells: nothing plans it (no kards, no
- * rubies) until the shop has it again, by name.
+ * rubies) until the shop has it again, by name. Takes gearQueue's result, which callers already have.
  */
-export function gearWaiting(ctx: Ctx, now: Date): Card[] {
-  const queued = new Set(gearQueue(ctx, now).map((g) => g.card.id));
+export function gearWaiting(ctx: Ctx, queue: GearStep[]): Card[] {
+  const queued = new Set(queue.map((g) => g.card.id));
   return ctx.state.cards.filter((c) => isRealmKlashGear(ctx.state, c) && !queued.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
 }
 

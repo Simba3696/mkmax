@@ -2,16 +2,15 @@ import { useMemo } from 'react';
 import { useStore } from '../store';
 import { usePlan } from '../planner';
 import { REALM_KLASH_CURRENCY, gearForecast, gearQueue, gearWaiting, levelLabel, targetLevel } from '../engine';
-import { CardThumb, daysFromNow, FoldCard, fmt, FusionLabel, useNow } from '../ui';
+import { CardThumb, daysFromNow, FoldCard, fmt, FusionLabel } from '../ui';
 import { grow, hint, row, rowTitle } from '../classes';
 
 /** The Realm Klash gear still to max, in buying order, with when each piece is done at the daily Blood Ruby income. */
 function useGear() {
   const { state, update } = useStore();
-  const now = useNow();
-  const { ctx } = usePlan();
+  const { now, ctx } = usePlan();
   const gear = useMemo(() => gearQueue(ctx, now), [ctx, now]);
-  const waiting = useMemo(() => gearWaiting(ctx, now), [ctx, now]);
+  const waiting = useMemo(() => gearWaiting(ctx, gear), [ctx, gear]);
   const rubies = state.currencies.find((c) => c.id === REALM_KLASH_CURRENCY);
   const done = useMemo(() => gearForecast(gear, rubies?.balance ?? 0, rubies?.perDay), [gear, rubies?.balance, rubies?.perDay]);
   const onDay = (days: number) => (days === 0 ? 'now' : `around ${daysFromNow(days, now)}`);
@@ -68,9 +67,12 @@ export default function GearOrder() {
     });
   return (
     <FoldCard id="settings-gear" title="Blood Ruby gear order">
-      <p className="text-muted text-small">
-        Blood Rubies max these one at a time, top first, before buying any pack. A piece whose store item is out of purchases is skipped for now.
-      </p>
+      {/* Only pieces not on sale left: there's no order to explain, just the line saying so. */}
+      {gear.length > 0 && (
+        <p className="text-muted text-small">
+          Blood Rubies max these one at a time, top first, before buying any pack. A piece whose store item is out of purchases is skipped for now.
+        </p>
+      )}
       {/* From tablets on, keep the ↑/↓ buttons near the piece they move instead of at the far edge of a wide card. */}
       <div className="md:max-w-[40rem]">
         {gear.map((g, i) => {

@@ -226,9 +226,6 @@ describe('kameos', () => {
       expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(['Moloch’s Ball and Chain', 'devastator']);
     });
 
-    // Value: protects=the documented order for all ten pieces, the default five then the rest by name; fails_when=a name
-    // changes in REALM_KLASH_GEAR or DEFAULT_GEAR_ORDER but not the other; why_new=nothing checked the two lists together;
-    // seam=none; no_claim=new pieces (the list is final)
     // Value: protects=the Plan can name Realm Klash pieces nothing plans; fails_when=a piece with no store item on sale
     // is missing, or a piece on sale, other gear or a character is listed; why_new=the list is new; seam=none;
     // no_claim=the wording (GearOrder)
@@ -238,9 +235,13 @@ describe('kameos', () => {
         [item('Shadow Sash'), item('Bloody Tomahawk', { endsAt: '2026-01-01T00:00' })],
       );
       // Tomahawk's item expired on Jan 1; Devastator has none.
-      expect(gearWaiting(buildCtx(s), NOW).map((c) => c.name)).toEqual(['Bloody Tomahawk', 'Devastator']);
+      const ctx = buildCtx(s);
+      expect(gearWaiting(ctx, gearQueue(ctx, NOW)).map((c) => c.name)).toEqual(['Bloody Tomahawk', 'Devastator']);
     });
 
+    // Value: protects=the documented order for all ten pieces, the default five then the rest by name; fails_when=a name
+    // changes in REALM_KLASH_GEAR or DEFAULT_GEAR_ORDER but not the other; why_new=nothing checked the two lists together;
+    // seam=none; no_claim=new pieces (the list is final)
     it('orders all ten pieces: the default five, then the other five by name', () => {
       const names = ['Bloody Shokan Armor', 'Bloody Tomahawk', 'Bloody Voodoo Doll', 'Datusha, Bane of the Moroi', 'Devastator', "Blaze's Life Force", "Moloch's Ball and Chain", 'Shadow Sash', "Shang Tsung's Stone", "Sindel's Signet Ring"];
       const s = setup(names.map((n) => gear(n, F(2))), names.map((n) => item(n)));
