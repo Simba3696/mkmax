@@ -2,25 +2,13 @@
 
 ## Realm Klash gear
 
-### Keep an off-sale piece's place in the Blood Ruby gear order
+### Let a gear order tap keep its own direction, and skip taps that move nothing
 
-**What:** When ↑/↓ in Settings → Blood Ruby gear order saves the order, keep each piece that isn't on sale at its saved place and only swap the two pieces being moved.
+**What:** Pass the arrow's direction (up or down) into `moveInGearOrder` instead of working it out from where the two pieces sit now, and don't call `update` when the order comes back unchanged.
 
-**Why:** Today the save writes the pieces on sale first and the others after them, so a piece you put first drops below every piece on sale once its store item is back. The new "Not on sale now" line lists such pieces under the order with no way to move them, so the lost place is easy to miss.
+**Why:** A tap made on a screen that's one move behind (a sync landing between render and tap) moves the piece back and undoes the last move. A tap whose pieces have gone (maxed, or removed by a sync) still stamps the save and pushes a sync for nothing, which can make this device's copy look newest.
 
-**Context:** Found by the /ship red team on tidy-todos (2026-10-12); it predates that branch. `move` in `src/views/GearOrder.tsx` builds `ids` from `gear` (`gearQueue`, pieces on sale only) and appends the rest of `gearOrder`. Fix: rank queued and waiting pieces together (by saved index, then `DEFAULT_GEAR_ORDER`) and swap inside that list, with an engine test.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** None
-
-### Test that Rerun keeps a Realm Klash store item a store item
-
-**What:** Add a row to the Rerun test in `src/events.test.ts`: an earlier run with `store: true`, a Blood Ruby currency and a drop, under a name that isn't a Kasket, reruns with `store: true`, the same drop and no `kasket`.
-
-**Why:** The note on kept items promises "Rerun copies its drop and Store item setting". If a change to the Kasket logic in `packFromShop` left `copy` empty for a store item, Rerun would add a plain pack, the piece would leave the gear queue, and every test would still pass.
-
-**Context:** Found by the /ship testing specialist on tidy-todos (2026-10-12). `copy` is `last && !kasket ? last : undefined` in `packFromShop` (`src/events.ts`); `grep store src/events.test.ts` finds nothing.
+**Context:** Found by the /ship review of todo-followups (2026-10-12). `move` in `src/views/GearOrder.tsx` and `moveInGearOrder` in `src/engine.ts` (`from < to` picks the side). Both cases are rare; React flushes ordinary double taps first.
 
 **Effort:** S
 **Priority:** P3
@@ -28,51 +16,37 @@
 
 ## Plan
 
-### Say "every buy" for a store item that always drops its card
+### Work the plan out once when the phone wakes the app
 
-**What:** In Pack ranking, a card a pack always drops reads "100% per buy · every buy" (or similar) instead of "about 1 buys per copy".
+**What:** In `useNow` (`src/ui.tsx`), restart the minute timer on return, or have its tick skip when the reading is under a minute old.
 
-**Why:** "about 1 buys per copy" is wrong English and says nothing a 100% drop doesn't already say.
+**Why:** On a phone that paused timers while asleep, waking the app reads the time on the visibility event and then again when the overdue minute tick fires, so the whole planner runs twice within milliseconds. The plan is right; it only costs time on wake.
 
-**Context:** Found by /qa on tidy-todos (2026-10-12). Repro: add a store item with one drop at 100%, open the Plan, look under Pack ranking. The line comes from `targetLine` in `src/ui.tsx`, which has tests in `src/engine.test.ts` ("pack ranking lines").
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
-### Time the return-to-app clock check from when the app was hidden
-
-**What:** In `useNow` (`src/ui.tsx`), note the time when the page goes hidden and, when it's shown again, read the time again only if it was hidden for 30 seconds or more.
-
-**Why:** The check compares against the last time read, not how long the app was away. A quick switch just before the minute tick still works the whole plan out again, and after timers were paused the time can lag by up to about 90 seconds. The pack editor's season and end-date choices use this shared time too.
-
-**Context:** Found by the /ship adversarial review on tidy-todos (2026-10-12). Extend `src/ui.test.tsx`, which covers hidden, a quick return and a long return.
+**Context:** Found by the /ship review of todo-followups (2026-10-12). Extend `src/ui.test.tsx`; it fakes only `Date`, so this needs fake timers too.
 
 **Effort:** S
 **Priority:** P3
 **Depends on:** None
 
-### Say in the comments and architecture doc that the clock also moves on return
+### Name the one-minute tick in useNow
 
-**What:** Update the comments that say the shared clock moves only once a minute: the header and `now` field in `src/planner.tsx`, the `useNow` comment in `src/ui.tsx`, and the two lines in `docs/architecture.md` ("once per change and once a minute").
+**What:** Add a `TICK_MS = 60000` next to `AWAY_MS` in `src/ui.tsx` and use it for both the `setInterval` and the quick-return check.
 
-**Why:** The clock now also reads the time again when the app comes back after a while in the background, which is why it changed.
+**Why:** The quick-return rule ("read the time if a minute tick was missed") only works while its `60000` matches the interval's. Two bare numbers can drift apart.
 
-**Context:** Found by the /ship maintainability specialist on tidy-todos (2026-10-12).
+**Context:** Found by the /ship maintainability review of todo-followups (2026-10-12).
 
 **Effort:** S
 **Priority:** P4
 **Depends on:** None
 
-## Import
+### Read the time on a back-forward restore that only fires pageshow
 
-### Keep a Kasket when an import marks a pack with no drops a store item too
+**What:** In `useNow`, also read the time on `pageshow` when `event.persisted` is true, under the same rules as a return.
 
-**What:** In `kasketShape` (`src/engine.ts`), let the store item win only when the pack has drops; a pack with no drops keeps its Kasket.
+**Why:** Some WebKit versions restore a page from the back-forward cache with only `pageshow`, no `visibilitychange`, so the time waits for the next minute tick (up to about a minute). Rare in an installed PWA.
 
-**Why:** A hand-edited import with `store: true`, a `kasket` and empty `drops` now becomes a store item that drops nothing, so the planner values it at 0 without a word. The app never saves both itself, so only an edited import reaches this.
-
-**Context:** Found by the /ship adversarial review on tidy-todos (2026-10-12). `kasketShape` runs on every load from `normalize`. Add a row to the import test in `src/engine.test.ts` ("save migration").
+**Context:** Found by the /ship adversarial review of todo-followups (2026-10-12).
 
 **Effort:** S
 **Priority:** P4

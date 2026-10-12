@@ -95,6 +95,14 @@ describe('event schedule', () => {
     // `named ?? last.kasket` order flips, so a Gold Kasket once set to Diamond reruns drawing from Diamond; why_new=the
     // rows above only rerun with the same rarity or an unknown name; seam=none; no_claim=the pack editor's rarity list
     expect(packFromShop(shop, s, 'new', { ...packFromShop(shop, s, 'old'), kasket: 'diamond' })).toMatchObject({ kasket: 'gold' });
+    // Value: protects=Rerun of a Realm Klash store item keeps it a store item with its drop, as the kept-item note says;
+    // fails_when=a change to the Kasket logic leaves the rerun a plain pack, so the piece drops out of the gear queue;
+    // why_new=no test reran a store item; seam=none; no_claim=which runs Clear expired keeps (engine tests)
+    const sashShop = { ...shop, name: 'Shadow Sash', currency: 'Blood Rubies', cost: 800 };
+    const sashItem = { ...packFromShop(sashShop, s, 'old'), store: true, drops: [{ cardId: 'sash', chance: 100 }] };
+    const sashRerun = packFromShop(sashShop, s, 'new', sashItem);
+    expect(sashRerun).toMatchObject({ store: true, currencyId: 'blood-rubies', drops: [{ cardId: 'sash', chance: 100 }] });
+    expect(sashRerun).not.toHaveProperty('kasket');
     // Value: protects=no Kasket of a rarity the save no longer has; fails_when=Add makes a Kasket that says its rarity
     // no longer exists; why_new=the rarity check is new; seam=none; no_claim=the version 15 upgrade (engine tests)
     expect(packFromShop(shop, { ...s, rarities: s.rarities.filter((r) => r.id !== 'gold') }, 'g')).not.toHaveProperty('kasket');

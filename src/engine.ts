@@ -407,10 +407,11 @@ export function kasketPullCards(ctx: Ctx, pack: Pack) {
  * cards). An empty or null `kasket` means it isn't one: the editor uses '' while no rarity is chosen, and an import
  * or synced save can carry null, since JSON has no undefined. Without this the planner would value such a pack by
  * drops the screen hides. A pack marked both a store item and a Kasket (the editor never does this, only a
- * hand-edited import) stays a store item, since a Realm Klash piece's store item is what Blood Rubies buy it through.
+ * hand-edited import) stays a store item when it has a drop, since a Realm Klash piece's store item is what Blood
+ * Rubies buy it through; with no drops it stays a Kasket, which is worth something, rather than a store item of nothing.
  */
 export function kasketShape(pack: Pack): Pack {
-  if (typeof pack.kasket !== 'string' || !pack.kasket || pack.store) {
+  if (typeof pack.kasket !== 'string' || !pack.kasket || (pack.store && pack.drops.length > 0)) {
     if (!('kasket' in pack)) return pack;
     const out = { ...pack };
     delete out.kasket;
@@ -447,8 +448,9 @@ export interface PackRank {
   /**
    * `withinBuys`: a Kasket giving new cards never repeats one, so each card in its pool of N comes within N buys;
    * buysPerCopy (which assumes repeats) would overstate it. Left out when its purchase limit has fewer buys left.
+   * `once`: the card comes from a Kasket of new cards, which gives it only once, so even a sure chance isn't "every buy".
    */
-  targets: { card: Card; value: number; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number }[];
+  targets: { card: Card; value: number; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number; once?: true }[];
 }
 
 export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
@@ -464,7 +466,7 @@ export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
           const card = ctx.cards.get(d.cardId);
           if (!card) return null;
           const e = expectedCopies(pack, d.chance);
-          return { card, value: gainValue(ctx, card, 0, e), pAtLeastOne: chanceAtLeastOne(pack, d.chance), buysPerCopy: e > 0 ? 1 / e : Infinity, ...(withinBuys && { withinBuys }) };
+          return { card, value: gainValue(ctx, card, 0, e), pAtLeastOne: chanceAtLeastOne(pack, d.chance), buysPerCopy: e > 0 ? 1 / e : Infinity, ...(withinBuys && { withinBuys }), ...(pool?.mode === 'new' && { once: true as const }) };
         })
         .filter((t): t is NonNullable<typeof t> => t != null && t.value > 0)
         .sort((a, b) => b.value - a.value);
@@ -517,13 +519,7 @@ export interface GearStep {
  */
 export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
   const items = ctx.state.packs.filter((p) => p.store && p.currencyId === REALM_KLASH_CURRENCY && p.cost > 0 && packStatus(p, now) !== 'expired');
-  const saved = ctx.state.gearOrder ?? [];
-  const rank = (c: Card) => {
-    const i = saved.indexOf(c.id);
-    if (i >= 0) return i;
-    const d = DEFAULT_GEAR_ORDER.indexOf(nameKey(c.name));
-    return d >= 0 ? saved.length + d : Infinity;
-  };
+  const byOrder = gearOrderCompare(ctx.state);
   return ctx.state.cards
     .filter((c) => isRealmKlashGear(ctx.state, c))
     .map((card) => {
@@ -535,16 +531,50 @@ export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
       };
     })
     .filter((g) => g.items.length > 0 && g.need > 0)
-    .sort((a, b) => rank(a.card) - rank(b.card) || a.card.name.localeCompare(b.card.name));
+    .sort((a, b) => byOrder(a.card, b.card));
+}
+
+/**
+ * Sorts Realm Klash pieces into the buying order: each piece's saved place, else its default place after every saved
+ * one, then by name. The gear queue, the "Not on sale now" line and the ↑/↓ move (moveInGearOrder) all use it, so they always agree.
+ */
+function gearOrderCompare(state: AppState) {
+  const saved = state.gearOrder ?? [];
+  const rank = (c: Card) => {
+    const i = saved.indexOf(c.id);
+    if (i >= 0) return i;
+    const d = DEFAULT_GEAR_ORDER.indexOf(nameKey(c.name));
+    return d >= 0 ? saved.length + d : Infinity;
+  };
+  return (a: Card, b: Card) => rank(a) - rank(b) || a.name.localeCompare(b.name);
+}
+
+/**
+ * The gear order to save after moving piece `id` past its on-sale neighbour `past` (Settings' ↑/↓). Every Realm Klash
+ * piece is saved in its place, on sale or not, and only the tapped piece moves: the two aren't swapped, since pieces
+ * waiting for their store item can sit between them, and swapping would push the other one past those too.
+ */
+export function moveInGearOrder(state: AppState, id: string, past: string): string[] {
+  const ids = state.cards
+    .filter((c) => isRealmKlashGear(state, c))
+    .sort(gearOrderCompare(state))
+    .map((c) => c.id);
+  const from = ids.indexOf(id);
+  const to = ids.indexOf(past);
+  if (from < 0 || to < 0 || id === past) return state.gearOrder ?? [];
+  ids.splice(from, 1);
+  const at = ids.indexOf(past);
+  ids.splice(from < to ? at + 1 : at, 0, id);
+  return [...ids, ...(state.gearOrder ?? []).filter((x) => !ids.includes(x))];
 }
 
 /**
  * Realm Klash gear still to max that no Blood Ruby store item on sale now sells: nothing plans it (no kards, no
- * rubies) until the shop has it again, by name. Takes gearQueue's result, which callers already have.
+ * rubies) until the shop has it again, in the buying order it goes back to. Takes gearQueue's result, which callers already have.
  */
 export function gearWaiting(ctx: Ctx, queue: GearStep[]): Card[] {
   const queued = new Set(queue.map((g) => g.card.id));
-  return ctx.state.cards.filter((c) => isRealmKlashGear(ctx.state, c) && !queued.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
+  return ctx.state.cards.filter((c) => isRealmKlashGear(ctx.state, c) && !queued.has(c.id)).sort(gearOrderCompare(ctx.state));
 }
 
 /**

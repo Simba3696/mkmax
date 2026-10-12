@@ -1,12 +1,12 @@
-// The planner's context and plan, worked out once per change (and once a minute, for dates) and shared by every
-// view, so the Packs badge and the Plan tab don't each run the whole planner.
+// The planner's context and plan, worked out once per change (and again as the clock moves on, for dates) and shared
+// by every view, so the Packs badge and the Plan tab don't each run the whole planner.
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { buildCtx, buildPlan, type Ctx, type Plan } from './engine';
 import { useStore } from './store';
 import { useNow } from './ui';
 
 interface Planned {
-  /** The time the plan was worked out for; it moves on once a minute. */
+  /** The time the plan was worked out for; it moves on once a minute, and when the app comes back after a while away. */
   now: Date;
   ctx: Ctx;
   plan: Plan;
