@@ -37,7 +37,7 @@ export function defaultRarities(): RarityRule[] {
     { id: 'gold', label: 'Gold', kind: 'character', color: '#f2c14e', dupesPerLevel: ones(20), fusionMax: 10, goal: 'max', hasGuests: true, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: [...kardCosts(), ...ASCENSION_KARD_COSTS] },
     // Equipment colors match the game: Epic purple, Rare blue, Uncommon green.
     // Only tracked until F3 (4 copies from scratch); Fusion Up Kards finish them. Realm Klash gear is Epic too,
-    // but those cards override the goal to max because they're bought outright.
+    // but it's always tracked to max, by name (REALM_KLASH_GEAR in engine.ts), because it's bought outright.
     { id: 'epic', label: 'Epic Equip', kind: 'equipment', color: '#c38bff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: [...GEAR_KARD_COSTS] },
     { id: 'rare', label: 'Rare Equip', kind: 'equipment', color: '#4da3ff', dupesPerLevel: ones(10), fusionMax: 10, goal: 'threshold', hasGuests: false, fusionUpThreshold: 3, fusionUpKards: 0, kardsPerLevel: [...GEAR_KARD_COSTS] },
     // Uncommon (green) gear is farmed from towers and taken to max; no Fusion Up Kards until checked in-game.
@@ -84,7 +84,7 @@ export function sampleState(): AppState {
     { id: 'c4', name: 'Shaolin Liu Kang', rarityId: 'diamond', fusion: 2, guest: false },
     { id: 'c5', name: 'Kold War Scorpion', rarityId: 'gold', fusion: 14, guest: false },
     { id: 'c6', name: 'Cryomancer Frost', rarityId: 'gold', fusion: 13, maxLevel: 16, guest: false },
-    { id: 'c7', name: 'Blood Ruby Talisman', rarityId: 'epic', fusion: 5, goal: 'max', guest: false },
+    { id: 'c7', name: 'Shadow Sash', rarityId: 'epic', fusion: 5, guest: false },
     { id: 'c8', name: 'Kombat Kunai', rarityId: 'epic', fusion: 2, guest: false, source: 'krypt' },
     { id: 'c9', name: 'Lin Kuei Gloves', rarityId: 'rare', fusion: 3, guest: false },
     { id: 'c10', name: 'Kori Blade', rarityId: 'epic', fusion: 2, guest: false, source: 'tower', sourceNote: 'Lin Kuei Tower' },
@@ -106,7 +106,7 @@ export function sampleState(): AppState {
       drops: [{ cardId: 'c5', chance: 10 }, { cardId: 'c6', chance: 10 }, { cardId: 'c9', chance: 4 }],
     },
     {
-      id: 'p4', name: 'Blood Ruby Talisman', currencyId: 'blood-rubies', cost: 300, rolls: 1, maxPurchases: 2, purchased: 0,
+      id: 'p4', name: 'Shadow Sash', currencyId: 'blood-rubies', cost: 300, rolls: 1, maxPurchases: 2, purchased: 0,
       startsAt: null, endsAt: inDays(2), store: true,
       drops: [{ cardId: 'c7', chance: 100 }],
     },
