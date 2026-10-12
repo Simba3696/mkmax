@@ -35,7 +35,7 @@ export interface Card {
   fusion: number;
   /** Per-card cap below the rarity max, as a stored level (e.g. a gold card that only ascends to A5). */
   maxLevel?: number | null;
-  /** Overrides the rarity's goal, e.g. Realm Klash epics are bought all the way to max while other epics stop at F3. */
+  /** Overrides the rarity's goal, e.g. Krypt gear finished to F10 while other epics stop at F3. Realm Klash gear ignores it (always max). */
   goal?: 'max' | 'threshold';
   /** Guest / limited-event card — only obtainable for a short time. */
   guest: boolean;

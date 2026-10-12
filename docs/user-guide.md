@@ -70,7 +70,7 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
 4. **Optional extras, once:**
    - Each currency's daily income (Settings → Currencies).
    - **Guest** ticks on guest cards.
-   - Realm Klash gear: add each piece as Epic Equip and as a Blood Ruby **Store item**, then set the order in Settings → Blood Ruby gear order. The app knows the 10 Realm Klash pieces by name (Bloody Shokan Armor, Bloody Tomahawk, Bloody Voodoo Doll, Datusha, Bane of the Moroi, Devastator, Blaze's Life Force, Moloch's Ball and Chain, Shadow Sash, Shang Tsung's Stone and Sindel's Signet Ring), so they're always tracked to F10 and the Kard plan never spends kards on them, whatever their Goal or store items.
+   - Realm Klash gear: add each piece as Epic Equip and as a Blood Ruby **Store item**, then set the order in Settings → Blood Ruby gear order. The app knows the 10 Realm Klash pieces by name (Bloody Shokan Armor; Bloody Tomahawk; Bloody Voodoo Doll; Datusha, Bane of the Moroi; Devastator; Blaze's Life Force; Moloch's Ball and Chain; Shadow Sash; Shang Tsung's Stone; Sindel's Signet Ring), so they're always tracked to F10 and the Kard plan never spends kards on them, whatever their Goal or store items.
    - The Realm Klash season end on Packs, only if the event schedule doesn't set it.
 
 ### The Get started card
@@ -275,7 +275,7 @@ Packs are split into three sections:
 - **Coming up**: packs whose start date is still ahead.
 - **Expired (N)**: folded; tap it to see them.
 
-Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
+Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all, except Blood Ruby store items for Realm Klash gear you're still maxing, since next season's **Rerun** copies them. Only each piece's latest item stays, and it clears once the piece is maxed. When only those are left, Clear expired hides. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
 
 - **Sort** shows once you have 2 packs: **Ending soonest** (the default) or **Currency**, which groups each section's packs under a heading per currency, in the order they're listed in Settings. Sort choices are remembered on each device and aren't synced.
 - **Summary line**, for example "400 Souls · 3 cards per buy · bought 2/5" for a random pack, or "300 Blood Rubies · store item · bought 0/2" for a store item. 2/5 means 2 bought of a 5-purchase limit.
@@ -301,7 +301,7 @@ On Packs, tap **I bought one**. This deducts the cost, and a store item also lev
 Tap **+ Add pack** (or **Edit** on a pack).
 
 - **Name:** use the in-game name, so **In the shop** recognises it.
-- **Store item:** tick it for one guaranteed copy per purchase (for example the Realm Klash store). It keeps only the first drop, at 100%, and hides **Cards per purchase**. Unticking it leaves that 100% drop for you to fix. A Blood Ruby store item that sells equipment counts as Realm Klash gear.
+- **Store item:** tick it for one guaranteed copy per purchase (for example the Realm Klash store). It keeps only the first drop, at 100%, and hides **Cards per purchase**. Unticking it leaves that 100% drop for you to fix. A Blood Ruby store item for one of the 10 Realm Klash pieces puts it in the Blood Ruby gear order, bought before anything else.
 - **Kasket:** tick it for a Kasket, then pick its **Kasket rarity** (characters or gear; Kameos aren't offered). The rarity is filled in for the four shop Kaskets' names. A Kasket has no drop chances or **Cards per purchase** (it's always 1): the editor shows its pool instead. Any drop chances you'd typed stay while the editor is open, so unticking brings them back, but saving a Kasket clears them. Ticking it unticks **Store item**, and the other way round. See [Kaskets](#kaskets).
 - **Currency:** from Settings. Choosing Blood Rubies shows the season checkbox.
 - **Cost:** the price of one purchase. It must be more than 0.
@@ -318,7 +318,7 @@ Tap **+ Add pack** (or **Edit** on a pack).
 
 **Even pools:** for odds like "9% for one random Rare tower item", tap **+ Even pool…**, tick the cards you want, and enter the 9% and how many items the whole pool has (every item, the ticked ones included; nothing is added to or taken off that count). Each ticked card gets 9% ÷ that number. If you leave the pool size blank, it divides by the number of cards you ticked, so leave it blank only when the ticked cards are the whole pool. If you enter fewer items than you ticked, it uses the number ticked. Ticks stay when you switch the rarity list, so a pool can mix rarities. A card that's already listed, like one with its own 1.5% line, gets its pool share added to that chance, and the editor shows the before and after first.
 
-**Adding a card from the editor:** under "Card not in your list yet? Add it here:", **Add card** adds a card to Cards straight away, even if you then cancel the pack. It joins the drops at 0%, so type its real chance (in a store item it becomes the item). It only asks for name, rarity and level, so set **Goal**, **Max**, **Guest** and **Source** on the card in Cards afterwards. Add Realm Klash gear on Cards first, with **Goal** set to **Max**: Epic gear at F3 or above added here is removed as soon as it's added.
+**Adding a card from the editor:** under "Card not in your list yet? Add it here:", **Add card** adds a card to Cards straight away, even if you then cancel the pack. It joins the drops at 0%, so type its real chance (in a store item it becomes the item). It only asks for name, rarity and level, so set **Goal**, **Max**, **Guest** and **Source** on the card in Cards afterwards. Realm Klash gear is kept at any level, since it's always tracked to F10. Other Epic gear at F3 or above added here is removed as soon as it's added, unless Epic's **Track until** is Max.
 
 **What stops Save pack:** the editor lists what's missing:
 
@@ -380,7 +380,7 @@ Realm Klash seasons last 2 weeks. Each season the Blood Ruby store swaps its cha
 - Purchases you log come off the balance automatically. Income doesn't, so update your balances after playing.
 - Kard boxes:
   - Diamond and Gold always show.
-  - Epic and Rare show once their **Track until** is Max in Settings → Fusion rules. By default gear stops at F3 and you finish it with kards in the game yourself. A card's own **Goal** of Max doesn't add the box.
+  - Epic and Rare show once their **Track until** is Max in Settings → Fusion rules. By default gear stops at F3 and you finish it with kards in the game yourself. A card's own **Goal** of Max doesn't add the box. Kards left in a box when you switch that rarity's **Track until** back to F3 stay saved but aren't planned or offered.
   - Uncommon shows once you turn its kards on in Settings → Fusion rules. Kameos have no kards.
   - After fusing with kards in the game, tap **Use N kards** on the card (or **Use** in the Fusion Up Kard plan) to take them off here and raise the card. Kards you use some other way, lower the count here yourself.
 
@@ -502,7 +502,7 @@ One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gol
 
 ### Blood Ruby gear order
 
-The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then any others by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now.
+The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then the other five by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now.
 
 ### Priority weights
 

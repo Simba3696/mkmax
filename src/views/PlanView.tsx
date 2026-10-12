@@ -87,7 +87,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
     );
   };
   // Kard counts only matter where cards are taken past the threshold with kards, which is a rarity tracked to max.
-  // A gear card with its own Goal of Max doesn't count: that's Realm Klash gear, maxed with Blood Rubies.
+  // One card's own Goal of Max doesn't add a kard count; only a rarity tracked to max does.
   const kardRarities = state.rarities.filter((r) => r.kind !== 'kameo' && r.fusionUpThreshold != null && r.goal === 'max');
 
   const wallet = (

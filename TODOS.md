@@ -100,4 +100,19 @@
 **Priority:** P3
 **Depends on:** None
 
+### Explain kept Realm Klash store items
+
+**What:** Loose ends of Clear expired keeping each Realm Klash piece's latest Blood Ruby store item (`keepWhenExpired` in `src/engine.ts`, Clear expired in `src/views/PacksView.tsx`):
+- Nothing in the app says why those items stay under Expired, or warns on Delete that next season's Rerun needs them.
+- A piece whose only store item has expired is in no plan at all (no kards, no ruby buys) until the shop has it again. Say so on the Plan or in Blood Ruby gear order.
+- The undo label's count comes from the render, not the draft `update` filters.
+
+**Why:** Deleting a kept item by hand means next season's item comes in without its drop or Store item, so Blood Rubies stop buying the piece without saying why.
+
+**Context:** Left over from the /review of issue #5 on 2026-10-12, which kept only the latest item per piece and based the rule on the name list.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
 ## Completed

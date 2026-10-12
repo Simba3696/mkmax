@@ -37,7 +37,7 @@ export function ascensionCaps(rule: RarityRule) {
 export const thresholdLevel = (rule: RarityRule) => (rule.fusionUpThreshold == null ? null : fLevel(rule.fusionUpThreshold));
 
 /** The card's goal: max for Realm Klash gear (always bought to max), else its own override, else the rarity's. */
-export const cardGoal = (card: Card, rule: RarityRule) => (rule.kind === 'equipment' && onRealmKlashList(card) ? 'max' : (card.goal ?? rule.goal));
+export const cardGoal = (card: Card, rule: RarityRule) => (rule.kind === 'equipment' && isRealmKlashName(card.name) ? 'max' : (card.goal ?? rule.goal));
 
 /** The level this card is being worked toward: rarity max, per-card cap, or the kard threshold. */
 export function targetLevel(card: Card, rule: RarityRule) {
@@ -62,9 +62,14 @@ export const isMaxed = (card: Card, rule: RarityRule) => card.fusion >= targetLe
 /**
  * Cards that reached their goal are done, so they leave the app: the card, its pack drops, and any store
  * item that only sold done cards. Mutates the state and returns the removed cards' names.
+ *
+ * Realm Klash gear also gets a stored goal of max first. The name already makes it max here, but a copy of the app
+ * from before the name list only reads the goal, so without it that copy would delete the gear at F3 and sync the
+ * deletion back. It also keeps a piece from being removed mid-rename, when the half-typed name is off the list.
  */
 export function pruneDone(s: AppState): string[] {
   const rules = new Map(s.rarities.map((r) => [r.id, r]));
+  for (const c of s.cards) if (c.goal !== 'max' && rules.get(c.rarityId)?.kind === 'equipment' && isRealmKlashName(c.name)) c.goal = 'max';
   const done = new Set(s.cards.filter((c) => rules.has(c.rarityId) && isMaxed(c, rules.get(c.rarityId)!)).map((c) => c.id));
   if (done.size === 0) return [];
   const names = s.cards.filter((c) => done.has(c.id)).map((c) => c.name);
@@ -120,13 +125,43 @@ export function cardWeight(state: AppState, card: Card) {
   return (card.guest ? w.guest : 1) * (kind === 'kameo' ? w.kameo : 1) * (card.source === 'challenge' ? w.challenge : 1);
 }
 
+/** Realm Klash gear: a fixed set of Epic pieces sold only for Blood Rubies. No more are being added. */
+const REALM_KLASH_GEAR = ['Bloody Shokan Armor', 'Bloody Tomahawk', 'Bloody Voodoo Doll', 'Datusha, Bane of the Moroi', 'Devastator', "Blaze's Life Force", "Moloch's Ball and Chain", 'Shadow Sash', "Shang Tsung's Stone", "Sindel's Signet Ring"];
+const REALM_KLASH_KEYS = new Set(REALM_KLASH_GEAR.map(nameKey));
+// The planner asks this for every card many times per plan, so remember each name's answer.
+const realmKlashByName = new Map<string, boolean>();
+/** Whether a name is on the Realm Klash list (case, word order and apostrophes don't matter). */
+export function isRealmKlashName(name: string) {
+  let on = realmKlashByName.get(name);
+  if (on === undefined) realmKlashByName.set(name, (on = REALM_KLASH_KEYS.has(nameKey(name))));
+  return on;
+}
+
 /**
  * Realm Klash gear: equipment on the fixed REALM_KLASH_GEAR list, matched by name. It's maxed with Blood Rubies,
  * which come in daily, so Fusion Up Kards (much harder to get) are never spent on it and Kaskets never give it. Only the
- * name counts, not the card's goal or its store items, so deleting or clearing a store item can't change it.
+ * name counts, not the card's goal or its store items. Clear expired keeps a piece's latest store item only so next
+ * season's Rerun can copy it (see keepWhenExpired).
  */
 export function isRealmKlashGear(state: AppState, card: Card) {
-  return state.rarities.find((r) => r.id === card.rarityId)?.kind === 'equipment' && onRealmKlashList(card);
+  return state.rarities.find((r) => r.id === card.rarityId)?.kind === 'equipment' && isRealmKlashName(card.name);
+}
+
+/**
+ * Whether Clear expired keeps this pack: the latest Blood Ruby store item for Realm Klash gear you still have. Next
+ * season's Rerun copies its drops and Store item setting from the latest run, and Blood Rubies only buy gear through
+ * store items, so deleting it would stop the plan buying the piece; older runs aren't needed. Maxed cards are deleted,
+ * so the item clears once its piece is done.
+ */
+export function keepWhenExpired(state: AppState, pack: Pack) {
+  const isItem = (p: Pack) => !!p.store && p.currencyId === REALM_KLASH_CURRENCY;
+  if (!isItem(pack)) return false;
+  return pack.drops.some((d) => {
+    const card = state.cards.find((c) => c.id === d.cardId);
+    if (!card || !isRealmKlashGear(state, card)) return false;
+    const later = (p: Pack) => p.id !== pack.id && isItem(p) && (p.endsAt ?? '') > (pack.endsAt ?? '') && p.drops.some((x) => x.cardId === d.cardId);
+    return !state.packs.some(later);
+  });
 }
 
 /** Fusion Up Kards needed to go from stored level `level` to the next one, or null if kards can't do that step. */
@@ -152,7 +187,8 @@ function allocateKards(state: AppState) {
   const kardPlan = new Map<string, KardPlan>();
   for (const rule of state.rarities) {
     const thr = thresholdLevel(rule);
-    if (thr == null || rule.fusionUpKards <= 0) continue;
+    // Only a rarity tracked to max has a kard box, so kards left saved on one tracked to F3 stay unplanned.
+    if (thr == null || rule.goal !== 'max' || rule.fusionUpKards <= 0) continue;
     const cap = (c: Card) => targetLevel(c, rule);
     const open = state.cards.filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c));
     const cards = open.filter((c) => !isRealmKlashGear(state, c));
@@ -457,15 +493,8 @@ export interface Plan {
   expectedGains: Map<string, number>;
 }
 
-/** Realm Klash gear: a fixed set of Epic pieces sold only for Blood Rubies. No more are being added. */
-const REALM_KLASH_GEAR = ['Bloody Shokan Armor', 'Bloody Tomahawk', 'Bloody Voodoo Doll', 'Datusha, Bane of the Moroi', 'Devastator', "Blaze's Life Force", "Moloch's Ball and Chain", 'Shadow Sash', "Shang Tsung's Stone", "Sindel's Signet Ring"];
-const REALM_KLASH_KEYS = new Set(REALM_KLASH_GEAR.map(nameKey));
-/** Whether a name is on the Realm Klash list (case, word order and apostrophes don't matter). */
-export const isRealmKlashName = (name: string) => REALM_KLASH_KEYS.has(nameKey(name));
-const onRealmKlashList = (card: Pick<Card, 'name'>) => isRealmKlashName(card.name);
-
-/** Blood Ruby gear order, by name, for gear that isn't in the saved order yet. */
-const DEFAULT_GEAR_ORDER = ['Shadow Sash', "Moloch's Ball and Chain", 'Devastator', 'Datusha, Bane of the Moroi', 'Bloody Tomahawk'];
+/** Blood Ruby gear order for gear that isn't in the saved order yet, matched like REALM_KLASH_GEAR. */
+const DEFAULT_GEAR_ORDER = ['Shadow Sash', "Moloch's Ball and Chain", 'Devastator', 'Datusha, Bane of the Moroi', 'Bloody Tomahawk'].map(nameKey);
 
 export interface GearStep {
   card: Card;
@@ -476,8 +505,8 @@ export interface GearStep {
 }
 
 /**
- * Realm Klash gear (equipment sold as a Blood Ruby store item) in buying order: the saved order first, then
- * DEFAULT_GEAR_ORDER, then by name.
+ * Realm Klash gear with an active Blood Ruby store item, in buying order: the saved order first, then DEFAULT_GEAR_ORDER,
+ * then by name. Only listed pieces, so gear that gets kards is never also bought with rubies.
  */
 export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
   const items = ctx.state.packs.filter((p) => p.store && p.currencyId === REALM_KLASH_CURRENCY && p.cost > 0 && packStatus(p, now) !== 'expired');
@@ -485,11 +514,11 @@ export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
   const rank = (c: Card) => {
     const i = saved.indexOf(c.id);
     if (i >= 0) return i;
-    const d = DEFAULT_GEAR_ORDER.indexOf(c.name);
+    const d = DEFAULT_GEAR_ORDER.indexOf(nameKey(c.name));
     return d >= 0 ? saved.length + d : Infinity;
   };
   return ctx.state.cards
-    .filter((c) => ctx.rules.get(c.rarityId)?.kind === 'equipment')
+    .filter((c) => isRealmKlashGear(ctx.state, c))
     .map((card) => {
       const rule = ctx.rules.get(card.rarityId)!;
       return {
@@ -639,13 +668,13 @@ export function stepCard(d: AppState, cardId: string, delta: 1 | -1) {
 
 /**
  * The Fusion Up Kards this card's next step would take from the Wallet now, or null when kards can't do it: below
- * the threshold (F3), already at its goal, Realm Klash gear (bought to max, never kards), a step with no kard cost,
- * or more kards than the Wallet holds.
+ * the threshold (F3), already at its goal, Realm Klash gear (bought to max, never kards), a rarity not tracked to max
+ * (it has no kard box), a step with no kard cost, or more kards than the Wallet holds.
  */
 export function kardStep(state: AppState, cardId: string): number | null {
   const card = state.cards.find((c) => c.id === cardId);
   const rule = card && state.rarities.find((r) => r.id === card.rarityId);
-  if (!card || !rule || card.fusion >= targetLevel(card, rule) || isRealmKlashGear(state, card)) return null;
+  if (!card || !rule || rule.goal !== 'max' || card.fusion >= targetLevel(card, rule) || isRealmKlashGear(state, card)) return null;
   const cost = kardCost(rule, card.fusion);
   return cost != null && cost <= rule.fusionUpKards ? cost : null;
 }
