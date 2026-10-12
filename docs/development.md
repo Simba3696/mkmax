@@ -5,7 +5,7 @@
 ```sh
 npm install
 npm run dev       # http://localhost:5173 (also reachable from your phone on the same Wi-Fi)
-npm test          # Vitest unit tests
+npm test          # Vitest: engine and data tests, plus screen tests
 npm run lint      # oxlint (correctness rules and React hooks rules)
 npm run build     # type-check and production build in dist/ (installable PWA)
 npm run catalog   # refresh public/catalog.json from MK Mobile Base
@@ -16,6 +16,10 @@ npx knip          # unused files, exports and dependencies (a dev tool; not run 
 ## Linting
 
 `npm run lint` runs [oxlint](https://oxc.rs/docs/guide/usage/linter) with `.oxlintrc.json`, and the deploy workflow runs it before the tests. It's oxlint rather than ESLint because typescript-eslint doesn't support TypeScript 7 yet. The config turns on the correctness rules plus `rules-of-hooks` and `exhaustive-deps`. It turns off `react/refs`, because the app uses the "latest ref" pattern (a ref updated during render so effects see the newest callback) on purpose, and `react/set-state-in-effect`.
+
+## Tests
+
+Planning, scoring and saved-data logic is tested in plain `*.test.ts` files next to the code, mostly `src/engine.test.ts`. Screens are tested in `*.test.tsx` files with [Testing Library](https://testing-library.com/docs/react-testing-library/intro/) in jsdom: each starts with `// @vitest-environment jsdom`, so the logic tests keep running in Node. A screen test renders the real `StoreProvider` and `PlanProvider` with a save seeded in `localStorage`, stubs `fetch` so the catalog and event schedule stay offline, and clears `localStorage` afterwards. Testing Library and jsdom are dev dependencies; nothing of them ships. jsdom needs Node 22.22 or newer (24.15 or newer on Node 24), so update Node if the screen tests fail to start. Each test opens with a `// Value:` comment saying what it protects and what would make it fail.
 
 ## Project layout
 
@@ -30,6 +34,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/kaskets.ts` | The shop's Kaskets and their rarities, and the hand-kept list of newest cards Kaskets leave out (replaced each game update) |
 | `src/normalize.ts` | Save-file migrations (`AppState.version`) |
 | `src/store.tsx` | App state, undo, and localStorage persistence |
+| `src/planner.tsx` | `PlanProvider` and `usePlan()`: the planner context and plan, worked out once and shared by every view |
 | `src/storage.ts` | Reading the save at startup, and keeping a copy of one that can't be read |
 | `src/sync.ts` | GitHub Gist sync: the API calls and which copy wins |
 | `src/syncLoop.ts` | When to pull, push or ask, around requests that can overlap edits and disconnects |

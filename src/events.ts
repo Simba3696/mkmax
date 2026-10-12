@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { nameKey } from './catalog';
 import { REALM_KLASH_CURRENCY, packStatus, toLocalInput } from './engine';
-import { kasketFor } from './kaskets';
+import { kasketIn } from './kaskets';
 import type { AppState, Card, Pack } from './types';
 
 export interface ShopPack {
@@ -180,11 +180,14 @@ export function lastRun(shop: ShopPack, state: AppState, now: Date): Pack | unde
  * A new pack filled in from the site: everything but the drop rates. A permanent Blood Ruby pack (like the
  * Kameo summon packs) doesn't leave with the Realm Klash season. A rerun (`last`, see lastRun) keeps the earlier
  * run's name, drops and cards per purchase, which the site doesn't have. A Kasket needs none of those: its pool is
- * worked out from the cards, so it gets its rarity and one card per purchase whatever an earlier run had.
+ * worked out from the cards, so it gets its rarity and one card per purchase, unless the earlier run was unticked.
  */
 export function packFromShop(shop: ShopPack, state: AppState, id: string, last?: Pack): Pack {
   const currencyId = currencyFor(shop.currency, state.currencies) ?? state.currencies[0]?.id ?? '';
-  const kasket = kasketFor(packName(shop));
+  // An earlier run decides: a pack you unticked as a Kasket stays unticked on Rerun, and keeps that run's odds; one you
+  // ticked stays a Kasket, of its own rarity when the shop name doesn't give one (the editor asks if that's gone).
+  const named = kasketIn(packName(shop), state.rarities);
+  const kasket = last ? (last.kasket ? (named ?? last.kasket) : undefined) : named;
   const copy = last && !kasket ? last : undefined;
   return {
     id,

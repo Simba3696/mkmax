@@ -4,7 +4,7 @@ import { ASCENSION_KARD_COST, ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KAR
 import { REALM_KLASH_CURRENCY, kasketShape, pruneDone } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
 import { fixPackNames } from './events';
-import { kasketFor } from './kaskets';
+import { kasketIn } from './kaskets';
 
 /**
  * Version 1 saves counted the first copy as F1; version 2 starts at F0. Shift owned levels up one,
@@ -173,7 +173,7 @@ export function normalize(input: unknown): AppState {
   // gstack-shortcut(dec-609574da): only the four shop names convert, upgrade when a Kasket saved under another name is found still on even-pool odds
   if (version < 15) {
     out.packs = out.packs.map((p) => {
-      const kasket = !p.store && !p.kasket ? kasketFor(p.name) : undefined;
+      const kasket = !p.store && !p.kasket ? kasketIn(p.name, out.rarities) : undefined;
       return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
     });
   }

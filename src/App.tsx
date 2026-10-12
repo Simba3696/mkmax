@@ -5,10 +5,10 @@ import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
-import { buildCtx, buildPlan, endingSoon, moveSeasonEnd, seasonEnd } from './engine';
+import { endingSoon, moveSeasonEnd, seasonEnd } from './engine';
 import { refreshEvents, scheduledSeason, useEvents } from './events';
 import { checkForAppUpdate } from './appUpdate';
-import { useNow } from './ui';
+import { usePlan } from './planner';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
 import PlanView from './views/PlanView';
@@ -87,7 +87,7 @@ export default function App() {
   // MK Mobile Base's schedule knows when the Realm Klash season ends, so it replaces the saved date (and the
   // 2-week guess) whenever it covers today, moving that season's items with it.
   const events = useEvents();
-  const now = useNow();
+  const { now, plan } = usePlan();
   const season = scheduledSeason(events, now);
   const scheduledEnd = season?.end ?? null;
   const savedEnd = seasonEnd(state.realmKlashSeasonEnd, now);
@@ -114,7 +114,7 @@ export default function App() {
   };
   // Packs the plan says to buy that end within a day: a count on the Packs tab and, where the phone supports it,
   // on the home-screen icon.
-  const soon = useMemo(() => endingSoon(buildPlan(buildCtx(state), now), now).length, [state, now]);
+  const soon = useMemo(() => endingSoon(plan, now).length, [plan, now]);
   useEffect(() => {
     if (!('setAppBadge' in navigator)) return;
     (soon ? navigator.setAppBadge(soon) : navigator.clearAppBadge()).catch(() => {});
@@ -181,13 +181,22 @@ export default function App() {
       <span>{t.label}</span>
     </button>
   );
+  // The logo goes back to the Plan, the screen the app opens on; on the Plan it scrolls back to the top.
+  const home = () => (tab === 'plan' ? scrollRoot()?.scrollTo({ top: 0 }) : go('plan'));
+  // The padding gives it a thumb-sized tap area, and the matching negative margin leaves it where it was. On the rail it
+  // gets the tabs' hover tint, and its mark grows a little unless the device asks for reduced motion.
   const logo = (
-    <span className="inline-flex items-center gap-[0.45rem] font-black tracking-[0.08em] text-[1.2rem]">
-      <img className="size-[26px]" src={`${import.meta.env.BASE_URL}logo-mark.svg`} alt="" />
+    <button
+      type="button"
+      onClick={home}
+      aria-label="MK MAX, go to the Plan"
+      className="group inline-flex items-center gap-[0.45rem] bg-transparent border-0 p-2 -m-2 min-h-0 font-black tracking-[0.08em] text-[1.2rem] md:rounded-panel md:transition-colors md:hover:bg-panel"
+    >
+      <img className="size-[26px] md:motion-safe:transition-transform md:motion-safe:group-hover:scale-110" src={`${import.meta.env.BASE_URL}logo-mark.svg`} alt="" />
       <span className="inline-flex gap-[0.45rem] md:max-lg:sr-only">
         MK<b className="text-red">MAX</b>
       </span>
-    </span>
+    </button>
   );
 
   // Phones: header on top, tab bar along the bottom. From 768px wide: a rail on the left with the logo, the main

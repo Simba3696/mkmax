@@ -63,7 +63,7 @@ New to the terms? Skim [Words you'll see](#words-youll-see) first.
    - For each Gold card, set **Max** to **F10 (no ascension)**, **A5 (Stage I)** or **A10 (Stage II)**, as the card shows in the game. New and pasted Gold cards start at A10, so a card that doesn't ascend will otherwise ask for 10 copies too many and is never removed at F10.
    - See [Cards tab](#cards-tab).
 2. **Packs.** Add the packs in the store, with the drop rates from each pack's in-game info screen.
-   - Start from **In the shop** (the foldable card near the top of Packs, under the season box) → **Add**. It fills in the name, currency, cost, purchase limit and dates. You add the odds, fix **Cards per purchase** (it always comes in as 1), fix a cost of 0, and tick **Store item** for single-card store items. Kaskets come in ready, with no odds to add. In the shop doesn't show when the event schedule hasn't loaded or has nothing new to suggest. Otherwise use **+ Add pack**.
+   - Start from **In the shop** (the foldable card near the top of Packs, under the season box) → **Add**. It fills in the name, currency, cost, purchase limit and dates. You add the odds, fix **Cards per purchase** (it always comes in as 1), fix a cost of 0, and tick **Store item** for single-card store items. Kaskets come in ready, with no odds to add, unless you've deleted the rarity they give. In the shop doesn't show when the event schedule hasn't loaded or has nothing new to suggest. Otherwise use **+ Add pack**.
    - A pack with no drop chances is worth nothing to the plan. Kaskets are the exception: the app works out their odds itself.
    - See [Entering a pack](#entering-a-pack-from-its-info-screen).
 3. **Wallet on the Plan.** Enter your currency balances and Fusion Up Kards in the Plan's Wallet card. The plan then shows what to buy. Only Diamond and Gold have kard boxes by default: gear stops at F3 and you finish it with kards in the game yourself. To have the plan finish gear to F10, set Epic or Rare's **Track until** to Max in Settings → Fusion rules. See [Wallet](#wallet).
@@ -121,11 +121,11 @@ Each is explained under [Reading the Plan](#reading-the-plan).
 
 ### Phones
 
-A header across the top shows **MK MAX**, "Pack planner" and, with sync on, the sync pill. A bar along the bottom has **Plan**, **Packs**, **Cards** and **Settings**. The current tab has a red line and a red icon.
+A header across the top shows **MK MAX**, "Pack planner" and, with sync on, the sync pill. A bar along the bottom has **Plan**, **Packs**, **Cards** and **Settings**. The current tab has a red line and a red icon. Tap the **MK MAX** logo to go back to the Plan; on the Plan it scrolls back to the top.
 
 ### Tablets and desktops
 
-On tablets and computers (768px wide and up), the tabs move to a rail on the left: Plan, Packs and Cards at the top, and the sync pill and **Settings** at the bottom. On wider screens the rail is wider and shows the full logo. Pages flow into columns on wide screens.
+On tablets and computers (768px wide and up), the tabs move to a rail on the left: Plan, Packs and Cards at the top, and the sync pill and **Settings** at the bottom. On wider screens the rail is wider and shows the full logo. The logo at the top of the rail goes to the Plan, as on phones. Pages flow into columns on wide screens.
 
 Swiping and pull to refresh need a touch screen. With a mouse, reload the page, or use Settings → **Sync now**.
 
@@ -275,7 +275,7 @@ Packs are split into three sections:
 - **Coming up**: packs whose start date is still ahead.
 - **Expired (N)**: folded; tap it to see them.
 
-Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all, except Blood Ruby store items for Realm Klash gear you're still maxing, since next season's **Rerun** copies them. Only the latest run of each item stays (Rerun finds it by name), and it clears once the piece is maxed. When only those are left, Clear expired hides. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
+Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all, except Blood Ruby store items for Realm Klash gear you're still maxing, since next season's **Rerun** copies them. Only the latest run of each item stays (Rerun finds it by name), and it clears once the piece is maxed. Each kept item says so on its card. If you delete one anyway, next season's item comes in without its drop, so pick the piece and tick **Store item** again. When only kept items are left, Clear expired hides. The Undo label counts the packs it actually removed. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
 
 - **Sort** shows once you have 2 packs: **Ending soonest** (the default) or **Currency**, which groups each section's packs under a heading per currency, in the order they're listed in Settings. Sort choices are remembered on each device and aren't synced.
 - **Summary line**, for example "400 Souls · 3 cards per buy · bought 2/5" for a random pack, or "300 Blood Rubies · store item · bought 0/2" for a store item. 2/5 means 2 bought of a 5-purchase limit.
@@ -338,7 +338,7 @@ The shop's Kaskets (Kollector's Diamond Kasket, Kollector's Gold Kasket, Event E
 - **Once you own them all**, a Kasket gives a card you haven't maxed, Gold cards still ascending included. That's only valued for rarities tracked to max: Epic and Rare gear stop at F3 here, so the app can't see most of what such a Kasket would give, and values it at 0. Set the rarity's **Track until** to Max in Settings and it's valued again.
 - **The line under the name** says which it is: "New card: 1 in 12 of the Diamond characters you don't own" (or "the only Diamond character you don't own"), "You own them all: 1 in 40 of your Diamond characters you haven't maxed", "You own every Epic gear piece it gives, so this isn't valued", or "Nothing left in this Kasket that MK Max tracks". A Kasket whose rarity was removed says so and isn't valued.
 - **The plan** counts a card as unlocked once it expects you to have pulled one. So with 10 cards in the pool, the 11th Kasket it plans gives a card you haven't maxed, as in the game.
-- **Kaskets you entered by hand** under one of the four shop names (that's not a store item) became Kaskets once, when this version of the app first loaded, whatever odds or cards per purchase they had. One saved under another name keeps its odds: tick **Kasket** in its editor.
+- **Kaskets you entered by hand** under one of the four shop names (that's not a store item) became Kaskets once, when this version of the app first loaded, whatever odds or cards per purchase they had, as long as your save still had that rarity. One saved under another name keeps its odds: tick **Kasket** in its editor.
 
 ### Edit, Rerun, Delete
 
@@ -351,7 +351,7 @@ The shop's Kaskets (Kollector's Diamond Kasket, Kollector's Gold Kasket, Event E
 **In the shop** lists packs from MK Mobile Base's event schedule that are on sale or coming up and aren't in the app yet. It hides itself when there's nothing to suggest. Its note says which day's schedule it's from.
 
 - **Add** opens the pack editor with the name, currency, cost, purchase limit and dates filled in, in your local time. You enter the drop rates, except for Kaskets, which need none.
-- **Rerun** shows instead of Add when you still have an earlier run of the pack under Expired. It fills in the same as Add, and also copies that run's name, drop rates, cards per purchase and store item setting. A Kasket keeps only the name. A pack that expired only after the shop's run began (a season you ended early, say) is the same run, so it isn't suggested.
+- **Rerun** shows instead of Add when you still have an earlier run of the pack under Expired. It fills in the same as Add, and also copies that run's name, drop rates, cards per purchase and store item setting. A Kasket keeps only the name, and a Kasket you ticked by hand stays one, of the rarity you picked. A pack you unticked as a Kasket stays unticked and keeps its odds. A pack that expired only after the shop's run began (a season you ended early, say) is the same run, so it isn't suggested.
 - **Cards per purchase always comes in as 1**, so fix it for packs that give several cards.
 - A pack the schedule has no price for comes in at cost 0, which you'll need to fix before saving.
 - **Not needed** hides a pack for good, and the hidden list syncs. The 8-second Undo is the only way to bring it back.
@@ -408,7 +408,7 @@ The note at the bottom repeats the basics: tap a pack to jump to it, Blood Ruby 
 
 ### Gear summary
 
-With a daily Blood Ruby income set, the Blood Rubies part of **What to buy** says when all the Realm Klash gear will be maxed (for example "around Feb 6, 2027", or **now**). Without a daily income it shows how many rubies the gear takes in all and asks you to set one. Settings → Blood Ruby gear order sets the order and shows each piece's own date. Both go away once the gear is maxed. See [How it works](how-it-works.md#scoring).
+With a daily Blood Ruby income set, the Blood Rubies part of **What to buy** says when all the Realm Klash gear will be maxed (for example "around Feb 6, 2027", or **now**). Without a daily income it shows how many rubies the gear takes in all and asks you to set one. Settings → Blood Ruby gear order sets the order and shows each piece's own date. Both go away once the gear is maxed. A Realm Klash piece you're still maxing whose store item isn't on sale gets no kards and no rubies, so Settings → Blood Ruby gear order lists it as "Not on sale now" until you add its store item again from In the shop. What to buy says so too while Blood Rubies have something to buy. See [How it works](how-it-works.md#scoring).
 
 ### When What to buy is empty
 
@@ -449,7 +449,7 @@ Each currency lists its best 3 packs. **Show N more** lists the rest, and **Show
 
 - The percentage is efficiency: value per cost, where 100% is the best pack in that currency.
 - "value per buy" uses your cards as they are now.
-- Up to 3 cards are listed under each pack, as "card: p per buy · about b buys per copy". The chance is of at least one copy per buy, and buys per copy is an average, not a guarantee. A Kasket that still has cards you don't own says "yours within n buys" instead ("yours next buy" for the last one): it never gives the same card twice, so each of its n cards comes within n buys. It only says so when its purchase limit leaves at least n buys.
+- Up to 3 cards are listed under each pack, as "card: p per buy · about b buys per copy". The chance is of at least one copy per buy, and buys per copy is an average, not a guarantee. A Kasket that still has cards you don't own says "yours within n buys" instead, or just "card: yours next buy" for the last one: it never gives the same card twice, so each of its n cards comes within n buys. It only says so when its purchase limit leaves at least n buys.
 - Upcoming packs, sold-out packs and free packs still appear. "Nothing you still need." at 0% often means no drop rates were entered.
 
 **Why it differs from What to buy:** the ranking has no urgency boost, doesn't count repeat buys as worth less, and ignores purchase limits and your balance. So a pack at the top here may not be planned.
@@ -458,7 +458,7 @@ Each currency lists its best 3 packs. **Show N more** lists the rest, and **Show
 
 ## Settings
 
-Settings has, in order: **Sync between devices**, **Fusion rules**, **Currencies**, **Blood Ruby gear order** (only while gear is left to max), **Priority weights**, **Data**, and the version. Most edits here have no Undo.
+Settings has, in order: **Sync between devices**, **Fusion rules**, **Currencies**, **Blood Ruby gear order** (only while Realm Klash gear is left to max), **Priority weights**, **Data**, and the version. Most edits here have no Undo.
 
 ### Sync between devices
 
@@ -502,7 +502,7 @@ One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gol
 
 ### Blood Ruby gear order
 
-The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then the other five by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now.
+The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then the other five by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now. A piece with no store item on sale at all is listed under the order as "Not on sale now".
 
 ### Priority weights
 
@@ -579,7 +579,7 @@ The bottom of Settings shows which version you have and the date of that change,
 - Adds MK Mobile Base art to cards that have none.
 - Takes the Realm Klash season end from the event schedule.
 - Re-reads the event schedule when you come back after an hour or more.
-- Updates countdowns every minute.
+- Updates countdowns and the plan every minute, and again when you come back to the app after half a minute or more, so a pack that ended while it was in the background stops being planned.
 - Removes cards already at their goal when it loads.
 
 The art doesn't count as a change for sync: every device adds the same art by itself, so it never makes two devices ask which copy to keep.
@@ -624,4 +624,4 @@ These notes are about changes to saved data over time. You can skip them.
 - When challenge tagging came in, Kameos already in the app were tagged once.
 - Challenges that no longer run are taken off the challenge list (so far Klassic Ermac, whose Kameo comes from packs now), and a Kameo tagged before its challenge was retired gets untagged once.
 - The older hand-kept per-tower counts were dropped.
-- Kaskets entered by hand under one of the four shop names were turned into Kaskets once, so their odds now follow your cards.
+- Kaskets entered by hand under one of the four shop names were turned into Kaskets once, if the save still had that rarity, so their odds now follow your cards.

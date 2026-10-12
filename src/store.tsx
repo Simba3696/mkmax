@@ -10,11 +10,12 @@ export { normalize };
 export type { SyncStatus };
 
 /**
- * Pass an undo label to offer "Undo <label>" for this change. `auto` marks a change the app makes by itself that
+ * Pass an undo label to offer "Undo <label>" for this change; it can be a function, called after the recipe, when it
+ * depends on what the recipe changed. `auto` marks a change the app makes by itself that
  * every device works out the same way (catalog art, or the season end on a fresh install): it's saved but doesn't count as an edit for sync, so it can't
  * make two devices disagree.
  */
-type Update = (recipe: (draft: AppState) => void, undoLabel?: string, opts?: { auto?: boolean }) => void;
+type Update = (recipe: (draft: AppState) => void, undoLabel?: string | (() => string), opts?: { auto?: boolean }) => void;
 
 /** The most recent undoable change: the state from just before it. */
 export interface UndoEntry {
@@ -138,7 +139,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!opts?.auto) draft.updatedAt = loop.nextStamp();
     stateRef.current = draft;
     setState(draft);
-    const label = [undoLabel, removed.length > 0 && `${removed.join(', ')} ${removed.length > 1 ? 'are' : 'is'} maxed and removed`].filter(Boolean).join(' · ');
+    const label = [typeof undoLabel === 'function' ? undoLabel() : undoLabel, removed.length > 0 && `${removed.join(', ')} ${removed.length > 1 ? 'are' : 'is'} maxed and removed`].filter(Boolean).join(' · ');
     if (label) setLastUndo({ label, prev, at: Date.now() });
     if (!opts?.auto) schedulePush();
   };
