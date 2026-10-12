@@ -323,10 +323,12 @@ export function kardFooter(rarities: RarityRule[]) {
 
 /**
  * One card under a pack in the Pack ranking: its chance per buy, then how soon a copy comes. A Kasket of new cards
- * never repeats one, so it says within how many buys instead of an average.
+ * never repeats one, so it says within how many buys instead of an average; for its last card, where "100% per
+ * buy" would say the same thing twice, just "yours next buy".
  */
 export function targetLine(t: { card: { name: string }; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number }) {
-  const when = t.withinBuys === 1 ? 'yours next buy' : t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${fmt(t.buysPerCopy)} buys per copy`;
+  if (t.withinBuys === 1) return `${t.card.name}: yours next buy`;
+  const when = t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${fmt(t.buysPerCopy)} buys per copy`;
   return `${t.card.name}: ${pct(t.pAtLeastOne)} per buy · ${when}`;
 }
 

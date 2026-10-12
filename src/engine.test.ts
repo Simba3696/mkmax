@@ -947,7 +947,7 @@ describe('pack ranking lines', () => {
     const t = (withinBuys?: number, pAtLeastOne = 0.25, buysPerCopy = 4) => targetLine({ card: { name: 'Raiden' }, pAtLeastOne, buysPerCopy, withinBuys });
     expect(t()).toBe('Raiden: 25% per buy · about 4 buys per copy');
     expect(t(3, 1 / 3, 3)).toBe('Raiden: 33% per buy · yours within 3 buys');
-    expect(t(1, 1, 1)).toBe('Raiden: 100% per buy · yours next buy');
+    expect(t(1, 1, 1)).toBe('Raiden: yours next buy'); // a Kasket's last card, said once
   });
 });
 
