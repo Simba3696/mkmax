@@ -91,6 +91,10 @@ describe('event schedule', () => {
     const newKasket = { ...shop, name: 'Kollector’s Platinum Kasket' };
     const ticked = { ...packFromShop(newKasket, s, 'old'), kasket: 'diamond' };
     expect(packFromShop(newKasket, s, 'new', ticked)).toMatchObject({ kasket: 'diamond', rolls: 1, drops: [] });
+    // Value: protects=on Rerun a known Kasket's shop name sets its rarity over the earlier run's; fails_when=the
+    // `named ?? last.kasket` order flips, so a Gold Kasket once set to Diamond reruns drawing from Diamond; why_new=the
+    // rows above only rerun with the same rarity or an unknown name; seam=none; no_claim=the pack editor's rarity list
+    expect(packFromShop(shop, s, 'new', { ...packFromShop(shop, s, 'old'), kasket: 'diamond' })).toMatchObject({ kasket: 'gold' });
     // Value: protects=no Kasket of a rarity the save no longer has; fails_when=Add makes a Kasket that says its rarity
     // no longer exists; why_new=the rarity check is new; seam=none; no_claim=the version 15 upgrade (engine tests)
     expect(packFromShop(shop, { ...s, rarities: s.rarities.filter((r) => r.id !== 'gold') }, 'g')).not.toHaveProperty('kasket');

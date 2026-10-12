@@ -227,7 +227,7 @@ describe('kameos', () => {
     });
 
     // Value: protects=the Plan can name Realm Klash pieces nothing plans; fails_when=a piece with no store item on sale
-    // is missing, or a piece on sale, other gear or a character is listed; why_new=the list is new; seam=none;
+    // is missing, or a piece on sale (sold out or not started yet included), other gear or a character is listed; why_new=the list is new; seam=none;
     // no_claim=the wording (GearOrder)
     it('lists the Realm Klash pieces with no store item on sale', () => {
       const s = setup(
@@ -237,6 +237,10 @@ describe('kameos', () => {
       // Tomahawk's item expired on Jan 1; Devastator has none.
       const ctx = buildCtx(s);
       expect(gearWaiting(ctx, gearQueue(ctx, NOW)).map((c) => c.name)).toEqual(['Bloody Tomahawk', 'Devastator']);
+      // A sold-out item only skips its piece for now, and one that hasn't started yet is saved for: neither is "not on sale".
+      s.packs = [item('Shadow Sash', { maxPurchases: 1, purchased: 1 }), item('Bloody Tomahawk', { startsAt: '2026-02-01T00:00' })];
+      const later = buildCtx(s);
+      expect(gearWaiting(later, gearQueue(later, NOW)).map((c) => c.name)).toEqual(['Devastator']);
     });
 
     // Value: protects=the documented order for all ten pieces, the default five then the rest by name; fails_when=a name
