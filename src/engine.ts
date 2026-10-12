@@ -449,7 +449,7 @@ export interface PackRank {
    * `withinBuys`: a Kasket giving new cards never repeats one, so each card in its pool of N comes within N buys;
    * buysPerCopy (which assumes repeats) would overstate it. Left out when its purchase limit has fewer buys left.
    */
-  targets: { card: Card; value: number; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number }[];
+  targets: { card: Card; value: number; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number; once?: true }[];
 }
 
 export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
@@ -465,7 +465,8 @@ export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
           const card = ctx.cards.get(d.cardId);
           if (!card) return null;
           const e = expectedCopies(pack, d.chance);
-          return { card, value: gainValue(ctx, card, 0, e), pAtLeastOne: chanceAtLeastOne(pack, d.chance), buysPerCopy: e > 0 ? 1 / e : Infinity, ...(withinBuys && { withinBuys }) };
+          // `once`: a Kasket of new cards never gives a card twice, so even a sure chance doesn't come every buy.
+          return { card, value: gainValue(ctx, card, 0, e), pAtLeastOne: chanceAtLeastOne(pack, d.chance), buysPerCopy: e > 0 ? 1 / e : Infinity, ...(withinBuys && { withinBuys }), ...(pool?.mode === 'new' && { once: true as const }) };
         })
         .filter((t): t is NonNullable<typeof t> => t != null && t.value > 0)
         .sort((a, b) => b.value - a.value);
@@ -518,7 +519,7 @@ export interface GearStep {
  */
 export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
   const items = ctx.state.packs.filter((p) => p.store && p.currencyId === REALM_KLASH_CURRENCY && p.cost > 0 && packStatus(p, now) !== 'expired');
-  const rank = gearRank(ctx.state);
+  const byOrder = gearOrderCompare(ctx.state);
   return ctx.state.cards
     .filter((c) => isRealmKlashGear(ctx.state, c))
     .map((card) => {
@@ -530,44 +531,50 @@ export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
       };
     })
     .filter((g) => g.items.length > 0 && g.need > 0)
-    .sort((a, b) => rank(a.card) - rank(b.card) || a.card.name.localeCompare(b.card.name));
+    .sort((a, b) => byOrder(a.card, b.card));
 }
 
-/** A Realm Klash piece's place in the buying order: its saved place, else its default place after every saved one. */
-function gearRank(state: AppState) {
+/**
+ * Sorts Realm Klash pieces into the buying order: each piece's saved place, else its default place after every saved
+ * one, then by name. The gear queue, the "Not on sale now" line and the ↑/↓ move (moveInGearOrder) all use it, so they always agree.
+ */
+function gearOrderCompare(state: AppState) {
   const saved = state.gearOrder ?? [];
-  return (c: Card) => {
+  const rank = (c: Card) => {
     const i = saved.indexOf(c.id);
     if (i >= 0) return i;
     const d = DEFAULT_GEAR_ORDER.indexOf(nameKey(c.name));
     return d >= 0 ? saved.length + d : Infinity;
   };
+  return (a: Card, b: Card) => rank(a) - rank(b) || a.name.localeCompare(b.name);
 }
 
 /**
- * The gear order to save after swapping two pieces (Settings' ↑/↓). Every Realm Klash piece is saved in its place,
- * on sale or not, so moving the pieces on sale never pushes one that's waiting for its store item down the list.
+ * The gear order to save after moving piece `id` past its on-sale neighbour `past` (Settings' ↑/↓). Every Realm Klash
+ * piece is saved in its place, on sale or not, and only the tapped piece moves: the two aren't swapped, since pieces
+ * waiting for their store item can sit between them, and swapping would push the other one past those too.
  */
-export function swapGearOrder(state: AppState, a: string, b: string): string[] {
-  const rank = gearRank(state);
+export function moveInGearOrder(state: AppState, id: string, past: string): string[] {
   const ids = state.cards
     .filter((c) => isRealmKlashGear(state, c))
-    .sort((x, y) => rank(x) - rank(y) || x.name.localeCompare(y.name))
+    .sort(gearOrderCompare(state))
     .map((c) => c.id);
-  const i = ids.indexOf(a);
-  const j = ids.indexOf(b);
-  if (i < 0 || j < 0) return state.gearOrder ?? [];
-  [ids[i], ids[j]] = [ids[j], ids[i]];
-  return [...ids, ...(state.gearOrder ?? []).filter((id) => !ids.includes(id))];
+  const from = ids.indexOf(id);
+  const to = ids.indexOf(past);
+  if (from < 0 || to < 0) return state.gearOrder ?? [];
+  ids.splice(from, 1);
+  const at = ids.indexOf(past);
+  ids.splice(from < to ? at + 1 : at, 0, id);
+  return [...ids, ...(state.gearOrder ?? []).filter((x) => !ids.includes(x))];
 }
 
 /**
  * Realm Klash gear still to max that no Blood Ruby store item on sale now sells: nothing plans it (no kards, no
- * rubies) until the shop has it again, by name. Takes gearQueue's result, which callers already have.
+ * rubies) until the shop has it again, in the buying order it goes back to. Takes gearQueue's result, which callers already have.
  */
 export function gearWaiting(ctx: Ctx, queue: GearStep[]): Card[] {
   const queued = new Set(queue.map((g) => g.card.id));
-  return ctx.state.cards.filter((c) => isRealmKlashGear(ctx.state, c) && !queued.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
+  return ctx.state.cards.filter((c) => isRealmKlashGear(ctx.state, c) && !queued.has(c.id)).sort(gearOrderCompare(ctx.state));
 }
 
 /**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, swapGearOrder, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, moveInGearOrder, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -143,22 +143,37 @@ describe('kameos', () => {
     });
 
     // Value: protects=moving pieces with ↑/↓ keeps a piece that's off sale in its place; fails_when=the saved order lists
-    // only pieces on sale, so the waiting piece drops below them when it's back; why_new=the swap moved out of GearOrder;
+    // only pieces on sale, so the waiting piece drops below them when it's back; why_new=the move left GearOrder for the engine;
     // seam=none; no_claim=the arrows themselves (GearOrder screen)
-    it('keeps a piece that is off sale in its place when two others swap', () => {
+    it('keeps a piece that is off sale in its place when two others trade places', () => {
       // Moloch's is first in the saved order but has no store item on sale.
       const s = setup(cards(), [item('Bloody Tomahawk'), item('Shadow Sash')], (s) => {
         s.gearOrder = ["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk'];
       });
       expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(['Shadow Sash', 'Bloody Tomahawk']);
-      s.gearOrder = swapGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk');
+      s.gearOrder = moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk');
       expect(s.gearOrder).toEqual(["Moloch's Ball and Chain", 'Bloody Tomahawk', 'Shadow Sash']);
       // Back in the shop, it's first again.
       s.packs.push(item("Moloch's Ball and Chain"));
       expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(["Moloch's Ball and Chain", 'Bloody Tomahawk', 'Shadow Sash']);
-      // A piece without a saved place still sorts by the default order, and swapping an unknown id changes nothing.
-      expect(swapGearOrder({ ...s, gearOrder: undefined }, 'Shadow Sash', "Moloch's Ball and Chain")).toEqual(["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk']);
-      expect(swapGearOrder(s, 'Shadow Sash', 'nope')).toBe(s.gearOrder);
+      // A piece without a saved place still sorts by the default order, and moving an unknown id changes nothing.
+      expect(moveInGearOrder({ ...s, gearOrder: undefined }, 'Shadow Sash', "Moloch's Ball and Chain")).toEqual(["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk']);
+      expect(moveInGearOrder(s, 'Shadow Sash', 'nope')).toBe(s.gearOrder);
+    });
+
+    // Regression: review of todo-followups — the arrows swapped two places, so the other piece jumped over waiting ones
+    // Found by /review on 2026-10-12
+    // Value: protects=only the tapped piece moves, past its neighbour; fails_when=the two pieces swap places, so the one
+    // not tapped drops below waiting pieces it was ahead of; why_new=review; seam=none; no_claim=the arrows (GearOrder test)
+    it('moves only the tapped piece past its neighbour, over any waiting pieces between them', () => {
+      // Shadow Sash and the Tomahawk are on sale; Moloch's and Devastator wait between them.
+      const s = setup([...cards(), gear('Devastator', F(8))], [item('Shadow Sash'), item('Bloody Tomahawk')], (s) => {
+        s.gearOrder = ['Shadow Sash', "Moloch's Ball and Chain", 'Devastator', 'Bloody Tomahawk'];
+      });
+      // ↑ on the Tomahawk: it goes just above Shadow Sash, which stays ahead of the waiting pieces.
+      expect(moveInGearOrder(s, 'Bloody Tomahawk', 'Shadow Sash')).toEqual(['Bloody Tomahawk', 'Shadow Sash', "Moloch's Ball and Chain", 'Devastator']);
+      // ↓ on Shadow Sash: it goes just below the Tomahawk, which stays behind the waiting pieces.
+      expect(moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk')).toEqual(["Moloch's Ball and Chain", 'Devastator', 'Bloody Tomahawk', 'Shadow Sash']);
     });
 
     // Value: protects=listed gear gets Blood Rubies and no kards, even with Epic tracked to Max; fails_when=the Kard plan
@@ -253,9 +268,10 @@ describe('kameos', () => {
         [gear('Shadow Sash', F(2)), gear('Devastator', F(2)), gear('Bloody Tomahawk', F(2)), gear('Kori Blade', F(2)), card('Devastator x', F(2), { name: 'Devastator' })],
         [item('Shadow Sash'), item('Bloody Tomahawk', { endsAt: '2026-01-01T00:00' })],
       );
-      // Tomahawk's item expired on Jan 1; Devastator has none.
+      // Tomahawk's item expired on Jan 1; Devastator has none. Listed in the buying order they go back to: Devastator
+      // comes before the Tomahawk by default.
       const ctx = buildCtx(s);
-      expect(gearWaiting(ctx, gearQueue(ctx, NOW)).map((c) => c.name)).toEqual(['Bloody Tomahawk', 'Devastator']);
+      expect(gearWaiting(ctx, gearQueue(ctx, NOW)).map((c) => c.name)).toEqual(['Devastator', 'Bloody Tomahawk']);
       // A sold-out item only skips its piece for now, and one that hasn't started yet is saved for: neither is "not on sale".
       s.packs = [item('Shadow Sash', { maxPurchases: 1, purchased: 1 }), item('Bloody Tomahawk', { startsAt: '2026-02-01T00:00' })];
       const later = buildCtx(s);
@@ -961,6 +977,16 @@ describe('kaskets', () => {
     expect(within([{ ...s.packs[0], maxPurchases: 5, purchased: 3 }])).toBeUndefined(); // two buys can't promise three cards
     expect(within([{ ...s.packs[0], maxPurchases: 5, purchased: 5 }])).toBeUndefined(); // no buys left
     expect(within([s.packs[0]], [card('a', 0)])).toBe(1); // the last card you don't own
+    // Regression: review of todo-followups — "every buy" followed "is a Kasket", not how the Kasket gives cards
+    // Found by /review on 2026-10-12
+    // Value: protects=a new-cards Kasket's cards are marked as coming once, an unmaxed Kasket's are not; fails_when=the
+    // mark follows the Kasket flag, so a one-card unmaxed Kasket can't say "every buy"; why_new=review; seam=none;
+    // no_claim=the rest of the wording (pack ranking lines)
+    const sold = rankPacks(buildCtx({ ...s, cards: [card('a', 0)], packs: [{ ...s.packs[0], maxPurchases: 5, purchased: 5 }] }), NOW);
+    expect(sold[0].targets[0].once).toBe(true); // the last new card, out of buys
+    const gold = ranks.find((r) => r.pack.id === 'kg')!.targets[0];
+    expect(gold.once).toBeUndefined();
+    expect(targetLine(gold)).toBe('g: every buy'); // the one Gold card left short of max, on every buy
   });
 
   it("doesn't value a Kasket of a Kameo rarity", () => {
@@ -995,10 +1021,21 @@ describe('pack ranking lines', () => {
   // Value: protects=a card every buy gives reads "every buy", and an average of one reads "buy"; fails_when=a store item
   // says "100% per buy · about 1 buys per copy" again; why_new=found by /qa; seam=none; no_claim=which cards rank
   it('says "every buy" for a card a buy always gives, and "1 buy" in the singular', () => {
-    const t = (pAtLeastOne: number, buysPerCopy: number) => targetLine({ card: { name: 'Shadow Sash' }, pAtLeastOne, buysPerCopy });
+    const t = (pAtLeastOne: number, buysPerCopy: number, once = false) => targetLine({ card: { name: 'Shadow Sash' }, pAtLeastOne, buysPerCopy, ...(once && { once: true as const }) });
     expect(t(1, 1)).toBe('Shadow Sash: every buy');
     expect(t(0.99, 1.002)).toBe('Shadow Sash: 99% per buy · about 1 buy per copy');
     expect(t(0.5, 1.5)).toBe('Shadow Sash: 50% per buy · about 1.5 buys per copy');
+    // Regression: review of todo-followups — "every buy" only for one sure copy per buy from a pack that isn't a Kasket
+    // Found by /review on 2026-10-12
+    // Value: protects=the ranking only promises what the pack gives; fails_when=a near-certain chance shows "100%", a
+    // pack giving several copies hides them, or a sold-out Kasket says "every buy"; why_new=review; seam=none;
+    // no_claim=which targets rankPacks marks once (kaskets test)
+    expect(t(0.996, 1.004)).toBe('Shadow Sash: 99% per buy · about 1 buy per copy'); // under 100% never reads 100%
+    expect(t(1, 1 / 3)).toBe('Shadow Sash: 100% per buy · about 0.33 buys per copy'); // three copies a buy
+    expect(t(1, 1, true)).toBe('Shadow Sash: 100% per buy · about 1 buy per copy'); // a new-cards Kasket's last card, out of buys
+    // Regression: review of todo-followups — a tiny but real chance read 0%
+    // Found by /review on 2026-10-12
+    expect(t(0.0004, 2500)).toBe('Shadow Sash: <0.1% per buy · about 2,500 buys per copy');
   });
 });
 

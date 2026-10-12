@@ -12,7 +12,13 @@ export function fmt(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: a < 10 ? 2 : 0 });
 }
 
-const pct = (p: number) => `${+(p * 100).toFixed(p < 0.1 ? 1 : 0)}%`;
+// Only a sure drop reads 100% and only an impossible one 0%: a chance just under certain shows as 99%, and a tiny
+// but real one as <0.1%.
+const pct = (p: number) => {
+  const v = +(p * 100).toFixed(p < 0.1 ? 1 : 0);
+  if (p > 0 && v === 0) return '<0.1%';
+  return `${p < 1 && v >= 100 ? 99 : v}%`;
+};
 
 export function timeUntil(iso: string, now: Date) {
   const ms = new Date(iso).getTime() - now.getTime();
@@ -22,6 +28,9 @@ export function timeUntil(iso: string, now: Date) {
   const m = Math.floor((abs % 3600000) / 60000);
   return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
+
+/** Back after this long in the background, the app reads the time again: half a minute. */
+const AWAY_MS = 30000;
 
 /**
  * The time, read again every minute so countdowns stay fresh, and when the app comes back after half a minute or more
@@ -34,12 +43,16 @@ export function useNow() {
     // A phone can hold the app in the background for hours with timers paused; read the time again on return so
     // packs that ended meanwhile don't still count as on sale. How long the app was away decides, so a quick app
     // switch keeps the time it had and doesn't run the whole planner again; the minute timer covers the rest.
-    let hiddenAt: number | null = null;
+    // Started in the background (a tab opened behind another): time the absence from load.
+    let hiddenAt: number | null = document.visibilityState === 'hidden' ? Date.now() : null;
     const onChange = () => {
       if (document.visibilityState === 'hidden') {
         hiddenAt = Date.now();
-      } else if (hiddenAt !== null) {
-        if (Date.now() - hiddenAt >= 30000) setNow(new Date());
+      } else {
+        // If the minute timer already caught up on return, keep its reading rather than work the plan out twice. With no
+        // hidden event seen (some browsers skip it on a back-forward restore), the reading's own age decides instead.
+        const away = hiddenAt === null || Date.now() - hiddenAt >= AWAY_MS;
+        if (away) setNow((prev) => (Date.now() - prev.getTime() >= AWAY_MS ? new Date() : prev));
         hiddenAt = null;
       }
     };
@@ -345,12 +358,14 @@ export function kardFooter(rarities: RarityRule[]) {
  * never repeats one, so it says within how many buys instead of an average; for its last card, where "100% per
  * buy" would say the same thing twice, just "yours next buy".
  */
-export function targetLine(t: { card: { name: string }; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number }) {
+export function targetLine(t: { card: { name: string }; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number; once?: true }) {
   if (t.withinBuys === 1) return `${t.card.name}: yours next buy`;
-  // A store item, or any pack that always drops the card: "100% per buy · about 1 buys per copy" says it twice.
-  if (t.pAtLeastOne >= 1) return `${t.card.name}: every buy`;
-  const buys = fmt(t.buysPerCopy);
-  const when = t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${buys} buy${buys === '1' ? '' : 's'} per copy`;
+  // Singular when the average shows as 1 (fmt keeps 2 decimals); decided on the number, since fmt follows the locale's digits.
+  const one = Math.round(t.buysPerCopy * 100) === 100;
+  // One sure copy every buy, like a store item: "100% per buy · about 1 buy per copy" says it twice. Not a card a
+  // Kasket of new cards gives once (`once`), and not a pack giving several copies a buy, whose average says how many.
+  if (t.pAtLeastOne >= 1 && one && !t.once) return `${t.card.name}: every buy`;
+  const when = t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${fmt(t.buysPerCopy)} buy${one ? '' : 's'} per copy`;
   return `${t.card.name}: ${pct(t.pAtLeastOne)} per buy · ${when}`;
 }
 

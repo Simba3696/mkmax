@@ -449,7 +449,7 @@ Each currency lists its best 3 packs. **Show N more** lists the rest, and **Show
 
 - The percentage is efficiency: value per cost, where 100% is the best pack in that currency.
 - "value per buy" uses your cards as they are now.
-- Up to 3 cards are listed under each pack, as "card: p per buy · about b buys per copy". The chance is of at least one copy per buy, and buys per copy is an average, not a guarantee. A card every buy gives, like a store item's, just says "card: every buy". A Kasket that still has cards you don't own says "yours within n buys" instead, or just "card: yours next buy" for the last one: it never gives the same card twice, so each of its n cards comes within n buys. It only says so when its purchase limit leaves at least n buys.
+- Up to 3 cards are listed under each pack, as "card: p per buy · about b buys per copy". The chance is of at least one copy per buy, and buys per copy is an average, not a guarantee. A card the pack gives on every buy, like a store item, just says "card: every buy". A Kasket that still has cards you don't own says "yours within n buys" instead, or just "card: yours next buy" for the last one: it never gives the same card twice, so each of its n cards comes within n buys. It only says so when its purchase limit leaves at least n buys.
 - Upcoming packs, sold-out packs and free packs still appear. "Nothing you still need." at 0% often means no drop rates were entered.
 
 **Why it differs from What to buy:** the ranking has no urgency boost, doesn't count repeat buys as worth less, and ignores purchase limits and your balance. So a pack at the top here may not be planned.
@@ -502,7 +502,7 @@ One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gol
 
 ### Blood Ruby gear order
 
-The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then the other five by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now. A piece with no store item on sale at all is listed under the order as "Not on sale now".
+The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then the other five by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now. A piece with no store item on sale at all is listed under the order as "Not on sale now". It keeps its place in the order, and goes back to it when you add its store item again; the line lists such pieces in that order.
 
 ### Priority weights
 

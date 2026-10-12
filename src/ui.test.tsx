@@ -52,4 +52,18 @@ describe('the shared clock', () => {
     show('visible');
     expect(read()).toBe(new Date('2026-10-12T15:00:00').toISOString());
   });
+
+  // Regression: review of todo-followups — the first return after starting in the background kept the old time
+  // Found by /review on 2026-10-12
+  // Value: protects=an app that starts hidden still reads the time on its first long-awaited return; fails_when=the
+  // absence is only timed from a "hidden" event; why_new=review; seam=none; no_claim=the once-a-minute interval
+  it('reads the time again on the first return after starting in the background', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-12T12:00:00'));
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    render(<Clock />);
+    vi.setSystemTime(new Date('2026-10-12T15:00:00'));
+    show('visible');
+    expect(seen.at(-1)!.toISOString()).toBe(new Date('2026-10-12T15:00:00').toISOString());
+  });
 });
