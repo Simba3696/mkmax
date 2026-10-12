@@ -121,11 +121,11 @@ Each is explained under [Reading the Plan](#reading-the-plan).
 
 ### Phones
 
-A header across the top shows **MK MAX**, "Pack planner" and, with sync on, the sync pill. A bar along the bottom has **Plan**, **Packs**, **Cards** and **Settings**. The current tab has a red line and a red icon.
+A header across the top shows **MK MAX**, "Pack planner" and, with sync on, the sync pill. A bar along the bottom has **Plan**, **Packs**, **Cards** and **Settings**. The current tab has a red line and a red icon. Tap the **MK MAX** logo to go back to the Plan; on the Plan it scrolls back to the top.
 
 ### Tablets and desktops
 
-On tablets and computers (768px wide and up), the tabs move to a rail on the left: Plan, Packs and Cards at the top, and the sync pill and **Settings** at the bottom. On wider screens the rail is wider and shows the full logo. Pages flow into columns on wide screens.
+On tablets and computers (768px wide and up), the tabs move to a rail on the left: Plan, Packs and Cards at the top, and the sync pill and **Settings** at the bottom. On wider screens the rail is wider and shows the full logo. The logo at the top of the rail goes to the Plan, as on phones. Pages flow into columns on wide screens.
 
 Swiping and pull to refresh need a touch screen. With a mouse, reload the page, or use Settings → **Sync now**.
 

@@ -181,13 +181,20 @@ export default function App() {
       <span>{t.label}</span>
     </button>
   );
+  // The logo goes back to the Plan, the screen the app opens on; on the Plan it scrolls back to the top.
+  const home = () => (tab === 'plan' ? scrollRoot()?.scrollTo({ top: 0 }) : go('plan'));
   const logo = (
-    <span className="inline-flex items-center gap-[0.45rem] font-black tracking-[0.08em] text-[1.2rem]">
+    <button
+      type="button"
+      onClick={home}
+      aria-label="MK MAX, go to the Plan"
+      className="inline-flex items-center gap-[0.45rem] bg-transparent border-transparent p-0 min-h-0 font-black tracking-[0.08em] text-[1.2rem]"
+    >
       <img className="size-[26px]" src={`${import.meta.env.BASE_URL}logo-mark.svg`} alt="" />
       <span className="inline-flex gap-[0.45rem] md:max-lg:sr-only">
         MK<b className="text-red">MAX</b>
       </span>
-    </span>
+    </button>
   );
 
   // Phones: header on top, tab bar along the bottom. From 768px wide: a rail on the left with the logo, the main
