@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { defaultState } from '../defaults';
 import { StoreProvider } from '../store';
 import { PlanProvider } from '../planner';
+import { SyncLoop } from '../syncLoop';
 import GearOrder, { GearSummary } from './GearOrder';
 import type { Card, Pack } from '../types';
 
@@ -51,6 +52,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('Realm Klash gear with no store item on sale', () => {
@@ -111,5 +113,24 @@ describe('Realm Klash gear with no store item on sale', () => {
     fireEvent.click(screen.getAllByLabelText('Move up')[1]);
     expect(order()).toMatch(/1\. Moloch.*2\. Devastator/);
     expect(JSON.parse(localStorage.getItem('mkmax:v1')!).gearOrder).toEqual(['sash', 'mol', 'dev']);
+  });
+
+  // Regression: /ship review of todo-followups — a tap on a screen one move behind moved the piece back
+  // Found by /ship on 2026-10-12
+  // Value: protects=the arrow passes its direction and saves nothing when the move is already done; fails_when=the button
+  // drops the direction, saves `order ?? []` (wiping the order) or saves null; why_new=review (only the engine and store
+  // halves were tested); seam=SyncLoop.nextStamp spied to count saves; no_claim=a sync landing between render and tap
+  it('saves nothing for a second tap made on the screen from before the first', () => {
+    renderWith([gear('sash', 'Shadow Sash'), gear('mol', "Moloch's Ball and Chain"), gear('dev', 'Devastator')], [item('mol'), item('dev')]);
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    const down = screen.getAllByLabelText('Move down')[0];
+    // Both taps land before React draws again, so the second still sees Moloch's first.
+    act(() => {
+      down.click();
+      down.click();
+    });
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).gearOrder).toEqual(['sash', 'dev', 'mol']);
+    expect(screen.getByTestId('settings').textContent).toMatch(/1\. Devastator.*2\. Moloch/);
+    expect(stamps).toHaveBeenCalledTimes(1);
   });
 });

@@ -29,40 +29,59 @@ export function timeUntil(iso: string, now: Date) {
   return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+/** How often the app reads the time while it's open, so countdowns stay fresh: once a minute. */
+const TICK_MS = 60000;
 /** Back after this long in the background, the app reads the time again: half a minute. */
 const AWAY_MS = 30000;
 
 /**
  * The time, read again every minute so countdowns stay fresh, and when the app comes back after half a minute or more
- * in the background. PlanProvider holds the one clock the views share, as `usePlan().now`.
+ * in the background or is restored from the back-forward cache. A reading on return starts the minute over.
+ * PlanProvider holds the one clock the views share, as `usePlan().now`.
  */
 export function useNow() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 60000);
+    let readAt = Date.now();
+    const read = () => {
+      readAt = Date.now();
+      setNow(new Date(readAt));
+    };
+    let t = setInterval(read, TICK_MS);
     // A phone can hold the app in the background for hours with timers paused; read the time again on return so
     // packs that ended meanwhile don't still count as on sale. How long the app was away decides, so a quick app
     // switch keeps the time it had and doesn't run the whole planner again; the minute timer covers the rest.
     // Started in the background (a tab opened behind another): time the absence from load.
     let hiddenAt: number | null = document.visibilityState === 'hidden' ? Date.now() : null;
-    const onChange = () => {
-      if (document.visibilityState === 'hidden') {
-        hiddenAt = Date.now();
-      } else {
-        // Back after a while: read the time unless the minute timer already caught up, so the plan isn't worked out
-        // twice. With no hidden event seen (some browsers skip it on a back-forward restore), the reading's own age
-        // decides. Back from a quick switch: read it only if a minute tick was missed, since a phone can pause timers
-        // while it sleeps and short screen locks would otherwise leave the time behind.
-        const away = hiddenAt === null || Date.now() - hiddenAt >= AWAY_MS;
-        const stale = away ? AWAY_MS : 60000;
-        setNow((prev) => (Date.now() - prev.getTime() >= stale ? new Date() : prev));
-        hiddenAt = null;
-      }
+    const onReturn = () => {
+      // Back after a while: read the time unless the minute timer already caught up, so the plan isn't worked out
+      // twice. Back from a quick switch, or with no hidden event seen (some browsers skip it on a back-forward restore,
+      // and one that sends two events has cleared it): read it only if a minute tick was missed, since a phone can
+      // pause timers while it sleeps and short screen locks would otherwise leave the time behind.
+      const away = hiddenAt !== null && Date.now() - hiddenAt >= AWAY_MS;
+      hiddenAt = null;
+      const age = Date.now() - readAt;
+      // A reading from later than now means the device clock went back: read it again.
+      if (age >= 0 && age < (away ? AWAY_MS : TICK_MS)) return;
+      read();
+      // Start the minute over, or the tick the phone held back while asleep fires moments later and runs the planner
+      // again for the same minute.
+      clearInterval(t);
+      t = setInterval(read, TICK_MS);
     };
+    const onChange = () => {
+      if (document.visibilityState === 'hidden') hiddenAt = Date.now();
+      else onReturn();
+    };
+    // Some browsers restore a page from the back-forward cache with only pageshow, no visibility change. The first
+    // load's pageshow isn't a restore, so it doesn't count.
+    const onPageShow = (e: PageTransitionEvent) => e.persisted && onReturn();
     document.addEventListener('visibilitychange', onChange);
+    window.addEventListener('pageshow', onPageShow);
     return () => {
       clearInterval(t);
       document.removeEventListener('visibilitychange', onChange);
+      window.removeEventListener('pageshow', onPageShow);
     };
   }, []);
   return now;

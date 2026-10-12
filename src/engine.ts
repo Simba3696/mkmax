@@ -550,21 +550,24 @@ function gearOrderCompare(state: AppState) {
 }
 
 /**
- * The gear order to save after moving piece `id` past its on-sale neighbour `past` (Settings' ↑/↓). Every Realm Klash
- * piece is saved in its place, on sale or not, and only the tapped piece moves: the two aren't swapped, since pieces
- * waiting for their store item can sit between them, and swapping would push the other one past those too.
+ * The gear order to save after moving piece `id` up (-1) or down (1) past its on-sale neighbour `past` (Settings' ↑/↓),
+ * or null when there's nothing to move. Every Realm Klash piece is saved in its place, on sale or not, and only the
+ * tapped piece moves: the two aren't swapped, since pieces waiting for their store item can sit between them, and
+ * swapping would push the other one past those too.
  */
-export function moveInGearOrder(state: AppState, id: string, past: string): string[] {
+export function moveInGearOrder(state: AppState, id: string, past: string, by: -1 | 1): string[] | null {
   const ids = state.cards
     .filter((c) => isRealmKlashGear(state, c))
     .sort(gearOrderCompare(state))
     .map((c) => c.id);
   const from = ids.indexOf(id);
   const to = ids.indexOf(past);
-  if (from < 0 || to < 0 || id === past) return state.gearOrder ?? [];
+  // Already on the side the arrow points to: the order changed (a sync) after the screen showed it. Moving by where
+  // the pieces sit now would send the piece back over its neighbour and undo the last move.
+  if (from < 0 || to < 0 || id === past || (by > 0) !== (from < to)) return null;
   ids.splice(from, 1);
   const at = ids.indexOf(past);
-  ids.splice(from < to ? at + 1 : at, 0, id);
+  ids.splice(by > 0 ? at + 1 : at, 0, id);
   return [...ids, ...(state.gearOrder ?? []).filter((x) => !ids.includes(x))];
 }
 
@@ -743,7 +746,8 @@ export function fuseWithKards(d: AppState, cardId: string): number | null {
 /**
  * Buy (delta 1) or take back (delta -1) one purchase of a pack: counts it, moves the cost out of (or back into)
  * the balance, and for a store item, which always gives its card, levels that card. Random packs leave the
- * cards to the "What did you pull?" step. Returns false when there's nothing to take back.
+ * cards to the "What did you pull?" step. Returns false when nothing was logged: the pack is gone, or a −1 has no
+ * purchase left to take back.
  *
  * A buy the balance doesn't cover takes it below 0 rather than stopping at 0: the typed balance was out of date,
  * and -1 (for a mis-tap) has to give back exactly what the buy took. The planner counts a negative balance as 0.

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { defaultState } from '../defaults';
 import { StoreProvider, useStore } from '../store';
 import { PlanProvider } from '../planner';
+import { SyncLoop } from '../syncLoop';
 import PacksView from './PacksView';
 import type { Pack } from '../types';
 
@@ -45,6 +46,7 @@ afterEach(() => {
   localStorage.clear();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('Packs: Clear expired', () => {
@@ -75,5 +77,56 @@ describe('Packs: Clear expired', () => {
     expect(screen.getByRole('button', { name: '▾ Expired (1)' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Clear expired' })).toBeNull();
     expect(screen.getByText(/Kept for next season:/)).toBeTruthy();
+  });
+});
+
+describe('Packs: logging a purchase', () => {
+  // Regression: review of clock-and-gear-taps — a tap with nothing to take back still saved and synced
+  // Found by /review on 2026-10-13
+  // Value: protects=a −1 with no purchase left to take back (the screen was drawn before the last one) saves nothing;
+  // fails_when=the button drops recordPurchase's "nothing done" and stamps the save anyway; why_new=review (Red Team);
+  // seam=SyncLoop.nextStamp spied to count saves; no_claim=the Plan's Bought one (PlanView.test.tsx)
+  it('saves nothing for a −1 that has no purchase left to take back', () => {
+    const s = JSON.parse(localStorage.getItem('mkmax:v1')!);
+    s.packs.find((p: Pack) => p.id === 'Live Pack').purchased = 1;
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <PacksView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    const takeBack = screen.getByRole('button', { name: 'Remove one purchase' });
+    // Both taps land before React draws again, so the second still sees the purchase the first took back.
+    act(() => {
+      takeBack.click();
+      takeBack.click();
+    });
+    const saved = JSON.parse(localStorage.getItem('mkmax:v1')!);
+    expect(saved.packs.find((p: Pack) => p.id === 'Live Pack').purchased).toBe(0);
+    expect(stamps).toHaveBeenCalledTimes(1);
+  });
+
+  // Value: protects=logging a buy of a random pack still opens "What did you pull?", and taking it back closes it;
+  // fails_when=the pull step opens only for a buy the change didn't record (the flag is read wrong), or a logged −1 no
+  // longer closes it; why_new=review (testing); seam=none; no_claim=store items
+  it('opens "What did you pull?" after logging a random pack, and closes it when the purchase is taken back', () => {
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <PacksView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    expect(screen.queryByText('What did you pull?')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'I bought one' }));
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).packs.find((p: Pack) => p.id === 'Live Pack').purchased).toBe(1);
+    expect(screen.getByText('What did you pull?')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove one purchase' }));
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).packs.find((p: Pack) => p.id === 'Live Pack').purchased).toBe(0);
+    expect(screen.queryByText('What did you pull?')).toBeNull();
   });
 });

@@ -1,55 +1,66 @@
 # TODOS
 
-## Realm Klash gear
+## Saving
 
-### Let a gear order tap keep its own direction, and skip taps that move nothing
+### Let every button that can go stale save nothing when it has nothing to do
 
-**What:** Pass the arrow's direction (up or down) into `moveInGearOrder` instead of working it out from where the two pieces sit now, and don't call `update` when the order comes back unchanged.
+**What:** Return `noChange` (from `src/store.tsx`) wherever a tap can find nothing to change, and look rows up by id rather than by their place on screen:
 
-**Why:** A tap made on a screen that's one move behind (a sync landing between render and tap) moves the piece back and undoes the last move. A tap whose pieces have gone (maxed, or removed by a sync) still stamps the save and pushes a sync for nothing, which can make this device's copy look newest.
+- Clear expired with nothing left to clear (`PacksView.tsx`, which already counts `cleared === 0`).
+- The + and − in "What did you pull?" (`PacksView.tsx`): `stepCard` clamps at 0 and max without saying so.
+- Edits, deletes and rarity actions on a card or pack a sync has removed (`CardsView.tsx` patch, Delete, the rarity questions; the pack Delete in `PacksView.tsx`; `TowersPanel`).
+- The season-end move in `App.tsx` when the latest copy already has that end.
+- Settings rows addressed by their place on screen (`d.currencies.splice(i, 1)`, `d.rarities[ri]`): a stale tap can change or remove the wrong currency or rarity. Undo brings it back.
+- A fuse tap after a sync changed the card's level or the Wallet fuses a different step than the button showed, and the Undo label gives the wrong kard count.
+- `recordPurchase` doesn't check the purchase limit; only the button's `disabled` does.
+- A gear ↑/↓ can move a piece past an on-sale piece a sync put between the two.
 
-**Context:** Found by the /ship review of todo-followups (2026-10-12). `move` in `src/views/GearOrder.tsx` and `moveInGearOrder` in `src/engine.ts` (`from < to` picks the side). Both cases are rare; React flushes ordinary double taps first.
+**Why:** Each of these still saves, stamps and syncs (and some offer an Undo) when a sync has changed things between the screen being drawn and the tap. That makes this device's copy look newest. The gear arrows, purchases and Fusion Up Kard buttons already follow this rule.
 
-**Effort:** S
+**Context:** Found by the /review Red Team and adversarial passes on clock-and-gear-taps (2026-10-13). All of these predate that branch and need a sync to land between render and tap. Test them the way `GearOrder.test.tsx` and `PacksView.test.tsx` do: two taps inside one `act()`, with `SyncLoop.prototype.nextStamp` spied to count saves.
+
+**Effort:** M
 **Priority:** P3
 **Depends on:** None
 
-## Plan
+### Close "What did you pull?" on a −1 that a sync already took back
 
-### Work the plan out once when the phone wakes the app
+**What:** In `buy` (`src/views/PacksView.tsx`), close the pull step on any −1, even when `recordPurchase` logs nothing: `if (!p.store && (done || delta < 0)) setPulling(delta > 0 ? p.id : null)`.
 
-**What:** In `useNow` (`src/ui.tsx`), restart the minute timer on return, or have its tick skip when the reading is under a minute old.
+**Why:** If another device took the purchase back and the sync lands between the screen being drawn and the tap, the −1 saves nothing (right) but leaves "What did you pull?" open for a purchase that no longer counts.
 
-**Why:** On a phone that paused timers while asleep, waking the app reads the time on the visibility event and then again when the overdue minute tick fires, so the whole planner runs twice within milliseconds. The plan is right; it only costs time on wake.
-
-**Context:** Found by the /ship review of todo-followups (2026-10-12). Extend `src/ui.test.tsx`; it fakes only `Date`, so this needs fake timers too.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
-### Name the one-minute tick in useNow
-
-**What:** Add a `TICK_MS = 60000` next to `AWAY_MS` in `src/ui.tsx` and use it for both the `setInterval` and the quick-return check.
-
-**Why:** The quick-return rule ("read the time if a minute tick was missed") only works while its `60000` matches the interval's. Two bare numbers can drift apart.
-
-**Context:** Found by the /ship maintainability review of todo-followups (2026-10-12).
+**Context:** Found by the /ship adversarial pass on clock-and-gear-taps (2026-10-13). The window is narrow: the −1 button goes once `purchased` is 0. Test it like `PacksView.test.tsx`'s stale −1: open the pull step, take the purchase back through a grabbed `update` in the same `act()` as the tap.
 
 **Effort:** S
 **Priority:** P4
 **Depends on:** None
 
-### Read the time on a back-forward restore that only fires pageshow
+## Cards
 
-**What:** In `useNow`, also read the time on `pageshow` when `event.persisted` is true, under the same rules as a return.
+### Keep a half-typed card when the Cards tab switches to Tower gear
 
-**Why:** Some WebKit versions restore a page from the back-forward cache with only `pageshow`, no `visibilitychange`, so the time waits for the next minute tick (up to about a minute). Rare in an installed PWA.
+**What:** Tapping the Cards tab while on Cards switches to Tower gear, which unmounts the card list and drops anything typed there: the Add a card draft, a pasted list, a rename in progress, the search box and filters. Keep both pages mounted and hide the one not showing, or lift that state into `App`.
 
-**Context:** Found by the /ship adversarial review of todo-followups (2026-10-12).
+**Why:** A quick double tap from another tab is already ignored (`DOUBLE_TAP_MS`), but a deliberate tap while typing, or a habitual "tap the tab to scroll up", still loses unsaved input that Undo can't bring back.
+
+**Context:** Chosen trade-off when the re-tap switch shipped on clock-and-gear-taps (2026-10-13): keep the switch the user asked for, guard only the double tap. Raised again by the /ship design and adversarial passes. `CardList` and `PasteList` keep their state in `useState` inside `src/views/CardsView.tsx`.
 
 **Effort:** S
-**Priority:** P4
+**Priority:** P3
+**Depends on:** None
+
+## Event schedule
+
+### Treat the first schedule download like the ones started on return
+
+**What:** In `src/events.ts`, record when the shared download started inside `loadEvents` (for example `loadingSince`) and have `refreshIfOld` skip while `loaded` is pending and under 30 seconds old, whoever started it. Give `fetch` a `signal: AbortSignal.timeout(30_000)` so a hung download rejects through the existing catch instead of hanging. Then `refreshingSince` can go, and the comments on the first-download rule and `events.firstload.test.ts`'s Value line should say what the code does.
+
+**Why:** Until a schedule has downloaded once, every return starts another download, even while the first is still on its way (an app switch during a slow first load), and a hung request is never cancelled, only replaced. What's shown stays right (downloads are numbered), so the cost is extra requests on a poor connection.
+
+**Context:** Found by the /ship performance, maintainability, testing, Red Team and adversarial passes on clock-and-gear-taps (2026-10-13). The comments at the `refreshIfOld` rule currently describe a half-minute rule that only covers downloads started on return.
+
+**Effort:** S
+**Priority:** P3
 **Depends on:** None
 
 ## Completed
