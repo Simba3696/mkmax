@@ -351,7 +351,7 @@ The shop's Kaskets (Kollector's Diamond Kasket, Kollector's Gold Kasket, Event E
 **In the shop** lists packs from MK Mobile Base's event schedule that are on sale or coming up and aren't in the app yet. It hides itself when there's nothing to suggest. Its note says which day's schedule it's from.
 
 - **Add** opens the pack editor with the name, currency, cost, purchase limit and dates filled in, in your local time. You enter the drop rates, except for Kaskets, which need none.
-- **Rerun** shows instead of Add when you still have an earlier run of the pack under Expired. It fills in the same as Add, and also copies that run's name, drop rates, cards per purchase and store item setting. A Kasket keeps only the name. A pack that expired only after the shop's run began (a season you ended early, say) is the same run, so it isn't suggested.
+- **Rerun** shows instead of Add when you still have an earlier run of the pack under Expired. It fills in the same as Add, and also copies that run's name, drop rates, cards per purchase and store item setting. A Kasket keeps only the name. A pack you unticked as a Kasket stays unticked and keeps its odds. A pack that expired only after the shop's run began (a season you ended early, say) is the same run, so it isn't suggested.
 - **Cards per purchase always comes in as 1**, so fix it for packs that give several cards.
 - A pack the schedule has no price for comes in at cost 0, which you'll need to fix before saving.
 - **Not needed** hides a pack for good, and the hidden list syncs. The 8-second Undo is the only way to bring it back.

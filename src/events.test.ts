@@ -75,12 +75,17 @@ describe('event schedule', () => {
     expect(lastRun(shop, s, NOW)).toBeUndefined();
   });
 
-  it('adds a Kasket from the shop as a Kasket, even over an earlier run with drops of its own', () => {
+  // Value: protects=Rerun keeps a Kasket a Kasket and an unticked one unticked with its odds; fails_when=Rerun re-ticks
+  // a pack the user unticked, or copies odds into a Kasket; why_new=the earlier run now decides; seam=none; no_claim=none
+  it('adds a Kasket from the shop as a Kasket, and on Rerun follows the earlier run', () => {
     const s = defaultState();
     const shop = { name: 'KOLLECTOR’S GOLD KASKET', start: null, end: null, cost: 300, currency: 'Dragon Krystals', limit: null, image: null };
     expect(packFromShop(shop, s, 'k')).toMatchObject({ name: 'Kollector’s Gold Kasket', kasket: 'gold', rolls: 1, drops: [], cost: 300 });
-    const old = { ...packFromShop(shop, s, 'old'), kasket: undefined, rolls: 3, drops: [{ cardId: 'c', chance: 5 }] };
-    expect(packFromShop(shop, s, 'new', old)).toMatchObject({ kasket: 'gold', rolls: 1, drops: [] });
+    expect(packFromShop(shop, s, 'again', packFromShop(shop, s, 'k'))).toMatchObject({ kasket: 'gold', rolls: 1, drops: [] });
+    const unticked = { ...packFromShop(shop, s, 'old'), kasket: undefined, rolls: 3, drops: [{ cardId: 'c', chance: 5 }] };
+    const rerun = packFromShop(shop, s, 'new', unticked);
+    expect(rerun).toMatchObject({ rolls: 3, drops: [{ cardId: 'c', chance: 5 }] });
+    expect(rerun).not.toHaveProperty('kasket');
     expect(packFromShop(events.packs[2], s, 'p')).not.toHaveProperty('kasket');
     // Value: protects=no Kasket of a rarity the save no longer has; fails_when=Add makes a Kasket that says its rarity
     // no longer exists; why_new=the rarity check is new; seam=none; no_claim=the version 15 upgrade (engine tests)
