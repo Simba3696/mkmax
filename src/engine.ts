@@ -448,6 +448,7 @@ export interface PackRank {
   /**
    * `withinBuys`: a Kasket giving new cards never repeats one, so each card in its pool of N comes within N buys;
    * buysPerCopy (which assumes repeats) would overstate it. Left out when its purchase limit has fewer buys left.
+   * `once`: the card comes from a Kasket of new cards, which gives it only once, so even a sure chance isn't "every buy".
    */
   targets: { card: Card; value: number; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number; once?: true }[];
 }
@@ -465,7 +466,6 @@ export function rankPacks(ctx: Ctx, now: Date): PackRank[] {
           const card = ctx.cards.get(d.cardId);
           if (!card) return null;
           const e = expectedCopies(pack, d.chance);
-          // `once`: a Kasket of new cards never gives a card twice, so even a sure chance doesn't come every buy.
           return { card, value: gainValue(ctx, card, 0, e), pAtLeastOne: chanceAtLeastOne(pack, d.chance), buysPerCopy: e > 0 ? 1 / e : Infinity, ...(withinBuys && { withinBuys }), ...(pool?.mode === 'new' && { once: true as const }) };
         })
         .filter((t): t is NonNullable<typeof t> => t != null && t.value > 0)
@@ -561,7 +561,7 @@ export function moveInGearOrder(state: AppState, id: string, past: string): stri
     .map((c) => c.id);
   const from = ids.indexOf(id);
   const to = ids.indexOf(past);
-  if (from < 0 || to < 0) return state.gearOrder ?? [];
+  if (from < 0 || to < 0 || id === past) return state.gearOrder ?? [];
   ids.splice(from, 1);
   const at = ids.indexOf(past);
   ids.splice(from < to ? at + 1 : at, 0, id);

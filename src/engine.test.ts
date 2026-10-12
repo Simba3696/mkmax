@@ -159,6 +159,7 @@ describe('kameos', () => {
       // A piece without a saved place still sorts by the default order, and moving an unknown id changes nothing.
       expect(moveInGearOrder({ ...s, gearOrder: undefined }, 'Shadow Sash', "Moloch's Ball and Chain")).toEqual(["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk']);
       expect(moveInGearOrder(s, 'Shadow Sash', 'nope')).toBe(s.gearOrder);
+      expect(moveInGearOrder(s, 'Shadow Sash', 'Shadow Sash')).toBe(s.gearOrder); // past itself: nothing moves
     });
 
     // Regression: review of todo-followups — the arrows swapped two places, so the other piece jumped over waiting ones
@@ -1036,6 +1037,7 @@ describe('pack ranking lines', () => {
     // Regression: review of todo-followups — a tiny but real chance read 0%
     // Found by /review on 2026-10-12
     expect(t(0.0004, 2500)).toBe('Shadow Sash: <0.1% per buy · about 2,500 buys per copy');
+    expect(t(0.995, 1.005)).toBe('Shadow Sash: 99% per buy · about 1.01 buys per copy'); // shown as 1.01, so plural
   });
 });
 

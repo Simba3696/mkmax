@@ -106,5 +106,10 @@ describe('Realm Klash gear with no store item on sale', () => {
     fireEvent.click(screen.getAllByLabelText('Move down')[0]);
     expect(order()).toMatch(/1\. Devastator.*2\. Moloch/);
     expect(JSON.parse(localStorage.getItem('mkmax:v1')!).gearOrder).toEqual(['sash', 'dev', 'mol']);
+    // Value: protects=↑ moves the tapped piece above the one before it; fails_when=the ↑ button passes the wrong
+    // neighbour or direction; why_new=only ↓ was clicked; seam=none; no_claim=none beyond protects
+    fireEvent.click(screen.getAllByLabelText('Move up')[1]);
+    expect(order()).toMatch(/1\. Moloch.*2\. Devastator/);
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).gearOrder).toEqual(['sash', 'mol', 'dev']);
   });
 });

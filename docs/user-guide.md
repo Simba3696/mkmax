@@ -502,7 +502,7 @@ One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gol
 
 ### Blood Ruby gear order
 
-The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then the other five by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now. A piece with no store item on sale at all is listed under the order as "Not on sale now". It keeps its place in the order, and goes back to it when you add its store item again; the line lists such pieces in that order.
+The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then the other five by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now. A piece with no store item on sale at all is listed under the order as "Not on sale now". Once you've moved pieces with ↑ and ↓, it keeps the place it had then and goes back to it when you add its store item again (a piece added later starts at the bottom); the line lists such pieces in that order.
 
 ### Priority weights
 
