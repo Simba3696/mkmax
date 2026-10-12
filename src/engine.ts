@@ -406,10 +406,11 @@ export function kasketPullCards(ctx: Ctx, pack: Pack) {
  * A pack as a Kasket is kept: one card per purchase, no drops or store item of its own (its pool comes from the
  * cards). An empty or null `kasket` means it isn't one: the editor uses '' while no rarity is chosen, and an import
  * or synced save can carry null, since JSON has no undefined. Without this the planner would value such a pack by
- * drops the screen hides.
+ * drops the screen hides. A pack marked both a store item and a Kasket (the editor never does this, only a
+ * hand-edited import) stays a store item, since a Realm Klash piece's store item is what Blood Rubies buy it through.
  */
 export function kasketShape(pack: Pack): Pack {
-  if (typeof pack.kasket !== 'string' || !pack.kasket) {
+  if (typeof pack.kasket !== 'string' || !pack.kasket || pack.store) {
     if (!('kasket' in pack)) return pack;
     const out = { ...pack };
     delete out.kasket;

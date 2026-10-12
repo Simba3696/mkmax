@@ -325,18 +325,27 @@ describe('save migration', () => {
     expect(shape(v14.rarities.map((r) => (r.id === 'diamond' ? { ...r, kind: 'kameo' as const } : r)))).toEqual([['kd', undefined, 1], ['kg', 'gold', 0]]);
   });
 
+  // Value: protects=an import marking a pack both a store item and a Kasket keeps the store item; fails_when=the store
+  // item is dropped, so Realm Klash gear leaves the gear queue without a word; why_new=store now wins; seam=none;
+  // no_claim=the pack editor, which never sets both
   it('keeps an imported Kasket at one card per purchase with no drops, and treats a null or empty rarity as no Kasket', () => {
     const drops = [{ cardId: 'a', chance: 50 }];
     const s = normalize({
       ...defaultState(),
       cards: [card('a', 0)],
-      packs: [pack('k', drops, { kasket: 'diamond', rolls: 5, store: true }), { ...pack('n', drops), kasket: null }, pack('e', drops, { kasket: '' })],
+      packs: [
+        pack('k', drops, { kasket: 'diamond', rolls: 5 }),
+        { ...pack('n', drops), kasket: null },
+        pack('e', drops, { kasket: '' }),
+        pack('s', [{ cardId: 'a', chance: 100 }], { kasket: 'diamond', store: true }),
+      ],
     });
     expect(s.packs[0]).toEqual(pack('k', [], { kasket: 'diamond' }));
-    expect(s.packs[0]).not.toHaveProperty('store');
     expect(s.packs[1]).not.toHaveProperty('kasket');
     expect(s.packs[2]).not.toHaveProperty('kasket');
     expect(s.packs[1].drops).toEqual(drops);
+    // Marked both a store item and a Kasket (only a hand-edited import): the store item wins.
+    expect(s.packs[3]).toEqual(pack('s', [{ cardId: 'a', chance: 100 }], { store: true }));
   });
 });
 
