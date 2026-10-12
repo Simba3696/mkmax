@@ -103,4 +103,47 @@ describe('the shared clock', () => {
     show('visible');
     expect(read()).toBe(new Date('2026-10-12T15:00:00').toISOString());
   });
+
+  // Regression: /ship review of todo-followups — waking the phone read the time twice, so the planner ran twice
+  // Found by /ship on 2026-10-12
+  // Value: protects=after a return reads the time, the next reading is a full minute later; fails_when=the minute timer
+  // keeps its old schedule and fires again moments after the return; why_new=review; seam=none; no_claim=how a real
+  // phone orders the overdue tick and the visibility event
+  it('waits a full minute after reading the time on a return before reading it again', () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(new Date('2026-10-12T12:00:00'));
+    render(<Clock />);
+    const readings = () => new Set(seen).size;
+    act(() => vi.advanceTimersByTime(40000));
+    show('hidden');
+    // Asleep three hours with timers paused: the minute tick is still 20s off on the timer's own clock.
+    vi.setSystemTime(new Date('2026-10-12T15:00:00'));
+    show('visible');
+    expect(readings()).toBe(2);
+    act(() => vi.advanceTimersByTime(59000));
+    expect(readings()).toBe(2);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(readings()).toBe(3);
+    expect(seen.at(-1)!.toISOString()).toBe(new Date('2026-10-12T15:01:00').toISOString());
+  });
+
+  // Regression: /ship review of todo-followups — a back-forward restore that sends only pageshow kept the old time
+  // Found by /ship on 2026-10-12
+  // Value: protects=a page restored from the back-forward cache reads the time when no visibility event comes;
+  // fails_when=only visibilitychange is listened for, or the first load's pageshow reads it again; why_new=review;
+  // seam=none; no_claim=which browsers skip the visibility event
+  it('reads the time on a back-forward restore, but not on the first load', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-12T12:00:00'));
+    render(<Clock />);
+    const restore = (persisted: boolean) =>
+      act(() => {
+        window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted }));
+      });
+    vi.setSystemTime(new Date('2026-10-12T15:00:00'));
+    restore(false);
+    expect(seen.at(-1)!.toISOString()).toBe(new Date('2026-10-12T12:00:00').toISOString());
+    restore(true);
+    expect(seen.at(-1)!.toISOString()).toBe(new Date('2026-10-12T15:00:00').toISOString());
+  });
 });

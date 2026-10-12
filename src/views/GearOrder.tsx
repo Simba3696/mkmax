@@ -58,10 +58,13 @@ export function GearSummary() {
 export default function GearOrder() {
   const { update, ctx, gear, done, onDay, rubyName, waiting } = useGear();
   if (!gear.length && !waiting.length) return null;
-  // Move a gear piece past its neighbour and save the whole order, so the list stays as shown.
-  const move = (i: number, by: number) =>
+  // Move a gear piece past its neighbour and save the whole order, so the list stays as shown. A tap with nothing left
+  // to move (the pieces have gone, or a sync already put them that way round) saves nothing.
+  const move = (i: number, by: -1 | 1) =>
     update((d) => {
-      d.gearOrder = moveInGearOrder(d, gear[i].card.id, gear[i + by].card.id);
+      const order = moveInGearOrder(d, gear[i].card.id, gear[i + by].card.id, by);
+      if (!order) return false;
+      d.gearOrder = order;
     });
   return (
     <FoldCard id="settings-gear" title="Blood Ruby gear order">

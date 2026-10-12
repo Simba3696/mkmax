@@ -46,4 +46,29 @@ describe('update undo labels', () => {
     expect(api().state.dismissedShopPacks).toEqual([]);
     expect(api().lastUndo).toBeNull();
   });
+
+  // Value: protects=a recipe that finds nothing to change saves, stamps and offers Undo for nothing; fails_when=update
+  // ignores the recipe's false and stamps updatedAt (making this device's copy look newest to sync); why_new=recipes
+  // couldn't call off a change before; seam=none; no_claim=the sync push timer (no sync token is set)
+  it('leaves the save untouched when the recipe returns false', () => {
+    let latest: Store | undefined;
+    render(
+      <StoreProvider>
+        <Grab onRender={(store) => (latest = store)} />
+      </StoreProvider>,
+    );
+    const api = () => latest!;
+    act(() => api().update((d) => void (d.dismissedShopPacks = ['A'])));
+    const before = api().state;
+    const saved = localStorage.getItem('mkmax:v1');
+    act(() =>
+      api().update((d) => {
+        d.dismissedShopPacks = ['B'];
+        return false;
+      }, 'Hid B'),
+    );
+    expect(api().state).toBe(before);
+    expect(localStorage.getItem('mkmax:v1')).toBe(saved);
+    expect(api().lastUndo).toBeNull();
+  });
 });

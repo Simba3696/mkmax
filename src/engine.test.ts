@@ -151,15 +151,31 @@ describe('kameos', () => {
         s.gearOrder = ["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk'];
       });
       expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(['Shadow Sash', 'Bloody Tomahawk']);
-      s.gearOrder = moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk');
+      s.gearOrder = moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk', 1)!;
       expect(s.gearOrder).toEqual(["Moloch's Ball and Chain", 'Bloody Tomahawk', 'Shadow Sash']);
       // Back in the shop, it's first again.
       s.packs.push(item("Moloch's Ball and Chain"));
       expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(["Moloch's Ball and Chain", 'Bloody Tomahawk', 'Shadow Sash']);
       // A piece without a saved place still sorts by the default order, and moving an unknown id changes nothing.
-      expect(moveInGearOrder({ ...s, gearOrder: undefined }, 'Shadow Sash', "Moloch's Ball and Chain")).toEqual(["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk']);
-      expect(moveInGearOrder(s, 'Shadow Sash', 'nope')).toBe(s.gearOrder);
-      expect(moveInGearOrder(s, 'Shadow Sash', 'Shadow Sash')).toBe(s.gearOrder); // past itself: nothing moves
+      expect(moveInGearOrder({ ...s, gearOrder: undefined }, 'Shadow Sash', "Moloch's Ball and Chain", 1)).toEqual(["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk']);
+      expect(moveInGearOrder(s, 'Shadow Sash', 'nope', 1)).toBeNull();
+      expect(moveInGearOrder(s, 'Shadow Sash', 'Shadow Sash', 1)).toBeNull(); // past itself: nothing moves
+    });
+
+    // Regression: /ship review of todo-followups — a tap on a screen one move behind moved the piece back
+    // Found by /ship on 2026-10-12
+    // Value: protects=a tap whose piece is already on the arrow's side of its neighbour (the order changed after the screen
+    // was drawn) moves nothing; fails_when=the direction is worked out from where the pieces sit now, so the piece jumps
+    // back over its neighbour; why_new=review; seam=none; no_claim=the arrows themselves (GearOrder test)
+    it('moves nothing when the tapped piece is already on the side its arrow points to', () => {
+      const s = setup(cards(), [item('Bloody Tomahawk'), item('Shadow Sash')], (s) => {
+        s.gearOrder = ['Bloody Tomahawk', 'Shadow Sash'];
+      });
+      // The screen still showed Shadow Sash first: ↓ on it, or ↑ on the Tomahawk, is already done.
+      expect(moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk', 1)).toBeNull();
+      expect(moveInGearOrder(s, 'Bloody Tomahawk', 'Shadow Sash', -1)).toBeNull();
+      // The arrow that still has something to do works as usual.
+      expect(moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk', -1)).toEqual(['Shadow Sash', 'Bloody Tomahawk', "Moloch's Ball and Chain"]);
     });
 
     // Regression: review of todo-followups — the arrows swapped two places, so the other piece jumped over waiting ones
@@ -172,9 +188,9 @@ describe('kameos', () => {
         s.gearOrder = ['Shadow Sash', "Moloch's Ball and Chain", 'Devastator', 'Bloody Tomahawk'];
       });
       // ↑ on the Tomahawk: it goes just above Shadow Sash, which stays ahead of the waiting pieces.
-      expect(moveInGearOrder(s, 'Bloody Tomahawk', 'Shadow Sash')).toEqual(['Bloody Tomahawk', 'Shadow Sash', "Moloch's Ball and Chain", 'Devastator']);
+      expect(moveInGearOrder(s, 'Bloody Tomahawk', 'Shadow Sash', -1)).toEqual(['Bloody Tomahawk', 'Shadow Sash', "Moloch's Ball and Chain", 'Devastator']);
       // ↓ on Shadow Sash: it goes just below the Tomahawk, which stays behind the waiting pieces.
-      expect(moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk')).toEqual(["Moloch's Ball and Chain", 'Devastator', 'Bloody Tomahawk', 'Shadow Sash']);
+      expect(moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk', 1)).toEqual(["Moloch's Ball and Chain", 'Devastator', 'Bloody Tomahawk', 'Shadow Sash']);
     });
 
     // Value: protects=listed gear gets Blood Rubies and no kards, even with Epic tracked to Max; fails_when=the Kard plan

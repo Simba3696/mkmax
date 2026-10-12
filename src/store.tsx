@@ -15,7 +15,7 @@ export type { SyncStatus };
  * every device works out the same way (catalog art, or the season end on a fresh install): it's saved but doesn't count as an edit for sync, so it can't
  * make two devices disagree.
  */
-type Update = (recipe: (draft: AppState) => void, undoLabel?: string | (() => string), opts?: { auto?: boolean }) => void;
+type Update = (recipe: (draft: AppState) => void | false, undoLabel?: string | (() => string), opts?: { auto?: boolean }) => void;
 
 /** The most recent undoable change: the state from just before it. */
 export interface UndoEntry {
@@ -134,7 +134,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // Built from the ref rather than a setState updater so the undo label can include what got pruned.
     const prev = stateRef.current;
     const draft = structuredClone(prev);
-    recipe(draft);
+    // A recipe that finds nothing to change returns false: no save, no stamp and no sync push, so a tap that does
+    // nothing can't make this device's copy look newest.
+    if (recipe(draft) === false) return;
     const removed = pruneDone(draft);
     if (!opts?.auto) draft.updatedAt = loop.nextStamp();
     stateRef.current = draft;
