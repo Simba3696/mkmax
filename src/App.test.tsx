@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 const tab = (name: string) => screen.getByRole('button', { name });
-/** Half a second on, so a tap on the Cards tab counts as deliberate rather than the second half of a double tap. */
+/** Past App's half-second double-tap window (DOUBLE_TAP_MS, 500), so a tap on the Cards tab counts as deliberate. */
 const later = () => vi.setSystemTime(Date.now() + 600);
 
 describe('the MK MAX logo', () => {
@@ -135,7 +135,7 @@ describe('the Cards tab', () => {
   // Regression: /ship review of clock-and-gear-taps — a quick double tap on Cards from another tab landed on Tower gear
   // Found by /ship on 2026-10-13
   // Value: protects=a second tap within half a second of opening Cards is ignored, and the active tab says what its
-  // next tap does; fails_when=a double tap flips to Tower gear (dropping a half-typed card) or the description goes or
+  // next tap does; fails_when=a double tap lands on Tower gear instead of the card list, a clock gone back blocks the tab, or the description goes or
   // names the wrong page; why_new=review (Red Team, design); seam=none; no_claim=real touch timing
   it('ignores a tap that comes straight after opening Cards, and says what the next tap does', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -161,5 +161,12 @@ describe('the Cards tab', () => {
     fireEvent.click(cardsTab());
     expect(towers()).toBeTruthy();
     expect(cardsTab().getAttribute('aria-description')).toBe('Tap again for Cards');
+
+    // Opened again, then the device clock goes back an hour: the next tap still switches, rather than waiting an hour.
+    fireEvent.click(nav.getByRole('button', { name: 'Packs' }));
+    fireEvent.click(cardsTab());
+    vi.setSystemTime(Date.now() - 60 * 60 * 1000);
+    fireEvent.click(cardsTab());
+    expect(towers()).toBeTruthy();
   });
 });

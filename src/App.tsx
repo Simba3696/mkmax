@@ -61,6 +61,9 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: () 
   );
 }
 
+/** A second tap on the Cards tab this soon after opening it is the end of a double tap: half a second. */
+const DOUBLE_TAP_MS = 500;
+
 export default function App() {
   const { state, update, sync, lastUndo, undo, dismissUndo } = useStore();
   // A mistyped or pasted link (#Packs, a docs anchor) opens Plan rather than a blank page with no tab selected.
@@ -122,8 +125,8 @@ export default function App() {
   // Cards and Tower gear share the Cards tab. Tapping the tab while on it switches between them; coming from another
   // tab always opens the card list, the page people go to Cards for.
   const [cardsPage, setCardsPage] = useState<CardsPage>('cards');
-  // When Cards was last opened from another tab: a second tap within half a second is the end of a double tap, not a
-  // request for Tower gear, and switching then would throw away a half-typed card or pasted list.
+  // When Cards was last opened from another tab: a second tap within DOUBLE_TAP_MS is the end of a double tap, so it
+  // opens the card list rather than flipping straight on to Tower gear.
   const cardsOpenedAt = useRef(0);
   const go = (t: TabId) => {
     if (t === tab) return;
@@ -195,7 +198,7 @@ export default function App() {
   const flipCards = () => {
     // A negative gap means the device clock went back since: not a double tap.
     const since = Date.now() - cardsOpenedAt.current;
-    if (since >= 0 && since < 500) return;
+    if (since >= 0 && since < DOUBLE_TAP_MS) return;
     setCardsPage((p) => (p === 'cards' ? 'towers' : 'cards'));
     scrollRoot()?.scrollTo({ top: 0 });
   };

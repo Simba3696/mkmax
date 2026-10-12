@@ -182,4 +182,27 @@ describe('event schedule on return', () => {
     visibility.mockRestore();
     await refreshEvents();
   });
+
+  // Regression: /ship review of clock-and-gear-taps — a screen opened during an older download got the older schedule
+  // Found by /ship on 2026-10-13
+  // Value: protects=a screen that opened while an older download ran shows the newer schedule once both finish;
+  // fails_when=the older download hands its own result to screens waiting on it, after the newer one was shown;
+  // why_new=review (Red Team, testing); seam=fetch stubbed; no_claim=the season-end move that reads it (App)
+  it('keeps the newer schedule on a screen that opened during an older download', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    at('21:00:00');
+    const older = deferred();
+    const newer = deferred();
+    vi.stubGlobal('fetch', vi.fn().mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise));
+    const a = refreshEvents();
+    const { result } = renderHook(() => useEvents());
+    const b = refreshEvents();
+    newer.resolve(schedule('newer2'));
+    await b;
+    older.resolve(schedule('older2'));
+    await a;
+    await vi.waitFor(() => expect(result.current?.fetchedAt).toBe('newer2'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(result.current?.fetchedAt).toBe('newer2');
+  });
 });

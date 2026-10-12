@@ -54,7 +54,8 @@ function loadEvents(): Promise<EventSchedule> {
     .then((e) => {
       // A download a newer one has already replaced on screen (a pull to refresh while one was running) doesn't
       // overwrite it. One that finishes first is still shown, in case the newer one fails.
-      if (n < shown) return e;
+      // Screens that were waiting on this download get the newer schedule too.
+      if (n < shown) return current ?? e;
       shown = n;
       current = e;
       fetchedAt = Date.now();
@@ -91,12 +92,13 @@ if (typeof document !== 'undefined') {
     if (refreshingSince && busy >= 0 && busy < 30 * 1000) return;
     // A download time later than now means the device clock went back: that counts as old.
     const age = Date.now() - fetchedAt;
-    const old = fetchedAt ? age < 0 || age > 60 * 60 * 1000 : !loaded;
+    // Never downloaded (the first one failed or is still hanging): always try again.
+    const old = !fetchedAt || age < 0 || age > 60 * 60 * 1000;
     if (!old) return;
-    const started = Date.now();
-    refreshingSince = started;
+    const startedAt = Date.now();
+    refreshingSince = startedAt;
     void refreshEvents().finally(() => {
-      if (refreshingSince === started) refreshingSince = 0;
+      if (refreshingSince === startedAt) refreshingSince = 0;
     });
   };
   document.addEventListener('visibilitychange', refreshIfOld);
