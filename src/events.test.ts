@@ -76,7 +76,7 @@ describe('event schedule', () => {
   });
 
   // Value: protects=Rerun keeps a Kasket a Kasket and an unticked one unticked with its odds; fails_when=Rerun re-ticks
-  // a pack the user unticked, or copies odds into a Kasket; why_new=the earlier run now decides; seam=none; no_claim=none
+  // a pack the user unticked, copies odds into a Kasket, or drops a hand-ticked one; why_new=the earlier run now decides; seam=none; no_claim=none
   it('adds a Kasket from the shop as a Kasket, and on Rerun follows the earlier run', () => {
     const s = defaultState();
     const shop = { name: 'KOLLECTOR’S GOLD KASKET', start: null, end: null, cost: 300, currency: 'Dragon Krystals', limit: null, image: null };
@@ -87,6 +87,10 @@ describe('event schedule', () => {
     expect(rerun).toMatchObject({ rolls: 3, drops: [{ cardId: 'c', chance: 5 }] });
     expect(rerun).not.toHaveProperty('kasket');
     expect(packFromShop(events.packs[2], s, 'p')).not.toHaveProperty('kasket');
+    // A Kasket ticked by hand under a name the app doesn't know stays one, rather than becoming a pack with no drops.
+    const newKasket = { ...shop, name: 'Kollector’s Platinum Kasket' };
+    const ticked = { ...packFromShop(newKasket, s, 'old'), kasket: 'diamond' };
+    expect(packFromShop(newKasket, s, 'new', ticked)).toMatchObject({ kasket: 'diamond', rolls: 1, drops: [] });
     // Value: protects=no Kasket of a rarity the save no longer has; fails_when=Add makes a Kasket that says its rarity
     // no longer exists; why_new=the rarity check is new; seam=none; no_claim=the version 15 upgrade (engine tests)
     expect(packFromShop(shop, { ...s, rarities: s.rarities.filter((r) => r.id !== 'gold') }, 'g')).not.toHaveProperty('kasket');

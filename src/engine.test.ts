@@ -829,6 +829,9 @@ describe('kaskets', () => {
     expect(isKasketExcluded({ name: 'flame forged will', rarityId: 'epic' })).toBe(true);
     expect(isKasketExcluded({ name: 'Flame Forged Will', rarityId: 'rare' })).toBe(false);
     expect(isKasketExcluded({ name: 'Sub-Zero MK1', rarityId: 'gold' })).toBe(false);
+    // A rarity of your own (or Diamond rebuilt under a new id) can't be matched by id, so the name decides.
+    expect(isKasketExcluded({ name: 'Sub-Zero MK1', rarityId: 'r-custom' })).toBe(true);
+    expect(isKasketExcluded({ name: 'Klassic Sub-Zero', rarityId: 'r-custom' })).toBe(false);
   });
 
   it("isn't valued once you own every piece of gear tracked only to the kard threshold, unless it's tracked to max", () => {

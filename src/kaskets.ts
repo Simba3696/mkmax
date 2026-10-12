@@ -29,6 +29,10 @@ const KASKET_EXCLUDED: [name: string, rarityId: string][] = [
 const RARITY_BY_KEY = new Map(Object.entries(KASKET_RARITY).map(([name, rarity]) => [nameKey(name), rarity]));
 const excludedKey = (name: string, rarityId: string) => `${rarityId}:${nameKey(name)}`;
 const EXCLUDED = new Set(KASKET_EXCLUDED.map(([name, rarityId]) => excludedKey(name, rarityId)));
+// The built-in rarities the list's ids refer to. A rarity added in Settings, or a built-in one rebuilt under a new
+// id, can't be told apart from them, so there the list matches by name alone, as it did before it carried rarities.
+const KNOWN_RARITIES = new Set(Object.values(KASKET_RARITY));
+const EXCLUDED_NAMES = new Set(KASKET_EXCLUDED.map(([name]) => nameKey(name)));
 
 /** The rarity a shop Kasket draws from, by name (word order and apostrophes don't matter); undefined for other packs. */
 export const kasketFor = (name: string) => RARITY_BY_KEY.get(nameKey(name));
@@ -42,5 +46,6 @@ export function kasketIn(name: string, rarities: Pick<RarityRule, 'id' | 'kind'>
   return id && rarities.some((r) => r.id === id && r.kind !== 'kameo') ? id : undefined;
 }
 
-/** Whether a card is one of the newest that Kaskets leave out: same name and same rarity. */
-export const isKasketExcluded = (card: Pick<Card, 'name' | 'rarityId'>) => EXCLUDED.has(excludedKey(card.name, card.rarityId));
+/** Whether a card is one of the newest that Kaskets leave out: same name and same rarity (by name alone on a rarity of your own). */
+export const isKasketExcluded = (card: Pick<Card, 'name' | 'rarityId'>) =>
+  KNOWN_RARITIES.has(card.rarityId) ? EXCLUDED.has(excludedKey(card.name, card.rarityId)) : EXCLUDED_NAMES.has(nameKey(card.name));

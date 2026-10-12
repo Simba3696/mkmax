@@ -184,8 +184,10 @@ export function lastRun(shop: ShopPack, state: AppState, now: Date): Pack | unde
  */
 export function packFromShop(shop: ShopPack, state: AppState, id: string, last?: Pack): Pack {
   const currencyId = currencyFor(shop.currency, state.currencies) ?? state.currencies[0]?.id ?? '';
-  // An earlier run decides: a pack you unticked as a Kasket stays unticked on Rerun, and keeps that run's odds.
-  const kasket = last && !last.kasket ? undefined : kasketIn(packName(shop), state.rarities);
+  // An earlier run decides: a pack you unticked as a Kasket stays unticked on Rerun, and keeps that run's odds; one you
+  // ticked stays a Kasket, of its own rarity when the shop name doesn't give one (the editor asks if that's gone).
+  const named = kasketIn(packName(shop), state.rarities);
+  const kasket = last ? (last.kasket ? (named ?? last.kasket) : undefined) : named;
   const copy = last && !kasket ? last : undefined;
   return {
     id,

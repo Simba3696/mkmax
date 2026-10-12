@@ -351,7 +351,7 @@ The shop's Kaskets (Kollector's Diamond Kasket, Kollector's Gold Kasket, Event E
 **In the shop** lists packs from MK Mobile Base's event schedule that are on sale or coming up and aren't in the app yet. It hides itself when there's nothing to suggest. Its note says which day's schedule it's from.
 
 - **Add** opens the pack editor with the name, currency, cost, purchase limit and dates filled in, in your local time. You enter the drop rates, except for Kaskets, which need none.
-- **Rerun** shows instead of Add when you still have an earlier run of the pack under Expired. It fills in the same as Add, and also copies that run's name, drop rates, cards per purchase and store item setting. A Kasket keeps only the name. A pack you unticked as a Kasket stays unticked and keeps its odds. A pack that expired only after the shop's run began (a season you ended early, say) is the same run, so it isn't suggested.
+- **Rerun** shows instead of Add when you still have an earlier run of the pack under Expired. It fills in the same as Add, and also copies that run's name, drop rates, cards per purchase and store item setting. A Kasket keeps only the name, and a Kasket you ticked by hand stays one, of the rarity you picked. A pack you unticked as a Kasket stays unticked and keeps its odds. A pack that expired only after the shop's run began (a season you ended early, say) is the same run, so it isn't suggested.
 - **Cards per purchase always comes in as 1**, so fix it for packs that give several cards.
 - A pack the schedule has no price for comes in at cost 0, which you'll need to fix before saving.
 - **Not needed** hides a pack for good, and the hidden list syncs. The 8-second Undo is the only way to bring it back.
@@ -408,7 +408,7 @@ The note at the bottom repeats the basics: tap a pack to jump to it, Blood Ruby 
 
 ### Gear summary
 
-With a daily Blood Ruby income set, the Blood Rubies part of **What to buy** says when all the Realm Klash gear will be maxed (for example "around Feb 6, 2027", or **now**). Without a daily income it shows how many rubies the gear takes in all and asks you to set one. Settings → Blood Ruby gear order sets the order and shows each piece's own date. Both go away once the gear is maxed. A Realm Klash piece you're still maxing whose store item isn't on sale gets no kards and no rubies, so both places list it as "Not on sale now" until you add its store item again from In the shop. See [How it works](how-it-works.md#scoring).
+With a daily Blood Ruby income set, the Blood Rubies part of **What to buy** says when all the Realm Klash gear will be maxed (for example "around Feb 6, 2027", or **now**). Without a daily income it shows how many rubies the gear takes in all and asks you to set one. Settings → Blood Ruby gear order sets the order and shows each piece's own date. Both go away once the gear is maxed. A Realm Klash piece you're still maxing whose store item isn't on sale gets no kards and no rubies, so Settings → Blood Ruby gear order lists it as "Not on sale now" until you add its store item again from In the shop. What to buy says so too while Blood Rubies have something to buy. See [How it works](how-it-works.md#scoring).
 
 ### When What to buy is empty
 
