@@ -62,6 +62,8 @@ describe('goals and caps', () => {
     expect(isMaxed(card('e', F(3), { rarityId: 'epic' }), epic)).toBe(true);
   });
 
+  // Value: protects=a card's own Goal of Max beats its rarity's F3; fails_when=targetLevel, copiesToMax or isMaxed ignore
+  // card.goal; why_new=cardGoal now also reads the Realm Klash list; seam=none; no_claim=the Goal control (browser QA)
   it('lets a card override its rarity goal', () => {
     const epic = rules().get('epic')!;
     const rk = card('rk', F(7), { rarityId: 'epic', goal: 'max' });
@@ -83,12 +85,14 @@ describe('kameos', () => {
     expect(s.cards.map((c) => c.id)).toEqual(['want']);
   });
 
+  // Value: protects=Blood Rubies max Realm Klash gear before buying a Kameo; fails_when=the Kameo item, listed first, is
+  // bought before the gear; why_new=the gear is now recognised by name; seam=none; no_claim=the gear's buying order
   it('get Blood Rubies only after the Realm Klash gear', () => {
     const s = setup(
-      [card('gear', F(8), { rarityId: 'epic', goal: 'max' }), kameo('k')],
+      [card('gear', F(8), { rarityId: 'epic', name: 'Shadow Sash' }), kameo('k')],
       [
-        pack('gear-item', [{ cardId: 'gear', chance: 100 }], { currencyId: 'blood-rubies', cost: 800, store: true }),
         pack('kameo-item', [{ cardId: 'k', chance: 100 }], { currencyId: 'blood-rubies', cost: 800, store: true }),
+        pack('gear-item', [{ cardId: 'gear', chance: 100 }], { currencyId: 'blood-rubies', cost: 800, store: true }),
       ],
       (s) => (s.currencies.find((c) => c.id === 'blood-rubies')!.balance = 1600),
     );
@@ -131,6 +135,8 @@ describe('kameos', () => {
       expect(plan.saveFor?.pack.id).toBe('Shadow Sash item');
     });
 
+    // Value: protects=listed gear gets Blood Rubies and no kards, even with Epic tracked to Max; fails_when=the Kard plan
+    // assigns kards to a listed piece or the ruby buys change; why_new=gear is listed by name; seam=none; no_claim=none
     it('never spends Epic Fusion Up Kards on the gear', () => {
       const s = setup(cards(), packs(), (s) => {
         withRubies(1500)(s);
@@ -167,6 +173,18 @@ describe('kameos', () => {
       const newer = pack('sash new', [{ cardId: 'sash', chance: 100 }], { currencyId: 'blood-rubies', store: true, endsAt: '2025-12-15T00:00' });
       s.packs = [older, newer];
       expect([keepWhenExpired(s, older), keepWhenExpired(s, newer)]).toEqual([false, true]);
+      // Value: protects=each piece keeps its own latest run; fails_when=a later run of another piece, or a later pack that isn't
+      // a Blood Ruby store item, counts as this piece's newer run and Clear expired deletes the one Rerun needs; why_new=the
+      // rows above only have runs of the same piece; seam=none; no_claim=equal end dates
+      s.cards.push(card('dev', F(5), { rarityId: 'epic', name: 'Devastator' }));
+      const devItem = pack('dev new', [{ cardId: 'dev', chance: 100 }], { currencyId: 'blood-rubies', store: true, endsAt: '2026-01-05T00:00' });
+      const soulsSash = pack('sash souls', [{ cardId: 'sash', chance: 100 }], { endsAt: '2026-01-05T00:00' });
+      s.packs = [older, newer, devItem, soulsSash];
+      expect([keepWhenExpired(s, older), keepWhenExpired(s, newer), keepWhenExpired(s, devItem)]).toEqual([false, true, true]);
+      // A current store item with no end date is newer than any expired run, so the expired one clears.
+      const undated = pack('sash undated', [{ cardId: 'sash', chance: 100 }], { currencyId: 'blood-rubies', store: true, endsAt: null });
+      s.packs = [newer, undated];
+      expect(keepWhenExpired(s, newer)).toBe(false);
     });
 
     // Value: protects=Blood Rubies buy only the listed Realm Klash pieces; fails_when=other gear sold for Blood Rubies is
@@ -178,6 +196,8 @@ describe('kameos', () => {
       expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(['sash']);
     });
 
+    // Value: protects=the default Blood Ruby order however a listed name is typed; fails_when=a curly apostrophe or lower
+    // case drops a piece to the end; why_new=the order is matched by key; seam=none; no_claim=a saved order (other tests)
     it('keeps the default buying order when a piece is typed with a curly apostrophe or in lower case', () => {
       const item = (cardId: string) => pack(`${cardId} item`, [{ cardId, chance: 100 }], { currencyId: 'blood-rubies', cost: 500, store: true });
       const s = setup([card('dev', F(2), { rarityId: 'epic', name: 'devastator' }), card('moloch', F(2), { rarityId: 'epic', name: 'Moloch’s Ball and Chain' })], [item('dev'), item('moloch')]);
@@ -303,6 +323,9 @@ describe('phases', () => {
     expect(buildCtx(s).kardPlan.get('diamond')).toEqual({ assignments: [{ cardId: 'near', from: F(9), to: F(10), kards: 10 }], left: 0, cards: 1, cheapest: 10, realmKlash: 0 });
   });
 
+  // Value: protects=Use takes one step's kards and raises the card, but never on Realm Klash gear; fails_when=kardStep or
+  // fuseWithKards works on a listed piece, or the wrong count leaves the Wallet; why_new=gear is listed by name;
+  // seam=none; no_claim=the Use button itself (browser QA)
   it('uses Fusion Up Kards for one step: kards off the Wallet, the card up a level', () => {
     const s = setup([card('d', F(3)), card('low', F(2)), card('gear', F(5), { rarityId: 'epic', name: 'Devastator' })], [], (s) => {
       s.rarities[0].fusionUpKards = 3;
@@ -469,6 +492,8 @@ describe('phases', () => {
     expect(buildCtx(s).kardPlan.get('gold')).toEqual({ assignments: [{ cardId: 'x', from: F(9), to: F(10), kards: 10 }], left: 0, cards: 2, cheapest: 10, realmKlash: 0 });
   });
 
+  // Value: protects=the plan's card count and Realm Klash count behind its notes; fails_when=listed gear counts as a card
+  // kards could go to, or realmKlash is wrong; why_new=gear is listed by name; seam=none; no_claim=the note text (kardNotes)
   it('counts the cards kards could go to, so the plan can tell no card at F3 from too few kards', () => {
     const s = setup([card('low', F(2)), card('rk', F(5), { rarityId: 'epic', name: 'Shadow Sash' })], [], (s) => {
       s.rarities[0].fusionUpKards = 30;
@@ -776,6 +801,9 @@ describe('kaskets', () => {
     expect(plan.expectedGains.get('far')).toBeCloseTo(3);
   });
 
+  // Value: protects=Kaskets never give a listed Realm Klash piece but can give other Blood Ruby gear; fails_when=the pool
+  // includes Shadow Sash or drops gear only because a store item sells it; why_new=gear is listed by name; seam=none;
+  // no_claim=the Kasket odds shown on Packs
   it('never gives Realm Klash gear', () => {
     // sash is listed; sold is ordinary gear that happens to be sold for Blood Rubies, so Kaskets can give it.
     const s = setup(

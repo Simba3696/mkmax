@@ -159,7 +159,8 @@ export function keepWhenExpired(state: AppState, pack: Pack) {
   return pack.drops.some((d) => {
     const card = state.cards.find((c) => c.id === d.cardId);
     if (!card || !isRealmKlashGear(state, card)) return false;
-    const later = (p: Pack) => p.id !== pack.id && isItem(p) && (p.endsAt ?? '') > (pack.endsAt ?? '') && p.drops.some((x) => x.cardId === d.cardId);
+    // A store item with no end date is still running, so it's newer than any expired run.
+    const later = (p: Pack) => p.id !== pack.id && isItem(p) && (!p.endsAt || p.endsAt > (pack.endsAt ?? '')) && p.drops.some((x) => x.cardId === d.cardId);
     return !state.packs.some(later);
   });
 }

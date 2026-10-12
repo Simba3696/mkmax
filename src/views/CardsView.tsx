@@ -38,7 +38,7 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
 /**
  * Goal for rarities with a Fusion Up Kard threshold: stop at the threshold (kards finish it) or buy all the way
  * to max. Stored only when it differs from the rarity's goal. Realm Klash gear is always bought to max, so it gets
- * a label instead of a choice (see isRealmKlashGear).
+ * a label instead of a choice (see isRealmKlashName).
  */
 function GoalSelect({ rule, name, value, onChange }: { rule: RarityRule; name: string; value: Card['goal']; onChange: (v: Card['goal']) => void }) {
   // Only equipment switches between "F3, Kards finish it" and buying to max; characters are always maxed.
