@@ -2,7 +2,7 @@
 // them all. The pool leaves out the newest characters and gear from the latest game update (KASKET_EXCLUDED), so
 // the planner works out each Kasket's drops from your cards (engine kasketPool) instead of a saved drop list.
 import { nameKey } from './catalog';
-import type { Card } from './types';
+import type { Card, RarityRule } from './types';
 
 /** The shop's Kaskets and the rarity each one draws from (MK Mobile Base's event schedule names). */
 const KASKET_RARITY: Record<string, string> = {
@@ -23,6 +23,15 @@ const EXCLUDED = new Set(KASKET_EXCLUDED.map(nameKey));
 
 /** The rarity a shop Kasket draws from, by name (word order and apostrophes don't matter); undefined for other packs. */
 export const kasketFor = (name: string) => RARITY_BY_KEY.get(nameKey(name));
+
+/**
+ * kasketFor, but only when the save still has that rarity and it isn't a Kameo rarity. A save whose built-in rarity
+ * was deleted or rebuilt under a new id keeps the pack's typed odds instead of getting a Kasket of a missing rarity.
+ */
+export function kasketIn(name: string, rarities: Pick<RarityRule, 'id' | 'kind'>[]) {
+  const id = kasketFor(name);
+  return id && rarities.some((r) => r.id === id && r.kind !== 'kameo') ? id : undefined;
+}
 
 /** Whether a card is one of the newest that Kaskets leave out. */
 export const isKasketExcluded = (card: Pick<Card, 'name'>) => EXCLUDED.has(nameKey(card.name));

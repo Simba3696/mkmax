@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { nameKey } from './catalog';
 import { REALM_KLASH_CURRENCY, packStatus, toLocalInput } from './engine';
-import { kasketFor } from './kaskets';
+import { kasketIn } from './kaskets';
 import type { AppState, Card, Pack } from './types';
 
 export interface ShopPack {
@@ -184,7 +184,7 @@ export function lastRun(shop: ShopPack, state: AppState, now: Date): Pack | unde
  */
 export function packFromShop(shop: ShopPack, state: AppState, id: string, last?: Pack): Pack {
   const currencyId = currencyFor(shop.currency, state.currencies) ?? state.currencies[0]?.id ?? '';
-  const kasket = kasketFor(packName(shop));
+  const kasket = kasketIn(packName(shop), state.rarities);
   const copy = last && !kasket ? last : undefined;
   return {
     id,

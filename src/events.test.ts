@@ -82,6 +82,9 @@ describe('event schedule', () => {
     const old = { ...packFromShop(shop, s, 'old'), kasket: undefined, rolls: 3, drops: [{ cardId: 'c', chance: 5 }] };
     expect(packFromShop(shop, s, 'new', old)).toMatchObject({ kasket: 'gold', rolls: 1, drops: [] });
     expect(packFromShop(events.packs[2], s, 'p')).not.toHaveProperty('kasket');
+    // Value: protects=no Kasket of a rarity the save no longer has; fails_when=Add makes a Kasket that says its rarity
+    // no longer exists; why_new=the rarity check is new; seam=none; no_claim=the version 15 upgrade (engine tests)
+    expect(packFromShop(shop, { ...s, rarities: s.rarities.filter((r) => r.id !== 'gold') }, 'g')).not.toHaveProperty('kasket');
   });
 
   it('fills in a pack from the shop, leaving permanent Blood Ruby packs out of the season', () => {

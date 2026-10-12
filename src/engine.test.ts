@@ -317,6 +317,12 @@ describe('save migration', () => {
     ]);
     // A version 15 save is left alone, so a pack unticked as a Kasket stays unticked.
     expect(normalize({ ...v14, version: 15 }).packs.every((p) => p.kasket === undefined)).toBe(true);
+    // Value: protects=a pack keeps its typed odds when its Kasket rarity is gone; fails_when=the upgrade makes a Kasket
+    // of a deleted rarity and wipes the odds for good; why_new=the upgrade runs once; seam=none; no_claim=renamed rarities
+    const two = [pack('kd', drops, { name: 'Kollector’s Diamond Kasket' }), pack('kg', drops, { name: 'Kollector’s Gold Kasket' })];
+    const shape = (rarities: RarityRule[]) => normalize({ ...v14, packs: two, rarities }).packs.map((p) => [p.id, p.kasket, p.drops.length]);
+    expect(shape(v14.rarities.filter((r) => r.id !== 'diamond'))).toEqual([['kd', undefined, 1], ['kg', 'gold', 0]]);
+    expect(shape(v14.rarities.map((r) => (r.id === 'diamond' ? { ...r, kind: 'kameo' as const } : r)))).toEqual([['kd', undefined, 1], ['kg', 'gold', 0]]);
   });
 
   it('keeps an imported Kasket at one card per purchase with no drops, and treats a null or empty rarity as no Kasket', () => {
