@@ -367,6 +367,8 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
             {packs.map((sp) => {
               const upcoming = sp.start && new Date(sp.start) > now;
               const last = lastRun(sp, state, now);
+              // A Kasket's Rerun copies only the name; its odds come from your cards.
+              const rerun = last && packFromShop(sp, state, '', last);
               return (
                 <div key={sp.name} className={`${row} items-center xl:border-t xl:border-line`}>
                   {sp.image && <img className={thumb} src={sp.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 44, height: 44 }} />}
@@ -378,8 +380,11 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
                       {upcoming ? ` · starts ${when(sp.start)}` : sp.end ? ` · ends ${when(sp.end)}` : ' · permanent'}
                     </div>
                   </div>
-                  {last ? (
-                    <button onClick={() => onAdd(packFromShop(sp, state, newId(), last))} title="Adds it again with the odds from its expired run">
+                  {rerun ? (
+                    <button
+                      onClick={() => onAdd({ ...rerun, id: newId() })}
+                      title={rerun.kasket ? 'Adds it again as a Kasket, with the name from its expired run' : 'Adds it again with the odds from its expired run'}
+                    >
                       Rerun
                     </button>
                   ) : (
