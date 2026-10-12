@@ -13,13 +13,22 @@ const KASKET_RARITY: Record<string, string> = {
 };
 
 /**
- * The newest characters and gear, which Kaskets leave out until the next update. From the 22 July 2026 update
- * (7.3). Replace the list each update via the patch-notes skill.
+ * The newest characters and gear, which Kaskets leave out until the next update, with each one's rarity, so a
+ * same-named card of another rarity still counts. From the 22 July 2026 update (7.3). Replace the list each update
+ * via the patch-notes skill.
  */
-const KASKET_EXCLUDED = ['Sub-Zero MK1', 'Scorpion MK2 Movie', 'Man in Control', 'Flame Forged Will', 'Man in the Sky', 'Flame Forged Ferocity'];
+const KASKET_EXCLUDED: [name: string, rarityId: string][] = [
+  ['Sub-Zero MK1', 'diamond'],
+  ['Scorpion MK2 Movie', 'diamond'],
+  ['Man in Control', 'epic'],
+  ['Flame Forged Will', 'epic'],
+  ['Man in the Sky', 'rare'],
+  ['Flame Forged Ferocity', 'rare'],
+];
 
 const RARITY_BY_KEY = new Map(Object.entries(KASKET_RARITY).map(([name, rarity]) => [nameKey(name), rarity]));
-const EXCLUDED = new Set(KASKET_EXCLUDED.map(nameKey));
+const excludedKey = (name: string, rarityId: string) => `${rarityId}:${nameKey(name)}`;
+const EXCLUDED = new Set(KASKET_EXCLUDED.map(([name, rarityId]) => excludedKey(name, rarityId)));
 
 /** The rarity a shop Kasket draws from, by name (word order and apostrophes don't matter); undefined for other packs. */
 export const kasketFor = (name: string) => RARITY_BY_KEY.get(nameKey(name));
@@ -33,5 +42,5 @@ export function kasketIn(name: string, rarities: Pick<RarityRule, 'id' | 'kind'>
   return id && rarities.some((r) => r.id === id && r.kind !== 'kameo') ? id : undefined;
 }
 
-/** Whether a card is one of the newest that Kaskets leave out. */
-export const isKasketExcluded = (card: Pick<Card, 'name'>) => EXCLUDED.has(nameKey(card.name));
+/** Whether a card is one of the newest that Kaskets leave out: same name and same rarity. */
+export const isKasketExcluded = (card: Pick<Card, 'name' | 'rarityId'>) => EXCLUDED.has(excludedKey(card.name, card.rarityId));

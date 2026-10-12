@@ -3,6 +3,7 @@ import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState
 import {
   addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
+import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
 import { daysFromNow, kardFooter, kardNotes, kasketLine } from './ui';
 import type { AppState, Card, Pack, RarityRule } from './types';
@@ -797,13 +798,24 @@ describe('kaskets', () => {
         card('ascending', A(2), { rarityId: 'gold', maxLevel: A(5) }),
         card('fusing', F(5), { rarityId: 'gold' }),
         card('capped', A(5), { rarityId: 'gold', maxLevel: A(5) }),
+        // Flame Forged Will is the newest Epic gear, not Gold, so a Gold card of that name is still in the pool.
         card('x', F(2), { rarityId: 'gold', name: 'Flame Forged Will' }),
       ],
       [kasket('gold')],
     );
     const pool = kasketPool(buildCtx(s), s.packs[0]);
     expect(pool.mode).toBe('unmaxed');
-    expect(ids(pool.cards)).toEqual(['ascending', 'fusing']);
+    expect(ids(pool.cards)).toEqual(['ascending', 'fusing', 'x']);
+  });
+
+  // Value: protects=the newest-cards list leaves out only a card of the right name and rarity; fails_when=a same-named
+  // card of another rarity is left out of its Kasket, or the newest card isn't; why_new=the list now carries rarities;
+  // seam=none; no_claim=the list's contents (patch-notes skill)
+  it('leaves out the newest cards by name and rarity', () => {
+    expect(isKasketExcluded({ name: 'Flame Forged Will', rarityId: 'epic' })).toBe(true);
+    expect(isKasketExcluded({ name: 'flame forged will', rarityId: 'epic' })).toBe(true);
+    expect(isKasketExcluded({ name: 'Flame Forged Will', rarityId: 'rare' })).toBe(false);
+    expect(isKasketExcluded({ name: 'Sub-Zero MK1', rarityId: 'gold' })).toBe(false);
   });
 
   it("isn't valued once you own every piece of gear tracked only to the kard threshold, unless it's tracked to max", () => {
