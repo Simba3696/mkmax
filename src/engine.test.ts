@@ -113,12 +113,16 @@ describe('kameos', () => {
     const packs = () => [item('Bloody Tomahawk'), item('Shadow Sash'), item("Moloch's Ball and Chain"), pack('kameo pack', [{ cardId: 'k', chance: 50 }], { currencyId: 'blood-rubies', cost: 100 })];
     const withRubies = (n: number) => (s: AppState) => void (s.currencies.find((c) => c.id === 'blood-rubies')!.balance = n);
 
+    // Value: protects=Blood Rubies finish one piece before the next, in the default order; fails_when=rubies spread over
+    // pieces or skip Shadow Sash; why_new=the pieces are listed by name; seam=none; no_claim=a saved order (below)
     it('maxes one piece at a time, Shadow Sash first by default', () => {
       const plan = rubies(setup(cards(), packs(), withRubies(1500)));
       expect(plan.buys.map((b) => [b.pack.id, b.count])).toEqual([['Shadow Sash item', 2], ["Moloch's Ball and Chain item", 1]]);
       expect(plan.saveFor).toMatchObject({ pack: { id: 'Bloody Tomahawk item' }, shortBy: 500, gear: true });
     });
 
+    // Value: protects=no Blood Ruby pack is bought while a listed piece still needs copies; fails_when=the Kameo pack is
+    // bought before the Tomahawk's last copy; why_new=the pieces are listed by name; seam=none; no_claim=none
     it('buys no packs until every piece is maxed', () => {
       expect(rubies(setup(cards(), packs(), withRubies(2400))).buys.map((b) => b.pack.id)).toEqual([
         'Shadow Sash item', "Moloch's Ball and Chain item", 'Bloody Tomahawk item',
@@ -126,6 +130,8 @@ describe('kameos', () => {
       expect(rubies(setup(cards(), packs(), withRubies(2600))).buys.map((b) => b.pack.id)).toContain('kameo pack');
     });
 
+    // Value: protects=the user's saved order beats the default; fails_when=Shadow Sash is bought before the moved Tomahawk;
+    // why_new=the pieces are listed by name; seam=none; no_claim=the arrows on Settings (browser QA)
     it('follows the saved order', () => {
       const plan = rubies(setup(cards(), packs(), (s) => {
         withRubies(1000)(s);
@@ -149,6 +155,8 @@ describe('kameos', () => {
       expect(rubies(s).buys.map((b) => [b.pack.id, b.count])).toEqual([['Shadow Sash item', 2], ["Moloch's Ball and Chain item", 1]]);
     });
 
+    // Value: protects=a piece whose store item is out of purchases doesn't hold up the rest; fails_when=rubies stop at
+    // Shadow Sash's limit; why_new=the pieces are listed by name; seam=none; no_claim=none
     it('moves on when a piece is out of purchases', () => {
       const ps = packs();
       ps[1].maxPurchases = 1;
@@ -191,17 +199,27 @@ describe('kameos', () => {
     // bought with rubies while the Kard plan also gives it kards; why_new=a store item no longer keeps kards off gear;
     // seam=none; no_claim=the buying order (gear-first tests)
     it('buys only Realm Klash gear with Blood Rubies', () => {
-      const item = (cardId: string) => pack(`${cardId} item`, [{ cardId, chance: 100 }], { currencyId: 'blood-rubies', cost: 500, store: true });
-      const s = setup([card('sash', F(2), { rarityId: 'epic', name: 'Shadow Sash' }), card('kori', F(2), { rarityId: 'epic', name: 'Kori Blade' })], [item('sash'), item('kori')]);
-      expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(['sash']);
+      const s = setup([gear('Shadow Sash', F(2)), gear('Kori Blade', F(2))], [item('Shadow Sash'), item('Kori Blade')]);
+      expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(['Shadow Sash']);
     });
 
     // Value: protects=the default Blood Ruby order however a listed name is typed; fails_when=a curly apostrophe or lower
     // case drops a piece to the end; why_new=the order is matched by key; seam=none; no_claim=a saved order (other tests)
     it('keeps the default buying order when a piece is typed with a curly apostrophe or in lower case', () => {
-      const item = (cardId: string) => pack(`${cardId} item`, [{ cardId, chance: 100 }], { currencyId: 'blood-rubies', cost: 500, store: true });
-      const s = setup([card('dev', F(2), { rarityId: 'epic', name: 'devastator' }), card('moloch', F(2), { rarityId: 'epic', name: 'Moloch’s Ball and Chain' })], [item('dev'), item('moloch')]);
-      expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(['moloch', 'dev']);
+      const s = setup([gear('devastator', F(2)), gear('Moloch’s Ball and Chain', F(2))], [item('devastator'), item('Moloch’s Ball and Chain')]);
+      expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(['Moloch’s Ball and Chain', 'devastator']);
+    });
+
+    // Value: protects=the documented order for all ten pieces, the default five then the rest by name; fails_when=a name
+    // changes in REALM_KLASH_GEAR or DEFAULT_GEAR_ORDER but not the other; why_new=nothing checked the two lists together;
+    // seam=none; no_claim=new pieces (the list is final)
+    it('orders all ten pieces: the default five, then the other five by name', () => {
+      const names = ['Bloody Shokan Armor', 'Bloody Tomahawk', 'Bloody Voodoo Doll', 'Datusha, Bane of the Moroi', 'Devastator', "Blaze's Life Force", "Moloch's Ball and Chain", 'Shadow Sash', "Shang Tsung's Stone", "Sindel's Signet Ring"];
+      const s = setup(names.map((n) => gear(n, F(2))), names.map((n) => item(n)));
+      expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.name)).toEqual([
+        'Shadow Sash', "Moloch's Ball and Chain", 'Devastator', 'Datusha, Bane of the Moroi', 'Bloody Tomahawk',
+        "Blaze's Life Force", 'Bloody Shokan Armor', 'Bloody Voodoo Doll', "Shang Tsung's Stone", "Sindel's Signet Ring",
+      ]);
     });
   });
 });
