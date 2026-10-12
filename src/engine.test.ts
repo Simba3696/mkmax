@@ -176,23 +176,38 @@ describe('kameos', () => {
       expect(keepWhenExpired(s, item('kori'))).toBe(false); // gear that isn't on the list
       expect(keepWhenExpired(s, item('d'))).toBe(false); // a character
       expect(keepWhenExpired(s, item('gone'))).toBe(false); // the piece was maxed and deleted
-      // Only the latest run: Rerun copies that one, so an older run clears.
-      const older = pack('sash old', [{ cardId: 'sash', chance: 100 }], { currencyId: 'blood-rubies', store: true, endsAt: '2025-12-01T00:00' });
-      const newer = pack('sash new', [{ cardId: 'sash', chance: 100 }], { currencyId: 'blood-rubies', store: true, endsAt: '2025-12-15T00:00' });
+      // Only the latest run: Rerun copies that one, so an older run of the same item clears.
+      const run = (id: string, endsAt: string | null, name = 'Shadow Sash item') =>
+        ({ ...pack(id, [{ cardId: 'sash', chance: 100 }], { currencyId: 'blood-rubies', store: true, endsAt }), name });
+      const older = run('sash old', '2025-12-01T00:00');
+      const newer = run('sash new', '2025-12-15T00:00');
       s.packs = [older, newer];
       expect([keepWhenExpired(s, older), keepWhenExpired(s, newer)]).toEqual([false, true]);
       // Value: protects=each piece keeps its own latest run; fails_when=a later run of another piece, or a later pack that isn't
       // a Blood Ruby store item, counts as this piece's newer run and Clear expired deletes the one Rerun needs; why_new=the
       // rows above only have runs of the same piece; seam=none; no_claim=equal end dates
       s.cards.push(card('dev', F(5), { rarityId: 'epic', name: 'Devastator' }));
-      const devItem = pack('dev new', [{ cardId: 'dev', chance: 100 }], { currencyId: 'blood-rubies', store: true, endsAt: '2026-01-05T00:00' });
-      const soulsSash = pack('sash souls', [{ cardId: 'sash', chance: 100 }], { endsAt: '2026-01-05T00:00' });
+      const devItem = { ...pack('dev new', [{ cardId: 'dev', chance: 100 }], { currencyId: 'blood-rubies', store: true, endsAt: '2026-01-05T00:00' }), name: 'Shadow Sash item' };
+      const soulsSash = { ...pack('sash souls', [{ cardId: 'sash', chance: 100 }], { endsAt: '2026-01-05T00:00' }), name: 'Shadow Sash item' };
       s.packs = [older, newer, devItem, soulsSash];
       expect([keepWhenExpired(s, older), keepWhenExpired(s, newer), keepWhenExpired(s, devItem)]).toEqual([false, true, true]);
       // A current store item with no end date is newer than any expired run, so the expired one clears.
-      const undated = pack('sash undated', [{ cardId: 'sash', chance: 100 }], { currencyId: 'blood-rubies', store: true, endsAt: null });
-      s.packs = [newer, undated];
+      s.packs = [newer, run('sash undated', null)];
       expect(keepWhenExpired(s, newer)).toBe(false);
+      // Value: protects=Clear expired and Rerun agree on which run is the latest; fails_when=two runs with the same end
+      // date are both kept, date formats are compared as text, or another item name's later run clears the only run of
+      // this name that Rerun can find; why_new=adversarial review; seam=none; no_claim=Rerun itself (events tests)
+      const sameEnd = [run('tie a', '2025-12-15T00:00'), run('tie b', '2025-12-15T00:00')];
+      s.packs = sameEnd;
+      expect(sameEnd.map((p) => keepWhenExpired(s, p))).toEqual([false, true]); // the one saved later stays
+      // 09:00 at UTC-2 is 11:00 UTC, an hour after 10:00 UTC, though it sorts first as text.
+      const utc = run('utc', '2025-12-15T10:00:00Z');
+      const offset = run('offset', '2025-12-15T09:00:00-02:00');
+      s.packs = [offset, utc];
+      expect([keepWhenExpired(s, utc), keepWhenExpired(s, offset)]).toEqual([false, true]);
+      const otherName = run('other name', '2026-01-01T00:00', 'Shadow Sash (season 2)');
+      s.packs = [older, otherName];
+      expect(keepWhenExpired(s, older)).toBe(true); // Rerun looks up 'Shadow Sash item' by name, so its last run stays
     });
 
     // Value: protects=Blood Rubies buy only the listed Realm Klash pieces; fails_when=other gear sold for Blood Rubies is

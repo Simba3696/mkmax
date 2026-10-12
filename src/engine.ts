@@ -148,19 +148,24 @@ export function isRealmKlashGear(state: AppState, card: Card) {
 }
 
 /**
- * Whether Clear expired keeps this pack: the latest Blood Ruby store item for Realm Klash gear you still have. Next
- * season's Rerun copies its drops and Store item setting from the latest run, and Blood Rubies only buy gear through
- * store items, so deleting it would stop the plan buying the piece; older runs aren't needed. Maxed cards are deleted,
- * so the item clears once its piece is done.
+ * Whether Clear expired keeps this pack: the latest run of a Blood Ruby store item for Realm Klash gear you still have.
+ * Next season's Rerun copies its drops and Store item setting from the latest run with the same name (lastRun in
+ * events.ts), and Blood Rubies only buy gear through store items, so deleting it would stop the plan buying the piece;
+ * older runs aren't needed. Maxed cards are deleted, so the item clears once its piece is done.
  */
 export function keepWhenExpired(state: AppState, pack: Pack) {
   const isItem = (p: Pack) => !!p.store && p.currencyId === REALM_KLASH_CURRENCY;
   if (!isItem(pack)) return false;
+  const name = nameKey(pack.name);
+  // A store item with no end date is still running, so it's newer than any expired run. Dates are compared as times,
+  // since saves can hold them in different formats; on the same end date, the one saved later counts as newer.
+  const end = (p: Pack) => (p.endsAt ? new Date(p.endsAt).getTime() : Infinity);
+  const index = (p: Pack) => state.packs.findIndex((q) => q.id === p.id);
+  const newer = (p: Pack) => end(p) > end(pack) || (end(p) === end(pack) && index(p) > index(pack));
   return pack.drops.some((d) => {
     const card = state.cards.find((c) => c.id === d.cardId);
     if (!card || !isRealmKlashGear(state, card)) return false;
-    // A store item with no end date is still running, so it's newer than any expired run.
-    const later = (p: Pack) => p.id !== pack.id && isItem(p) && (!p.endsAt || p.endsAt > (pack.endsAt ?? '')) && p.drops.some((x) => x.cardId === d.cardId);
+    const later = (p: Pack) => p.id !== pack.id && isItem(p) && nameKey(p.name) === name && p.drops.some((x) => x.cardId === d.cardId) && newer(p);
     return !state.packs.some(later);
   });
 }

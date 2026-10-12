@@ -275,7 +275,7 @@ Packs are split into three sections:
 - **Coming up**: packs whose start date is still ahead.
 - **Expired (N)**: folded; tap it to see them.
 
-Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all, except Blood Ruby store items for Realm Klash gear you're still maxing, since next season's **Rerun** copies them. Only each piece's latest item stays, and it clears once the piece is maxed. When only those are left, Clear expired hides. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
+Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all, except Blood Ruby store items for Realm Klash gear you're still maxing, since next season's **Rerun** copies them. Only the latest run of each item stays (Rerun finds it by name), and it clears once the piece is maxed. When only those are left, Clear expired hides. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
 
 - **Sort** shows once you have 2 packs: **Ending soonest** (the default) or **Currency**, which groups each section's packs under a heading per currency, in the order they're listed in Settings. Sort choices are remembered on each device and aren't synced.
 - **Summary line**, for example "400 Souls · 3 cards per buy · bought 2/5" for a random pack, or "300 Blood Rubies · store item · bought 0/2" for a store item. 2/5 means 2 bought of a 5-purchase limit.
