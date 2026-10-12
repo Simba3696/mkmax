@@ -5,7 +5,7 @@ import {
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
-import { daysFromNow, kardFooter, kardNotes, kasketLine } from './ui';
+import { daysFromNow, kardFooter, kardNotes, kasketLine, targetLine } from './ui';
 import type { AppState, Card, Pack, RarityRule } from './types';
 import type { KardPlan } from './engine';
 
@@ -911,9 +911,14 @@ describe('kaskets', () => {
     expect(ranks.find((r) => r.pack.id === 'kd')!.targets.map((t) => t.withinBuys)).toEqual([3, 3, 3]);
     // Once you own them all it gives unmaxed cards, which can repeat, so the usual average applies.
     expect(ranks.find((r) => r.pack.id === 'kg')!.targets[0].withinBuys).toBeUndefined();
-    // Two buys left can't promise all three cards.
-    s.packs[0] = { ...s.packs[0], maxPurchases: 5, purchased: 3 };
-    expect(rankPacks(buildCtx(s), NOW).find((r) => r.pack.id === 'kd')!.targets[0].withinBuys).toBeUndefined();
+    // Value: protects=the purchase-limit edges of "yours within n buys"; fails_when=<= becomes < (three buys left for
+    // three cards drops the line) or a pool of one isn't 1; why_new=only the "too few buys" side was tested; seam=none;
+    // no_claim=the wording (targetLine)
+    const within = (packs: Pack[], cards = s.cards) => rankPacks(buildCtx({ ...s, cards, packs }), NOW).find((r) => r.pack.id === 'kd')?.targets[0]?.withinBuys;
+    expect(within([{ ...s.packs[0], maxPurchases: 5, purchased: 2 }])).toBe(3); // exactly as many buys left as cards
+    expect(within([{ ...s.packs[0], maxPurchases: 5, purchased: 3 }])).toBeUndefined(); // two buys can't promise three cards
+    expect(within([{ ...s.packs[0], maxPurchases: 5, purchased: 5 }])).toBeUndefined(); // no buys left
+    expect(within([s.packs[0]], [card('a', 0)])).toBe(1); // the last card you don't own
   });
 
   it("doesn't value a Kasket of a Kameo rarity", () => {
@@ -932,6 +937,17 @@ describe('kaskets', () => {
     removeRarity(s, 'epic');
     expect(s.rarities.map((r) => r.id)).not.toContain('epic');
     expect(s.packs.map((p) => p.id)).toEqual(['diamond-k', 'p']);
+  });
+});
+
+describe('pack ranking lines', () => {
+  // Value: protects=the Pack ranking's per-card wording; fails_when=a Kasket's "yours within n buys" or "yours next buy"
+  // is lost or the average shows instead; why_new=the wording moved out of PlanView; seam=none; no_claim=which cards rank
+  it('says the chance per buy, then within how many buys a Kasket card comes or the average', () => {
+    const t = (withinBuys?: number, pAtLeastOne = 0.25, buysPerCopy = 4) => targetLine({ card: { name: 'Raiden' }, pAtLeastOne, buysPerCopy, withinBuys });
+    expect(t()).toBe('Raiden: 25% per buy · about 4 buys per copy');
+    expect(t(3, 1 / 3, 3)).toBe('Raiden: 33% per buy · yours within 3 buys');
+    expect(t(1, 1, 1)).toBe('Raiden: 100% per buy · yours next buy');
   });
 });
 

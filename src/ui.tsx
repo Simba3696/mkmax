@@ -321,6 +321,15 @@ export function kardFooter(rarities: RarityRule[]) {
   );
 }
 
+/**
+ * One card under a pack in the Pack ranking: its chance per buy, then how soon a copy comes. A Kasket of new cards
+ * never repeats one, so it says within how many buys instead of an average.
+ */
+export function targetLine(t: { card: { name: string }; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number }) {
+  const when = t.withinBuys === 1 ? 'yours next buy' : t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${fmt(t.buysPerCopy)} buys per copy`;
+  return `${t.card.name}: ${pct(t.pAtLeastOne)} per buy · ${when}`;
+}
+
 /** A Kasket's pool in words: how many cards share the odds, or why it isn't valued. */
 export function kasketLine(pool: KasketPool) {
   const rule = pool.rule;

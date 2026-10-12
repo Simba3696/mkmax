@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, daysToAfford, fuseWithKards, kardStep, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
-import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, kardFooter, kardNotes, NumInput, pct, RarityBadge, SOURCE_LABELS, timeUntil, useNow } from '../ui';
+import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, kardFooter, kardNotes, NumInput, RarityBadge, SOURCE_LABELS, targetLine, timeUntil, useNow } from '../ui';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
 import { GearSummary } from './GearOrder';
@@ -332,7 +332,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                       </div>
                       {r.targets.slice(0, 3).map((t) => (
                         <div key={t.card.id} className={target}>
-                          {t.card.name}: {pct(t.pAtLeastOne)} per buy · {t.withinBuys === 1 ? 'yours next buy' : t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${fmt(t.buysPerCopy)} buys per copy`}
+                          {targetLine(t)}
                         </div>
                       ))}
                       {r.targets.length === 0 && <div className={target}>Nothing you still need.</div>}
