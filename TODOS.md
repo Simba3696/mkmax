@@ -86,41 +86,6 @@
 **Priority:** P4
 **Depends on:** None
 
-## Gear kards
-
-### Tidy up how Realm Klash store items are kept
-
-**What:** Fix the loose ends of "Clear expired keeps Realm Klash gear store items" (`keepWhenExpired` in `src/engine.ts`, Clear expired in `src/views/PacksView.tsx`):
-- First: the Packs paragraph in `docs/user-guide.md` says to delete a kept item by hand "once you no longer need it". You need it as long as the piece exists, and `pruneDone` deletes it when the piece is maxed, so reword it to "leave it", and warn on the per-pack Delete for a kept item.
-- The undo label says "Cleared 1 expired packs".
-- The guide doesn't say Clear expired hides when only kept items are left.
-- Nothing in the app says why those items stay.
-- `keepWhenExpired` keeps every expired copy and items that mark nothing (a piece with a stored Max, Uncommon gear, gear still tracked to F3). Keep only the last item marking a piece.
-- Its tests don't check the store and Blood Ruby conditions separately.
-- A piece whose only store item expired is in no plan at all (no kards, no ruby buys). Say so on the Plan.
-- Picking plain Max in the Goal list does nothing while an expired store item still marks the piece.
-- The undo count comes from the render, not the draft.
-
-**Why:** Once Epic's Track until is Max, the store item is the only thing marking a piece added after that as Realm Klash gear. Losing it lets the Kard plan spend kards on it and Kaskets count it.
-
-**Context:** Found by the /ship review (passes 2-3 and the adversarial pass) on 2026-10-11 and deferred so the gear kard plan could ship (decisions 00b6ed88 and fd1db6e9). A dedicated Realm Klash flag on the card would remove most of these, but needs a save migration.
-
-**Effort:** M
-**Priority:** P2
-**Depends on:** None
-
-### Test the gear lines on the Plan
-
-**What:** Move the gear sentences in the Fusion Up Kard plan card (`src/views/PlanView.tsx`: the Next line, the not-enough line, the stuck note and the footer sentences) into a pure function in `src/ui.tsx`, the way `kasketLine` works, and table-test them in `src/engine.test.ts`.
-
-**Why:** Seven wording branches have no test: "Next" with 0 left, "1 kard", the not-enough line, one stuck piece, next and stuck together, stuck after finished rows, and the gear-only footer.
-
-**Context:** Deferred from the /ship coverage gate on 2026-10-11 (decision d5e7646c; the code carries a `gstack-shortcut` marker). Browser QA checked most of these lines by hand. No component-test library is needed.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
 ## Planner
 
 ### Work out the plan once per change

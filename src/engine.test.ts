@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
 import { kardTable, normalize } from './normalize';
-import { daysFromNow, kasketLine } from './ui';
+import { daysFromNow, kardFooter, kardNotes, kasketLine } from './ui';
 import type { AppState, Card, Pack, RarityRule } from './types';
+import type { KardPlan } from './engine';
 
 const NOW = new Date('2026-01-10T12:00:00');
 /** Stored level for ascension An on a rarity whose fusion tops out at F10. */
@@ -426,7 +427,7 @@ describe('phases', () => {
   });
 
   it('counts the cards kards could go to, so the plan can tell no card at F3 from too few kards', () => {
-    const s = setup([card('low', F(2)), card('rk', F(5), { rarityId: 'epic', goal: 'max' })], [], (s) => {
+    const s = setup([card('low', F(2)), card('rk', F(5), { rarityId: 'epic', name: 'Shadow Sash' })], [], (s) => {
       s.rarities[0].fusionUpKards = 30;
       s.rarities.find((r) => r.id === 'epic')!.fusionUpKards = 30;
     });
@@ -470,24 +471,26 @@ describe('phases', () => {
       expect(plan).toMatchObject({ left: 26, next: { cardId: 'alpha', needs: 27 } });
     });
 
-    it('never plans kards on Realm Klash gear, even when it needs the fewest', () => {
-      // rk-mark was set to Max before Epic's Track until was; rk-store is sold for Blood Rubies. Both need 15, f8 needs 27.
-      const item = pack('rk item', [{ cardId: 'rk-store', chance: 100 }], { currencyId: 'blood-rubies', store: true });
-      const s = setup([gear('rk-mark', F(9), { goal: 'max' }), gear('rk-store', F(9)), gear('f8', F(8))], [item], (s) => {
+    // Value: protects=Realm Klash gear on the list never gets kards, with no Goal or store item marking it; fails_when=the plan
+    // spends kards on a listed piece, or still treats a Goal of Max or a Blood Ruby store item as Realm Klash; why_new=Realm
+    // Klash gear is now recognised by name only; seam=none; no_claim=the Cards label (browser QA)
+    it('never plans kards on Realm Klash gear, even when it needs the fewest, and plans other gear normally', () => {
+      // Devastator (listed) needs 15; kmax (unlisted, Goal Max) needs 15; sold (unlisted, a Blood Ruby store item) needs 27.
+      const item = pack('sold item', [{ cardId: 'sold', chance: 100 }], { currencyId: 'blood-rubies', store: true });
+      const s = setup([gear('rk', F(9), { name: 'Devastator' }), gear('kmax', F(9), { goal: 'max' }), gear('sold', F(8))], [item], (s) => {
         const epic = s.rarities.find((r) => r.id === 'epic')!;
         epic.goal = 'max';
         epic.fusionUpKards = 30;
       });
-      expect(buildCtx(s).kardPlan.get('epic')).toEqual({ assignments: [{ cardId: 'f8', from: F(8), to: F(10), kards: 27 }], left: 3, cards: 1, cheapest: 12, realmKlash: 2 });
-    });
-
-    it('keeps Realm Klash gear store items when clearing expired packs', () => {
-      const s = setup([gear('rk', F(5)), card('d', F(4))]);
-      const item = (cardId: string, extra: Partial<Pack> = { currencyId: 'blood-rubies', store: true }) => pack(`${cardId} item`, [{ cardId, chance: 100 }], extra);
-      expect(keepWhenExpired(s, item('rk'))).toBe(true);
-      expect(keepWhenExpired(s, item('rk', {}))).toBe(false); // a Souls pack, not a Blood Ruby store item
-      expect(keepWhenExpired(s, item('d'))).toBe(false); // a character
-      expect(keepWhenExpired(s, item('gone'))).toBe(false); // the piece was maxed and deleted
+      expect(buildCtx(s).kardPlan.get('epic')).toEqual({
+        assignments: [{ cardId: 'kmax', from: F(9), to: F(10), kards: 15 }],
+        left: 15,
+        cards: 2,
+        cheapest: 12,
+        realmKlash: 1,
+        next: { cardId: 'sold', needs: 27 },
+      });
+      expect(kardStep(s, 'rk')).toBeNull();
     });
 
     // Ids sort the other way from names, so these fail if the tie-break uses ids or save order instead of names.
@@ -579,15 +582,23 @@ describe('weights', () => {
     expect(cardWeight(s, card('elder', 0, { rarityId: 'kameo-gold', guest: true, source: 'challenge' }))).toBeCloseTo(1.5 * 0.25 * 0.2);
   });
 
-  it('treats equipment sold as a Blood Ruby store item as Realm Klash gear, whatever its goal', () => {
-    const gear = card('sash', F(5), { rarityId: 'epic' });
-    const item = pack('sash item', [{ cardId: 'sash', chance: 100 }], { currencyId: 'blood-rubies', store: true });
-    expect(isRealmKlashGear(setup([gear]), gear)).toBe(false);
-    expect(isRealmKlashGear(setup([gear], [item]), gear)).toBe(true);
-    expect(isRealmKlashGear(setup([gear], [{ ...item, currencyId: 'souls' }]), gear)).toBe(false);
-    // A character sold for Blood Rubies isn't gear.
-    const hero = card('hero', F(5));
-    expect(isRealmKlashGear(setup([hero], [{ ...item, drops: [{ cardId: 'hero', chance: 100 }] }]), hero)).toBe(false);
+  // Value: protects=Realm Klash gear is the fixed list of gear, matched by name; fails_when=a listed piece is missed (a typo or
+  // apostrophe), unlisted gear counts because of its Goal or a store item, or a character with a listed name counts;
+  // why_new=the list replaced Goal and store items; seam=none; no_claim=the game adding pieces (the list is final)
+  it('recognises Realm Klash gear by name, whatever its goal or store items', () => {
+    const named = (name: string, extra: Partial<Card> = {}) => card('x', F(5), { rarityId: 'epic', name, ...extra });
+    const listed = ['Bloody Shokan Armor', 'Bloody Tomahawk', 'Bloody Voodoo Doll', 'Datusha, Bane of the Moroi', 'Devastator', "Blaze's Life Force", "Moloch's Ball and Chain", 'Shadow Sash', "Shang Tsung's Stone", "Sindel's Signet Ring"];
+    for (const name of listed) expect(isRealmKlashGear(setup([named(name)]), named(name)), name).toBe(true);
+    expect(isRealmKlashGear(setup([]), named('SHANG TSUNG’S STONE'))).toBe(true); // nor case or a curly apostrophe
+    expect(isRealmKlashGear(setup([]), named('signet ring, sindel’s'))).toBe(true); // nor word order
+    // Unlisted gear isn't Realm Klash gear, even with a Goal of Max or sold for Blood Rubies.
+    const kori = named('Kori Blade', { goal: 'max' });
+    const item = pack('kori item', [{ cardId: 'x', chance: 100 }], { currencyId: 'blood-rubies', store: true });
+    expect(isRealmKlashGear(setup([kori], [item]), kori)).toBe(false);
+    // A character with a listed name isn't gear.
+    expect(isRealmKlashGear(setup([]), card('x', F(5), { name: 'Devastator' }))).toBe(false);
+    // Realm Klash gear is always bought to max, whatever its stored goal.
+    expect(targetLevel(named('Devastator', { goal: 'threshold' }), rules().get('epic')!)).toBe(F(10));
   });
 });
 
@@ -707,11 +718,12 @@ describe('kaskets', () => {
   });
 
   it('never gives Realm Klash gear', () => {
+    // sash is listed; sold is ordinary gear that happens to be sold for Blood Rubies, so Kaskets can give it.
     const s = setup(
-      [card('sash', 0, { rarityId: 'epic', goal: 'max' }), card('sold', 0, { rarityId: 'epic' }), card('kunai', 0, { rarityId: 'epic' })],
+      [card('sash', 0, { rarityId: 'epic', name: 'Shadow Sash' }), card('sold', 0, { rarityId: 'epic' }), card('kunai', 0, { rarityId: 'epic' })],
       [kasket('epic'), pack('store', [{ cardId: 'sold', chance: 100 }], { store: true, currencyId: 'blood-rubies' })],
     );
-    expect(ids(kasketPool(buildCtx(s), s.packs[0]).cards)).toEqual(['kunai']);
+    expect(ids(kasketPool(buildCtx(s), s.packs[0]).cards)).toEqual(['sold', 'kunai']);
   });
 
   it('puts gear only a Kasket gives in the priority targets', () => {
@@ -773,6 +785,78 @@ describe('kaskets', () => {
     removeRarity(s, 'epic');
     expect(s.rarities.map((r) => r.id)).not.toContain('epic');
     expect(s.packs.map((p) => p.id)).toEqual(['diamond-k', 'p']);
+  });
+});
+
+describe('kard plan notes', () => {
+  const epic: RarityRule = { ...rules().get('epic')!, goal: 'max', fusionUpKards: 60 };
+  const diamond: RarityRule = { ...rules().get('diamond')!, fusionUpKards: 10 };
+  const gear = (id: string, name: string, fusion: number, extra: Partial<Card> = {}) => card(id, fusion, { rarityId: 'epic', name, ...extra });
+  const cards = new Map(
+    [gear('hood', 'Lin Kuei Hood', F(8)), gear('mask', 'Dragon Mask', F(7)), gear('sword', 'Ninja Sword', F(3)), gear('ring', 'Kori Ring', F(3), { maxLevel: F(4) })].map((c) => [c.id, c]),
+  );
+  const row = { cardId: 'hood', from: F(8), to: F(10), kards: 27 };
+  const plan = (p: Partial<KardPlan>): KardPlan => ({ assignments: [], left: 0, cards: 1, cheapest: 1, realmKlash: 0, ...p });
+
+  // Value: protects=the exact sentences under each rarity in the Fusion Up Kard plan, in order; fails_when=a branch shows the
+  // wrong note, drops one (next and stuck together), gets the shortfall or kard/kards wrong, or adds "more" at 0 left;
+  // why_new=the sentences were built inline in PlanView with no test; seam=none; no_claim=how PlanView lays the notes out (browser QA)
+  it('writes the notes for each case of the plan', () => {
+    const stuckLine = (name: string) => `${name} can't reach F10 with kards: a step on the way has no kard cost in Settings → Fusion rules.`;
+    const cases: [string, KardPlan, RarityRule, string[]][] = [
+      ['no card yet', plan({ cards: 0, left: 60 }), epic, ['No Epic Equip card at F3 or higher yet, so these kards wait.']],
+      [
+        'no card but Realm Klash gear',
+        plan({ cards: 0, left: 60, realmKlash: 1 }),
+        epic,
+        ['No Epic Equip card at F3 or higher that kards can go to yet, so these kards wait. Realm Klash gear gets none.'],
+      ],
+      [
+        'not enough to finish a piece',
+        plan({ left: 20, next: { cardId: 'hood', needs: 27 } }),
+        epic,
+        ['Not enough kards to finish a piece yet: Lin Kuei Hood needs 27 to reach F10, 7 more than you have.'],
+      ],
+      ['one stuck piece', plan({ left: 60, stuck: ['mask'] }), epic, [stuckLine('Dragon Mask')]],
+      [
+        'several stuck pieces',
+        plan({ left: 60, stuck: ['mask', 'hood', 'sword'] }),
+        epic,
+        ["Dragon Mask and 2 more can't reach their goal with kards: a step on the way has no kard cost in Settings → Fusion rules."],
+      ],
+      [
+        'next and stuck with no rows',
+        plan({ left: 5, next: { cardId: 'hood', needs: 27 }, stuck: ['mask'] }),
+        epic,
+        ['Not enough kards to finish a piece yet: Lin Kuei Hood needs 27 to reach F10, 22 more than you have.', stuckLine('Dragon Mask')],
+      ],
+      ['a character step too dear', plan({ left: 1, cheapest: 2 }), diamond, ['Not enough kards for any step yet: the cheapest next step costs 2.']],
+      ['no step costs known', plan({ left: 1, cheapest: null }), diamond, ['Not enough kards for any step yet.']],
+      [
+        'next with kards left',
+        plan({ assignments: [row], left: 33, next: { cardId: 'mask', needs: 36 } }),
+        epic,
+        ['Next: Dragon Mask needs 36 kards to reach F10, 3 more than you have left.'],
+      ],
+      ['next with none left', plan({ assignments: [row], left: 0, next: { cardId: 'mask', needs: 36 } }), epic, ['Next: Dragon Mask needs 36 kards to reach F10.']],
+      ['next needing 1 kard', plan({ assignments: [row], left: 0, next: { cardId: 'ring', needs: 1 } }), epic, ['Next: Kori Ring needs 1 kard to reach F4.']],
+      ['stuck after rows', plan({ assignments: [row], left: 33, stuck: ['mask'] }), epic, [stuckLine('Dragon Mask')]],
+      ['rows and nothing else', plan({ assignments: [row], left: 33 }), epic, []],
+    ];
+    for (const [name, p, rule, notes] of cases) expect(kardNotes(p, rule, cards), name).toEqual(notes);
+  });
+
+  // Value: protects=the footer explains only the kinds of kards you hold; fails_when=the character or gear sentence shows
+  // without kards of that kind, or is missing with them; why_new=built inline in PlanView with no test; seam=none;
+  // no_claim=the "After fusing… tap Use" sentence that PlanView adds after it
+  it('explains character and gear kards only for the kinds that have kards', () => {
+    const chars = 'Character kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra. ';
+    const gearText = 'Gear kards finish one piece at a time, the one needing fewest kards first, since gear only gets its special effect at F10. ';
+    expect(kardFooter([diamond])).toBe(chars);
+    expect(kardFooter([epic])).toBe(gearText);
+    expect(kardFooter([diamond, epic])).toBe(chars + gearText);
+    expect(kardFooter([{ ...diamond, fusionUpKards: 0 }, epic])).toBe(gearText);
+    expect(kardFooter([])).toBe('');
   });
 });
 

@@ -1,3 +1,4 @@
+import { nameKey } from './catalog';
 import { isKasketExcluded } from './kaskets';
 import type { AppState, Card, DropEntry, Pack, RarityRule } from './types';
 
@@ -35,8 +36,8 @@ export function ascensionCaps(rule: RarityRule) {
 /** Stored level where Fusion Up Kards become usable, or null. */
 export const thresholdLevel = (rule: RarityRule) => (rule.fusionUpThreshold == null ? null : fLevel(rule.fusionUpThreshold));
 
-/** The card's goal: its own override (e.g. a Realm Klash epic bought to max), else the rarity's. */
-export const cardGoal = (card: Card, rule: RarityRule) => card.goal ?? rule.goal;
+/** The card's goal: max for Realm Klash gear (always bought to max), else its own override, else the rarity's. */
+export const cardGoal = (card: Card, rule: RarityRule) => (rule.kind === 'equipment' && onRealmKlashList(card) ? 'max' : (card.goal ?? rule.goal));
 
 /** The level this card is being worked toward: rarity max, per-card cap, or the kard threshold. */
 export function targetLevel(card: Card, rule: RarityRule) {
@@ -83,7 +84,7 @@ interface KardAssignment {
   kards: number;
 }
 
-interface KardPlan {
+export interface KardPlan {
   assignments: KardAssignment[];
   /** Kards the plan couldn't use: not enough for any remaining character step, or, for gear, to finish the next piece. */
   left: number;
@@ -120,25 +121,12 @@ export function cardWeight(state: AppState, card: Card) {
 }
 
 /**
- * Realm Klash gear: equipment bought to max (its goal override) or sold as a Blood Ruby store item. It's maxed
- * with Blood Rubies, which come in daily, so Fusion Up Kards (much harder to get) are never spent on it.
+ * Realm Klash gear: equipment on the fixed REALM_KLASH_GEAR list, matched by name. It's maxed with Blood Rubies,
+ * which come in daily, so Fusion Up Kards (much harder to get) are never spent on it and Kaskets never give it. Only the
+ * name counts, not the card's goal or its store items, so deleting or clearing a store item can't change it.
  */
 export function isRealmKlashGear(state: AppState, card: Card) {
-  if (state.rarities.find((r) => r.id === card.rarityId)?.kind !== 'equipment') return false;
-  return card.goal === 'max' || state.packs.some((p) => p.store && p.currencyId === REALM_KLASH_CURRENCY && p.drops.some((d) => d.cardId === card.id));
-}
-
-/**
- * Whether Clear expired keeps this pack: a Blood Ruby store item for gear you still have. Once a gear rarity's Track
- * until is Max, the store item is the only thing marking a piece added after that as Realm Klash gear, so deleting it
- * would let the Kard plan spend kards on the piece. Maxed cards are deleted, so any card still here is short of its goal.
- */
-export function keepWhenExpired(state: AppState, pack: Pack) {
-  if (!pack.store || pack.currencyId !== REALM_KLASH_CURRENCY) return false;
-  return pack.drops.some((d) => {
-    const card = state.cards.find((c) => c.id === d.cardId);
-    return !!card && state.rarities.find((r) => r.id === card.rarityId)?.kind === 'equipment';
-  });
+  return state.rarities.find((r) => r.id === card.rarityId)?.kind === 'equipment' && onRealmKlashList(card);
 }
 
 /** Fusion Up Kards needed to go from stored level `level` to the next one, or null if kards can't do that step. */
@@ -468,6 +456,13 @@ export interface Plan {
   /** Expected copies gained per card if you follow the plan. */
   expectedGains: Map<string, number>;
 }
+
+/** Realm Klash gear: a fixed set of Epic pieces sold only for Blood Rubies. No more are being added. */
+const REALM_KLASH_GEAR = ['Bloody Shokan Armor', 'Bloody Tomahawk', 'Bloody Voodoo Doll', 'Datusha, Bane of the Moroi', 'Devastator', "Blaze's Life Force", "Moloch's Ball and Chain", 'Shadow Sash', "Shang Tsung's Stone", "Sindel's Signet Ring"];
+const REALM_KLASH_KEYS = new Set(REALM_KLASH_GEAR.map(nameKey));
+/** Whether a name is on the Realm Klash list (case, word order and apostrophes don't matter). */
+export const isRealmKlashName = (name: string) => REALM_KLASH_KEYS.has(nameKey(name));
+const onRealmKlashList = (card: Pick<Card, 'name'>) => isRealmKlashName(card.name);
 
 /** Blood Ruby gear order, by name, for gear that isn't in the saved order yet. */
 const DEFAULT_GEAR_ORDER = ['Shadow Sash', "Moloch's Ball and Chain", 'Devastator', 'Datusha, Bane of the Moroi', 'Bloody Tomahawk'];
