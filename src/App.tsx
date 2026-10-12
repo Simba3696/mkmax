@@ -13,7 +13,7 @@ import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
 import PlanView from './views/PlanView';
 import PacksView, { type PackFocus } from './views/PacksView';
-import CardsView from './views/CardsView';
+import CardsView, { type CardsPage } from './views/CardsView';
 import SettingsView from './views/SettingsView';
 
 const TABS = [
@@ -119,8 +119,12 @@ export default function App() {
     if (!('setAppBadge' in navigator)) return;
     (soon ? navigator.setAppBadge(soon) : navigator.clearAppBadge()).catch(() => {});
   }, [soon]);
+  // Cards and Tower gear share the Cards tab. Tapping the tab while on it switches between them; coming from another
+  // tab always opens the card list, as the tab did before it could switch.
+  const [cardsPage, setCardsPage] = useState<CardsPage>('cards');
   const go = (t: TabId) => {
     if (t === tab) return;
+    if (t === 'cards') setCardsPage('cards');
     enterDir.current = tabIndex(t) > tabIndex(tab) ? 1 : -1;
     setTab(t);
     history.replaceState(null, '', `#${t}`);
@@ -165,7 +169,7 @@ export default function App() {
           : 'text-muted md:hover:bg-panel md:hover:text-fg'
       }`}
       aria-current={tab === t.id ? 'page' : undefined}
-      onClick={() => go(t.id)}
+      onClick={() => (t.id === 'cards' && tab === 'cards' ? flipCards() : go(t.id))}
     >
       <span className={`flex relative ${tab === t.id ? 'text-red' : ''}`}>
         <t.Icon />
@@ -181,6 +185,10 @@ export default function App() {
       <span>{t.label}</span>
     </button>
   );
+  const flipCards = () => {
+    setCardsPage((p) => (p === 'cards' ? 'towers' : 'cards'));
+    scrollRoot()?.scrollTo({ top: 0 });
+  };
   // The logo goes back to the Plan, the screen the app opens on; on the Plan it scrolls back to the top.
   const home = () => (tab === 'plan' ? scrollRoot()?.scrollTo({ top: 0 }) : go('plan'));
   // The padding gives it a thumb-sized tap area, and the matching negative margin leaves it where it was. On the rail it
@@ -213,7 +221,7 @@ export default function App() {
         <div className="max-w-page md:max-w-[1400px] mx-auto p-4 md:px-6 md:py-6 lg:px-8" ref={pageRef}>
           {tab === 'plan' && <PlanView goto={go} openPack={openPack} />}
           {tab === 'packs' && <PacksView focus={focusPack} onFocused={() => setFocusPack(null)} />}
-          {tab === 'cards' && <CardsView />}
+          {tab === 'cards' && <CardsView sub={cardsPage} onSub={setCardsPage} />}
           {tab === 'settings' && <SettingsView />}
         </div>
       </main>

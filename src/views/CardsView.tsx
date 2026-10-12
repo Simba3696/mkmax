@@ -167,16 +167,18 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
   );
 }
 
-export default function CardsView() {
-  const [sub, setSub] = useState<'cards' | 'towers'>('cards');
+/** Which of the Cards tab's two pages is showing. App holds it, so tapping the Cards tab again can switch it. */
+export type CardsPage = 'cards' | 'towers';
+
+export default function CardsView({ sub, onSub }: { sub: CardsPage; onSub: (sub: CardsPage) => void }) {
   return (
     <>
       {/* A short switch on wide screens: stretched across 1000px+ it reads as a banner, not two buttons. */}
       <div className="flex mb-[0.8rem] border border-line rounded-panel overflow-hidden md:max-w-[360px]">
-        <button className={segment(sub === 'cards')} onClick={() => setSub('cards')}>
+        <button className={segment(sub === 'cards')} onClick={() => onSub('cards')} aria-pressed={sub === 'cards'}>
           Cards
         </button>
-        <button className={segment(sub === 'towers')} onClick={() => setSub('towers')}>
+        <button className={segment(sub === 'towers')} onClick={() => onSub('towers')} aria-pressed={sub === 'towers'}>
           Tower gear
         </button>
       </div>

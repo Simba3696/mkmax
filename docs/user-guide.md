@@ -177,7 +177,7 @@ The Packs tab shows a red count of packs the plan says to buy that end within 24
 
 ### Cards and Tower gear
 
-Two buttons at the top switch between your card list and the [Tower gear](#tower-gear) view. The tab always opens on **Cards**.
+Two buttons at the top switch between your card list and the [Tower gear](#tower-gear) view. Tapping the **Cards** tab again while you're on it switches too, and starts the page at the top. Coming from another tab, it always opens on **Cards**.
 
 ### Add card
 

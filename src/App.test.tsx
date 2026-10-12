@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { StoreProvider } from './store';
 import { PlanProvider } from './planner';
 import App from './App';
@@ -50,5 +50,49 @@ describe('the MK MAX logo', () => {
     fireEvent.click(logo);
     expect(tab('Plan').getAttribute('aria-current')).toBe('page');
     expect(scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 0 });
+  });
+});
+
+describe('the Cards tab', () => {
+  // Value: protects=tapping Cards while on Cards switches between the card list and Tower gear, scrolled to the top,
+  // and Cards opened from another tab starts on the card list; fails_when=a second tap does nothing, the switch and the
+  // tab disagree, or Tower gear stays picked after leaving; why_new=new behaviour; seam=none; no_claim=the slide
+  // animation (jsdom has no layout; scrollTo is a spy)
+  it('switches between Cards and Tower gear when tapped again, and opens on Cards', () => {
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const nav = within(screen.getByRole('navigation', { name: 'Tabs' }));
+    const cardsTab = () => nav.getByRole('button', { name: 'Cards' });
+    const towers = () => screen.queryByText(/Tower gear is farmed, not bought/);
+    const pressed = (name: string) => screen.getByRole('button', { name, pressed: true });
+
+    fireEvent.click(cardsTab());
+    expect(cardsTab().getAttribute('aria-current')).toBe('page');
+    expect(pressed('Cards')).toBeTruthy();
+    expect(towers()).toBeNull();
+    const root = document.querySelector<HTMLElement>('[data-scroll-root]')!;
+    const scrollTo = vi.fn();
+    root.scrollTo = scrollTo;
+
+    fireEvent.click(cardsTab());
+    expect(pressed('Tower gear')).toBeTruthy();
+    expect(towers()).toBeTruthy();
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 0 });
+
+    fireEvent.click(cardsTab());
+    expect(pressed('Cards')).toBeTruthy();
+    expect(towers()).toBeNull();
+
+    // Left on Tower gear, Cards opens on the card list again, as it always has.
+    fireEvent.click(cardsTab());
+    fireEvent.click(nav.getByRole('button', { name: 'Packs' }));
+    fireEvent.click(cardsTab());
+    expect(pressed('Cards')).toBeTruthy();
+    expect(towers()).toBeNull();
   });
 });

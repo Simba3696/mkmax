@@ -31,7 +31,7 @@ describe('Cards: Fusion Up Kards', () => {
     render(
       <StoreProvider>
         <PlanProvider>
-          <CardsView />
+          <CardsView sub="cards" onSub={() => {}} />
         </PlanProvider>
       </StoreProvider>,
     );
