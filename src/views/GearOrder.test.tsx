@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { defaultState } from '../defaults';
 import { StoreProvider } from '../store';
 import { PlanProvider } from '../planner';
@@ -61,13 +61,13 @@ describe('Realm Klash gear with no store item on sale', () => {
     const two = renderWith([gear('sash', 'Shadow Sash'), gear('dev', 'Devastator')]);
     const settings = two.getByTestId('settings');
     expect(settings.textContent).toContain('Blood Ruby gear order');
-    expect(settings.textContent).toContain('Not on sale now: Devastator, Shadow Sash.');
+    expect(settings.textContent).toContain('Not on sale now: Shadow Sash, Devastator.');
     expect(settings.textContent).toContain("Nothing plans them until they're back in the shop; then add them from In the shop on Packs.");
     expect(settings.textContent).not.toContain('Blood Rubies max these one at a time');
     // Nothing queued, so the Plan has no "all maxed" or "takes N Blood Rubies" line, only the waiting one.
     const plan = two.getByTestId('plan');
     expect(plan.querySelectorAll('p')).toHaveLength(1);
-    expect(plan.textContent).toContain('Not on sale now: Devastator, Shadow Sash.');
+    expect(plan.textContent).toContain('Not on sale now: Shadow Sash, Devastator.');
     expect(plan.textContent).not.toMatch(/all maxed|in all/);
     cleanup();
     localStorage.clear();
@@ -94,5 +94,22 @@ describe('Realm Klash gear with no store item on sale', () => {
     const none = renderWith([gear('sash', 'Shadow Sash')], [item('sash')]);
     expect(none.getByTestId('settings').textContent).toContain('1. Shadow Sash');
     expect(none.container.textContent).not.toContain('Not on sale now');
+  });
+
+  // Value: protects=↓ moves the piece past its neighbour on screen and saves an order that keeps the off-sale piece in
+  // its place; fails_when=the arrows pass the wrong pieces, move off by one, or save only the pieces on sale; why_new=
+  // only moveInGearOrder itself was tested; seam=none; no_claim=sync of the saved order
+  it('moves a piece down with the arrow and keeps a piece that is off sale first', () => {
+    renderWith([gear('sash', 'Shadow Sash'), gear('mol', "Moloch's Ball and Chain"), gear('dev', 'Devastator')], [item('mol'), item('dev')]);
+    const order = () => screen.getByTestId('settings').textContent;
+    expect(order()).toMatch(/1\. Moloch.*2\. Devastator.*Not on sale now: Shadow Sash\./);
+    fireEvent.click(screen.getAllByLabelText('Move down')[0]);
+    expect(order()).toMatch(/1\. Devastator.*2\. Moloch/);
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).gearOrder).toEqual(['sash', 'dev', 'mol']);
+    // Value: protects=↑ moves the tapped piece above the one before it; fails_when=the ↑ button passes the wrong
+    // neighbour or direction; why_new=only ↓ was clicked; seam=none; no_claim=none beyond protects
+    fireEvent.click(screen.getAllByLabelText('Move up')[1]);
+    expect(order()).toMatch(/1\. Moloch.*2\. Devastator/);
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).gearOrder).toEqual(['sash', 'mol', 'dev']);
   });
 });

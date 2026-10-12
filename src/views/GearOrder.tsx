@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
 import { usePlan } from '../planner';
-import { REALM_KLASH_CURRENCY, gearForecast, gearQueue, gearWaiting, levelLabel, targetLevel } from '../engine';
+import { REALM_KLASH_CURRENCY, gearForecast, gearQueue, gearWaiting, levelLabel, moveInGearOrder, targetLevel } from '../engine';
 import { CardThumb, daysFromNow, FoldCard, fmt, FusionLabel } from '../ui';
 import { grow, hint, row, rowTitle } from '../classes';
 
@@ -58,12 +58,10 @@ export function GearSummary() {
 export default function GearOrder() {
   const { update, ctx, gear, done, onDay, rubyName, waiting } = useGear();
   if (!gear.length && !waiting.length) return null;
-  // Swap a gear piece with its neighbour and save the whole order, so the list stays as shown.
+  // Move a gear piece past its neighbour and save the whole order, so the list stays as shown.
   const move = (i: number, by: number) =>
     update((d) => {
-      const ids = gear.map((g) => g.card.id);
-      [ids[i], ids[i + by]] = [ids[i + by], ids[i]];
-      d.gearOrder = [...ids, ...(d.gearOrder ?? []).filter((id) => !ids.includes(id))];
+      d.gearOrder = moveInGearOrder(d, gear[i].card.id, gear[i + by].card.id);
     });
   return (
     <FoldCard id="settings-gear" title="Blood Ruby gear order">
