@@ -539,6 +539,15 @@ export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
 }
 
 /**
+ * Realm Klash gear still to max that no Blood Ruby store item on sale now sells: nothing plans it (no kards, no
+ * rubies) until the shop has it again, by name.
+ */
+export function gearWaiting(ctx: Ctx, now: Date): Card[] {
+  const queued = new Set(gearQueue(ctx, now).map((g) => g.card.id));
+  return ctx.state.cards.filter((c) => isRealmKlashGear(ctx.state, c) && !queued.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
  * Blood Rubies max the Realm Klash gear first, one piece at a time in gearQueue order; nothing else is bought
  * until every piece is done or out of purchases. Then, for every currency, greedy: repeatedly buy the
  * affordable pack with the best (marginal EV / cost), updating expected card progress after each buy so later

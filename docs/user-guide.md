@@ -275,7 +275,7 @@ Packs are split into three sections:
 - **Coming up**: packs whose start date is still ahead.
 - **Expired (N)**: folded; tap it to see them.
 
-Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all, except Blood Ruby store items for Realm Klash gear you're still maxing, since next season's **Rerun** copies them. Only the latest run of each item stays (Rerun finds it by name), and it clears once the piece is maxed. When only those are left, Clear expired hides. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
+Expired packs are left out of the plan and Pack ranking. They stay until you clear them: **Clear expired** (two taps, with Undo) deletes them all, except Blood Ruby store items for Realm Klash gear you're still maxing, since next season's **Rerun** copies them. Only the latest run of each item stays (Rerun finds it by name), and it clears once the piece is maxed. Each kept item says so on its card. If you delete one anyway, next season's item comes in without its drop, so pick the piece and tick **Store item** again. When only kept items are left, Clear expired hides. The Undo label counts the packs it actually removed. When the shop has a pack again that you still have under Expired, **In the shop** suggests it with **Rerun** instead of **Add**.
 
 - **Sort** shows once you have 2 packs: **Ending soonest** (the default) or **Currency**, which groups each section's packs under a heading per currency, in the order they're listed in Settings. Sort choices are remembered on each device and aren't synced.
 - **Summary line**, for example "400 Souls · 3 cards per buy · bought 2/5" for a random pack, or "300 Blood Rubies · store item · bought 0/2" for a store item. 2/5 means 2 bought of a 5-purchase limit.
@@ -408,7 +408,7 @@ The note at the bottom repeats the basics: tap a pack to jump to it, Blood Ruby 
 
 ### Gear summary
 
-With a daily Blood Ruby income set, the Blood Rubies part of **What to buy** says when all the Realm Klash gear will be maxed (for example "around Feb 6, 2027", or **now**). Without a daily income it shows how many rubies the gear takes in all and asks you to set one. Settings → Blood Ruby gear order sets the order and shows each piece's own date. Both go away once the gear is maxed. See [How it works](how-it-works.md#scoring).
+With a daily Blood Ruby income set, the Blood Rubies part of **What to buy** says when all the Realm Klash gear will be maxed (for example "around Feb 6, 2027", or **now**). Without a daily income it shows how many rubies the gear takes in all and asks you to set one. Settings → Blood Ruby gear order sets the order and shows each piece's own date. Both go away once the gear is maxed. A Realm Klash piece you're still maxing whose store item isn't on sale gets no kards and no rubies, so both places list it as "Not on sale now" until you add its store item again from In the shop. See [How it works](how-it-works.md#scoring).
 
 ### When What to buy is empty
 
@@ -458,7 +458,7 @@ Each currency lists its best 3 packs. **Show N more** lists the rest, and **Show
 
 ## Settings
 
-Settings has, in order: **Sync between devices**, **Fusion rules**, **Currencies**, **Blood Ruby gear order** (only while gear is left to max), **Priority weights**, **Data**, and the version. Most edits here have no Undo.
+Settings has, in order: **Sync between devices**, **Fusion rules**, **Currencies**, **Blood Ruby gear order** (only while Realm Klash gear is left to max), **Priority weights**, **Data**, and the version. Most edits here have no Undo.
 
 ### Sync between devices
 
@@ -502,7 +502,7 @@ One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gol
 
 ### Blood Ruby gear order
 
-The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then the other five by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now.
+The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then the other five by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now. A piece with no store item on sale at all is listed under the order as "Not on sale now".
 
 ### Priority weights
 

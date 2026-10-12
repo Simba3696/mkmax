@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -229,6 +229,18 @@ describe('kameos', () => {
     // Value: protects=the documented order for all ten pieces, the default five then the rest by name; fails_when=a name
     // changes in REALM_KLASH_GEAR or DEFAULT_GEAR_ORDER but not the other; why_new=nothing checked the two lists together;
     // seam=none; no_claim=new pieces (the list is final)
+    // Value: protects=the Plan can name Realm Klash pieces nothing plans; fails_when=a piece with no store item on sale
+    // is missing, or a piece on sale, other gear or a character is listed; why_new=the list is new; seam=none;
+    // no_claim=the wording (GearOrder)
+    it('lists the Realm Klash pieces with no store item on sale', () => {
+      const s = setup(
+        [gear('Shadow Sash', F(2)), gear('Devastator', F(2)), gear('Bloody Tomahawk', F(2)), gear('Kori Blade', F(2)), card('Devastator x', F(2), { name: 'Devastator' })],
+        [item('Shadow Sash'), item('Bloody Tomahawk', { endsAt: '2026-01-01T00:00' })],
+      );
+      // Tomahawk's item expired on Jan 1; Devastator has none.
+      expect(gearWaiting(buildCtx(s), NOW).map((c) => c.name)).toEqual(['Bloody Tomahawk', 'Devastator']);
+    });
+
     it('orders all ten pieces: the default five, then the other five by name', () => {
       const names = ['Bloody Shokan Armor', 'Bloody Tomahawk', 'Bloody Voodoo Doll', 'Datusha, Bane of the Moroi', 'Devastator', "Blaze's Life Force", "Moloch's Ball and Chain", 'Shadow Sash', "Shang Tsung's Stone", "Sindel's Signet Ring"];
       const s = setup(names.map((n) => gear(n, F(2))), names.map((n) => item(n)));

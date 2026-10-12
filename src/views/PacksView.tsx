@@ -151,6 +151,12 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         <PackTiming pack={p} now={now} />
       </div>
       {p.kasket !== undefined && <div className={`${note} mt-[0.4rem]`}>{kasketLine(kasketPool(ctx, p))}</div>}
+      {packStatus(p, now) === 'expired' && keepWhenExpired(state, p) && (
+        <div className={`${note} mt-[0.4rem]`}>
+          Kept for next season: <b>Rerun</b> copies its drop and Store item setting, so Blood Rubies keep buying the piece. If you delete it, pick the piece and
+          tick Store item again when the shop has it.
+        </div>
+      )}
       <DropList pack={p} drops={packDrops(ctx, p)} cardName={cardName} open={openDrops.has(p.id)} onToggle={() => toggleDrops(p.id)} />
       <div className="hidden lg:block lg:flex-1" aria-hidden />
       <div className={actions}>
@@ -244,12 +250,18 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
           {clearable.length > 0 && (
             <ConfirmButton
               label="Clear expired"
-              onConfirm={() =>
+              onConfirm={() => {
+                // Counted from the change itself, not the list on screen, which a sync could have changed.
+                let cleared = 0;
                 update(
-                  (d) => void (d.packs = d.packs.filter((p) => packStatus(p, now) !== 'expired' || keepWhenExpired(d, p))),
-                  `Cleared ${clearable.length} expired pack${clearable.length === 1 ? '' : 's'}`,
-                )
-              }
+                  (d) => {
+                    const kept = d.packs.filter((p) => packStatus(p, now) !== 'expired' || keepWhenExpired(d, p));
+                    cleared = d.packs.length - kept.length;
+                    d.packs = kept;
+                  },
+                  () => `Cleared ${cleared} expired pack${cleared === 1 ? '' : 's'}`,
+                );
+              }}
             />
           )}
         </div>
