@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Card, RarityRule } from './types';
-import { levelLabel, type KasketPool } from './engine';
+import { levelLabel, targetLevel, type KardPlan, type KasketPool } from './engine';
 import { btn, card, chipTone, type ChipTone } from './classes';
 
 export function fmt(n: number) {
@@ -272,6 +272,52 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
     <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={() => (armed ? onConfirm() : setArmed(true))}>
       {armed ? 'Tap again to confirm' : label}
     </button>
+  );
+}
+
+/**
+ * The Fusion Up Kard plan's notes for one rarity, in the order the Plan shows them: with no rows, why nothing is
+ * planned; with rows, the gear piece the leftover kards go to next. Gear that a step with no kard cost blocks is named
+ * either way, since "not enough kards" would be wrong for it.
+ */
+export function kardNotes(plan: KardPlan, rule: RarityRule, cards: Map<string, Card>): string[] {
+  if (plan.cards === 0)
+    return [
+      plan.realmKlash > 0
+        ? `No ${rule.label} card at F${rule.fusionUpThreshold} or higher that kards can go to yet, so these kards wait. Realm Klash gear gets none.`
+        : `No ${rule.label} card at F${rule.fusionUpThreshold} or higher yet, so these kards wait.`,
+    ];
+  const next = plan.next && cards.get(plan.next.cardId);
+  const nextGoal = next && levelLabel(rule, targetLevel(next, rule));
+  const short = plan.next ? plan.next.needs - plan.left : 0;
+  const stuck = plan.stuck?.map((id) => cards.get(id)).filter((c) => c != null) ?? [];
+  const stuckNote =
+    stuck.length === 0
+      ? null
+      : stuck.length === 1
+        ? `${stuck[0].name} can't reach ${levelLabel(rule, targetLevel(stuck[0], rule))} with kards: a step on the way has no kard cost in Settings → Fusion rules.`
+        : `${stuck[0].name} and ${stuck.length - 1} more can't reach their goal with kards: a step on the way has no kard cost in Settings → Fusion rules.`;
+  const notes: string[] = [];
+  if (plan.assignments.length === 0) {
+    notes.push(
+      next && plan.next
+        ? `Not enough kards to finish a piece yet: ${next.name} needs ${plan.next.needs} to reach ${nextGoal}, ${short} more than you have.`
+        : (stuckNote ?? `Not enough kards for any step yet${plan.cheapest != null ? `: the cheapest next step costs ${plan.cheapest}.` : '.'}`),
+    );
+    if (next && stuckNote) notes.push(stuckNote);
+    return notes;
+  }
+  if (next && plan.next) notes.push(`Next: ${next.name} needs ${plan.next.needs} kard${plan.next.needs === 1 ? '' : 's'} to reach ${nextGoal}${plan.left > 0 ? `, ${short} more than you have left` : ''}.`);
+  if (stuckNote) notes.push(stuckNote);
+  return notes;
+}
+
+/** How the Kard plan shares kards out, for the kinds that have kards: characters on cheapest steps, gear piece by piece. */
+export function kardFooter(rarities: RarityRule[]) {
+  const hasKards = (equipment: boolean) => rarities.some((r) => (r.kind === 'equipment') === equipment && r.fusionUpKards > 0);
+  return (
+    (hasKards(false) ? 'Character kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra. ' : '') +
+    (hasKards(true) ? 'Gear kards finish one piece at a time, the one needing fewest kards first, since gear only gets its special effect at F10. ' : '')
   );
 }
 

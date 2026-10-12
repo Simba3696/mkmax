@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
-import { ascensionCaps, buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, kardStep, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
+import { ascensionCaps, buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isRealmKlashName, kardStep, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice, useNow } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -37,23 +37,20 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
 
 /**
  * Goal for rarities with a Fusion Up Kard threshold: stop at the threshold (kards finish it) or buy all the way
- * to max (e.g. Realm Klash epics). Stored only when it differs from the rarity's goal.
+ * to max. Stored only when it differs from the rarity's goal. Realm Klash gear is always bought to max, so it gets
+ * a label instead of a choice (see isRealmKlashName).
  */
-function GoalSelect({ rule, value, onChange }: { rule: RarityRule; value: Card['goal']; onChange: (v: Card['goal']) => void }) {
+function GoalSelect({ rule, name, value, onChange }: { rule: RarityRule; name: string; value: Card['goal']; onChange: (v: Card['goal']) => void }) {
   // Only equipment switches between "F3, Kards finish it" and buying to max; characters are always maxed.
   if (rule.kind !== 'equipment' || rule.fusionUpThreshold == null) return null;
-  const current = value ?? rule.goal;
   const max = levelLabel(rule, maxFusion(rule));
-  // A stored Max marks Realm Klash gear (see isRealmKlashGear) even once the rarity's own goal is Max too, which
-  // happens to gear set to Max before its Track until was. Say so, and offer the plain Max that clears the mark.
-  const stuck = value === 'max' && rule.goal === 'max';
+  if (isRealmKlashName(name)) return <span className={`${check} text-muted`}>Realm Klash gear (bought to {max} with Blood Rubies)</span>;
   return (
     <label className={check}>
       Goal
-      <select value={current} onChange={(e) => onChange(e.target.value === rule.goal || e.target.value === 'plain' ? undefined : (e.target.value as Card['goal']))}>
+      <select value={value ?? rule.goal} onChange={(e) => onChange(e.target.value === rule.goal ? undefined : (e.target.value as Card['goal']))}>
         <option value="threshold">F{rule.fusionUpThreshold} (Kards finish it)</option>
-        <option value="max">{`Max (${max}${value === 'max' || rule.goal === 'threshold' ? ', Realm Klash gear' : ''})`}</option>
-        {stuck && <option value="plain">{`Max (${max})`}</option>}
+        <option value="max">{`Max (${max})`}</option>
       </select>
     </label>
   );
@@ -384,7 +381,7 @@ function CardList() {
               </select>
             </label>
           )}
-          {draftRule && <GoalSelect rule={draftRule} value={draft.goal} onChange={(v) => setDraft({ ...draft, goal: v })} />}
+          {draftRule && <GoalSelect rule={draftRule} name={draft.name} value={draft.goal} onChange={(v) => setDraft({ ...draft, goal: v })} />}
           {draftRule && <CapSelect rule={draftRule} value={draft.maxLevel} onChange={(v) => setDraft({ ...draft, maxLevel: v })} />}
           {draftRule?.hasGuests && (
             <label className={check}>
@@ -543,7 +540,7 @@ function CardList() {
                     Use {kardCost} kard{kardCost === 1 ? '' : 's'}
                   </button>
                 )}
-                <GoalSelect rule={rule} value={c.goal} onChange={(v) => patch(c.id, { goal: v })} />
+                <GoalSelect rule={rule} name={c.name} value={c.goal} onChange={(v) => patch(c.id, { goal: v })} />
                 <CapSelect rule={rule} value={c.maxLevel} onChange={(v) => patch(c.id, { maxLevel: v })} />
                 {rule.hasGuests && (
                   <label className={check}>

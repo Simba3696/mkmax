@@ -79,7 +79,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
   const groups = { active: [] as Pack[], upcoming: [] as Pack[], expired: [] as Pack[] };
   for (const p of state.packs) groups[packStatus(p, now)].push(p);
   for (const g of Object.values(groups)) g.sort((a, b) => (sortBy === 'currency' ? curIndex(a) - curIndex(b) : 0) || urgency(a) - urgency(b));
-  // Realm Klash gear store items stay even once expired, since they're what keeps kards off the piece (see keepWhenExpired).
+  // Realm Klash gear store items stay even once expired, since next season's Rerun copies them (see keepWhenExpired).
   const clearable = groups.expired.filter((p) => !keepWhenExpired(state, p));
   /**
    * A status group's packs, with a currency heading before each currency's packs when sorted by currency. Phones stack
@@ -244,7 +244,10 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
             <ConfirmButton
               label="Clear expired"
               onConfirm={() =>
-                update((d) => void (d.packs = d.packs.filter((p) => packStatus(p, now) !== 'expired' || keepWhenExpired(d, p))), `Cleared ${clearable.length} expired packs`)
+                update(
+                  (d) => void (d.packs = d.packs.filter((p) => packStatus(p, now) !== 'expired' || keepWhenExpired(d, p))),
+                  `Cleared ${clearable.length} expired pack${clearable.length === 1 ? '' : 's'}`,
+                )
               }
             />
           )}
