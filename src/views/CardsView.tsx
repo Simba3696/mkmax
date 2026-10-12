@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { newId, useStore } from '../store';
+import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { ascensionCaps, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isRealmKlashName, kardStep, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
@@ -304,7 +304,7 @@ function CardList() {
 
   /** Fuse one level with Fusion Up Kards from the Wallet, as done in the game. */
   function fuse(c: Card, cost: number) {
-    update((d) => void fuseWithKards(d, c.id), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${c.name}`);
+    update((d) => (fuseWithKards(d, c.id) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${c.name}`);
   }
 
   function rename(c: Card, text: string) {

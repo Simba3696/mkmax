@@ -564,7 +564,7 @@ export function moveInGearOrder(state: AppState, id: string, past: string, by: -
   const to = ids.indexOf(past);
   // Already on the side the arrow points to: the order changed (a sync) after the screen showed it. Moving by where
   // the pieces sit now would send the piece back over its neighbour and undo the last move.
-  if (from < 0 || to < 0 || id === past || (by > 0) !== from < to) return null;
+  if (from < 0 || to < 0 || id === past || (by > 0) !== (from < to)) return null;
   ids.splice(from, 1);
   const at = ids.indexOf(past);
   ids.splice(by > 0 ? at + 1 : at, 0, id);
@@ -746,7 +746,8 @@ export function fuseWithKards(d: AppState, cardId: string): number | null {
 /**
  * Buy (delta 1) or take back (delta -1) one purchase of a pack: counts it, moves the cost out of (or back into)
  * the balance, and for a store item, which always gives its card, levels that card. Random packs leave the
- * cards to the "What did you pull?" step. Returns false when there's nothing to take back.
+ * cards to the "What did you pull?" step. Returns false when nothing was logged: the pack is gone, or a −1 has no
+ * purchase left to take back.
  *
  * A buy the balance doesn't cover takes it below 0 rather than stopping at 0: the typed balance was out of date,
  * and -1 (for a mis-tap) has to give back exactly what the buy took. The planner counts a negative balance as 0.

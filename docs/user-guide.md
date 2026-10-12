@@ -578,7 +578,7 @@ The bottom of Settings shows which version you have and the date of that change,
 
 - Adds MK Mobile Base art to cards that have none.
 - Takes the Realm Klash season end from the event schedule.
-- Re-reads the event schedule when you come back after an hour or more.
+- Re-reads the event schedule when you come back after an hour or more, and tries again when you come back if it couldn't be downloaded.
 - Updates countdowns and the plan every minute, and again when you come back to the app after being away for half a minute or more, so a pack that ended while it was in the background stops being planned.
 - Removes cards already at their goal when it loads.
 

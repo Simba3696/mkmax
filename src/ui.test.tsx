@@ -127,6 +127,58 @@ describe('the shared clock', () => {
     expect(seen.at(-1)!.toISOString()).toBe(new Date('2026-10-12T15:01:00').toISOString());
   });
 
+  // Regression: review of clock-and-gear-taps — a restore sending both events read the time on the second one
+  // Found by /review on 2026-10-13
+  // Value: protects=a restore that sends both a visibility change and pageshow is one return, read at most once;
+  // fails_when=the second event, finding no hidden time, counts as a long absence and reads a reading under a minute old;
+  // why_new=review; seam=none; no_claim=which order real browsers send them in
+  it('treats a restore that sends both events as one quick return', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const at = (t: string) => vi.setSystemTime(new Date(`2026-10-12T${t}`));
+    at('12:00:00');
+    render(<Clock />);
+    at('12:00:40');
+    show('hidden');
+    at('12:00:45');
+    show('visible');
+    act(() => void window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true })));
+    expect(new Set(seen).size).toBe(1);
+  });
+
+  // Value: protects=a long absence ended by both a visibility change and pageshow reads the time once; fails_when=a
+  // reading doesn't move the last-read time on, so the second event reads again and the planner runs twice; why_new=
+  // review (testing); seam=none; no_claim=which order real browsers send them in
+  it('reads the time once when a long absence ends with both events', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const at = (t: string) => vi.setSystemTime(new Date(`2026-10-12T${t}`));
+    at('12:00:00');
+    render(<Clock />);
+    at('12:00:40');
+    show('hidden');
+    at('15:00:00');
+    show('visible');
+    act(() => void window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true })));
+    expect(new Set(seen).size).toBe(2);
+    expect(seen.at(-1)!.toISOString()).toBe(new Date('2026-10-12T15:00:00').toISOString());
+  });
+
+  // Regression: review of clock-and-gear-taps — after the device clock went back, returns kept the old time
+  // Found by /review on 2026-10-13
+  // Value: protects=a return reads the time when the last reading is later than now (the clock was set back);
+  // fails_when=a negative age counts as fresh, so countdowns wait for the minute tick; why_new=review; seam=none;
+  // no_claim=time zone changes
+  it('reads the time on return after the device clock went back', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const at = (t: string) => vi.setSystemTime(new Date(`2026-10-12T${t}`));
+    at('12:00:00');
+    render(<Clock />);
+    at('11:00:00');
+    show('hidden');
+    at('11:05:00');
+    show('visible');
+    expect(seen.at(-1)!.toISOString()).toBe(new Date('2026-10-12T11:05:00').toISOString());
+  });
+
   // Regression: /ship review of todo-followups — a back-forward restore that sends only pageshow kept the old time
   // Found by /ship on 2026-10-12
   // Value: protects=a page restored from the back-forward cache reads the time when no visibility event comes;

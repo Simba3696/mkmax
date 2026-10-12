@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useStore } from '../store';
+import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { REALM_KLASH_CURRENCY, gearForecast, gearQueue, gearWaiting, levelLabel, moveInGearOrder, targetLevel } from '../engine';
 import { CardThumb, daysFromNow, FoldCard, fmt, FusionLabel } from '../ui';
@@ -63,7 +63,7 @@ export default function GearOrder() {
   const move = (i: number, by: -1 | 1) =>
     update((d) => {
       const order = moveInGearOrder(d, gear[i].card.id, gear[i + by].card.id, by);
-      if (!order) return false;
+      if (!order) return noChange;
       d.gearOrder = order;
     });
   return (

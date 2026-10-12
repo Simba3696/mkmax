@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useStore } from '../store';
+import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { REALM_KLASH_CURRENCY, daysToAfford, fuseWithKards, kardStep, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
 import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, kardFooter, kardNotes, NumInput, RarityBadge, SOURCE_LABELS, targetLine, timeUntil } from '../ui';
@@ -68,8 +68,12 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
   // A store item levels its card straight away. A random pack opens in Packs with "What did you pull?" showing.
   const buyNow = (pack: Pack) => {
-    update((d) => void recordPurchase(d, pack.id, 1), `Bought ${pack.name}`);
-    if (!pack.store) openPack(pack.id, true);
+    let bought = false;
+    update((d) => {
+      bought = recordPurchase(d, pack.id, 1);
+      return bought ? undefined : noChange;
+    }, `Bought ${pack.name}`);
+    if (bought && !pack.store) openPack(pack.id, true);
   };
   /** When the currency's daily income covers what "Save for" is short by, and whether the pack ends first. */
   const forecast = ({ currencyId, saveFor }: CurrencyPlan) => {
@@ -233,7 +237,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                         {/* One step per tap, as kards are used in the game; the plan updates after each. */}
                         {cost != null && (
                           <button
-                            onClick={() => update((d) => void fuseWithKards(d, a.cardId), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${name}`)}
+                            onClick={() => update((d) => (fuseWithKards(d, a.cardId) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${name}`)}
                             title={`Fuse ${name} to ${levelLabel(r, a.from + 1)} with ${cost} kard${cost === 1 ? '' : 's'} from the Wallet`}
                           >
                             Use {cost}

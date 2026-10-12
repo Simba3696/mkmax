@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { newId, useStore } from '../store';
+import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { REALM_KLASH_CURRENCY, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
 import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice } from '../ui';
@@ -102,8 +102,15 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
 
   // Store items give a known card, so buying one levels it up; for random packs we ask what was pulled.
   const buy = (p: Pack, delta: 1 | -1) => {
-    update((d) => void recordPurchase(d, p.id, delta), delta > 0 ? `Bought ${p.name}` : undefined);
-    if (!p.store) setPulling(delta > 0 ? p.id : null);
+    let done = false;
+    update(
+      (d) => {
+        done = recordPurchase(d, p.id, delta);
+        return done ? undefined : noChange;
+      },
+      delta > 0 ? `Bought ${p.name}` : undefined,
+    );
+    if (done && !p.store) setPulling(delta > 0 ? p.id : null);
   };
 
   /** A pulled card's row in "What did you pull?": + and − step its level. */

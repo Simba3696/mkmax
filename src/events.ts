@@ -41,22 +41,27 @@ const listeners = new Set<(e: EventSchedule) => void>();
 
 /** The schedule, fetched once and shared; refreshEvents() fetches it again. */
 function loadEvents(): Promise<EventSchedule> {
-  loaded ??= fetch(`${import.meta.env.BASE_URL}events.json`, { cache: 'no-cache' })
+  if (loaded) return loaded;
+  const load: Promise<EventSchedule> = fetch(`${import.meta.env.BASE_URL}events.json`, { cache: 'no-cache' })
     .then((r) => {
       if (!r.ok) throw new Error(`events.json: HTTP ${r.status}`);
       return r.json() as Promise<EventSchedule>;
     })
     .then((e) => {
+      // A download that a newer one has replaced (a pull to refresh while one was running) doesn't overwrite it.
+      if (loaded !== load) return e;
       current = e;
       fetchedAt = Date.now();
       listeners.forEach((l) => l(e));
       return e;
     })
     .catch((e) => {
-      loaded = null;
+      // Only if no newer download has started since, so a failed one can't cancel it.
+      if (loaded === load) loaded = null;
       throw e;
     });
-  return loaded;
+  loaded = load;
+  return load;
 }
 
 /**
@@ -68,11 +73,28 @@ export function refreshEvents(): Promise<unknown> {
   return loadEvents().catch(() => {});
 }
 
-// Coming back to the app after an hour or more also picks up a newer schedule.
+// Coming back to the app after an hour or more also picks up a newer schedule, including a restore from the
+// back-forward cache that sends only pageshow, and tries again if no download has worked yet.
 if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && fetchedAt && Date.now() - fetchedAt > 60 * 60 * 1000) void refreshEvents();
-  });
+  // A restore can send both events at once, so one download at a time, unless that one has hung for half a minute
+  // (a phone back on a patchy connection), which would otherwise stop every later return from refreshing.
+  let refreshingSince = 0;
+  const refreshIfOld = () => {
+    if (document.visibilityState !== 'visible') return;
+    const busy = Date.now() - refreshingSince;
+    if (refreshingSince && busy >= 0 && busy < 30 * 1000) return;
+    // A download time later than now means the device clock went back: that counts as old.
+    const age = Date.now() - fetchedAt;
+    const old = fetchedAt ? age < 0 || age > 60 * 60 * 1000 : !loaded;
+    if (!old) return;
+    const started = Date.now();
+    refreshingSince = started;
+    void refreshEvents().finally(() => {
+      if (refreshingSince === started) refreshingSince = 0;
+    });
+  };
+  document.addEventListener('visibilitychange', refreshIfOld);
+  window.addEventListener('pageshow', (e) => e.persisted && refreshIfOld());
 }
 
 /** The bundled schedule, or null until it loads (or if it isn't there). Updates when it's fetched again. */

@@ -36,7 +36,8 @@ const AWAY_MS = 30000;
 
 /**
  * The time, read again every minute so countdowns stay fresh, and when the app comes back after half a minute or more
- * in the background. PlanProvider holds the one clock the views share, as `usePlan().now`.
+ * in the background or is restored from the back-forward cache. A reading on return starts the minute over.
+ * PlanProvider holds the one clock the views share, as `usePlan().now`.
  */
 export function useNow() {
   const [now, setNow] = useState(() => new Date());
@@ -54,12 +55,14 @@ export function useNow() {
     let hiddenAt: number | null = document.visibilityState === 'hidden' ? Date.now() : null;
     const onReturn = () => {
       // Back after a while: read the time unless the minute timer already caught up, so the plan isn't worked out
-      // twice. With no hidden event seen (some browsers skip it on a back-forward restore), the reading's own age
-      // decides. Back from a quick switch: read it only if a minute tick was missed, since a phone can pause timers
-      // while it sleeps and short screen locks would otherwise leave the time behind.
-      const away = hiddenAt === null || Date.now() - hiddenAt >= AWAY_MS;
+      // twice. Back from a quick switch, or with no hidden event seen (some browsers skip it on a back-forward restore,
+      // and one that sends two events has cleared it): read it only if a minute tick was missed, since a phone can
+      // pause timers while it sleeps and short screen locks would otherwise leave the time behind.
+      const away = hiddenAt !== null && Date.now() - hiddenAt >= AWAY_MS;
       hiddenAt = null;
-      if (Date.now() - readAt < (away ? AWAY_MS : TICK_MS)) return;
+      const age = Date.now() - readAt;
+      // A reading from later than now means the device clock went back: read it again.
+      if (age >= 0 && age < (away ? AWAY_MS : TICK_MS)) return;
       read();
       // Start the minute over, or the tick the phone held back while asleep fires moments later and runs the planner
       // again for the same minute.
