@@ -12,7 +12,7 @@ export function fmt(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: a < 10 ? 2 : 0 });
 }
 
-export const pct = (p: number) => `${+(p * 100).toFixed(p < 0.1 ? 1 : 0)}%`;
+const pct = (p: number) => `${+(p * 100).toFixed(p < 0.1 ? 1 : 0)}%`;
 
 export function timeUntil(iso: string, now: Date) {
   const ms = new Date(iso).getTime() - now.getTime();
