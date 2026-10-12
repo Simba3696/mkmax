@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
-import { REALM_KLASH_CURRENCY, buildCtx, gearForecast, gearQueue, levelLabel, targetLevel } from '../engine';
+import { usePlan } from '../planner';
+import { REALM_KLASH_CURRENCY, gearForecast, gearQueue, levelLabel, targetLevel } from '../engine';
 import { CardThumb, daysFromNow, FoldCard, fmt, FusionLabel, useNow } from '../ui';
 import { grow, hint, row, rowTitle } from '../classes';
 
@@ -8,7 +9,7 @@ import { grow, hint, row, rowTitle } from '../classes';
 function useGear() {
   const { state, update } = useStore();
   const now = useNow();
-  const ctx = useMemo(() => buildCtx(state), [state]);
+  const { ctx } = usePlan();
   const gear = useMemo(() => gearQueue(ctx, now), [ctx, now]);
   const rubies = state.currencies.find((c) => c.id === REALM_KLASH_CURRENCY);
   const done = useMemo(() => gearForecast(gear, rubies?.balance ?? 0, rubies?.perDay), [gear, rubies?.balance, rubies?.perDay]);

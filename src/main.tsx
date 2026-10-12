@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { startServiceWorker } from './appUpdate';
 import { StoreProvider } from './store';
+import { PlanProvider } from './planner';
 import App from './App';
 import './styles.css';
 
@@ -17,7 +18,9 @@ void navigator.storage
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <StoreProvider>
-      <App />
+      <PlanProvider>
+        <App />
+      </PlanProvider>
     </StoreProvider>
   </StrictMode>,
 );

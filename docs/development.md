@@ -30,6 +30,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/kaskets.ts` | The shop's Kaskets and their rarities, and the hand-kept list of newest cards Kaskets leave out (replaced each game update) |
 | `src/normalize.ts` | Save-file migrations (`AppState.version`) |
 | `src/store.tsx` | App state, undo, and localStorage persistence |
+| `src/planner.tsx` | `PlanProvider` and `usePlan()`: the planner context and plan, worked out once and shared by every view |
 | `src/storage.ts` | Reading the save at startup, and keeping a copy of one that can't be read |
 | `src/sync.ts` | GitHub Gist sync: the API calls and which copy wins |
 | `src/syncLoop.ts` | When to pull, push or ask, around requests that can overlap edits and disconnects |

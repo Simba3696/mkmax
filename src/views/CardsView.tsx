@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { newId, useStore } from '../store';
-import { ascensionCaps, buildCtx, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isRealmKlashName, kardStep, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
-import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice, useNow } from '../ui';
+import { usePlan } from '../planner';
+import { ascensionCaps, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isRealmKlashName, kardStep, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
+import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
@@ -191,9 +192,8 @@ type CardSort = (typeof CARD_SORTS)[number];
 
 function CardList() {
   const { state, update } = useStore();
-  const ctx = useMemo(() => buildCtx(state), [state]);
+  const { now, ctx } = usePlan();
   const events = useEvents();
-  const now = useNow();
   const [rarity, setRarity] = useState<string>('all');
   const [q, setQ] = useState('');
   const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all');

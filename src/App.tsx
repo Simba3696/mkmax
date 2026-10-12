@@ -5,10 +5,10 @@ import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
-import { buildCtx, buildPlan, endingSoon, moveSeasonEnd, seasonEnd } from './engine';
+import { endingSoon, moveSeasonEnd, seasonEnd } from './engine';
 import { refreshEvents, scheduledSeason, useEvents } from './events';
 import { checkForAppUpdate } from './appUpdate';
-import { useNow } from './ui';
+import { usePlan } from './planner';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
 import PlanView from './views/PlanView';
@@ -87,7 +87,7 @@ export default function App() {
   // MK Mobile Base's schedule knows when the Realm Klash season ends, so it replaces the saved date (and the
   // 2-week guess) whenever it covers today, moving that season's items with it.
   const events = useEvents();
-  const now = useNow();
+  const { now, plan } = usePlan();
   const season = scheduledSeason(events, now);
   const scheduledEnd = season?.end ?? null;
   const savedEnd = seasonEnd(state.realmKlashSeasonEnd, now);
@@ -114,7 +114,7 @@ export default function App() {
   };
   // Packs the plan says to buy that end within a day: a count on the Packs tab and, where the phone supports it,
   // on the home-screen icon.
-  const soon = useMemo(() => endingSoon(buildPlan(buildCtx(state), now), now).length, [state, now]);
+  const soon = useMemo(() => endingSoon(plan, now).length, [plan, now]);
   useEffect(() => {
     if (!('setAppBadge' in navigator)) return;
     (soon ? navigator.setAppBadge(soon) : navigator.clearAppBadge()).catch(() => {});

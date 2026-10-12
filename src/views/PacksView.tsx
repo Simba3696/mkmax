@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { newId, useStore } from '../store';
-import { REALM_KLASH_CURRENCY, buildCtx, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
+import { usePlan } from '../planner';
+import { REALM_KLASH_CURRENCY, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
 import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice, useNow } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
@@ -57,7 +58,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
     setPullingPack(id);
     setPulled('');
   };
-  const ctx = useMemo(() => buildCtx(state), [state]);
+  const { ctx } = usePlan();
   const rules = new Map(state.rarities.map((r) => [r.id, r]));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
   const cardName = (id: string) => state.cards.find((c) => c.id === id)?.name ?? '(deleted card)';

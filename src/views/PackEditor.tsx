@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { newId, useStore } from '../store';
+import { usePlan } from '../planner';
 import { LevelOptions, Modal, NumInput, kasketLine, useNow } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
-import { REALM_KLASH_CURRENCY, addPool as withPool, buildCtx, editedPack, editorSeasonEnd, fromEndedSeason, isSeasonal, kasketPool, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
+import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, isSeasonal, kasketPool, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
 import { initialSource } from '../challenges';
 import { scheduledSeason, scheduledSeasonEnd, useEvents } from '../events';
 import { kasketFor } from '../kaskets';
@@ -65,7 +66,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     setP((x) => ({ ...x, drops: x.drops.map((d, j) => (j === i ? { ...d, ...patch } : d)) }));
   const totalChance = p.drops.reduce((a, d) => a + d.chance, 0);
   const inPack = new Set(p.drops.map((d) => d.cardId));
-  const ctx = useMemo(() => buildCtx(state), [state]);
+  const { ctx } = usePlan();
   // Kaskets give characters or gear; a saved rarity that's since been removed isn't in the list, so it asks again.
   const kasketRarities = state.rarities.filter((r) => r.kind !== 'kameo');
   const kasketRule = kasketRarities.find((r) => r.id === p.kasket);

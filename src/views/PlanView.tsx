@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
-import { REALM_KLASH_CURRENCY, buildCtx, buildPlan, daysToAfford, fuseWithKards, kardStep, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
-import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, kardFooter, kardNotes, NumInput, RarityBadge, SOURCE_LABELS, targetLine, timeUntil, useNow } from '../ui';
+import { usePlan } from '../planner';
+import { REALM_KLASH_CURRENCY, daysToAfford, fuseWithKards, kardStep, levelLabel, rankPacks, rankTargets, recordPurchase, thresholdLevel, type CurrencyPlan, type Phase } from '../engine';
+import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, kardFooter, kardNotes, NumInput, RarityBadge, SOURCE_LABELS, targetLine, timeUntil } from '../ui';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
 import { GearSummary } from './GearOrder';
@@ -44,9 +45,7 @@ export function PackTiming({ pack, now }: { pack: Pack; now: Date }) {
 
 export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'cards' | 'settings') => void; openPack: (id: string, pull?: boolean) => void }) {
   const { state, update, unreadable } = useStore();
-  const now = useNow();
-  const ctx = useMemo(() => buildCtx(state), [state]);
-  const plan = useMemo(() => buildPlan(ctx, now), [ctx, now]);
+  const { now, ctx, plan } = usePlan();
   const ranks = useMemo(() => rankPacks(ctx, now), [ctx, now]);
   /** Currencies whose full pack ranking is showing; back to the top few when the Plan is reopened. */
   const [openRanks, setOpenRanks] = useState<ReadonlySet<string>>(new Set());
