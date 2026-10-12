@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
 } from './engine';
+import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
-import { daysFromNow, kardFooter, kardNotes, kasketLine } from './ui';
+import { daysFromNow, kardFooter, kardNotes, kasketLine, targetLine } from './ui';
 import type { AppState, Card, Pack, RarityRule } from './types';
 import type { KardPlan } from './engine';
 
@@ -225,6 +226,23 @@ describe('kameos', () => {
       expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(['Moloch’s Ball and Chain', 'devastator']);
     });
 
+    // Value: protects=the Plan can name Realm Klash pieces nothing plans; fails_when=a piece with no store item on sale
+    // is missing, or a piece on sale (sold out or not started yet included), other gear or a character is listed; why_new=the list is new; seam=none;
+    // no_claim=the wording (GearOrder)
+    it('lists the Realm Klash pieces with no store item on sale', () => {
+      const s = setup(
+        [gear('Shadow Sash', F(2)), gear('Devastator', F(2)), gear('Bloody Tomahawk', F(2)), gear('Kori Blade', F(2)), card('Devastator x', F(2), { name: 'Devastator' })],
+        [item('Shadow Sash'), item('Bloody Tomahawk', { endsAt: '2026-01-01T00:00' })],
+      );
+      // Tomahawk's item expired on Jan 1; Devastator has none.
+      const ctx = buildCtx(s);
+      expect(gearWaiting(ctx, gearQueue(ctx, NOW)).map((c) => c.name)).toEqual(['Bloody Tomahawk', 'Devastator']);
+      // A sold-out item only skips its piece for now, and one that hasn't started yet is saved for: neither is "not on sale".
+      s.packs = [item('Shadow Sash', { maxPurchases: 1, purchased: 1 }), item('Bloody Tomahawk', { startsAt: '2026-02-01T00:00' })];
+      const later = buildCtx(s);
+      expect(gearWaiting(later, gearQueue(later, NOW)).map((c) => c.name)).toEqual(['Devastator']);
+    });
+
     // Value: protects=the documented order for all ten pieces, the default five then the rest by name; fails_when=a name
     // changes in REALM_KLASH_GEAR or DEFAULT_GEAR_ORDER but not the other; why_new=nothing checked the two lists together;
     // seam=none; no_claim=new pieces (the list is final)
@@ -317,20 +335,35 @@ describe('save migration', () => {
     ]);
     // A version 15 save is left alone, so a pack unticked as a Kasket stays unticked.
     expect(normalize({ ...v14, version: 15 }).packs.every((p) => p.kasket === undefined)).toBe(true);
+    // Value: protects=a pack keeps its typed odds when its Kasket rarity is gone; fails_when=the upgrade makes a Kasket
+    // of a deleted rarity and wipes the odds for good; why_new=the upgrade runs once; seam=none; no_claim=renamed rarities
+    const two = [pack('kd', drops, { name: 'Kollector’s Diamond Kasket' }), pack('kg', drops, { name: 'Kollector’s Gold Kasket' })];
+    const shape = (rarities: RarityRule[]) => normalize({ ...v14, packs: two, rarities }).packs.map((p) => [p.id, p.kasket, p.drops.length]);
+    expect(shape(v14.rarities.filter((r) => r.id !== 'diamond'))).toEqual([['kd', undefined, 1], ['kg', 'gold', 0]]);
+    expect(shape(v14.rarities.map((r) => (r.id === 'diamond' ? { ...r, kind: 'kameo' as const } : r)))).toEqual([['kd', undefined, 1], ['kg', 'gold', 0]]);
   });
 
+  // Value: protects=an import marking a pack both a store item and a Kasket keeps the store item; fails_when=the store
+  // item is dropped, so Realm Klash gear leaves the gear queue without a word; why_new=store now wins; seam=none;
+  // no_claim=the pack editor, which never sets both
   it('keeps an imported Kasket at one card per purchase with no drops, and treats a null or empty rarity as no Kasket', () => {
     const drops = [{ cardId: 'a', chance: 50 }];
     const s = normalize({
       ...defaultState(),
       cards: [card('a', 0)],
-      packs: [pack('k', drops, { kasket: 'diamond', rolls: 5, store: true }), { ...pack('n', drops), kasket: null }, pack('e', drops, { kasket: '' })],
+      packs: [
+        pack('k', drops, { kasket: 'diamond', rolls: 5 }),
+        { ...pack('n', drops), kasket: null },
+        pack('e', drops, { kasket: '' }),
+        pack('s', [{ cardId: 'a', chance: 100 }], { kasket: 'diamond', store: true }),
+      ],
     });
     expect(s.packs[0]).toEqual(pack('k', [], { kasket: 'diamond' }));
-    expect(s.packs[0]).not.toHaveProperty('store');
     expect(s.packs[1]).not.toHaveProperty('kasket');
     expect(s.packs[2]).not.toHaveProperty('kasket');
     expect(s.packs[1].drops).toEqual(drops);
+    // Marked both a store item and a Kasket (only a hand-edited import): the store item wins.
+    expect(s.packs[3]).toEqual(pack('s', [{ cardId: 'a', chance: 100 }], { store: true }));
   });
 });
 
@@ -782,13 +815,27 @@ describe('kaskets', () => {
         card('ascending', A(2), { rarityId: 'gold', maxLevel: A(5) }),
         card('fusing', F(5), { rarityId: 'gold' }),
         card('capped', A(5), { rarityId: 'gold', maxLevel: A(5) }),
+        // Flame Forged Will is the newest Epic gear, not Gold, so a Gold card of that name is still in the pool.
         card('x', F(2), { rarityId: 'gold', name: 'Flame Forged Will' }),
       ],
       [kasket('gold')],
     );
     const pool = kasketPool(buildCtx(s), s.packs[0]);
     expect(pool.mode).toBe('unmaxed');
-    expect(ids(pool.cards)).toEqual(['ascending', 'fusing']);
+    expect(ids(pool.cards)).toEqual(['ascending', 'fusing', 'x']);
+  });
+
+  // Value: protects=the newest-cards list leaves out only a card of the right name and rarity; fails_when=a same-named
+  // card of another rarity is left out of its Kasket, or the newest card isn't; why_new=the list now carries rarities;
+  // seam=none; no_claim=the list's contents (patch-notes skill)
+  it('leaves out the newest cards by name and rarity', () => {
+    expect(isKasketExcluded({ name: 'Flame Forged Will', rarityId: 'epic' })).toBe(true);
+    expect(isKasketExcluded({ name: 'flame forged will', rarityId: 'epic' })).toBe(true);
+    expect(isKasketExcluded({ name: 'Flame Forged Will', rarityId: 'rare' })).toBe(false);
+    expect(isKasketExcluded({ name: 'Sub-Zero MK1', rarityId: 'gold' })).toBe(false);
+    // A rarity of your own (or Diamond rebuilt under a new id) can't be matched by id, so the name decides.
+    expect(isKasketExcluded({ name: 'Sub-Zero MK1', rarityId: 'r-custom' })).toBe(true);
+    expect(isKasketExcluded({ name: 'Klassic Sub-Zero', rarityId: 'r-custom' })).toBe(false);
   });
 
   it("isn't valued once you own every piece of gear tracked only to the kard threshold, unless it's tracked to max", () => {
@@ -884,9 +931,14 @@ describe('kaskets', () => {
     expect(ranks.find((r) => r.pack.id === 'kd')!.targets.map((t) => t.withinBuys)).toEqual([3, 3, 3]);
     // Once you own them all it gives unmaxed cards, which can repeat, so the usual average applies.
     expect(ranks.find((r) => r.pack.id === 'kg')!.targets[0].withinBuys).toBeUndefined();
-    // Two buys left can't promise all three cards.
-    s.packs[0] = { ...s.packs[0], maxPurchases: 5, purchased: 3 };
-    expect(rankPacks(buildCtx(s), NOW).find((r) => r.pack.id === 'kd')!.targets[0].withinBuys).toBeUndefined();
+    // Value: protects=the purchase-limit edges of "yours within n buys"; fails_when=<= becomes < (three buys left for
+    // three cards drops the line) or a pool of one isn't 1; why_new=only the "too few buys" side was tested; seam=none;
+    // no_claim=the wording (targetLine)
+    const within = (packs: Pack[], cards = s.cards) => rankPacks(buildCtx({ ...s, cards, packs }), NOW).find((r) => r.pack.id === 'kd')?.targets[0]?.withinBuys;
+    expect(within([{ ...s.packs[0], maxPurchases: 5, purchased: 2 }])).toBe(3); // exactly as many buys left as cards
+    expect(within([{ ...s.packs[0], maxPurchases: 5, purchased: 3 }])).toBeUndefined(); // two buys can't promise three cards
+    expect(within([{ ...s.packs[0], maxPurchases: 5, purchased: 5 }])).toBeUndefined(); // no buys left
+    expect(within([s.packs[0]], [card('a', 0)])).toBe(1); // the last card you don't own
   });
 
   it("doesn't value a Kasket of a Kameo rarity", () => {
@@ -905,6 +957,17 @@ describe('kaskets', () => {
     removeRarity(s, 'epic');
     expect(s.rarities.map((r) => r.id)).not.toContain('epic');
     expect(s.packs.map((p) => p.id)).toEqual(['diamond-k', 'p']);
+  });
+});
+
+describe('pack ranking lines', () => {
+  // Value: protects=the Pack ranking's per-card wording; fails_when=a Kasket's "yours within n buys" or "yours next buy"
+  // is lost or the average shows instead; why_new=the wording moved out of PlanView; seam=none; no_claim=which cards rank
+  it('says the chance per buy, then within how many buys a Kasket card comes or the average', () => {
+    const t = (withinBuys?: number, pAtLeastOne = 0.25, buysPerCopy = 4) => targetLine({ card: { name: 'Raiden' }, pAtLeastOne, buysPerCopy, withinBuys });
+    expect(t()).toBe('Raiden: 25% per buy · about 4 buys per copy');
+    expect(t(3, 1 / 3, 3)).toBe('Raiden: 33% per buy · yours within 3 buys');
+    expect(t(1, 1, 1)).toBe('Raiden: yours next buy'); // a Kasket's last card, said once
   });
 });
 

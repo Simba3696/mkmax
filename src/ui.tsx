@@ -12,7 +12,7 @@ export function fmt(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: a < 10 ? 2 : 0 });
 }
 
-export const pct = (p: number) => `${+(p * 100).toFixed(p < 0.1 ? 1 : 0)}%`;
+const pct = (p: number) => `${+(p * 100).toFixed(p < 0.1 ? 1 : 0)}%`;
 
 export function timeUntil(iso: string, now: Date) {
   const ms = new Date(iso).getTime() - now.getTime();
@@ -27,8 +27,17 @@ export function timeUntil(iso: string, now: Date) {
 export function useNow() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(t);
+    const tick = () => setNow(new Date());
+    const t = setInterval(tick, 60000);
+    // A phone can hold the app in the background for hours with timers paused; read the time again on return so
+    // packs that ended meanwhile don't still count as on sale.
+    // A quick app switch keeps the time it had, so it doesn't run the whole planner again.
+    const onShow = () => document.visibilityState === 'visible' && setNow((prev) => (Date.now() - prev.getTime() >= 30000 ? new Date() : prev));
+    document.addEventListener('visibilitychange', onShow);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onShow);
+    };
   }, []);
   return now;
 }
@@ -319,6 +328,17 @@ export function kardFooter(rarities: RarityRule[]) {
     (hasKards(false) ? 'Character kards go to the cheapest steps first, since each step saves one pack copy. Guest cards count extra. ' : '') +
     (hasKards(true) ? 'Gear kards finish one piece at a time, the one needing fewest kards first, since gear only gets its special effect at F10. ' : '')
   );
+}
+
+/**
+ * One card under a pack in the Pack ranking: its chance per buy, then how soon a copy comes. A Kasket of new cards
+ * never repeats one, so it says within how many buys instead of an average; for its last card, where "100% per
+ * buy" would say the same thing twice, just "yours next buy".
+ */
+export function targetLine(t: { card: { name: string }; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number }) {
+  if (t.withinBuys === 1) return `${t.card.name}: yours next buy`;
+  const when = t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${fmt(t.buysPerCopy)} buys per copy`;
+  return `${t.card.name}: ${pct(t.pAtLeastOne)} per buy · ${when}`;
 }
 
 /** A Kasket's pool in words: how many cards share the odds, or why it isn't valued. */

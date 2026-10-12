@@ -406,10 +406,11 @@ export function kasketPullCards(ctx: Ctx, pack: Pack) {
  * A pack as a Kasket is kept: one card per purchase, no drops or store item of its own (its pool comes from the
  * cards). An empty or null `kasket` means it isn't one: the editor uses '' while no rarity is chosen, and an import
  * or synced save can carry null, since JSON has no undefined. Without this the planner would value such a pack by
- * drops the screen hides.
+ * drops the screen hides. A pack marked both a store item and a Kasket (the editor never does this, only a
+ * hand-edited import) stays a store item, since a Realm Klash piece's store item is what Blood Rubies buy it through.
  */
 export function kasketShape(pack: Pack): Pack {
-  if (typeof pack.kasket !== 'string' || !pack.kasket) {
+  if (typeof pack.kasket !== 'string' || !pack.kasket || pack.store) {
     if (!('kasket' in pack)) return pack;
     const out = { ...pack };
     delete out.kasket;
@@ -535,6 +536,15 @@ export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
     })
     .filter((g) => g.items.length > 0 && g.need > 0)
     .sort((a, b) => rank(a.card) - rank(b.card) || a.card.name.localeCompare(b.card.name));
+}
+
+/**
+ * Realm Klash gear still to max that no Blood Ruby store item on sale now sells: nothing plans it (no kards, no
+ * rubies) until the shop has it again, by name. Takes gearQueue's result, which callers already have.
+ */
+export function gearWaiting(ctx: Ctx, queue: GearStep[]): Card[] {
+  const queued = new Set(queue.map((g) => g.card.id));
+  return ctx.state.cards.filter((c) => isRealmKlashGear(ctx.state, c) && !queued.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**

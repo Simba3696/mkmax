@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { newId, useStore } from '../store';
-import { REALM_KLASH_CURRENCY, buildCtx, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
-import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice, useNow } from '../ui';
+import { usePlan } from '../planner';
+import { REALM_KLASH_CURRENCY, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
+import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
 import PackEditor from './PackEditor';
@@ -34,7 +35,7 @@ export interface PackFocus {
 export default function PacksView({ focus = null, onFocused }: { focus?: PackFocus | null; onFocused?: () => void }) {
   const focusId = focus?.id ?? null;
   const { state, update } = useStore();
-  const now = useNow();
+  const { now, ctx } = usePlan();
   const [editing, setEditing] = useState<Pack | 'new' | null>(null);
   const focusPack = focusId ? state.packs.find((p) => p.id === focusId) : undefined;
   const [showExpired, setShowExpired] = useState(() => !!focusPack && packStatus(focusPack, now) === 'expired');
@@ -57,7 +58,6 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
     setPullingPack(id);
     setPulled('');
   };
-  const ctx = useMemo(() => buildCtx(state), [state]);
   const rules = new Map(state.rarities.map((r) => [r.id, r]));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
   const cardName = (id: string) => state.cards.find((c) => c.id === id)?.name ?? '(deleted card)';
@@ -150,6 +150,12 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         <PackTiming pack={p} now={now} />
       </div>
       {p.kasket !== undefined && <div className={`${note} mt-[0.4rem]`}>{kasketLine(kasketPool(ctx, p))}</div>}
+      {packStatus(p, now) === 'expired' && keepWhenExpired(state, p) && (
+        <div className={`${note} mt-[0.4rem]`}>
+          Kept for next season: <b>Rerun</b> copies its drop and Store item setting, so Blood Rubies keep buying the piece. If you delete it, pick the piece and
+          tick Store item again when the shop has it.
+        </div>
+      )}
       <DropList pack={p} drops={packDrops(ctx, p)} cardName={cardName} open={openDrops.has(p.id)} onToggle={() => toggleDrops(p.id)} />
       <div className="hidden lg:block lg:flex-1" aria-hidden />
       <div className={actions}>
@@ -243,12 +249,19 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
           {clearable.length > 0 && (
             <ConfirmButton
               label="Clear expired"
-              onConfirm={() =>
+              onConfirm={() => {
+                // Counted from the change itself, not the list on screen, which a sync could have changed.
+                let cleared = 0;
                 update(
-                  (d) => void (d.packs = d.packs.filter((p) => packStatus(p, now) !== 'expired' || keepWhenExpired(d, p))),
-                  `Cleared ${clearable.length} expired pack${clearable.length === 1 ? '' : 's'}`,
-                )
-              }
+                  (d) => {
+                    const kept = d.packs.filter((p) => packStatus(p, now) !== 'expired' || keepWhenExpired(d, p));
+                    cleared = d.packs.length - kept.length;
+                    d.packs = kept;
+                  },
+                  // Nothing to undo if a sync had already cleared them.
+                  () => (cleared ? `Cleared ${cleared} expired pack${cleared === 1 ? '' : 's'}` : ''),
+                );
+              }}
             />
           )}
         </div>
@@ -269,7 +282,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
  */
 function SeasonBar() {
   const { state, update } = useStore();
-  const now = useNow();
+  const { now } = usePlan();
   const events = useEvents();
   const end = seasonEnd(state.realmKlashSeasonEnd, now);
   const scheduled = scheduledSeasonEnd(events, now);
@@ -340,7 +353,7 @@ function SeasonBar() {
  */
 function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
   const { state, update } = useStore();
-  const now = useNow();
+  const { now } = usePlan();
   const events = useEvents();
   const [open, setOpen] = useState(true);
   if (!events) return null;
@@ -367,6 +380,8 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
             {packs.map((sp) => {
               const upcoming = sp.start && new Date(sp.start) > now;
               const last = lastRun(sp, state, now);
+              // A Kasket's Rerun copies only the name; its odds come from your cards.
+              const rerun = last && packFromShop(sp, state, '', last);
               return (
                 <div key={sp.name} className={`${row} items-center xl:border-t xl:border-line`}>
                   {sp.image && <img className={thumb} src={sp.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 44, height: 44 }} />}
@@ -378,8 +393,11 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
                       {upcoming ? ` · starts ${when(sp.start)}` : sp.end ? ` · ends ${when(sp.end)}` : ' · permanent'}
                     </div>
                   </div>
-                  {last ? (
-                    <button onClick={() => onAdd(packFromShop(sp, state, newId(), last))} title="Adds it again with the odds from its expired run">
+                  {rerun ? (
+                    <button
+                      onClick={() => onAdd({ ...rerun, id: newId() })}
+                      title={rerun.kasket ? 'Adds it again as a Kasket, with the name from its expired run' : 'Adds it again with the odds from its expired run'}
+                    >
                       Rerun
                     </button>
                   ) : (

@@ -1,118 +1,81 @@
 # TODOS
 
-## Kaskets
+## Realm Klash gear
 
-### Only turn a pack into a Kasket when its rarity exists
+### Keep an off-sale piece's place in the Blood Ruby gear order
 
-**What:** In the version 15 upgrade (`src/normalize.ts`) and in `packFromShop` (`src/events.ts`), convert a shop-named pack only when the rarity it maps to is still in the save and isn't a Kameo rarity.
+**What:** When ↑/↓ in Settings → Blood Ruby gear order saves the order, keep each piece that isn't on sale at its saved place and only swap the two pieces being moved.
 
-**Why:** A save whose built-in Epic, Rare, Diamond or Gold rarity was deleted (or rebuilt under a new id) would have that pack's typed odds wiped and get a Kasket that says "This Kasket's rarity no longer exists". The upgrade runs once, so the odds can't come back.
+**Why:** Today the save writes the pieces on sale first and the others after them, so a piece you put first drops below every piece on sale once its store item is back. The new "Not on sale now" line lists such pieces under the order with no way to move them, so the lost place is easy to miss.
 
-**Context:** Found by the /ship review on 2026-10-10 (maintainability and red team). Fix: `kasket && out.rarities.some((r) => r.id === kasket && r.kind !== 'kameo')`, with a migration test that removes `epic` first. The user's own save keeps the built-in rarities, so this is a guard for other saves.
+**Context:** Found by the /ship red team on tidy-todos (2026-10-12); it predates that branch. `move` in `src/views/GearOrder.tsx` builds `ids` from `gear` (`gearQueue`, pieces on sale only) and appends the rest of `gearOrder`. Fix: rank queued and waiting pieces together (by saved index, then `DEFAULT_GEAR_ORDER`) and swap inside that list, with an engine test.
 
 **Effort:** S
 **Priority:** P2
 **Depends on:** None
 
-### Test the "yours within n buys" edges
+### Test that Rerun keeps a Realm Klash store item a store item
 
-**What:** Add rows to the `withinBuys` test in `src/engine.test.ts`: buys left equal to the pool size (still shown), no buys left (not shown) and a pool of one (`withinBuys` 1).
+**What:** Add a row to the Rerun test in `src/events.test.ts`: an earlier run with `store: true`, a Blood Ruby currency and a drop, under a name that isn't a Kasket, reruns with `store: true`, the same drop and no `kasket`.
 
-**Why:** Changing `<=` to `<` in the purchase-limit check, or a slip in the one-card wording, would pass every current test.
+**Why:** The note on kept items promises "Rerun copies its drop and Store item setting". If a change to the Kasket logic in `packFromShop` left `copy` empty for a store item, Rerun would add a plain pack, the piece would leave the gear queue, and every test would still pass.
 
-**Context:** Found by the /ship testing specialist on 2026-10-10. The wording lives inline in `src/views/PlanView.tsx`; moving it into a small helper next to `kasketLine` in `src/ui.tsx` would let it be tested the same way.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
-### Say a Kasket's last card once in the Pack ranking
-
-**What:** For a Kasket with one card left, the Pack ranking reads "Name: 100% per buy · yours next buy". Show one phrase.
-
-**Why:** Both halves say the same thing.
-
-**Context:** `src/views/PlanView.tsx` target line, and `docs/user-guide.md` (Pack ranking). Found by the /ship design specialist on 2026-10-10.
+**Context:** Found by the /ship testing specialist on tidy-todos (2026-10-12). `copy` is `last && !kasket ? last : undefined` in `packFromShop` (`src/events.ts`); `grep store src/events.test.ts` finds nothing.
 
 **Effort:** S
 **Priority:** P3
 **Depends on:** None
 
-### Fix the Rerun tooltip for Kaskets
+## Plan
 
-**What:** The Rerun button says "Adds it again with the odds from its expired run", but a Kasket rerun copies only the name.
+### Say "every buy" for a store item that always drops its card
 
-**Why:** The tooltip promises something a Kasket rerun doesn't do.
+**What:** In Pack ranking, a card a pack always drops reads "100% per buy · every buy" (or similar) instead of "about 1 buys per copy".
 
-**Context:** `src/views/PacksView.tsx` (In the shop row). Use a Kasket-specific title when `kasketFor(packName(sp))` matches. Found by the /ship red team on 2026-10-10.
+**Why:** "about 1 buys per copy" is wrong English and says nothing a 100% drop doesn't already say.
 
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
-### Keep an unticked Kasket unticked on Rerun
-
-**What:** When a shop Kasket's earlier run was unticked as a Kasket, Rerun ticks it again and doesn't copy that run's odds. Use the earlier run's setting when there is one.
-
-**Why:** The version 15 comment says a pack the user unticks stays unticked; Rerun undoes that.
-
-**Context:** `packFromShop` in `src/events.ts` takes `kasket` from the shop name alone. Issue #1 asked for Kaskets from In the shop to ignore an earlier run, so the events test "even over an earlier run with drops of its own" needs updating with the change. Found by the /ship adversarial review on 2026-10-10.
+**Context:** Found by /qa on tidy-todos (2026-10-12). Repro: add a store item with one drop at 100%, open the Plan, look under Pack ranking. The line comes from `targetLine` in `src/ui.tsx`, which has tests in `src/engine.test.ts` ("pack ranking lines").
 
 **Effort:** S
 **Priority:** P3
 **Depends on:** None
 
-### Keep a store item when an import also marks it a Kasket
+### Time the return-to-app clock check from when the app was hidden
 
-**What:** In `kasketShape` (`src/engine.ts`), when a pack has both `store` and a `kasket`, drop `kasket` rather than `store`.
+**What:** In `useNow` (`src/ui.tsx`), note the time when the page goes hidden and, when it's shown again, read the time again only if it was hidden for 30 seconds or more.
 
-**Why:** A hand-edited or corrupted import with both set loses its store item, which for Realm Klash gear drops it from the gear queue without a word.
+**Why:** The check compares against the last time read, not how long the app was away. A quick switch just before the minute tick still works the whole plan out again, and after timers were paused the time can lag by up to about 90 seconds. The pack editor's season and end-date choices use this shared time too.
 
-**Context:** Found by the /ship adversarial review on 2026-10-10. Needs an import the app itself never writes.
+**Context:** Found by the /ship adversarial review on tidy-todos (2026-10-12). Extend `src/ui.test.tsx`, which covers hidden, a quick return and a long return.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Say in the comments and architecture doc that the clock also moves on return
+
+**What:** Update the comments that say the shared clock moves only once a minute: the header and `now` field in `src/planner.tsx`, the `useNow` comment in `src/ui.tsx`, and the two lines in `docs/architecture.md` ("once per change and once a minute").
+
+**Why:** The clock now also reads the time again when the app comes back after a while in the background, which is why it changed.
+
+**Context:** Found by the /ship maintainability specialist on tidy-todos (2026-10-12).
 
 **Effort:** S
 **Priority:** P4
 **Depends on:** None
 
-### Match the newest-cards list by rarity as well as name
+## Import
 
-**What:** Key `KASKET_EXCLUDED` in `src/kaskets.ts` by name and rarity.
+### Keep a Kasket when an import marks a pack with no drops a store item too
 
-**Why:** A same-named card of another rarity would be left out of its Kasket too. Today the only clashes are Diamond Kameos, which Kaskets never give.
+**What:** In `kasketShape` (`src/engine.ts`), let the store item win only when the pack has drops; a pack with no drops keeps its Kasket.
 
-**Context:** Found by the /ship adversarial review on 2026-10-10. Revisit when a patch adds a character and gear of the same name.
+**Why:** A hand-edited import with `store: true`, a `kasket` and empty `drops` now becomes a store item that drops nothing, so the planner values it at 0 without a word. The app never saves both itself, so only an edited import reaches this.
+
+**Context:** Found by the /ship adversarial review on tidy-todos (2026-10-12). `kasketShape` runs on every load from `normalize`. Add a row to the import test in `src/engine.test.ts` ("save migration").
 
 **Effort:** S
 **Priority:** P4
-**Depends on:** None
-
-## Planner
-
-### Work out the plan once per change
-
-**What:** App.tsx works out the whole plan for its badge and PlanView works it out again, on every change and every minute. Share one result.
-
-**Why:** Halves the planner's work on phones; Kaskets made each pass a little dearer.
-
-**Context:** `src/App.tsx` (the `buildPlan(buildCtx(state), now)` for the badge) and `src/views/PlanView.tsx`. A memoised ctx and plan in the store, or a shared hook keyed on state and now. Deferred from the /ship review on 2026-10-10 to keep the Kasket release focused.
-
-**Effort:** M
-**Priority:** P3
-**Depends on:** None
-
-### Explain kept Realm Klash store items
-
-**What:** Loose ends of Clear expired keeping each Realm Klash piece's latest Blood Ruby store item (`keepWhenExpired` in `src/engine.ts`, Clear expired in `src/views/PacksView.tsx`):
-- Nothing in the app says why those items stay under Expired, or warns on Delete that next season's Rerun needs them.
-- A piece whose only store item has expired is in no plan at all (no kards, no ruby buys) until the shop has it again. Say so on the Plan or in Blood Ruby gear order.
-- The undo label's count comes from the render, not the draft `update` filters.
-
-**Why:** Deleting a kept item by hand means next season's item comes in without its drop or Store item, so Blood Rubies stop buying the piece without saying why.
-
-**Context:** Left over from the /review of issue #5 on 2026-10-12, which kept only the latest item per piece and based the rule on the name list.
-
-**Effort:** S
-**Priority:** P3
 **Depends on:** None
 
 ## Completed

@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
 import { useStore } from '../store';
-import { buildCtx, copiesToMax, levelLabel, maxFusion, targetLevel } from '../engine';
+import { usePlan } from '../planner';
+import { copiesToMax, levelLabel, maxFusion, targetLevel } from '../engine';
 import { CardThumb, RarityBadge } from '../ui';
 import { card, grow, row, rowTitle, stepper, stepperVal } from '../classes';
 import type { Card } from '../types';
@@ -14,7 +14,7 @@ const NO_TOWER = 'Tower not named';
  */
 export default function TowersPanel() {
   const { state, update } = useStore();
-  const ctx = useMemo(() => buildCtx(state), [state]);
+  const { ctx } = usePlan();
 
   const patch = (id: string, p: Partial<Card>) =>
     update((d) => {
