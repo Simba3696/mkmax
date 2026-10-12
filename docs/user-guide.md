@@ -579,7 +579,7 @@ The bottom of Settings shows which version you have and the date of that change,
 - Adds MK Mobile Base art to cards that have none.
 - Takes the Realm Klash season end from the event schedule.
 - Re-reads the event schedule when you come back after an hour or more.
-- Updates countdowns every minute.
+- Updates countdowns and the plan every minute, and again when you come back to the app after half a minute or more, so a pack that ended while it was in the background stops being planned.
 - Removes cards already at their goal when it loads.
 
 The art doesn't count as a change for sync: every device adds the same art by itself, so it never makes two devices ask which copy to keep.
@@ -624,4 +624,4 @@ These notes are about changes to saved data over time. You can skip them.
 - When challenge tagging came in, Kameos already in the app were tagged once.
 - Challenges that no longer run are taken off the challenge list (so far Klassic Ermac, whose Kameo comes from packs now), and a Kameo tagged before its challenge was retired gets untagged once.
 - The older hand-kept per-tower counts were dropped.
-- Kaskets entered by hand under one of the four shop names were turned into Kaskets once, so their odds now follow your cards.
+- Kaskets entered by hand under one of the four shop names were turned into Kaskets once, if the save still had that rarity, so their odds now follow your cards.

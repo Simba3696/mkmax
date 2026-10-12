@@ -19,7 +19,7 @@ npx knip          # unused files, exports and dependencies (a dev tool; not run 
 
 ## Tests
 
-Planning, scoring and saved-data logic is tested in plain `*.test.ts` files next to the code, mostly `src/engine.test.ts`. Screens are tested in `*.test.tsx` files with [Testing Library](https://testing-library.com/docs/react-testing-library/intro/) in jsdom: each starts with `// @vitest-environment jsdom`, so the logic tests keep running in Node. A screen test renders the real `StoreProvider` and `PlanProvider` with a save seeded in `localStorage`, stubs `fetch` so the catalog and event schedule stay offline, and clears `localStorage` afterwards. Testing Library and jsdom are dev dependencies; nothing of them ships. Each test opens with a `// Value:` comment saying what it protects and what would make it fail.
+Planning, scoring and saved-data logic is tested in plain `*.test.ts` files next to the code, mostly `src/engine.test.ts`. Screens are tested in `*.test.tsx` files with [Testing Library](https://testing-library.com/docs/react-testing-library/intro/) in jsdom: each starts with `// @vitest-environment jsdom`, so the logic tests keep running in Node. A screen test renders the real `StoreProvider` and `PlanProvider` with a save seeded in `localStorage`, stubs `fetch` so the catalog and event schedule stay offline, and clears `localStorage` afterwards. Testing Library and jsdom are dev dependencies; nothing of them ships. jsdom needs Node 22.22 or newer (24.15 or newer on Node 24), so update Node if the screen tests fail to start. Each test opens with a `// Value:` comment saying what it protects and what would make it fail.
 
 ## Project layout
 
