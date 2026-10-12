@@ -25,24 +25,31 @@ afterEach(() => {
 });
 
 describe('the shared clock', () => {
-  // Value: protects=the time is read again when the app comes back after a while, and not on a quick switch or while
-  // hidden; fails_when=the visibilitychange listener goes, the visible check flips, or the 30s threshold goes; why_new=
-  // useNow had no test; seam=none; no_claim=the once-a-minute interval (timers aren't faked)
-  it('reads the time again when the app comes back after a while, but not after a quick switch', () => {
+  // Value: protects=the time is read again when the app comes back after half a minute away, and not after a quick
+  // switch, however old the last reading; fails_when=the listener goes, the hidden/visible checks flip, or the time
+  // away is measured from the last reading; why_new=the check now times the absence; seam=none; no_claim=the
+  // once-a-minute interval (timers aren't faked)
+  it('reads the time again after half a minute away, but not after a quick switch', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-10-12T12:00:00'));
+    const at = (t: string) => vi.setSystemTime(new Date(`2026-10-12T${t}`));
+    const read = () => seen.at(-1)!.toISOString();
+    at('12:00:00');
     render(<Clock />);
-    const at = () => seen.at(-1)!.toISOString();
-    const start = at();
+    const start = read();
 
-    vi.setSystemTime(new Date('2026-10-12T12:00:10'));
-    show('visible');
-    expect(at()).toBe(start); // back after ten seconds: same time, so the plan isn't worked out again
-
-    vi.setSystemTime(new Date('2026-10-12T15:00:00'));
+    // Away ten seconds, just before the minute timer would fire: the last reading is 50s old, but the app keeps it.
+    at('12:00:50');
     show('hidden');
-    expect(at()).toBe(start);
+    at('12:01:00');
     show('visible');
-    expect(at()).toBe(new Date('2026-10-12T15:00:00').toISOString());
+    expect(read()).toBe(start);
+
+    // Away three hours: read again on return, not while still hidden.
+    at('12:01:00');
+    show('hidden');
+    at('15:00:00');
+    expect(read()).toBe(start);
+    show('visible');
+    expect(read()).toBe(new Date('2026-10-12T15:00:00').toISOString());
   });
 });

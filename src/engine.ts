@@ -407,10 +407,11 @@ export function kasketPullCards(ctx: Ctx, pack: Pack) {
  * cards). An empty or null `kasket` means it isn't one: the editor uses '' while no rarity is chosen, and an import
  * or synced save can carry null, since JSON has no undefined. Without this the planner would value such a pack by
  * drops the screen hides. A pack marked both a store item and a Kasket (the editor never does this, only a
- * hand-edited import) stays a store item, since a Realm Klash piece's store item is what Blood Rubies buy it through.
+ * hand-edited import) stays a store item when it has a drop, since a Realm Klash piece's store item is what Blood
+ * Rubies buy it through; with no drops it stays a Kasket, which is worth something, rather than a store item of nothing.
  */
 export function kasketShape(pack: Pack): Pack {
-  if (typeof pack.kasket !== 'string' || !pack.kasket || pack.store) {
+  if (typeof pack.kasket !== 'string' || !pack.kasket || (pack.store && pack.drops.length > 0)) {
     if (!('kasket' in pack)) return pack;
     const out = { ...pack };
     delete out.kasket;
@@ -517,13 +518,7 @@ export interface GearStep {
  */
 export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
   const items = ctx.state.packs.filter((p) => p.store && p.currencyId === REALM_KLASH_CURRENCY && p.cost > 0 && packStatus(p, now) !== 'expired');
-  const saved = ctx.state.gearOrder ?? [];
-  const rank = (c: Card) => {
-    const i = saved.indexOf(c.id);
-    if (i >= 0) return i;
-    const d = DEFAULT_GEAR_ORDER.indexOf(nameKey(c.name));
-    return d >= 0 ? saved.length + d : Infinity;
-  };
+  const rank = gearRank(ctx.state);
   return ctx.state.cards
     .filter((c) => isRealmKlashGear(ctx.state, c))
     .map((card) => {
@@ -536,6 +531,34 @@ export function gearQueue(ctx: Ctx, now: Date): GearStep[] {
     })
     .filter((g) => g.items.length > 0 && g.need > 0)
     .sort((a, b) => rank(a.card) - rank(b.card) || a.card.name.localeCompare(b.card.name));
+}
+
+/** A Realm Klash piece's place in the buying order: its saved place, else its default place after every saved one. */
+function gearRank(state: AppState) {
+  const saved = state.gearOrder ?? [];
+  return (c: Card) => {
+    const i = saved.indexOf(c.id);
+    if (i >= 0) return i;
+    const d = DEFAULT_GEAR_ORDER.indexOf(nameKey(c.name));
+    return d >= 0 ? saved.length + d : Infinity;
+  };
+}
+
+/**
+ * The gear order to save after swapping two pieces (Settings' ↑/↓). Every Realm Klash piece is saved in its place,
+ * on sale or not, so moving the pieces on sale never pushes one that's waiting for its store item down the list.
+ */
+export function swapGearOrder(state: AppState, a: string, b: string): string[] {
+  const rank = gearRank(state);
+  const ids = state.cards
+    .filter((c) => isRealmKlashGear(state, c))
+    .sort((x, y) => rank(x) - rank(y) || x.name.localeCompare(y.name))
+    .map((c) => c.id);
+  const i = ids.indexOf(a);
+  const j = ids.indexOf(b);
+  if (i < 0 || j < 0) return state.gearOrder ?? [];
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  return [...ids, ...(state.gearOrder ?? []).filter((id) => !ids.includes(id))];
 }
 
 /**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, swapGearOrder, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -140,6 +140,25 @@ describe('kameos', () => {
       }));
       expect(plan.buys.map((b) => [b.pack.id, b.count])).toEqual([['Bloody Tomahawk item', 2]]);
       expect(plan.saveFor?.pack.id).toBe('Shadow Sash item');
+    });
+
+    // Value: protects=moving pieces with ↑/↓ keeps a piece that's off sale in its place; fails_when=the saved order lists
+    // only pieces on sale, so the waiting piece drops below them when it's back; why_new=the swap moved out of GearOrder;
+    // seam=none; no_claim=the arrows themselves (GearOrder screen)
+    it('keeps a piece that is off sale in its place when two others swap', () => {
+      // Moloch's is first in the saved order but has no store item on sale.
+      const s = setup(cards(), [item('Bloody Tomahawk'), item('Shadow Sash')], (s) => {
+        s.gearOrder = ["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk'];
+      });
+      expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(['Shadow Sash', 'Bloody Tomahawk']);
+      s.gearOrder = swapGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk');
+      expect(s.gearOrder).toEqual(["Moloch's Ball and Chain", 'Bloody Tomahawk', 'Shadow Sash']);
+      // Back in the shop, it's first again.
+      s.packs.push(item("Moloch's Ball and Chain"));
+      expect(gearQueue(buildCtx(s), NOW).map((g) => g.card.id)).toEqual(["Moloch's Ball and Chain", 'Bloody Tomahawk', 'Shadow Sash']);
+      // A piece without a saved place still sorts by the default order, and swapping an unknown id changes nothing.
+      expect(swapGearOrder({ ...s, gearOrder: undefined }, 'Shadow Sash', "Moloch's Ball and Chain")).toEqual(["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk']);
+      expect(swapGearOrder(s, 'Shadow Sash', 'nope')).toBe(s.gearOrder);
     });
 
     // Value: protects=listed gear gets Blood Rubies and no kards, even with Epic tracked to Max; fails_when=the Kard plan
@@ -343,9 +362,9 @@ describe('save migration', () => {
     expect(shape(v14.rarities.map((r) => (r.id === 'diamond' ? { ...r, kind: 'kameo' as const } : r)))).toEqual([['kd', undefined, 1], ['kg', 'gold', 0]]);
   });
 
-  // Value: protects=an import marking a pack both a store item and a Kasket keeps the store item; fails_when=the store
-  // item is dropped, so Realm Klash gear leaves the gear queue without a word; why_new=store now wins; seam=none;
-  // no_claim=the pack editor, which never sets both
+  // Value: protects=an import marking a pack both a store item and a Kasket keeps the store item if it has a drop, else
+  // the Kasket; fails_when=the store item is dropped, so Realm Klash gear leaves the gear queue without a word, or a pack
+  // with no drops becomes a store item of nothing; why_new=store now wins; seam=none; no_claim=the pack editor
   it('keeps an imported Kasket at one card per purchase with no drops, and treats a null or empty rarity as no Kasket', () => {
     const drops = [{ cardId: 'a', chance: 50 }];
     const s = normalize({
@@ -356,14 +375,17 @@ describe('save migration', () => {
         { ...pack('n', drops), kasket: null },
         pack('e', drops, { kasket: '' }),
         pack('s', [{ cardId: 'a', chance: 100 }], { kasket: 'diamond', store: true }),
+        pack('t', [], { kasket: 'diamond', store: true }),
       ],
     });
     expect(s.packs[0]).toEqual(pack('k', [], { kasket: 'diamond' }));
     expect(s.packs[1]).not.toHaveProperty('kasket');
     expect(s.packs[2]).not.toHaveProperty('kasket');
     expect(s.packs[1].drops).toEqual(drops);
-    // Marked both a store item and a Kasket (only a hand-edited import): the store item wins.
+    // Marked both a store item and a Kasket (only a hand-edited import): the store item wins when it has a drop, and
+    // the Kasket when it has none, so the pack isn't a store item that drops nothing.
     expect(s.packs[3]).toEqual(pack('s', [{ cardId: 'a', chance: 100 }], { store: true }));
+    expect(s.packs[4]).toEqual(pack('t', [], { kasket: 'diamond' }));
   });
 });
 
@@ -968,6 +990,15 @@ describe('pack ranking lines', () => {
     expect(t()).toBe('Raiden: 25% per buy · about 4 buys per copy');
     expect(t(3, 1 / 3, 3)).toBe('Raiden: 33% per buy · yours within 3 buys');
     expect(t(1, 1, 1)).toBe('Raiden: yours next buy'); // a Kasket's last card, said once
+  });
+
+  // Value: protects=a card every buy gives reads "every buy", and an average of one reads "buy"; fails_when=a store item
+  // says "100% per buy · about 1 buys per copy" again; why_new=found by /qa; seam=none; no_claim=which cards rank
+  it('says "every buy" for a card a buy always gives, and "1 buy" in the singular', () => {
+    const t = (pAtLeastOne: number, buysPerCopy: number) => targetLine({ card: { name: 'Shadow Sash' }, pAtLeastOne, buysPerCopy });
+    expect(t(1, 1)).toBe('Shadow Sash: every buy');
+    expect(t(0.99, 1.002)).toBe('Shadow Sash: 99% per buy · about 1 buy per copy');
+    expect(t(0.5, 1.5)).toBe('Shadow Sash: 50% per buy · about 1.5 buys per copy');
   });
 });
 

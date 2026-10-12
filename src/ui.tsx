@@ -23,20 +23,30 @@ export function timeUntil(iso: string, now: Date) {
   return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-/** Re-renders every minute so countdowns stay fresh. */
+/**
+ * The time, read again every minute so countdowns stay fresh, and when the app comes back after half a minute or more
+ * in the background. PlanProvider holds the one clock the views share, as `usePlan().now`.
+ */
 export function useNow() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const tick = () => setNow(new Date());
-    const t = setInterval(tick, 60000);
+    const t = setInterval(() => setNow(new Date()), 60000);
     // A phone can hold the app in the background for hours with timers paused; read the time again on return so
-    // packs that ended meanwhile don't still count as on sale.
-    // A quick app switch keeps the time it had, so it doesn't run the whole planner again.
-    const onShow = () => document.visibilityState === 'visible' && setNow((prev) => (Date.now() - prev.getTime() >= 30000 ? new Date() : prev));
-    document.addEventListener('visibilitychange', onShow);
+    // packs that ended meanwhile don't still count as on sale. How long the app was away decides, so a quick app
+    // switch keeps the time it had and doesn't run the whole planner again; the minute timer covers the rest.
+    let hiddenAt: number | null = null;
+    const onChange = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+      } else if (hiddenAt !== null) {
+        if (Date.now() - hiddenAt >= 30000) setNow(new Date());
+        hiddenAt = null;
+      }
+    };
+    document.addEventListener('visibilitychange', onChange);
     return () => {
       clearInterval(t);
-      document.removeEventListener('visibilitychange', onShow);
+      document.removeEventListener('visibilitychange', onChange);
     };
   }, []);
   return now;
@@ -337,7 +347,10 @@ export function kardFooter(rarities: RarityRule[]) {
  */
 export function targetLine(t: { card: { name: string }; pAtLeastOne: number; buysPerCopy: number; withinBuys?: number }) {
   if (t.withinBuys === 1) return `${t.card.name}: yours next buy`;
-  const when = t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${fmt(t.buysPerCopy)} buys per copy`;
+  // A store item, or any pack that always drops the card: "100% per buy · about 1 buys per copy" says it twice.
+  if (t.pAtLeastOne >= 1) return `${t.card.name}: every buy`;
+  const buys = fmt(t.buysPerCopy);
+  const when = t.withinBuys ? `yours within ${t.withinBuys} buys` : `about ${buys} buy${buys === '1' ? '' : 's'} per copy`;
   return `${t.card.name}: ${pct(t.pAtLeastOne)} per buy · ${when}`;
 }
 
