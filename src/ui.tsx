@@ -27,8 +27,16 @@ export function timeUntil(iso: string, now: Date) {
 export function useNow() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(t);
+    const tick = () => setNow(new Date());
+    const t = setInterval(tick, 60000);
+    // A phone can hold the app in the background for hours with timers paused; read the time again on return so
+    // packs that ended meanwhile don't still count as on sale.
+    const onShow = () => document.visibilityState === 'visible' && tick();
+    document.addEventListener('visibilitychange', onShow);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onShow);
+    };
   }, []);
   return now;
 }

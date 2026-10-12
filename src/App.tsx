@@ -183,16 +183,16 @@ export default function App() {
   );
   // The logo goes back to the Plan, the screen the app opens on; on the Plan it scrolls back to the top.
   const home = () => (tab === 'plan' ? scrollRoot()?.scrollTo({ top: 0 }) : go('plan'));
-  // On the rail it gets the tabs' hover tint and its mark grows a little; the padding and matching negative margin
-  // leave it where it was.
+  // The padding gives it a thumb-sized tap area, and the matching negative margin leaves it where it was. On the rail it
+  // gets the tabs' hover tint, and its mark grows a little unless the device asks for reduced motion.
   const logo = (
     <button
       type="button"
       onClick={home}
       aria-label="MK MAX, go to the Plan"
-      className="group inline-flex items-center gap-[0.45rem] bg-transparent border-0 p-0 min-h-0 font-black tracking-[0.08em] text-[1.2rem] md:p-2 md:-m-2 md:rounded-panel md:transition-colors md:hover:bg-panel"
+      className="group inline-flex items-center gap-[0.45rem] bg-transparent border-0 p-2 -m-2 min-h-0 font-black tracking-[0.08em] text-[1.2rem] md:rounded-panel md:transition-colors md:hover:bg-panel"
     >
-      <img className="size-[26px] md:transition-transform md:group-hover:scale-110" src={`${import.meta.env.BASE_URL}logo-mark.svg`} alt="" />
+      <img className="size-[26px] md:motion-safe:transition-transform md:motion-safe:group-hover:scale-110" src={`${import.meta.env.BASE_URL}logo-mark.svg`} alt="" />
       <span className="inline-flex gap-[0.45rem] md:max-lg:sr-only">
         MK<b className="text-red">MAX</b>
       </span>

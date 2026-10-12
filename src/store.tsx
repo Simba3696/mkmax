@@ -10,11 +10,11 @@ export { normalize };
 export type { SyncStatus };
 
 /**
- * Pass an undo label to offer "Undo <label>" for this change. `auto` marks a change the app makes by itself that
+ * Pass an undo label to offer "Undo <label>" for this change; it can be a function, called after the recipe, when it
+ * depends on what the recipe changed. `auto` marks a change the app makes by itself that
  * every device works out the same way (catalog art, or the season end on a fresh install): it's saved but doesn't count as an edit for sync, so it can't
  * make two devices disagree.
  */
-/** The undo label can be a function, called after the recipe, when it depends on what the recipe changed. */
 type Update = (recipe: (draft: AppState) => void, undoLabel?: string | (() => string), opts?: { auto?: boolean }) => void;
 
 /** The most recent undoable change: the state from just before it. */

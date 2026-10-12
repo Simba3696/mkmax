@@ -5,19 +5,21 @@ import { nameKey } from './catalog';
 import type { Card, RarityRule } from './types';
 
 /** The shop's Kaskets and the rarity each one draws from (MK Mobile Base's event schedule names). */
-const KASKET_RARITY: Record<string, string> = {
+const KASKET_RARITY = {
   'Kollector’s Diamond Kasket': 'diamond',
   'Kollector’s Gold Kasket': 'gold',
   'Event Epic Equipment Kasket': 'epic',
   'Event Rare Equipment Kasket': 'rare',
-};
+} as const satisfies Record<string, string>;
+type KasketRarity = (typeof KASKET_RARITY)[keyof typeof KASKET_RARITY];
 
 /**
  * The newest characters and gear, which Kaskets leave out until the next update, with each one's rarity, so a
  * same-named card of another rarity still counts. From the 22 July 2026 update (7.3). Replace the list each update
  * via the patch-notes skill.
  */
-const KASKET_EXCLUDED: [name: string, rarityId: string][] = [
+// Typed by KASKET_RARITY's ids, so a misspelt rarity in a new update's list fails the build instead of matching nothing.
+const KASKET_EXCLUDED: [name: string, rarityId: KasketRarity][] = [
   ['Sub-Zero MK1', 'diamond'],
   ['Scorpion MK2 Movie', 'diamond'],
   ['Man in Control', 'epic'],
@@ -31,7 +33,7 @@ const excludedKey = (name: string, rarityId: string) => `${rarityId}:${nameKey(n
 const EXCLUDED = new Set(KASKET_EXCLUDED.map(([name, rarityId]) => excludedKey(name, rarityId)));
 // The built-in rarities the list's ids refer to. A rarity added in Settings, or a built-in one rebuilt under a new
 // id, can't be told apart from them, so there the list matches by name alone, as it did before it carried rarities.
-const KNOWN_RARITIES = new Set(Object.values(KASKET_RARITY));
+const KNOWN_RARITIES = new Set<string>(Object.values(KASKET_RARITY));
 const EXCLUDED_NAMES = new Set(KASKET_EXCLUDED.map(([name]) => nameKey(name)));
 
 /** The rarity a shop Kasket draws from, by name (word order and apostrophes don't matter); undefined for other packs. */
