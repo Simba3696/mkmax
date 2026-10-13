@@ -79,8 +79,10 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     const line = trimmed.replace(/^(?:[-–—*•·]|\d+[.)])\s+/, '');
     const [name, ...parts] = line.split(/\s+[-–—]\s+/);
     if (parts.length === 0) {
-      const heading = findRarity(line.replace(/:$/, ''), rarities);
-      if (heading && heading.label.toLowerCase() === line.replace(/:$/, '').toLowerCase()) {
+      // A heading is a rarity's full name. Matched on the name alone, so a name the list was typed with still counts
+      // when the rarity has since been renamed (the caller passes old names too), even where it's also the rarity's id.
+      const heading = rarities.find((r) => r.label.toLowerCase() === line.replace(/:$/, '').toLowerCase());
+      if (heading) {
         headingRarityId = heading.id;
         continue;
       }

@@ -87,18 +87,25 @@ function CapSelect({ rule, value, onChange }: { rule: RarityRule; value: number 
 }
 
 /** Add many cards at once from a pasted list, one name per line; rarity headings in the list switch the rarity. */
-function PasteList({ startRarityId }: { startRarityId: string }) {
+function PasteList({ pickedId, startRarityId }: { pickedId: string; startRarityId: string }) {
   const { state, update } = useStore();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  // Every rarity seen while the list was typed, kept after another device removes one: a heading or " - " detail naming
-  // it then still reads as that rarity, and its lines are skipped, rather than filed under whichever rarity comes before
-  // it (or the heading becoming a card). Editing the text never forgets one.
+  // The list is read with the rarities, their names and the rarity picked above as they were while it was typed, so a
+  // sync can't change what it means. Every rarity and name seen is kept: a line under a rarity another device removed
+  // (picked above, a heading or after " - ") is skipped, rather than filed under whichever rarity comes before it or
+  // the heading becoming a card, and a heading still matches a rarity renamed since. The rarity picked above follows a
+  // new pick, not a sync removing it (the form then shows the first rarity).
   const [known, setKnown] = useState(state.rarities);
-  const remember = () => setKnown((k) => [...state.rarities, ...k.filter((r) => !state.rarities.some((x) => x.id === r.id))]);
-  const rarities = useMemo(() => [...state.rarities, ...known.filter((r) => !state.rarities.some((x) => x.id === r.id))], [state.rarities, known]);
-  const parsed = useMemo(() => parseCardList(text, rarities, startRarityId, state.cards), [text, rarities, startRarityId, state.cards]);
+  const rarities = useMemo(() => [...state.rarities, ...known.filter((r) => !state.rarities.some((x) => x.id === r.id && x.label === r.label))], [state.rarities, known]);
+  const [start, setStart] = useState({ pickedId, id: startRarityId });
+  if (start.pickedId !== pickedId) setStart({ pickedId, id: startRarityId });
+  const remember = () => setKnown(rarities);
+  // After an Add that left lines behind, Done clears them.
+  const [leftOver, setLeftOver] = useState(false);
+  const parsed = useMemo(() => parseCardList(text, rarities, start.id, state.cards), [text, rarities, start.id, state.cards]);
   const live = (rarityId: string) => state.rarities.some((r) => r.id === rarityId);
+  // Only a rarity the list knew: with no rarities at all, plain lines have none, and the Settings note covers them.
   const removed = parsed.cards.filter((c) => !live(c.rarityId) && rarities.some((r) => r.id === c.rarityId));
   const newCards = parsed.cards.filter((c) => live(c.rarityId));
   const counts = state.rarities
@@ -108,7 +115,7 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
   if (!open) {
     return (
       <div className={actions}>
-        <button onClick={() => (remember(), setOpen(true))}>Paste a list…</button>
+        <button onClick={() => (remember(), setStart({ pickedId, id: startRarityId }), setLeftOver(false), setOpen(true))}>Paste a list…</button>
       </div>
     );
   }
@@ -148,13 +155,17 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
         return done.charAt(0).toUpperCase() + done.slice(1);
       },
     );
-    // A list with lines a sync left nowhere to go stays, so they aren't lost: the box shows what's left, and what's skipped.
-    if (added + updated < total || removed.length) return;
+    // A list with lines that weren't added (a sync left them nowhere to go, or they were skipped) stays, so they aren't
+    // lost; the lines just added now show as already listed, and Done clears the box.
+    if (added + updated < total || removed.length || parsed.problems.length) return setLeftOver(true);
+    close();
+  }
+  function close() {
     setText('');
     setOpen(false);
   }
 
-  const startLabel = state.rarities.find((r) => r.id === startRarityId)?.label ?? '';
+  const startLabel = rarities.find((r) => r.id === start.id)?.label ?? '';
   return (
     <div className={subpanel}>
       {/* A readable line length; the textarea below still takes the full width. */}
@@ -165,7 +176,7 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
         update makes Gold characters ascendable, add "Stage I" (Max A5) or "Stage II" (Max A10), like "Kenshi, Elder God - Gold - Stage I": a card not in your list
         was maxed, so it comes back at the cap below with 5 copies to go.
       </p>
-      <textarea value={text} onChange={(e) => (setText(e.target.value), remember())} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
+      <textarea value={text} onChange={(e) => (setText(e.target.value), remember(), setLeftOver(false))} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
       <div className="text-small text-muted">
         {!state.rarities.length
           ? 'Add a rarity in Settings first: every card needs one.'
@@ -173,7 +184,9 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
             ? `New: ${counts.map((x) => `${x.n} ${x.label}`).join(' · ')}`
             : parsed.updates.length
               ? ''
-              : 'Nothing to add yet.'}
+              : leftOver
+                ? 'Nothing left to add.'
+                : 'Nothing to add yet.'}
         {parsed.updates.length > 0 && ` · updating ${parsed.updates.length} already listed (${parsed.updates.map((u) => u.name).join('; ')})`}
         {parsed.duplicates.length > 0 && ` · skipping ${parsed.duplicates.length} already listed (${parsed.duplicates.join('; ')})`}
       </div>
@@ -191,12 +204,18 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
       )}
       <div className={actions}>
         <button onClick={() => setOpen(false)}>Cancel</button>
-        <button className={btn.primary} disabled={!total} onClick={addAll}>
-          {newCards.length > 0 && `Add ${newCards.length}`}
-          {newCards.length > 0 && parsed.updates.length > 0 && ', '}
-          {parsed.updates.length > 0 && `update ${parsed.updates.length}`}
-          {!total && 'Add cards'}
-        </button>
+        {leftOver && !total ? (
+          <button className={btn.primary} onClick={close}>
+            Done
+          </button>
+        ) : (
+          <button className={btn.primary} disabled={!total} onClick={addAll}>
+            {newCards.length > 0 && `Add ${newCards.length}`}
+            {newCards.length > 0 && parsed.updates.length > 0 && ', '}
+            {parsed.updates.length > 0 && `update ${parsed.updates.length}`}
+            {!total && 'Add cards'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -494,7 +513,7 @@ function CardList() {
             {draftRule.label} is tracked only until F{draftRule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.
           </p>
         )}
-        <PasteList startRarityId={draftRule?.id ?? ''} />
+        <PasteList pickedId={draft.rarityId} startRarityId={draftRule?.id ?? ''} />
       </section>
 
       {/* Kept in view while scrolling a long list on wide screens, where it fits on one row; elsewhere it scrolls away as before. */}
