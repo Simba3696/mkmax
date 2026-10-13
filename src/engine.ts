@@ -809,9 +809,20 @@ export function stretchedWeekEnds(saved: string | null | undefined, now: Date, w
   if (!saved || !weekEnds?.length) return [];
   const t = new Date(saved);
   if (isNaN(t.getTime())) return [];
-  const passed: string[] = [];
-  for (; t <= now; t.setDate(t.getDate() + SEASON_DAYS)) passed.push(toLocalInput(t)); // setDate keeps the local time across DST
-  return passed.filter((c) => weekEnds.includes(c)).reverse();
+  const ends = weekEnds.map((w) => [w, new Date(w).getTime()] as const);
+  // A saved end long ago (or with a mistyped year) would take many 2-week steps to roll forward: skip to a season
+  // before the earliest week end. setDate keeps the local time across clock changes.
+  const span = SEASON_DAYS * 24 * 3600_000;
+  const steps = Math.floor((Math.min(...ends.map(([, e]) => e)) - t.getTime()) / span) - 1;
+  if (steps > 0) t.setDate(t.getDate() + steps * SEASON_DAYS);
+  // The rolled end keeps its local time while the schedule's week ends are fixed instants, so across a clock change
+  // they can be an hour apart: both spellings count, since items may end on either.
+  const found = new Set<string>();
+  for (; t <= now; t.setDate(t.getDate() + SEASON_DAYS)) {
+    const near = ends.filter(([, e]) => Math.abs(e - t.getTime()) <= 3600_000);
+    if (near.length) [toLocalInput(t), ...near.map(([w]) => w)].forEach((c) => found.add(c));
+  }
+  return [...found].sort().reverse();
 }
 
 /**
@@ -845,7 +856,10 @@ export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: str
   for (const p of s.packs) {
     if (!p.season || !p.endsAt) continue;
     const start = p.startsAt;
-    const ahead = start && !(still && start >= to) && changeovers.find((c) => start >= c);
+    // An item already starting at `to` (or, when `to` isn't moving, after it) is in the season it belongs to, with its own
+    // end from the schedule: neither its start nor its end moves.
+    if (start && (still ? start >= to : start === to)) continue;
+    const ahead = start && changeovers.find((c) => start >= c);
     if (ahead) {
       if (start === ahead) p.startsAt = to;
       p.endsAt = seasonEnd(to, new Date(p.startsAt!));
