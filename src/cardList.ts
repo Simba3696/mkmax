@@ -30,6 +30,8 @@ export interface ParsedList {
   problems: { line: string; reason: string }[];
   /** The line each of `cards` came from, in the same order, for messages that quote it. */
   cardLines: string[];
+  /** Each of `duplicates` as `rarityId|name key`, in the same order, to tell same-named cards of different rarities apart. */
+  duplicateKeys: string[];
 }
 
 /** Grades the game has that aren't tracked as cards here. */
@@ -74,7 +76,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
   const byKey = new Map(existing.map((c) => [`${c.rarityId}|${nameKey(c.name)}`, c]));
   const seen = new Set<string>();
   let headingRarityId = startRarityId;
-  const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [], cardLines: [] };
+  const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [], cardLines: [], duplicateKeys: [] };
   for (const raw of text.split(/\r?\n/)) {
     const trimmed = raw.trim().replace(/\s+/g, ' ');
     if (!trimmed || /^[-=_*\s]+$/.test(trimmed)) continue;
@@ -133,6 +135,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     const key = `${rarityId}|${nameKey(name)}`;
     if (seen.has(key)) {
       out.duplicates.push(name);
+      out.duplicateKeys.push(key);
       continue;
     }
     seen.add(key);
@@ -148,7 +151,10 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       if (source && (source !== card.source || sourceNote !== card.sourceNote)) Object.assign(patch, { source, sourceNote });
       if (maxLevel !== undefined && maxLevel !== (card.maxLevel ?? null)) patch.maxLevel = maxLevel;
       if (Object.keys(patch).length) out.updates.push({ cardId: card.id, name: card.name, patch });
-      else out.duplicates.push(name);
+      else {
+        out.duplicates.push(name);
+        out.duplicateKeys.push(key);
+      }
       continue;
     }
     // Every card still being maxed is in the app, so a Gold card made ascendable that isn't was maxed and removed:

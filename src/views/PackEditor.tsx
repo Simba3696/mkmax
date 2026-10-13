@@ -3,7 +3,7 @@ import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { LevelOptions, Modal, NumInput, kasketLine } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
-import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, isSeasonal, kasketPool, maxFusion, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
+import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, isMaxed, isSeasonal, kasketPool, maxFusion, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
 import { initialSource } from '../challenges';
 import { scheduledSeason, scheduledSeasonEnd, useEvents } from '../events';
 import { kasketFor } from '../kaskets';
@@ -81,6 +81,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   // The rarity the box shows: the one picked, or the first once a sync has removed that one (its level starts at not owned).
   const newCardRule = state.rarities.find((r) => r.id === newCard.rarityId) ?? state.rarities[0];
   const newCardFusion = newCardRule?.id === newCard.rarityId ? newCard.fusion : 0;
+  // A level that is already the card's goal: the card would be done (and deleted) as soon as it's saved.
+  const newCardDone = !!newCardRule && isMaxed({ id: '', name: '', rarityId: newCardRule.id, fusion: newCardFusion, guest: false }, newCardRule);
   function addNewCard() {
     if (!newCard.name.trim() || !newCardRule) return;
     let card = undefined as Card | undefined;
@@ -89,10 +91,13 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       // to delete it. A level a sync has since taken off the rarity is saved as not owned.
       const rule = d.rarities.find((r) => r.id === newCardRule.id);
       if (!rule) return noChange;
-      card = { id: newId(), name: newCard.name.trim(), rarityId: rule.id, fusion: newCardFusion <= maxFusion(rule) ? newCardFusion : 0, guest: false };
-      const source = initialSource(card, d.rarities);
-      if (source) card.source = source;
-      d.cards.push(card);
+      const made: Card = { id: newId(), name: newCard.name.trim(), rarityId: rule.id, fusion: newCardFusion <= maxFusion(rule) ? newCardFusion : 0, guest: false };
+      // A card already at its goal is done: the save would delete it at once and leave the pack a drop for nothing.
+      if (isMaxed(made, rule)) return noChange;
+      const source = initialSource(made, d.rarities);
+      if (source) made.source = source;
+      d.cards.push(made);
+      card = made;
     });
     // The typed name stays for another try when nothing was added.
     if (!card) return;
@@ -348,13 +353,14 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
               <select className="flex-1" value={newCardFusion} onChange={(e) => setNewCard({ ...newCard, rarityId: newCardRule?.id ?? '', fusion: Number(e.target.value) })}>
                 <LevelOptions rule={newCardRule} />
               </select>
-              <button onClick={addNewCard} disabled={!newCard.name.trim()}>
+              <button onClick={addNewCard} disabled={!newCard.name.trim() || newCardDone}>
                 Add card
               </button>
             </div>
             {newCard.rarityId && newCardRule && newCardRule.id !== newCard.rarityId && (
               <div className="text-small text-muted">The rarity you picked was removed on another device, so this card goes in as {newCardRule.label}.</div>
             )}
+            {newCardDone && <div className="text-small text-muted">That level is already the card's goal, so it would be done at once: pick a lower level to add it.</div>}
           </div>
         </>
       )}

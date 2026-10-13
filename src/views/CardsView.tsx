@@ -1,7 +1,7 @@
 import { Activity, useEffect, useMemo, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isRealmKlashName, kardStep, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel } from '../engine';
+import { ascensionCaps, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -102,17 +102,19 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const [start, setStart] = useState({ pick, id: startRarityId });
   if (start.pick !== pick) setStart({ pick, id: startRarityId });
   const remember = () => setKnown(rarities);
-  // After an Add that left lines behind, the box stays until Done. Lines that Add already saved are left out after:
-  // a card saved at its goal is deleted at once as done, and would otherwise be offered again as new.
+  // After an Add that left lines behind, the box stays until Done. A card that Add saved at its goal is deleted at once
+  // as done, so its line would read as new again: it's left out (`gone`). The other cards Add saved now match the list
+  // and aren't listed as skipped (`justAdded`). An Undo or a delete brings their lines back as new.
   const [leftOver, setLeftOver] = useState(false);
-  const [handled, setHandled] = useState<Set<string>>(new Set());
+  const [gone, setGone] = useState<Set<string>>(new Set());
+  const [justAdded, setJustAdded] = useState<Set<string>>(new Set());
   const keyOf = (rarityId: string, name: string) => `${rarityId}|${nameKey(name)}`;
   const parsed = useMemo(() => parseCardList(text, rarities, start.id, state.cards), [text, rarities, start.id, state.cards]);
   const live = (rarityId: string) => state.rarities.some((r) => r.id === rarityId);
   // Only a rarity the list knew: with no rarities at all, plain lines have none, and the Settings note covers them.
   const isRemoved = (c: (typeof parsed.cards)[number]) => !live(c.rarityId) && rarities.some((r) => r.id === c.rarityId);
   const removedLines = parsed.cardLines.filter((_, i) => isRemoved(parsed.cards[i]));
-  const newCards = parsed.cards.filter((c) => live(c.rarityId) && !handled.has(keyOf(c.rarityId, c.name)));
+  const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(keyOf(c.rarityId, c.name)));
   const counts = state.rarities
     .map((r) => ({ label: r.label, n: newCards.filter((c) => c.rarityId === r.id).length }))
     .filter((x) => x.n > 0);
@@ -127,11 +129,12 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
 
   const total = newCards.length + parsed.updates.length;
   // After an Add, the cards it just saved now match the list: they were added, not skipped, so they aren't listed.
-  const skipped = parsed.duplicates.filter((name) => ![...handled].some((k) => k.endsWith(`|${nameKey(name)}`)));
+  const skipped = parsed.duplicates.filter((_, i) => !justAdded.has(parsed.duplicateKeys[i]));
   function addAll() {
     let added = 0;
     let updated = 0;
     let saved: string[] = [];
+    let done: string[] = [];
     update(
       (d) => {
         // Not under a rarity a sync removed after the list was read: those cards would be hidden everywhere, with no way
@@ -139,35 +142,38 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId));
         const updates = parsed.updates.flatMap((u) => d.cards.filter((c) => c.id === u.cardId).map((c) => ({ c, patch: u.patch })));
         if (!cards.length && !updates.length) return noChange;
-        d.cards.push(
-          ...cards.map(
-            (c): Card => ({
-              id: newId(),
-              name: c.name,
-              rarityId: c.rarityId,
-              // As Add card does: a level a sync has since taken off the rarity is saved as not owned.
-              fusion: (c.fusion ?? 0) <= maxFusion(d.rarities.find((r) => r.id === c.rarityId)!) ? (c.fusion ?? 0) : 0,
-              guest: false,
-              source: c.source ?? initialSource(c, d.rarities),
-              ...(c.sourceNote && { sourceNote: c.sourceNote }),
-              ...(c.maxLevel != null && { maxLevel: c.maxLevel }),
-            }),
-          ),
+        const fresh = cards.map(
+          (c): Card => ({
+            id: newId(),
+            name: c.name,
+            rarityId: c.rarityId,
+            // As Add card does: a level a sync has since taken off the rarity is saved as not owned.
+            fusion: (c.fusion ?? 0) <= maxFusion(d.rarities.find((r) => r.id === c.rarityId)!) ? (c.fusion ?? 0) : 0,
+            guest: false,
+            source: c.source ?? initialSource(c, d.rarities),
+            ...(c.sourceNote && { sourceNote: c.sourceNote }),
+            ...(c.maxLevel != null && { maxLevel: c.maxLevel }),
+          }),
         );
+        d.cards.push(...fresh);
         for (const { c, patch } of updates) Object.assign(c, patch);
         added = cards.length;
         updated = updates.length;
-        saved = [...cards.map((c) => keyOf(c.rarityId, c.name)), ...updates.map(({ c }) => keyOf(c.rarityId, c.name))];
+        const touched = [...fresh, ...updates.map(({ c }) => c)];
+        saved = touched.map((c) => keyOf(c.rarityId, c.name));
+        // At their goal now, so the save deletes them as done.
+        done = touched.filter((c) => isMaxed(c, d.rarities.find((r) => r.id === c.rarityId)!)).map((c) => keyOf(c.rarityId, c.name));
       },
       () => {
-        const done = [added && `added ${added} card${added === 1 ? '' : 's'}`, updated && `updated ${updated}`].filter(Boolean).join(', ');
-        return done.charAt(0).toUpperCase() + done.slice(1);
+        const label = [added && `added ${added} card${added === 1 ? '' : 's'}`, updated && `updated ${updated}`].filter(Boolean).join(', ');
+        return label.charAt(0).toUpperCase() + label.slice(1);
       },
     );
     // A list with lines that weren't added (a sync left them nowhere to go, or they were skipped) stays, so they aren't
-    // lost; the lines just added are left out from then on, and Done clears the box.
+    // lost, and Done clears the box.
     if (added + updated < total || removedLines.length || parsed.problems.length) {
-      setHandled((h) => new Set([...h, ...saved]));
+      setGone((g) => new Set([...g, ...done]));
+      setJustAdded((j) => new Set([...j, ...saved]));
       setLeftOver(true);
       return;
     }
@@ -176,7 +182,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   function close() {
     setText('');
     setLeftOver(false);
-    setHandled(new Set());
+    setGone(new Set());
+    setJustAdded(new Set());
     setOpen(false);
   }
 
@@ -216,13 +223,14 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
       </div>
       {parsed.problems.length + removedLines.length > 0 && (
         <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
-          {parsed.problems.map((p) => (
-            <li key={p.line}>
+          {/* Keyed by place too: the same line can be pasted twice. */}
+          {parsed.problems.map((p, i) => (
+            <li key={`${i}|${p.line}`}>
               Skipped "{p.line}": {p.reason}.
             </li>
           ))}
-          {removedLines.map((line) => (
-            <li key={`removed|${line}`}>Skipped "{line}": its rarity was removed on another device.</li>
+          {removedLines.map((line, i) => (
+            <li key={`removed|${i}|${line}`}>Skipped "{line}": its rarity was removed on another device.</li>
           ))}
         </ul>
       )}
