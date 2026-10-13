@@ -534,7 +534,7 @@ An emptied box saves 0. **Reset weights** puts the defaults back, with no confir
 
 ### Version
 
-The bottom of Settings shows which version you have and the date of that change, for example `Version 0ebc412 · 2026-09-27`. It only changes when the app itself does: the daily event schedule refresh keeps the same version. See [Updates](#updates).
+The bottom of Settings shows which version you have and the date of that change, for example `Version 06894c1 · 2026-09-27`. It only changes when the app itself does: the daily event schedule refresh keeps the same version. See [Updates](#updates).
 
 ## What's tracked
 
