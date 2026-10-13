@@ -82,7 +82,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   const newCardRule = state.rarities.find((r) => r.id === newCard.rarityId) ?? state.rarities[0];
   const newCardFusion = newCardRule?.id === newCard.rarityId ? newCard.fusion : 0;
   // A level that is already the card's goal: the card would be done (and deleted) as soon as it's saved.
-  const newCardDone = !!newCardRule && isMaxed({ id: '', name: '', rarityId: newCardRule.id, fusion: newCardFusion, guest: false }, newCardRule);
+  const newCardDone = !!newCardRule && isMaxed({ id: '', name: newCard.name.trim(), rarityId: newCardRule.id, fusion: newCardFusion, guest: false }, newCardRule);
+  // (By its name too: Realm Klash gear is tracked to F10 at any rarity's Track until.)
   function addNewCard() {
     if (!newCard.name.trim() || !newCardRule) return;
     let card = undefined as Card | undefined;

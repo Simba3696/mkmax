@@ -114,7 +114,9 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   // Only a rarity the list knew: with no rarities at all, plain lines have none, and the Settings note covers them.
   const isRemoved = (c: (typeof parsed.cards)[number]) => !live(c.rarityId) && rarities.some((r) => r.id === c.rarityId);
   const removedLines = parsed.cardLines.filter((_, i) => isRemoved(parsed.cards[i]));
-  const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(keyOf(c.rarityId, c.name)));
+  // By level too, so a line edited down from its goal is offered again.
+  const goneKey = (rarityId: string, name: string, fusion?: number, maxLevel?: number | null) => `${keyOf(rarityId, name)}|${fusion ?? ''}|${maxLevel ?? ''}`;
+  const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(goneKey(c.rarityId, c.name, c.fusion, c.maxLevel)));
   const counts = state.rarities
     .map((r) => ({ label: r.label, n: newCards.filter((c) => c.rarityId === r.id).length }))
     .filter((x) => x.n > 0);
@@ -162,7 +164,12 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         const touched = [...fresh, ...updates.map(({ c }) => c)];
         saved = touched.map((c) => keyOf(c.rarityId, c.name));
         // At their goal now, so the save deletes them as done.
-        done = touched.filter((c) => isMaxed(c, d.rarities.find((r) => r.id === c.rarityId)!)).map((c) => keyOf(c.rarityId, c.name));
+        // Keyed as the line reads (its level as typed), which is how it would come back as a new card.
+        const ruleOf = (c: Card) => d.rarities.find((r) => r.id === c.rarityId)!;
+        done = [
+          ...cards.filter((_, i) => isMaxed(fresh[i], ruleOf(fresh[i]))).map((c) => goneKey(c.rarityId, c.name, c.fusion, c.maxLevel)),
+          ...updates.filter(({ c }) => isMaxed(c, ruleOf(c))).map(({ c, patch }) => goneKey(c.rarityId, c.name, patch.fusion, patch.maxLevel)),
+        ];
       },
       () => {
         const label = [added && `added ${added} card${added === 1 ? '' : 's'}`, updated && `updated ${updated}`].filter(Boolean).join(', ');
