@@ -91,13 +91,16 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
   const { state, update } = useStore();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  // The rarities as they were when the list was typed. If another device removes one the list names (as a heading or
-  // after " - "), its lines are skipped, rather than filed under whichever rarity comes before it.
-  const [typedWith, setTypedWith] = useState(state.rarities);
-  const rarities = useMemo(() => [...state.rarities, ...typedWith.filter((r) => !state.rarities.some((x) => x.id === r.id))], [state.rarities, typedWith]);
+  // Every rarity seen while the list was typed, kept after another device removes one: a heading or " - " detail naming
+  // it then still reads as that rarity, and its lines are skipped, rather than filed under whichever rarity comes before
+  // it (or the heading becoming a card). Editing the text never forgets one.
+  const [known, setKnown] = useState(state.rarities);
+  const remember = () => setKnown((k) => [...state.rarities, ...k.filter((r) => !state.rarities.some((x) => x.id === r.id))]);
+  const rarities = useMemo(() => [...state.rarities, ...known.filter((r) => !state.rarities.some((x) => x.id === r.id))], [state.rarities, known]);
   const parsed = useMemo(() => parseCardList(text, rarities, startRarityId, state.cards), [text, rarities, startRarityId, state.cards]);
-  const removed = parsed.cards.filter((c) => !state.rarities.some((r) => r.id === c.rarityId));
-  const newCards = parsed.cards.filter((c) => !removed.includes(c));
+  const live = (rarityId: string) => state.rarities.some((r) => r.id === rarityId);
+  const removed = parsed.cards.filter((c) => !live(c.rarityId) && rarities.some((r) => r.id === c.rarityId));
+  const newCards = parsed.cards.filter((c) => live(c.rarityId));
   const counts = state.rarities
     .map((r) => ({ label: r.label, n: newCards.filter((c) => c.rarityId === r.id).length }))
     .filter((x) => x.n > 0);
@@ -105,7 +108,7 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
   if (!open) {
     return (
       <div className={actions}>
-        <button onClick={() => (setTypedWith(state.rarities), setOpen(true))}>Paste a list…</button>
+        <button onClick={() => (remember(), setOpen(true))}>Paste a list…</button>
       </div>
     );
   }
@@ -145,8 +148,8 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
         return done.charAt(0).toUpperCase() + done.slice(1);
       },
     );
-    // A list with lines a sync left nowhere to go stays, so it isn't lost: the box shows what's left to add.
-    if (added + updated < total) return;
+    // A list with lines a sync left nowhere to go stays, so they aren't lost: the box shows what's left, and what's skipped.
+    if (added + updated < total || removed.length) return;
     setText('');
     setOpen(false);
   }
@@ -162,9 +165,15 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
         update makes Gold characters ascendable, add "Stage I" (Max A5) or "Stage II" (Max A10), like "Kenshi, Elder God - Gold - Stage I": a card not in your list
         was maxed, so it comes back at the cap below with 5 copies to go.
       </p>
-      <textarea value={text} onChange={(e) => (setText(e.target.value), setTypedWith(state.rarities))} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
+      <textarea value={text} onChange={(e) => (setText(e.target.value), remember())} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
       <div className="text-small text-muted">
-        {counts.length ? `New: ${counts.map((x) => `${x.n} ${x.label}`).join(' · ')}` : parsed.updates.length ? '' : 'Nothing to add yet.'}
+        {!state.rarities.length
+          ? 'Add a rarity in Settings first: every card needs one.'
+          : counts.length
+            ? `New: ${counts.map((x) => `${x.n} ${x.label}`).join(' · ')}`
+            : parsed.updates.length
+              ? ''
+              : 'Nothing to add yet.'}
         {parsed.updates.length > 0 && ` · updating ${parsed.updates.length} already listed (${parsed.updates.map((u) => u.name).join('; ')})`}
         {parsed.duplicates.length > 0 && ` · skipping ${parsed.duplicates.length} already listed (${parsed.duplicates.join('; ')})`}
       </div>
@@ -258,8 +267,8 @@ function CardList() {
 
   const draftRule = ctx.rules.get(draft.rarityId) ?? state.rarities[0];
   // What the form shows, and Add card saves: the rarity picked, or the first once a sync has removed that one (the box
-  // shows the first). Falling back starts that rarity's level, goal and cap at their defaults, as picking it would: the
-  // removed rarity's don't fit it (a Gold A2 would be saved at a Diamond's max and deleted at once as maxed).
+  // shows the first). Falling back starts that rarity's level, goal and cap at their defaults, since the removed
+  // rarity's don't fit it (a Gold A2 would be saved at a Diamond's max and deleted at once as maxed).
   const shown = !draftRule || draftRule.id === draft.rarityId ? draft : { ...draft, rarityId: draftRule.id, fusion: 0, maxLevel: null, goal: undefined };
   // Cards to look up: no art yet, art that stopped loading, or art from an older wiki lookup (some of those are
   // stat screenshots rather than card art), which mkmobilebase usually has a proper card image for.
