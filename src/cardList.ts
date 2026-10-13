@@ -65,7 +65,8 @@ function parseLevel(word: string, rule: RarityRule | undefined): number | null {
  * "Unowned"), and for Gold an ascension stage ("Stage I" is a Max of A5, "Stage II" A10). A line that's only a
  * rarity's name (e.g. "Gold Kameo") switches the rarity for the lines after it, so lists copied from notes with
  * headings work as-is. Underline rows ("-----") and blank lines are skipped, and a leading bullet or number is
- * dropped.
+ * dropped. `rarities` may list a rarity again under an older name (Paste a list passes the names a list was typed
+ * with): current entries come first, and a rarity's rules are read from its first entry.
  */
 export function parseCardList(text: string, rarities: RarityRule[], startRarityId: string, existing: Card[]): ParsedList {
   const byKey = new Map(existing.map((c) => [`${c.rarityId}|${nameKey(c.name)}`, c]));
