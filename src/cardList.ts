@@ -6,6 +6,8 @@ import type { Card, RarityRule } from './types';
 interface ListedCard {
   name: string;
   rarityId: string;
+  /** The line it came from (bullets and extra spaces dropped), for messages that quote it. */
+  line: string;
   /** Stored level from the line (e.g. "F2" → 3, "Unowned" → 0); unset means not owned. */
   fusion?: number;
   source?: Card['source'];
@@ -17,6 +19,8 @@ interface ListedCard {
 interface CardUpdate {
   cardId: string;
   name: string;
+  /** The line it came from, as in ListedCard. */
+  line: string;
   patch: Partial<Pick<Card, 'fusion' | 'source' | 'sourceNote' | 'maxLevel'>>;
 }
 
@@ -24,16 +28,13 @@ export interface ParsedList {
   cards: ListedCard[];
   /** Cards already in the app that the line gives a level or source for. */
   updates: CardUpdate[];
-  /** Names skipped because that card is already in the app (with nothing to update) or earlier in the list. */
-  duplicates: string[];
+  /**
+   * Cards skipped because they're already in the app (with nothing to update) or earlier in the list, with their
+   * cardKey to tell same-named cards of different rarities apart.
+   */
+  duplicates: { name: string; key: string }[];
   /** Lines that couldn't be used, with why. */
   problems: { line: string; reason: string }[];
-  /** The line each of `cards` came from, in the same order, for messages that quote it. */
-  cardLines: string[];
-  /** The line each of `updates` came from, in the same order. */
-  updateLines: string[];
-  /** Each of `duplicates` as its cardKey, in the same order, to tell same-named cards of different rarities apart. */
-  duplicateKeys: string[];
 }
 
 /** One card in a list, whatever case, spacing or word order its name is typed in: its rarity and name key. */
@@ -81,7 +82,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
   const byKey = new Map(existing.map((c) => [cardKey(c.rarityId, c.name), c]));
   const seen = new Set<string>();
   let headingRarityId = startRarityId;
-  const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [], cardLines: [], updateLines: [], duplicateKeys: [] };
+  const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [] };
   for (const raw of text.split(/\r?\n/)) {
     const trimmed = raw.trim().replace(/\s+/g, ' ');
     if (!trimmed || /^[-=_*\s]+$/.test(trimmed)) continue;
@@ -139,8 +140,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
 
     const key = cardKey(rarityId, name);
     if (seen.has(key)) {
-      out.duplicates.push(name);
-      out.duplicateKeys.push(key);
+      out.duplicates.push({ name, key });
       continue;
     }
     seen.add(key);
@@ -155,14 +155,8 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       if (fusion != null && fusion !== card.fusion) patch.fusion = fusion;
       if (source && (source !== card.source || sourceNote !== card.sourceNote)) Object.assign(patch, { source, sourceNote });
       if (maxLevel !== undefined && maxLevel !== (card.maxLevel ?? null)) patch.maxLevel = maxLevel;
-      if (Object.keys(patch).length) {
-        out.updates.push({ cardId: card.id, name: card.name, patch });
-        out.updateLines.push(line);
-      }
-      else {
-        out.duplicates.push(name);
-        out.duplicateKeys.push(key);
-      }
+      if (Object.keys(patch).length) out.updates.push({ cardId: card.id, name: card.name, line, patch });
+      else out.duplicates.push({ name, key });
       continue;
     }
     // Every card still being maxed is in the app, so a Gold card made ascendable that isn't was maxed and removed:
@@ -177,12 +171,12 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     out.cards.push({
       name,
       rarityId,
+      line,
       ...(start != null && { fusion: start }),
       ...(source && { source }),
       ...(sourceNote && { sourceNote }),
       ...(maxLevel !== undefined && { maxLevel }),
     });
-    out.cardLines.push(line);
   }
   return out;
 }

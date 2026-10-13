@@ -112,11 +112,10 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const live = (rarityId: string) => state.rarities.some((r) => r.id === rarityId);
   // Only a rarity the list knew: with no rarities at all, plain lines have none, and the Settings note covers them.
   const isRemoved = (c: (typeof parsed.cards)[number]) => !live(c.rarityId) && rarities.some((r) => r.id === c.rarityId);
-  const removedLines = parsed.cardLines.filter((_, i) => isRemoved(parsed.cards[i]));
+  const removedLines = parsed.cards.filter(isRemoved).map((c) => c.line);
   // `gone` holds the lines as typed, so an edited line (a lower level, say) is offered again, and a line that reads
   // differently once its card is gone (a Stage line brings a maxed card back) still matches.
-  const cardLine = (c: (typeof parsed.cards)[number]) => parsed.cardLines[parsed.cards.indexOf(c)];
-  const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(cardLine(c)));
+  const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(c.line));
   const counts = state.rarities
     .map((r) => ({ label: r.label, n: newCards.filter((c) => c.rarityId === r.id).length }))
     .filter((x) => x.n > 0);
@@ -131,7 +130,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
 
   const total = newCards.length + parsed.updates.length;
   // After an Add, the cards it just saved now match the list: they were added, not skipped, so they aren't listed.
-  const skipped = parsed.duplicates.filter((_, i) => !justAdded.has(parsed.duplicateKeys[i]));
+  const skipped = parsed.duplicates.filter((x) => !justAdded.has(x.key)).map((x) => x.name);
   function addAll() {
     let added = 0;
     let updated = 0;
@@ -142,7 +141,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // Not under a rarity a sync removed after the list was read: those cards would be hidden everywhere, with no way
         // to delete them. Nor updates to cards a sync removed.
         const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId));
-        const updates = parsed.updates.flatMap((u, i) => d.cards.filter((c) => c.id === u.cardId).map((c) => ({ c, patch: u.patch, line: parsed.updateLines[i] })));
+        const updates = parsed.updates.flatMap((u) => d.cards.filter((c) => c.id === u.cardId).map((c) => ({ c, patch: u.patch, line: u.line })));
         if (!cards.length && !updates.length) return noChange;
         const fresh = cards.map(
           (c): Card => ({
@@ -166,7 +165,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // At their goal now, so the save deletes them as done: their lines are left out from then on.
         const ruleOf = (c: Card) => d.rarities.find((r) => r.id === c.rarityId)!;
         done = [
-          ...cards.filter((_, i) => isMaxed(fresh[i], ruleOf(fresh[i]))).map(cardLine),
+          ...cards.filter((_, i) => isMaxed(fresh[i], ruleOf(fresh[i]))).map((c) => c.line),
           ...updates.filter(({ c }) => isMaxed(c, ruleOf(c))).map(({ line }) => line),
         ];
       },
