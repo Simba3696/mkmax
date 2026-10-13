@@ -94,8 +94,11 @@ export default function App() {
   const season = scheduledSeason(events, now);
   const scheduledEnd = season?.end ?? null;
   const savedEnd = seasonEnd(state.realmKlashSeasonEnd, now);
+  // A saved end on one of the season's earlier week ends: the schedule added weeks after it passed, and items still end
+  // on it, even when it rolls forward to the scheduled end (a 2-week extension).
+  const extendedEnd = !!state.realmKlashSeasonEnd && !!season?.weekEnds.includes(state.realmKlashSeasonEnd);
   useEffect(() => {
-    if (!scheduledEnd || scheduledEnd === savedEnd) return;
+    if (!scheduledEnd || (scheduledEnd === savedEnd && !extendedEnd)) return;
     // Wait for this launch's first sync: another device has often made the move already, and moving first would
     // turn its pull into a "which copy" prompt.
     if (!sync.settled) return;
@@ -104,7 +107,7 @@ export default function App() {
     // A pull since this ran may already have brought the move in from another device: then there's nothing to save.
     update((d) => (moveSeasonEnd(d, scheduledEnd, now, season?.weekEnds) ? undefined : noChange), undefined, { auto: !state.updatedAt && state.packs.length === 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scheduledEnd, savedEnd, sync.settled]);
+  }, [scheduledEnd, savedEnd, extendedEnd, sync.settled]);
 
   const pageRef = useRef<HTMLDivElement>(null);
   /** Direction the next tab change should slide in from, set by go() and used once the new tab has rendered. */

@@ -193,6 +193,19 @@ describe('kameos', () => {
       expect(moveInGearOrder(s, 'Shadow Sash', "Moloch's Ball and Chain", 1, onSale)).toEqual(["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk']);
     });
 
+    // Regression: /review of stale-screens-and-schedule — ↓ still moved a piece a sync had taken off sale
+    // Found by /review on 2026-10-13
+    // Value: protects=a tap on a piece that's no longer on sale moves nothing, whichever arrow; fails_when=only the
+    // neighbour is checked, so ↓ moves the off-sale piece when its neighbour is first on sale; why_new=review (testing,
+    // maintainability, adversarial); seam=none; no_claim=the arrows (GearOrder test)
+    it('moves nothing when a sync took the tapped piece off sale', () => {
+      const s = setup(cards(), [item("Moloch's Ball and Chain"), item('Bloody Tomahawk')], (s) => {
+        s.gearOrder = ['Shadow Sash', "Moloch's Ball and Chain", 'Bloody Tomahawk'];
+      });
+      const onSale = ["Moloch's Ball and Chain", 'Bloody Tomahawk'];
+      expect(moveInGearOrder(s, 'Shadow Sash', "Moloch's Ball and Chain", 1, onSale)).toBeNull();
+    });
+
     // Regression: review of todo-followups — the arrows swapped two places, so the other piece jumped over waiting ones
     // Found by /review on 2026-10-12
     // Value: protects=only the tapped piece moves, past its neighbour; fails_when=the two pieces swap places, so the one
@@ -494,6 +507,22 @@ describe('phases', () => {
     expect(fuseWithKards(s, 'd', 1)).toBeNull(); // the button said 1 kard (F3 → F4); F4 → F5 costs 2 now
     expect([s.cards[0].fusion, s.rarities[0].fusionUpKards]).toEqual([F(4), 5]);
     expect(fuseWithKards(s, 'd', 2)).toBe(2);
+  });
+
+  // Regression: /review of stale-screens-and-schedule — a stale fuse tap fused a second level when the next step cost the same
+  // Found by /review on 2026-10-13
+  // Value: protects=a fuse goes ahead only from the level the button showed; fails_when=only the cost is checked, so a
+  // sync that already made the step lets the tap make the next one, which costs the same, and spend the kards twice;
+  // why_new=review (Red Team); seam=none; no_claim=the buttons (PlanView and CardsView tests)
+  it('fuses nothing when a sync already made the step the button showed, even if the next costs the same', () => {
+    const s = setup([card('d', F(5))], [], (s) => {
+      s.rarities[0].fusionUpKards = 10;
+      s.rarities[0].kardsPerLevel = [0, 0, 0, 2, 2, 2, 2, 2, 2, 2];
+    });
+    // The button was drawn at F4 (2 kards); a sync already fused it to F5, whose step also costs 2.
+    expect(fuseWithKards(s, 'd', 2, F(4))).toBeNull();
+    expect([s.cards[0].fusion, s.rarities[0].fusionUpKards]).toEqual([F(5), 10]);
+    expect(fuseWithKards(s, 'd', 2, F(5))).toBe(2);
   });
 
   it("uses kards on a Gold ascension step, and not past the card's cap", () => {
@@ -1356,6 +1385,26 @@ describe('Realm Klash seasons', () => {
     // The season before ended at this season's start, so its items stay.
     expect(s.packs.map((p) => p.endsAt)).toEqual(['2026-01-17T11:00', '2026-01-03T11:00', '2026-01-17T11:00']);
     expect(s.realmKlashSeasonEnd).toBe('2026-01-17T11:00');
+  });
+
+  // Regression: /review of stale-screens-and-schedule — a season stretched by exactly 2 weeks left its items expired
+  // Found by /review on 2026-10-13
+  // Value: protects=when the schedule's new end is the saved end rolled forward 2 weeks, items still ending on the saved
+  // week end move too; fails_when=matching the rolled-forward end counts as nothing to move; why_new=review (Red Team,
+  // adversarial, maintainability); seam=none; no_claim=the App effect that calls it
+  it('moves items still on the saved end when the schedule extended the season by exactly 2 weeks', () => {
+    const s = setup([], [
+      pack('this', [], { season: true, endsAt: '2026-01-10T11:00' }),
+      pack('before', [], { season: true, endsAt: '2026-01-03T11:00' }),
+      // The next season, already dated by the schedule as one week long: the changeover at Jan 24 hasn't moved.
+      pack('next', [], { season: true, startsAt: '2026-01-24T11:00', endsAt: '2026-01-31T11:00' }),
+    ], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
+    // Rolled forward 2 weeks, the saved Jan 10 end is Jan 24: the same date the schedule now gives.
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', NOW, ['2026-01-10T11:00'])).toBe(true);
+    expect(s.packs.map((p) => p.endsAt)).toEqual(['2026-01-24T11:00', '2026-01-03T11:00', '2026-01-31T11:00']);
+    expect(s.realmKlashSeasonEnd).toBe('2026-01-24T11:00');
+    // Once moved, the same schedule has nothing left to move.
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', NOW, ['2026-01-10T11:00'])).toBe(false);
   });
 
   it("leaves the last season's items alone when its end was set a little after the real changeover", () => {

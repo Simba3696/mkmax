@@ -72,11 +72,11 @@ export default function SettingsView() {
 
   // Rows are found by id when the change runs, not by their place on screen: a sync can reorder or remove rarities and
   // currencies while Settings is open, and a change by place would land on the wrong row. A row that's gone saves nothing.
-  const editRarity = (id: string, edit: (r: RarityRule) => void, undoLabel?: string) =>
+  const editRarity = (id: string, edit: (r: RarityRule) => void | typeof noChange, undoLabel?: string) =>
     update((d) => {
       const r = d.rarities.find((x) => x.id === id);
       if (!r) return noChange;
-      edit(r);
+      return edit(r);
     }, undoLabel);
   const editCurrency = (id: string, edit: (c: AppState['currencies'][number]) => void) =>
     update((d) => {
@@ -207,7 +207,13 @@ export default function SettingsView() {
                             <span className={note}>
                               {levelLabel(r, li + 1)}→{levelLabel(r, li + 2)}
                             </span>
-                            <NumInput value={n} min={0} step={1} onChange={(v) => editRarity(r.id, (x) => void (x.dupesPerLevel[li] = v ?? 0))} />
+                            <NumInput
+                              value={n}
+                              min={0}
+                              step={1}
+                              // Not past the end of a list a sync has shortened: that would leave holes, or bring a step back.
+                              onChange={(v) => editRarity(r.id, (x) => (li < x.dupesPerLevel.length ? void (x.dupesPerLevel[li] = v ?? 0) : noChange))}
+                            />
                           </label>
                         ))}
                       </div>
@@ -221,6 +227,8 @@ export default function SettingsView() {
                         <button
                           onClick={() =>
                             editRarity(r.id, (dr) => {
+                              // Only to the steps on screen: not again if a sync already added one, nor to a rarity it made a Kameo.
+                              if (dr.kind === 'kameo' || dr.dupesPerLevel.length !== r.dupesPerLevel.length) return noChange;
                               dr.dupesPerLevel.push(1);
                               // Give the new step its kard cost now, as the next load would, so the plan doesn't change on a reload.
                               dr.kardsPerLevel = kardTable(dr);
@@ -229,7 +237,14 @@ export default function SettingsView() {
                         >
                           + Level
                         </button>
-                        <button disabled={r.dupesPerLevel.length <= 1} onClick={() => editRarity(r.id, (x) => void x.dupesPerLevel.pop())}>
+                        <button
+                          disabled={r.dupesPerLevel.length <= 1}
+                          onClick={() =>
+                            // Only from the steps on screen, and never the last one: a sync that already took steps away
+                            // could leave none, and every owned card of the rarity would count as maxed and be deleted.
+                            editRarity(r.id, (x) => (x.dupesPerLevel.length > 1 && x.dupesPerLevel.length === r.dupesPerLevel.length ? void x.dupesPerLevel.pop() : noChange))
+                          }
+                        >
                           − Level
                         </button>
                         <span className={`${note} lg:flex-1 lg:min-w-0`}>
@@ -242,7 +257,13 @@ export default function SettingsView() {
                       className={btn.ghost}
                       disabled={state.cards.some((c) => c.rarityId === r.id)}
                       title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : withKaskets('Remove rarity', state.packs.filter((p) => p.kasket === r.id).length)}
-                      onClick={() => update((d) => removeRarity(d, r.id), withKaskets(`Removed ${r.label}`, state.packs.filter((p) => p.kasket === r.id).length))}
+                      onClick={() =>
+                        // Not if a sync already removed it, or brought in cards that use it.
+                        update(
+                          (d) => (d.rarities.some((x) => x.id === r.id) && !d.cards.some((c) => c.rarityId === r.id) ? removeRarity(d, r.id) : noChange),
+                          withKaskets(`Removed ${r.label}`, state.packs.filter((p) => p.kasket === r.id).length),
+                        )
+                      }
                     >
                       Remove
                     </button>

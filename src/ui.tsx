@@ -111,11 +111,12 @@ export function useBrokenImageUrls(): ReadonlySet<string> {
 const thumb = 'flex-none max-w-none rounded-panel border-2 border-line object-cover bg-panel-2';
 
 export function CardThumb({ card, rule, size = 44 }: { card: Card; rule?: RarityRule; size?: number }) {
-  const [broken, setBroken] = useState(false);
-  useEffect(() => setBroken(false), [card.imageUrl]);
+  // The URL that failed, rather than a flag reset by an effect: effects run again when a hidden page (Activity) is shown,
+  // which would ask for dead art again each time. A new URL still gets its own try.
+  const [failed, setFailed] = useState<string | null>(null);
   const style = { width: size, height: size, borderColor: rule?.color };
-  if (card.imageUrl && !broken) {
-    return <img className={thumb} style={style} src={card.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => (setBroken(true), markBroken(card.imageUrl!))} />;
+  if (card.imageUrl && card.imageUrl !== failed) {
+    return <img className={thumb} style={style} src={card.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => (setFailed(card.imageUrl!), markBroken(card.imageUrl!))} />;
   }
   const initials = card.name
     .split(/[\s,/]+/)

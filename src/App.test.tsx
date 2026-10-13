@@ -24,10 +24,10 @@ afterEach(() => {
 const tab = (name: string) => screen.getByRole('button', { name });
 /** Past App's half-second double-tap window (DOUBLE_TAP_MS, 500), so a tap on the Cards tab counts as deliberate. */
 const later = () => vi.setSystemTime(Date.now() + 600);
-/** Tower gear's page when it's the one showing; both Cards pages stay mounted, the other hidden. */
+/** Tower gear's page when it's the one showing; both Cards pages keep their state, and Activity hides the other. */
 const towers = () => {
   const intro = screen.queryByText(/Tower gear is farmed, not bought/);
-  return intro && !intro.closest('[hidden]') ? intro : null;
+  return intro && !intro.closest('[style*="display: none"]') ? intro : null;
 };
 
 describe('the MK MAX logo', () => {

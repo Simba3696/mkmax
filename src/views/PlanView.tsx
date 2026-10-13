@@ -254,7 +254,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                         {/* One step per tap, as kards are used in the game; the plan updates after each. */}
                         {cost != null && (
                           <button
-                            onClick={() => update((d) => (fuseWithKards(d, a.cardId, cost) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${name}`)}
+                            onClick={() => update((d) => (fuseWithKards(d, a.cardId, cost, a.from) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${name}`)}
                             title={`Fuse ${name} to ${levelLabel(r, a.from + 1)} with ${cost} kard${cost === 1 ? '' : 's'} from the Wallet`}
                           >
                             Use {cost}

@@ -108,3 +108,73 @@ describe('Cards: taps on a screen a sync has changed', () => {
     expect(stamps).toHaveBeenCalledTimes(1);
   });
 });
+
+// Last in the file: the catalog stays loaded once a test has downloaded it.
+describe('Cards: rarity questions on a screen a sync has changed', () => {
+  const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!);
+  // Regression: /review of stale-screens-and-schedule — rarity answers saved again when a sync had already made them
+  // Found by /review on 2026-10-13
+  // Value: protects=Use the site's and Keep mine save nothing when a sync already gave the card that rarity or that
+  // answer; fails_when=they return noChange only for a removed card, so an answer already in place stamps and syncs
+  // again; why_new=review (Red Team); seam=fetch serves a one-item catalog, a grabbed update stands in for the sync,
+  // SyncLoop.nextStamp spied; no_claim=a real sync, the Undo label
+  it("saves nothing for Use the site's or Keep mine when a sync already did it", async () => {
+    vi.stubGlobal('fetch', (url: string) =>
+      String(url).endsWith('catalog.json')
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [{ kind: 'character', name: 'Raiden, Dark', rarity: 'diamond', slug: 'raiden-dark', image: 'x.png' }] }) })
+        : Promise.reject(new Error('offline')),
+    );
+    const s = defaultState();
+    s.cards = [{ id: 'raiden', name: 'Raiden, Dark', rarityId: 'gold', fusion: 2, guest: false, imageUrl: 'x.png' }];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    let update!: ReturnType<typeof useStore>['update'];
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <CardsView sub="cards" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const useSite = await screen.findByRole('button', { name: "Use the site's" });
+    const keep = screen.getByRole('button', { name: 'Keep mine' });
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    // All in one act, so both buttons are still on screen for their taps. Each answer is one the other device already
+    // gave the other way round: Keep mine after it used the site's rarity, and the site's after it kept the card's.
+    act(() => {
+      update((d) => void (d.cards[0].rarityId = 'diamond'));
+      keep.click();
+      update((d) => void Object.assign(d.cards[0], { rarityId: 'gold', keptRarity: 'diamond' }));
+      useSite.click();
+    });
+    expect(saved().cards[0]).toMatchObject({ rarityId: 'gold', keptRarity: 'diamond' });
+    expect(stamps).toHaveBeenCalledTimes(2); // the two sync stand-ins only
+  });
+
+  // Regression: /review of stale-screens-and-schedule — switching back to Cards reloaded art that had failed to load
+  // Found by /review on 2026-10-13
+  // Value: protects=a card whose art failed shows its initials again after the Cards tab switches to Tower gear and back;
+  // fails_when=the thumbnail resets its failed state each time the hidden page is shown, asking for the dead URL again;
+  // why_new=review (adversarial, after the switch to Activity); seam=the img's error event is fired by hand;
+  // no_claim=the browser's own image cache
+  it('keeps showing initials for art that failed, after switching pages', async () => {
+    const s = defaultState();
+    s.cards = [{ id: 'kitana', name: 'Kitana', rarityId: 'gold', fusion: 2, guest: false, imageUrl: 'https://example.invalid/kitana.png' }];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    const page = (sub: 'cards' | 'towers') => (
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub={sub} onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>
+    );
+    const { container, rerender } = render(page('cards'));
+    const art = () => container.querySelector('img[src="https://example.invalid/kitana.png"]');
+    act(() => void art()!.dispatchEvent(new Event('error')));
+    expect(art()).toBeNull();
+    rerender(page('towers'));
+    rerender(page('cards'));
+    await act(async () => {});
+    expect(art()).toBeNull();
+  });
+});

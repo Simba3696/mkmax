@@ -42,6 +42,8 @@ let started = 0;
 let shown = 0;
 // When the download still on its way started, or 0 when none is: a return leaves it to finish for half a minute.
 let loadingSince = 0;
+// Which download that is, so an older one finishing can't clear it (two can start in the same millisecond).
+let loadingNumber = 0;
 // A download that hangs (a phone back on a patchy connection) gives up after this, so the next return can try again.
 const DOWNLOAD_TIMEOUT_MS = 30 * 1000;
 const listeners = new Set<(e: EventSchedule) => void>();
@@ -50,10 +52,13 @@ const listeners = new Set<(e: EventSchedule) => void>();
 function loadEvents(): Promise<EventSchedule> {
   if (loaded) return loaded;
   const n = ++started;
-  const timeout = typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) } : {};
-  const since = Date.now();
-  loadingSince = since;
-  const load: Promise<EventSchedule> = fetch(`${import.meta.env.BASE_URL}events.json`, { cache: 'no-cache', ...timeout })
+  // A timer rather than AbortSignal.timeout, which older Safari lacks: there a hung download would never be cancelled,
+  // and each return after half a minute would add another.
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), DOWNLOAD_TIMEOUT_MS);
+  loadingSince = Date.now();
+  loadingNumber = n;
+  const load: Promise<EventSchedule> = fetch(`${import.meta.env.BASE_URL}events.json`, { cache: 'no-cache', signal: abort.signal })
     .then((r) => {
       if (!r.ok) throw new Error(`events.json: HTTP ${r.status}`);
       return r.json() as Promise<EventSchedule>;
@@ -75,7 +80,8 @@ function loadEvents(): Promise<EventSchedule> {
       throw e;
     })
     .finally(() => {
-      if (loadingSince === since) loadingSince = 0;
+      clearTimeout(timer);
+      if (loadingNumber === n) loadingSince = 0;
     });
   loaded = load;
   return load;

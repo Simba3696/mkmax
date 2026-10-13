@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Activity, useEffect, useMemo, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { ascensionCaps, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isRealmKlashName, kardStep, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
@@ -182,13 +182,16 @@ export default function CardsView({ sub, onSub }: { sub: CardsPage; onSub: (sub:
           Tower gear
         </button>
       </div>
-      {/* Both stay mounted, so switching pages keeps a half-typed card, a pasted list or a search on the card list. */}
-      <div hidden={sub !== 'cards'}>
+      {/*
+        Both keep their state, so switching pages keeps a half-typed card, a pasted list or a search on the card list.
+        Activity hides the other page and holds off redrawing it (and its effects, like the catalog download) until shown.
+      */}
+      <Activity mode={sub === 'cards' ? 'visible' : 'hidden'}>
         <CardList />
-      </div>
-      <div hidden={sub !== 'towers'}>
+      </Activity>
+      <Activity mode={sub === 'towers' ? 'visible' : 'hidden'}>
         <TowersPanel />
-      </div>
+      </Activity>
     </>
   );
 }
@@ -279,27 +282,39 @@ function CardList() {
 
   const cardCount = (n: number) => `${n} card${n === 1 ? '' : 's'}`;
   const whichCards = (fixes: typeof rarityFixes) => (fixes.length === 1 ? fixes[0].card.name : cardCount(fixes.length));
+  // The answers go only to cards still waiting for them: a sync may have removed some, or already answered for them.
+  // The Undo label counts the cards actually changed.
   function applyRarityFixes(fixes: typeof rarityFixes) {
-    update((d) => {
-      const found = fixes.map((f) => ({ f, c: d.cards.find((x) => x.id === f.card.id) })).filter((x) => x.c);
-      if (!found.length) return noChange; // a sync removed them
-      for (const { f, c } of found) applyRarityFix(c!, f.to, d.rarities);
-    }, `Changed the rarity of ${whichCards(fixes)}`);
+    let done: typeof fixes = [];
+    update(
+      (d) => {
+        const found = fixes.flatMap((f) => d.cards.filter((c) => c.id === f.card.id && c.rarityId !== f.to && c.keptRarity !== f.to).map((c) => ({ f, c })));
+        if (!found.length) return noChange;
+        for (const { f, c } of found) applyRarityFix(c, f.to, d.rarities);
+        done = found.map((x) => x.f);
+      },
+      () => `Changed the rarity of ${whichCards(done)}`,
+    );
   }
 
   function keepRarities(fixes: typeof rarityFixes) {
-    update((d) => {
-      const found = fixes.map((f) => ({ f, c: d.cards.find((x) => x.id === f.card.id) })).filter((x) => x.c);
-      if (!found.length) return noChange; // a sync removed them
-      for (const { f, c } of found) c!.keptRarity = f.to;
-    }, `Kept your rarity for ${whichCards(fixes)}`);
+    let done: typeof fixes = [];
+    update(
+      (d) => {
+        const found = fixes.flatMap((f) => d.cards.filter((c) => c.id === f.card.id && c.rarityId !== f.to && c.keptRarity !== f.to).map((c) => ({ f, c })));
+        if (!found.length) return noChange;
+        for (const { f, c } of found) c.keptRarity = f.to;
+        done = found.map((x) => x.f);
+      },
+      () => `Kept your rarity for ${whichCards(done)}`,
+    );
   }
 
   // Brings a kept card back into the rarity check, in case Keep mine was the wrong choice.
   const askRarityAgain = (c: Card) =>
     update((d) => {
       const x = d.cards.find((y) => y.id === c.id);
-      if (!x) return noChange;
+      if (!x?.keptRarity) return noChange; // removed, or already asked again
       delete x.keptRarity;
     }, `Asking about ${c.name}'s rarity again`);
 
@@ -313,7 +328,7 @@ function CardList() {
 
   /** Fuse one level with Fusion Up Kards from the Wallet, as done in the game: the step the button showed, or none. */
   function fuse(c: Card, cost: number) {
-    update((d) => (fuseWithKards(d, c.id, cost) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${c.name}`);
+    update((d) => (fuseWithKards(d, c.id, cost, c.fusion) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${c.name}`);
   }
 
   function rename(c: Card, text: string) {

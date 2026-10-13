@@ -232,3 +232,27 @@ describe('Packs: taps on a screen a sync has changed', () => {
     expect(stamps).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('Packs: the pull step', () => {
+  // Regression: /review of stale-screens-and-schedule — a −1 on another pack closed "What did you pull?"
+  // Found by /review on 2026-10-13
+  // Value: protects=a −1 on one pack leaves another pack's pull step open; fails_when=any −1 closes whichever step is
+  // open; why_new=review (adversarial); seam=none; no_claim=store items
+  it("keeps one pack's pull step open when a purchase of another is taken back", () => {
+    const s = JSON.parse(localStorage.getItem('mkmax:v1')!);
+    s.packs.push(pack('Other Pack', { endsAt: '2026-10-25T12:00', purchased: 1 }));
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <PacksView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    fireEvent.click(within(document.getElementById('pack-Live Pack')!).getByRole('button', { name: 'I bought one' }));
+    expect(screen.getByText('What did you pull?')).toBeTruthy();
+    fireEvent.click(within(document.getElementById('pack-Other Pack')!).getByRole('button', { name: 'Remove one purchase' }));
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).packs.find((p: Pack) => p.id === 'Other Pack').purchased).toBe(0);
+    expect(screen.getByText('What did you pull?')).toBeTruthy();
+  });
+});

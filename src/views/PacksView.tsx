@@ -110,8 +110,11 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
       },
       delta > 0 ? `Bought ${p.name}` : undefined,
     );
-    // A buy that logged nothing doesn't open the pull step; any −1 closes it, even one a sync had already taken back.
-    if (!p.store && (done || delta < 0)) setPulling(delta > 0 ? p.id : null);
+    // A buy that logged nothing doesn't open the pull step; a −1 closes this pack's, even one a sync had already taken
+    // back, and leaves another pack's open.
+    if (p.store) return;
+    if (delta > 0 && done) setPulling(p.id);
+    else if (delta < 0 && pulling === p.id) setPulling(null);
   };
 
   /** A pulled card's row in "What did you pull?": + and − step its level. */
@@ -423,7 +426,10 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
                   )}
                   <button
                     className={btn.ghost}
-                    onClick={() => update((d) => void (d.dismissedShopPacks = [...(d.dismissedShopPacks ?? []), sp.name]), `Hid ${packName(sp)}`)}
+                    onClick={() =>
+                      // Not again if a sync already hid it.
+                      update((d) => (d.dismissedShopPacks?.includes(sp.name) ? noChange : void (d.dismissedShopPacks = [...(d.dismissedShopPacks ?? []), sp.name])), `Hid ${packName(sp)}`)
+                    }
                   >
                     Not needed
                   </button>
