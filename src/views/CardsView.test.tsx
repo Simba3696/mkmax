@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { defaultState } from '../defaults';
 import { StoreProvider, useStore } from '../store';
 import { PlanProvider } from '../planner';
@@ -212,6 +212,24 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     act(() => update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'diamond'))));
     act(() => screen.getByRole('button', { name: 'Add' }).click());
     expect(saved().cards.map((c: { name: string; rarityId: string }) => [c.name, c.rarityId])).toEqual([['Raiden, Dark', saved().rarities[0].id]]);
+  });
+
+  // Regression: /ship review of stale-screens-and-schedule — the fallback Add kept the removed rarity's level, goal and cap
+  // Found by /ship on 2026-10-13
+  // Value: protects=after a sync removes the picked rarity, Add saves the card as the form shows it under the first rarity:
+  // not owned, no goal or cap of its own; fails_when=the old rarity's level carries over, so a Gold A2 is saved at the
+  // first rarity's max and deleted at once as maxed; why_new=review (Red Team, pass 3); seam=a grabbed update stands in
+  // for the sync; no_claim=a real sync
+  it("doesn't carry the removed rarity's level, goal or cap into the rarity shown", () => {
+    renderWith([]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.change(form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Kitana, Klassic' } });
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'gold' } });
+    fireEvent.change(form.getByLabelText('Current level'), { target: { value: '13' } });
+    act(() => update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'gold'))));
+    act(() => form.getByRole('button', { name: 'Add' }).click());
+    const card = saved().cards[0];
+    expect([card?.name, card?.rarityId, card?.fusion, card?.goal, card?.maxLevel ?? null]).toEqual(['Kitana, Klassic', saved().rarities[0].id, 0, undefined, null]);
   });
 });
 

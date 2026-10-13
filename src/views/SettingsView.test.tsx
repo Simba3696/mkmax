@@ -262,4 +262,25 @@ describe('Settings level steps on a screen a sync has changed', () => {
     expect(diamond().dupesPerLevel).toEqual([]);
     expect(stamps).toHaveBeenCalledTimes(2); // the two sync stand-ins only
   });
+
+  // Value: protects=+ Level and − Level act only on the steps the screen showed: a sync that already added or removed a
+  // step makes the tap save nothing; fails_when=the length check goes, so a stale + adds a second step or a stale − takes
+  // a second one away (changing when owned cards count as maxed); why_new=review (testing, pass 3: only the Kameo and
+  // last-step guards were tested); seam=a grabbed update stands in for the sync, SyncLoop.nextStamp spied; no_claim=a real sync
+  it('adds or takes away no step when a sync already changed the steps shown', () => {
+    const stamps = renderSettings();
+    const plus = within(panelOf('Diamond')).getByRole('button', { name: '+ Level' });
+    act(() => {
+      update((d) => void d.rarities.find((r) => r.id === 'diamond')!.dupesPerLevel.push(1));
+      plus.click();
+    });
+    expect(diamond().dupesPerLevel).toHaveLength(11);
+    const minus = within(panelOf('Diamond')).getByRole('button', { name: '− Level' });
+    act(() => {
+      update((d) => void (d.rarities.find((r) => r.id === 'diamond')!.dupesPerLevel = Array(9).fill(1)));
+      minus.click();
+    });
+    expect(diamond().dupesPerLevel).toHaveLength(9);
+    expect(stamps).toHaveBeenCalledTimes(2); // the two sync stand-ins only
+  });
 });

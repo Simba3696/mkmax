@@ -350,7 +350,10 @@ function CardList() {
   function add() {
     if (!draft.name.trim()) return;
     // The rarity the form shows: the one picked, or the first once a sync has removed that one (the box shows the first).
+    // Falling back starts that rarity's level, goal and cap at their defaults, as picking it would: the removed rarity's
+    // don't fit it (a Gold A2 would be saved at a Diamond's max and deleted at once as maxed).
     const rarityId = draftRule?.id ?? '';
+    const base = rarityId === draft.rarityId ? draft : { ...draft, rarityId, fusion: 0, maxLevel: null, goal: undefined };
     let added = false;
     update((d) => {
       // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
@@ -358,21 +361,21 @@ function CardList() {
       const rule = d.rarities.find((r) => r.id === rarityId);
       if (!rule) return noChange;
       const isEquip = rule.kind === 'equipment';
-      const tower = isEquip && draft.source === 'tower' ? draft.sourceNote?.trim() : undefined;
+      const tower = isEquip && base.source === 'tower' ? base.sourceNote?.trim() : undefined;
       d.cards.push({
         id: newId(),
-        ...draft,
-        rarityId,
-        name: draft.name.trim(),
-        fusion: Math.min(draft.fusion, maxFusion(rule)),
-        guest: rule.hasGuests && draft.guest,
-        source: isEquip ? draft.source : initialSource({ ...draft, rarityId }, d.rarities),
+        ...base,
+        name: base.name.trim(),
+        // A level a sync has since taken off the rarity isn't one the level box can show: it shows (and saves) not owned.
+        fusion: base.fusion <= maxFusion(rule) ? base.fusion : 0,
+        guest: rule.hasGuests && base.guest,
+        source: isEquip ? base.source : initialSource(base, d.rarities),
         sourceNote: tower || undefined,
       });
       added = true;
     });
     // The typed name stays for another try when nothing was added.
-    if (added) setDraft({ ...draft, rarityId, name: '', fusion: 0, guest: false });
+    if (added) setDraft({ ...base, name: '', fusion: 0, guest: false });
   }
 
   const rarityOrder = (c: Card) => (sortBy === 'name' ? 0 : state.rarities.findIndex((r) => r.id === c.rarityId));
