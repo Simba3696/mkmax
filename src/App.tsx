@@ -78,8 +78,16 @@ export default function App() {
     loadCatalog().then(
       (items) => {
         if (cancelled) return;
-        const updates = catalogImageUpdates(state.cards, new Map(state.rarities.map((r) => [r.id, r])), items);
-        if (updates.size) update((d) => d.cards.forEach((c) => Object.assign(c, updates.get(c.id) ?? {})), undefined, { auto: true });
+        // From the save as it is once the catalog is in: a sync meanwhile may have given a card an image pasted by hand.
+        update(
+          (d) => {
+            const updates = catalogImageUpdates(d.cards, new Map(d.rarities.map((r) => [r.id, r])), items);
+            if (!updates.size) return noChange;
+            d.cards.forEach((c) => Object.assign(c, updates.get(c.id) ?? {}));
+          },
+          undefined,
+          { auto: true },
+        );
       },
       () => {}, // offline or no catalog: Find images still works later
     );

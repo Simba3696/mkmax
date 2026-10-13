@@ -355,7 +355,9 @@ function SeasonBar() {
         {end && (
           <ConfirmButton
             label="Ended early"
-            onConfirm={() => update((d) => (moveSeasonEnd(d, toLocalInput(now), now) ? undefined : noChange), 'Ended the Realm Klash season early')}
+            // Only the season the button showed: once a sync has ended it, the season shown next is a new one, and ending
+            // that would expire everything entered for it.
+            onConfirm={() => update((d) => (seasonEnd(d.realmKlashSeasonEnd, now) === end && moveSeasonEnd(d, toLocalInput(now), now) ? undefined : noChange), 'Ended the Realm Klash season early')}
           />
         )}
       </div>

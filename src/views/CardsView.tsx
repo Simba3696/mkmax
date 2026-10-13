@@ -106,24 +106,36 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
 
   const total = parsed.cards.length + parsed.updates.length;
   function addAll() {
-    const label = [parsed.cards.length && `Added ${parsed.cards.length} cards`, parsed.updates.length && `updated ${parsed.updates.length}`].filter(Boolean).join(', ');
-    update((d) => {
-      d.cards.push(
-        ...parsed.cards.map(
-          (c): Card => ({
-            id: newId(),
-            name: c.name,
-            rarityId: c.rarityId,
-            fusion: c.fusion ?? 0,
-            guest: false,
-            source: c.source ?? initialSource(c, d.rarities),
-            ...(c.sourceNote && { sourceNote: c.sourceNote }),
-            ...(c.maxLevel != null && { maxLevel: c.maxLevel }),
-          }),
-        ),
-      );
-      for (const u of parsed.updates) Object.assign(d.cards.find((c) => c.id === u.cardId) ?? {}, u.patch);
-    }, label);
+    let added = 0;
+    let updated = 0;
+    update(
+      (d) => {
+        // Not under a rarity a sync removed after the list was read: those cards would be hidden everywhere, with no way
+        // to delete them. Nor updates to cards a sync removed.
+        const cards = parsed.cards.filter((c) => d.rarities.some((r) => r.id === c.rarityId));
+        const updates = parsed.updates.flatMap((u) => d.cards.filter((c) => c.id === u.cardId).map((c) => ({ c, patch: u.patch })));
+        if (!cards.length && !updates.length) return noChange;
+        d.cards.push(
+          ...cards.map(
+            (c): Card => ({
+              id: newId(),
+              name: c.name,
+              rarityId: c.rarityId,
+              // As Add card does: a level a sync has since taken off the rarity is saved as not owned.
+              fusion: (c.fusion ?? 0) <= maxFusion(d.rarities.find((r) => r.id === c.rarityId)!) ? (c.fusion ?? 0) : 0,
+              guest: false,
+              source: c.source ?? initialSource(c, d.rarities),
+              ...(c.sourceNote && { sourceNote: c.sourceNote }),
+              ...(c.maxLevel != null && { maxLevel: c.maxLevel }),
+            }),
+          ),
+        );
+        for (const { c, patch } of updates) Object.assign(c, patch);
+        added = cards.length;
+        updated = updates.length;
+      },
+      () => [added && `Added ${added} cards`, updated && `updated ${updated}`].filter(Boolean).join(', '),
+    );
     setText('');
     setOpen(false);
   }
@@ -261,12 +273,15 @@ function CardList() {
       }
       // Older wiki images the catalog couldn't improve on: remember they were checked so they stop counting.
       const keep = missingImages.filter((c) => !found.has(c.id) && c.imageUrl && !brokenUrls.has(c.imageUrl) && c.wikiTitle);
+      // The lookup can take minutes: a card whose image a sync changed meanwhile (one pasted on another device) keeps it.
+      const lookedUp = new Map(missingImages.map((c) => [c.id, c.imageUrl]));
       update((d) => {
-        for (const c of d.cards) {
-          const m = found.get(c.id);
-          if (m) Object.assign(c, m);
-          else if (keep.some((k) => k.id === c.id)) c.imagePage = wikiUrl(c.wikiTitle!);
-        }
+        const cards = d.cards.filter((c) => lookedUp.has(c.id) && lookedUp.get(c.id) === c.imageUrl);
+        const art = cards.flatMap((c) => (found.has(c.id) ? [{ c, m: found.get(c.id)! }] : []));
+        const checked = cards.filter((c) => keep.some((k) => k.id === c.id) && c.wikiTitle && c.imagePage !== wikiUrl(c.wikiTitle));
+        if (!art.length && !checked.length) return noChange;
+        for (const { c, m } of art) Object.assign(c, m);
+        for (const c of checked) c.imagePage = wikiUrl(c.wikiTitle!);
       });
       const left = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl))).length;
       const leftMsg = !left
@@ -283,12 +298,14 @@ function CardList() {
   const cardCount = (n: number) => `${n} card${n === 1 ? '' : 's'}`;
   const whichCards = (fixes: typeof rarityFixes) => (fixes.length === 1 ? fixes[0].card.name : cardCount(fixes.length));
   // The answers go only to cards still waiting for them: a sync may have removed some, or already answered for them.
-  // The Undo label counts the cards actually changed.
+  // Nor to a rarity a sync has removed, where the card would be hidden. The Undo label counts the cards actually changed.
   function applyRarityFixes(fixes: typeof rarityFixes) {
     let done: typeof fixes = [];
     update(
       (d) => {
-        const found = fixes.flatMap((f) => d.cards.filter((c) => c.id === f.card.id && c.rarityId !== f.to && c.keptRarity !== f.to).map((c) => ({ f, c })));
+        const found = fixes
+          .filter((f) => d.rarities.some((r) => r.id === f.to))
+          .flatMap((f) => d.cards.filter((c) => c.id === f.card.id && c.rarityId !== f.to && c.keptRarity !== f.to).map((c) => ({ f, c })));
         if (!found.length) return noChange;
         for (const { f, c } of found) applyRarityFix(c, f.to, d.rarities);
         done = found.map((x) => x.f);
@@ -452,7 +469,7 @@ function CardList() {
             {draftRule.label} is tracked only until F{draftRule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.
           </p>
         )}
-        <PasteList startRarityId={draft.rarityId} />
+        <PasteList startRarityId={draftRule?.id ?? ''} />
       </section>
 
       {/* Kept in view while scrolling a long list on wide screens, where it fits on one row; elsewhere it scrolls away as before. */}

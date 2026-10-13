@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { newId, useStore } from '../store';
+import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { LevelOptions, Modal, NumInput, kasketLine } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
-import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, isSeasonal, kasketPool, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
+import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, isSeasonal, kasketPool, maxFusion, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
 import { initialSource } from '../challenges';
 import { scheduledSeason, scheduledSeasonEnd, useEvents } from '../events';
 import { kasketFor } from '../kaskets';
@@ -78,14 +78,27 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     p.startsAt && endsAt && p.startsAt >= endsAt && 'The end time must be after the start time.',
   ].filter(Boolean) as string[];
 
+  // The rarity the box shows: the one picked, or the first once a sync has removed that one (its level starts at not owned).
+  const newCardRule = state.rarities.find((r) => r.id === newCard.rarityId) ?? state.rarities[0];
   function addNewCard() {
-    if (!newCard.name.trim()) return;
-    const card: Card = { id: newId(), name: newCard.name.trim(), rarityId: newCard.rarityId, fusion: newCard.fusion, guest: false };
-    const source = initialSource(card, state.rarities);
-    if (source) card.source = source;
-    update((d) => void d.cards.push(card));
-    setP((x) => ({ ...x, drops: x.store ? [{ cardId: card.id, chance: 100 }] : [...x.drops, { cardId: card.id, chance: 0 }] }));
-    setNewCard((n) => ({ ...n, name: '', fusion: 0 }));
+    if (!newCard.name.trim() || !newCardRule) return;
+    const fusion = newCardRule.id === newCard.rarityId ? newCard.fusion : 0;
+    let card = undefined as Card | undefined;
+    update((d) => {
+      // Not under a rarity a sync removed after the editor was drawn: the card would be hidden everywhere, with no way
+      // to delete it. A level a sync has since taken off the rarity is saved as not owned.
+      const rule = d.rarities.find((r) => r.id === newCardRule.id);
+      if (!rule) return noChange;
+      card = { id: newId(), name: newCard.name.trim(), rarityId: rule.id, fusion: fusion <= maxFusion(rule) ? fusion : 0, guest: false };
+      const source = initialSource(card, d.rarities);
+      if (source) card.source = source;
+      d.cards.push(card);
+    });
+    // The typed name stays for another try when nothing was added.
+    if (!card) return;
+    const id = card.id;
+    setP((x) => ({ ...x, drops: x.store ? [{ cardId: id, chance: 100 }] : [...x.drops, { cardId: id, chance: 0 }] }));
+    setNewCard((n) => ({ ...n, rarityId: newCardRule.id, name: '', fusion: 0 }));
   }
 
   // The pool's total is shared by every item in it, not only the ones picked, so each card gets total ÷ pool size.
@@ -325,7 +338,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
             <div className="text-small text-muted">Card not in your list yet? Add it here:</div>
             <div className={`${dropRow} flex-wrap`}>
               <input className="flex-1 lg:flex-[2]" value={newCard.name} placeholder="Card name" onChange={(e) => setNewCard({ ...newCard, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addNewCard()} />
-              <select className="flex-1" value={newCard.rarityId} onChange={(e) => setNewCard({ ...newCard, rarityId: e.target.value })}>
+              <select className="flex-1" value={newCardRule?.id ?? ''} onChange={(e) => setNewCard({ ...newCard, rarityId: e.target.value })}>
                 {state.rarities.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.label}
@@ -333,7 +346,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
                 ))}
               </select>
               <select className="flex-1" value={newCard.fusion} onChange={(e) => setNewCard({ ...newCard, fusion: Number(e.target.value) })}>
-                <LevelOptions rule={state.rarities.find((r) => r.id === newCard.rarityId)} />
+                <LevelOptions rule={newCardRule} />
               </select>
               <button onClick={addNewCard} disabled={!newCard.name.trim()}>
                 Add card
