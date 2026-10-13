@@ -948,7 +948,8 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     act(() => store.update((d) => void Object.assign(d.cards[0], { imageUrl: PASTED, wikiTitle: undefined })));
     expect(release).toBeDefined(); // the catalog was still downloading
     await act(async () => release!());
-    await screen.findByText(/^Updated 0 of 1\./);
+    // Counted as kept, not as one to paste an image for.
+    await screen.findByText('Updated 0 of 1. 1 got an image while it looked, and kept it.');
     expect(saved().cards[0]).toMatchObject({ imageUrl: PASTED });
     expect(saved().cards[0].imagePage).toBeUndefined();
     expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only

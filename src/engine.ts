@@ -846,7 +846,9 @@ export function stretchedWeekEnds(saved: string | null | undefined, now: Date, w
  * to a season after the saved end has passed, and that season's items still end on the saved date rather than the
  * 2-week guess, so items ending on one of those week ends (the saved end, or a 2-week changeover it rolled through)
  * move too. Only a week end counts, give or take a clock change (see stretchedWeekEnds): a date typed by hand, or set
- * with Ended early, a little after the real changeover belongs to the season before.
+ * with Ended early, a little after the real changeover belongs to the season before. An item starting on or after
+ * one of those week ends is on sale in the season that's still on (store items only show up once they're in the
+ * store), so it keeps its start.
  */
 export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: string[]) {
   const from = seasonEnd(s.realmKlashSeasonEnd, now);
@@ -870,9 +872,10 @@ export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: str
       if (!still && changeovers.includes(p.endsAt)) p.endsAt = seasonEnd(to, new Date(start));
       continue;
     }
-    const ahead = start && changeovers.find((c) => start >= c);
-    if (ahead) {
-      if (start === ahead) p.startsAt = to;
+    // Only the current end, when it moves, has items entered ahead past it. A stretched week end has passed while the
+    // season went on, so an item starting there is on sale now: it keeps its start, and ends with the season.
+    if (!still && from && start && start >= from) {
+      if (start === from) p.startsAt = to;
       p.endsAt = seasonEnd(to, new Date(p.startsAt!));
     } else if (changeovers.includes(p.endsAt)) p.endsAt = to;
   }

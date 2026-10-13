@@ -364,10 +364,15 @@ function CardList() {
       const keep = missingImages.filter((c) => !found.has(c.id) && c.imageUrl && !brokenUrls.has(c.imageUrl) && c.wikiTitle);
       // The lookup can take minutes: a card whose image a sync changed meanwhile (one pasted on another device) keeps it.
       const lookedUp = new Map(missingImages.map((c) => [c.id, c.imageUrl]));
-      // Counted from the change itself, so cards a sync gave an image meanwhile aren't reported as updated.
+      // Counted from the change itself, so a card a sync gave an image meanwhile is counted as that, not as updated or as
+      // one to paste an image for.
       let updated = 0;
+      let meanwhile = 0;
+      let left = 0;
       update((d) => {
         const cards = d.cards.filter((c) => lookedUp.has(c.id) && lookedUp.get(c.id) === c.imageUrl);
+        meanwhile = d.cards.filter((c) => lookedUp.has(c.id) && lookedUp.get(c.id) !== c.imageUrl).length;
+        left = cards.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl))).length;
         const art = cards.flatMap((c) => (found.has(c.id) ? [{ c, m: found.get(c.id)! }] : []));
         const checked = cards.filter((c) => keep.some((k) => k.id === c.id) && c.wikiTitle && c.imagePage !== wikiUrl(c.wikiTitle));
         if (!art.length && !checked.length) return noChange;
@@ -375,13 +380,13 @@ function CardList() {
         for (const c of checked) c.imagePage = wikiUrl(c.wikiTitle!);
         updated = art.length;
       });
-      const left = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl))).length;
       const leftMsg = !left
         ? ''
         : wikiError
           ? ` Couldn't reach the MK Mobile wiki (${wikiError}), so ${left} weren't looked up there. Try again later.`
           : ` ${left} not found online: open "Image" on those cards to paste a URL.`;
-      setImgStatus({ busy: false, msg: `Updated ${updated} of ${missingImages.length}.${leftMsg}` });
+      const meanwhileMsg = meanwhile ? ` ${meanwhile} got an image while it looked, and kept it.` : '';
+      setImgStatus({ busy: false, msg: `Updated ${updated} of ${missingImages.length}.${meanwhileMsg}${leftMsg}` });
     } catch (e) {
       setImgStatus({ busy: false, msg: `Couldn't look up images: ${(e as Error).message}` });
     }

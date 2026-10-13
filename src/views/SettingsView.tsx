@@ -261,13 +261,19 @@ export default function SettingsView() {
                       className={btn.ghost}
                       disabled={state.cards.some((c) => c.rarityId === r.id)}
                       title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : withKaskets('Remove rarity', state.packs.filter((p) => p.kasket === r.id).length)}
-                      onClick={() =>
+                      onClick={() => {
+                        // The Kaskets counted as the change removes them: a sync may have added or removed some since.
+                        let kaskets = 0;
                         // Not if a sync already removed it, or brought in cards that use it.
                         update(
-                          (d) => (d.rarities.some((x) => x.id === r.id) && !d.cards.some((c) => c.rarityId === r.id) ? removeRarity(d, r.id) : noChange),
-                          withKaskets(`Removed ${r.label}`, state.packs.filter((p) => p.kasket === r.id).length),
-                        )
-                      }
+                          (d) => {
+                            if (!d.rarities.some((x) => x.id === r.id) || d.cards.some((c) => c.rarityId === r.id)) return noChange;
+                            kaskets = d.packs.filter((p) => p.kasket === r.id).length;
+                            removeRarity(d, r.id);
+                          },
+                          () => withKaskets(`Removed ${r.label}`, kaskets),
+                        );
+                      }}
                     >
                       Remove
                     </button>
