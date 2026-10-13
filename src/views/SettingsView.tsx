@@ -93,6 +93,7 @@ export default function SettingsView() {
     editRarity(
       r.id,
       (dr) => {
+        if (dr.kind === kind) return noChange; // a sync already made it that kind
         dr.kind = kind;
         if (kind === 'kameo') Object.assign(dr, { dupesPerLevel: [], fusionMax: 0, goal: 'max', fusionUpThreshold: null, fusionUpKards: 0 });
         else if (dr.dupesPerLevel.length === 0) {

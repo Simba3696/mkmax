@@ -256,3 +256,46 @@ describe('Packs: the pull step', () => {
     expect(screen.getByText('What did you pull?')).toBeTruthy();
   });
 });
+
+// Last in the file: the event schedule stays loaded once a test has downloaded it.
+describe('Packs: In the shop on a screen a sync has changed', () => {
+  // Regression: /ship review of stale-screens-and-schedule — Not needed had no test for a pack a sync already hid
+  // Found by /ship on 2026-10-13
+  // Value: protects=Not needed on a shop pack a sync already hid saves nothing and doesn't add its name again; fails_when=
+  // the already-hidden check goes, so the tap stamps, syncs and lists the name twice; why_new=review (testing);
+  // seam=fetch serves a one-pack events.json, a grabbed update stands in for the sync; no_claim=a real sync
+  it('saves nothing for Not needed on a shop pack a sync already hid', async () => {
+    vi.stubGlobal('fetch', (url: string) =>
+      String(url).endsWith('events.json')
+        ? Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                fetchedAt: '2026-10-12T00:00:00Z',
+                capturedAt: null,
+                packs: [{ name: 'QA SHOP PACK', start: null, end: null, cost: 100, currency: 'Soul', limit: null, image: null }],
+                challenges: [],
+                seasons: [],
+              }),
+          })
+        : Promise.reject(new Error('offline')),
+    );
+    let update!: ReturnType<typeof useStore>['update'];
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <PacksView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const notNeeded = await screen.findByRole('button', { name: 'Not needed' });
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    act(() => {
+      update((d) => void (d.dismissedShopPacks = ['QA SHOP PACK']));
+      notNeeded.click();
+    });
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).dismissedShopPacks).toEqual(['QA SHOP PACK']);
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
+});

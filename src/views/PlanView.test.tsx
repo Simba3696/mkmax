@@ -58,6 +58,45 @@ describe('Plan: Fusion Up Kards', () => {
   });
 });
 
+describe('Plan: Use N on a screen a sync has changed', () => {
+  // Regression: /ship review of stale-screens-and-schedule — Plan's Use N had no test for a step a sync already made
+  // Found by /ship on 2026-10-13
+  // Value: protects=Plan's Use N fuses nothing when a sync already made that step and the next costs the same; fails_when=
+  // the button stops passing the level it showed, so the tap fuses a second level and spends the kards twice; why_new=
+  // review (testing: only the Cards button had this test); seam=SyncLoop.nextStamp spied, a grabbed update stands in for
+  // the sync; no_claim=a real sync
+  it('fuses nothing when a sync already made the step and the next costs the same', () => {
+    const s = defaultState();
+    s.rarities.find((r) => r.id === 'diamond')!.fusionUpKards = 10;
+    s.cards = [{ id: 'scorpion', name: 'Scorpion', rarityId: 'diamond', fusion: 4, guest: false }];
+    s.packs = [{ id: 'p', name: 'Pack', currencyId: 'souls', cost: 100, rolls: 1, maxPurchases: null, purchased: 0, startsAt: null, endsAt: null, drops: [{ cardId: 'scorpion', chance: 50 }] }];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    let update!: ReturnType<typeof useStore>['update'];
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <PlanView goto={() => {}} openPack={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    const use = screen.getByRole('button', { name: 'Use 1' });
+    act(() => {
+      update((d) => {
+        const diamond = d.rarities.find((r) => r.id === 'diamond')!;
+        d.cards[0].fusion = 5;
+        diamond.fusionUpKards = 9;
+        diamond.kardsPerLevel[4] = 1; // the next step costs the same 1 kard
+      });
+      use.click();
+    });
+    const saved = JSON.parse(localStorage.getItem('mkmax:v1')!);
+    expect([saved.cards[0].fusion, saved.rarities.find((r: { id: string }) => r.id === 'diamond').fusionUpKards]).toEqual([5, 9]);
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
+});
+
 describe('Plan: Bought one', () => {
   // Value: protects=Bought one on a random pack logs one purchase, saves once and opens it in Packs to ask what was
   // pulled; fails_when=the button's noChange check is flipped (nothing is logged) or the pull step no longer opens after

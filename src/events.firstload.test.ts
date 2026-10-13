@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useEvents } from './events';
+import { refreshEvents, useEvents } from './events';
 
 // Its own file, so events.ts starts with no schedule downloaded, as the app does when it opens.
 afterEach(() => {
@@ -30,6 +30,28 @@ describe('event schedule that never loaded', () => {
     document.dispatchEvent(new Event('visibilitychange'));
     expect(fetch).toHaveBeenCalledTimes(1);
     vi.setSystemTime(new Date('2026-10-12T12:00:40'));
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('two schedule downloads at once', () => {
+  // Regression: /ship review of stale-screens-and-schedule — the download-number check had no test
+  // Found by /ship on 2026-10-13
+  // Value: protects=an older download finishing doesn't clear a newer one's still-running mark, so a quick return starts
+  // no third download; fails_when=any download finishing clears the mark (two started in the same millisecond share a
+  // start time); why_new=review (testing); seam=fetch stubbed; no_claim=real browser event order
+  it('leaves the newer download running when an older one finishes first', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-12T13:00:00'));
+    const answers: ((r: Response) => void)[] = [];
+    const fetch = vi.fn(() => new Promise<Response>((answer) => answers.push(answer)));
+    vi.stubGlobal('fetch', fetch);
+    const first = refreshEvents(); // the app opening
+    void refreshEvents(); // a pull to refresh while it is still on its way, in the same millisecond
+    answers[0](new Response('{}', { status: 500 }));
+    await first;
+    vi.setSystemTime(new Date('2026-10-12T13:00:05'));
     document.dispatchEvent(new Event('visibilitychange'));
     expect(fetch).toHaveBeenCalledTimes(2);
   });

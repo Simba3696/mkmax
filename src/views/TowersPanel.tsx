@@ -1,6 +1,6 @@
 import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { copiesToMax, levelLabel, maxFusion, targetLevel } from '../engine';
+import { copiesToMax, levelLabel, maxFusion, stepCard, targetLevel } from '../engine';
 import { CardThumb, RarityBadge } from '../ui';
 import { card, grow, row, rowTitle, stepper, stepperVal } from '../classes';
 import type { Card } from '../types';
@@ -16,12 +16,9 @@ export default function TowersPanel() {
   const { state, update } = useStore();
   const { ctx } = usePlan();
 
-  const patch = (id: string, p: Partial<Card>) =>
-    update((d) => {
-      const c = d.cards.find((x) => x.id === id);
-      if (!c) return noChange; // a sync removed it
-      Object.assign(c, p);
-    });
+  // A level tap steps from the level it showed: saving that level ± 1 would undo a level a sync has added since.
+  const stepLevel = (c: Card, by: 1 | -1) =>
+    update((d) => (d.cards.find((x) => x.id === c.id)?.fusion === c.fusion && stepCard(d, c.id, by) ? undefined : noChange));
 
   // Grouped ignoring case, since tower names are typed by hand: "Lin kuei tower" files with "Lin Kuei Tower".
   const byTower = new Map<string, { tower: string; cards: Card[] }>();
@@ -71,11 +68,11 @@ export default function TowersPanel() {
                     </div>
                   </div>
                   <div className={stepper}>
-                    <button onClick={() => patch(c.id, { fusion: Math.max(0, c.fusion - 1) })} disabled={c.fusion <= 0} aria-label="Lower level">
+                    <button onClick={() => stepLevel(c, -1)} disabled={c.fusion <= 0} aria-label="Lower level">
                       −
                     </button>
                     <span className={stepperVal}>{c.fusion === 0 ? '—' : levelLabel(rule, c.fusion)}</span>
-                    <button onClick={() => patch(c.id, { fusion: Math.min(max, c.fusion + 1) })} disabled={c.fusion >= max} aria-label="Raise level">
+                    <button onClick={() => stepLevel(c, 1)} disabled={c.fusion >= max} aria-label="Raise level">
                       +
                     </button>
                   </div>

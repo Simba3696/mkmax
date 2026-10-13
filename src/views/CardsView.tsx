@@ -1,7 +1,7 @@
 import { Activity, useEffect, useMemo, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isRealmKlashName, kardStep, levelLabel, maxFusion, targetLevel, thresholdLevel } from '../engine';
+import { ascensionCaps, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isRealmKlashName, kardStep, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -326,6 +326,10 @@ function CardList() {
       Object.assign(c, p);
     });
 
+  // A level tap steps from the level it showed: saving that level ± 1 would undo a level a sync has added since.
+  const stepLevel = (c: Card, by: 1 | -1) =>
+    update((d) => (d.cards.find((x) => x.id === c.id)?.fusion === c.fusion && stepCard(d, c.id, by) ? undefined : noChange));
+
   /** Fuse one level with Fusion Up Kards from the Wallet, as done in the game: the step the button showed, or none. */
   function fuse(c: Card, cost: number) {
     update((d) => (fuseWithKards(d, c.id, cost, c.fusion) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${c.name}`);
@@ -347,17 +351,22 @@ function CardList() {
     if (!draft.name.trim()) return;
     const isEquip = draftRule?.kind === 'equipment';
     const tower = isEquip && draft.source === 'tower' ? draft.sourceNote?.trim() : undefined;
-    update((d) =>
-      void d.cards.push({
+    let added = false;
+    update((d) => {
+      // Not under a rarity a sync has removed: the card would be hidden everywhere, with no way to delete it.
+      if (!d.rarities.some((r) => r.id === draft.rarityId)) return noChange;
+      d.cards.push({
         id: newId(),
         ...draft,
         name: draft.name.trim(),
         guest: !!draftRule?.hasGuests && draft.guest,
         source: isEquip ? draft.source : initialSource(draft, d.rarities),
         sourceNote: tower || undefined,
-      }),
-    );
-    setDraft({ ...draft, name: '', fusion: 0, guest: false });
+      });
+      added = true;
+    });
+    // The typed name stays for another try when nothing was added.
+    if (added) setDraft({ ...draft, name: '', fusion: 0, guest: false });
   }
 
   const rarityOrder = (c: Card) => (sortBy === 'name' ? 0 : state.rarities.findIndex((r) => r.id === c.rarityId));
@@ -549,11 +558,11 @@ function CardList() {
                   </div>
                 </div>
                 <div className={stepper}>
-                  <button onClick={() => patch(c.id, { fusion: Math.max(0, c.fusion - 1) })} disabled={c.fusion <= 0} aria-label="Lower level">
+                  <button onClick={() => stepLevel(c, -1)} disabled={c.fusion <= 0} aria-label="Lower level">
                     −
                   </button>
                   <span className={stepperVal}>{c.fusion === 0 ? '—' : levelLabel(rule, c.fusion)}</span>
-                  <button onClick={() => patch(c.id, { fusion: Math.min(max, c.fusion + 1) })} disabled={c.fusion >= max} aria-label="Raise level">
+                  <button onClick={() => stepLevel(c, 1)} disabled={c.fusion >= max} aria-label="Raise level">
                     +
                   </button>
                 </div>
