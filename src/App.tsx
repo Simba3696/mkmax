@@ -5,7 +5,7 @@ import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
-import { endingSoon, moveSeasonEnd, seasonEnd } from './engine';
+import { endingSoon, moveSeasonEnd, seasonEnd, stretchedWeekEnds } from './engine';
 import { refreshEvents, scheduledSeason, useEvents } from './events';
 import { checkForAppUpdate } from './appUpdate';
 import { usePlan } from './planner';
@@ -102,9 +102,9 @@ export default function App() {
   const season = scheduledSeason(events, now);
   const scheduledEnd = season?.end ?? null;
   const savedEnd = seasonEnd(state.realmKlashSeasonEnd, now);
-  // A saved end on one of the season's earlier week ends: the schedule added weeks after it passed, and items still end
-  // on it, even when it rolls forward to the scheduled end (a 2-week extension).
-  const extendedEnd = !!state.realmKlashSeasonEnd && !!season?.weekEnds.includes(state.realmKlashSeasonEnd);
+  // The saved end rolled through one of the season's earlier week ends: the schedule added weeks after it passed, and
+  // items still end on it, even when the saved end rolls forward to the scheduled end (a 2-week extension).
+  const extendedEnd = stretchedWeekEnds(state.realmKlashSeasonEnd, now, season?.weekEnds).length > 0;
   useEffect(() => {
     if (!scheduledEnd || (scheduledEnd === savedEnd && !extendedEnd)) return;
     // Wait for this launch's first sync: another device has often made the move already, and moving first would

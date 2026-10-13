@@ -800,10 +800,25 @@ export function seasonEnd(saved: string | null | undefined, now: Date): string |
 }
 
 /**
+ * The changeovers the saved season end has already rolled through (itself, then every 2 weeks, up to now) that the
+ * schedule lists as earlier week ends of the current season: the season was stretched after they passed, so items
+ * still ending on them belong to the season that's still on. The saved end is usually a season or more back (it's only
+ * rewritten when the date changes), so checking the saved end alone misses most stretched seasons. Latest first.
+ */
+export function stretchedWeekEnds(saved: string | null | undefined, now: Date, weekEnds?: string[]): string[] {
+  if (!saved || !weekEnds?.length) return [];
+  const t = new Date(saved);
+  if (isNaN(t.getTime())) return [];
+  const passed: string[] = [];
+  for (; t <= now; t.setDate(t.getDate() + SEASON_DAYS)) passed.push(toLocalInput(t)); // setDate keeps the local time across DST
+  return passed.filter((c) => weekEnds.includes(c)).reverse();
+}
+
+/**
  * Change the current season's end (a corrected timer, or a season that ended early). Every seasonal pack that
  * was ending with it moves too; packs from earlier seasons keep their dates. Mutates the state, and returns whether
  * anything moved: false when the current season end (the saved one rolled forward, see seasonEnd) is already `to`
- * and the saved end isn't one of `weekEnds`.
+ * and none of the season's earlier week ends need moving (see stretchedWeekEnds).
  *
  * An item entered ahead for a later season (see packEndOnSave) starts once the season it was saved against is over,
  * so it moves with that changeover to stay in the season it starts in, and its end becomes the 2-week guess from the
@@ -818,16 +833,15 @@ export function seasonEnd(saved: string | null | undefined, now: Date): string |
  */
 export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: string[]) {
   const from = seasonEnd(s.realmKlashSeasonEnd, now);
-  const saved = s.realmKlashSeasonEnd;
-  const extended = saved && weekEnds?.includes(saved) ? saved : null;
+  const extended = stretchedWeekEnds(s.realmKlashSeasonEnd, now, weekEnds);
   // Already there (often a pull brought the move in from another device): nothing to move. Unless the schedule
-  // stretched the season by exactly 2 weeks: the saved week end rolled forward is then the new end, but items still
-  // ending on that week end have to move.
-  if (from === to && !extended) return false;
-  // When `to` is the current end, that changeover isn't moving: only the saved week end does, and items starting at
+  // stretched the season by exactly 2 weeks: the saved end rolled forward is then the new end, but items still ending
+  // on one of the season's earlier week ends have to move.
+  if (from === to && !extended.length) return false;
+  // When `to` is the current end, that changeover isn't moving: only the earlier week ends do, and items starting at
   // or after `to` (the next season's) keep their dates.
   const still = from === to;
-  const changeovers = [still ? null : from, extended].filter((c): c is string => !!c);
+  const changeovers = [...(still ? [] : [from]), ...extended].filter((c): c is string => !!c);
   for (const p of s.packs) {
     if (!p.season || !p.endsAt) continue;
     const start = p.startsAt;
