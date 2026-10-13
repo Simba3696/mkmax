@@ -1,4 +1,4 @@
-import { useStore } from '../store';
+import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { copiesToMax, levelLabel, maxFusion, targetLevel } from '../engine';
 import { CardThumb, RarityBadge } from '../ui';
@@ -19,7 +19,8 @@ export default function TowersPanel() {
   const patch = (id: string, p: Partial<Card>) =>
     update((d) => {
       const c = d.cards.find((x) => x.id === id);
-      if (c) Object.assign(c, p);
+      if (!c) return noChange; // a sync removed it
+      Object.assign(c, p);
     });
 
   // Grouped ignoring case, since tower names are typed by hand: "Lin kuei tower" files with "Lin Kuei Tower".

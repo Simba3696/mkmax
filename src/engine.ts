@@ -553,9 +553,10 @@ function gearOrderCompare(state: AppState) {
  * The gear order to save after moving piece `id` up (-1) or down (1) past its on-sale neighbour `past` (Settings' ↑/↓),
  * or null when there's nothing to move. Every Realm Klash piece is saved in its place, on sale or not, and only the
  * tapped piece moves: the two aren't swapped, since pieces waiting for their store item can sit between them, and
- * swapping would push the other one past those too.
+ * swapping would push the other one past those too. `onSale` is the pieces on sale now, in buying order (gearQueue):
+ * when given, `past` must still be the next one in the arrow's direction.
  */
-export function moveInGearOrder(state: AppState, id: string, past: string, by: -1 | 1): string[] | null {
+export function moveInGearOrder(state: AppState, id: string, past: string, by: -1 | 1, onSale?: string[]): string[] | null {
   const ids = state.cards
     .filter((c) => isRealmKlashGear(state, c))
     .sort(gearOrderCompare(state))
@@ -565,6 +566,8 @@ export function moveInGearOrder(state: AppState, id: string, past: string, by: -
   // Already on the side the arrow points to: the order changed (a sync) after the screen showed it. Moving by where
   // the pieces sit now would send the piece back over its neighbour and undo the last move.
   if (from < 0 || to < 0 || id === past || (by > 0) !== (from < to)) return null;
+  // A sync put another piece on sale between them since the screen was drawn: moving would jump that one too.
+  if (onSale && onSale[onSale.indexOf(id) + by] !== past) return null;
   ids.splice(from, 1);
   const at = ids.indexOf(past);
   ids.splice(by > 0 ? at + 1 : at, 0, id);
@@ -708,11 +711,14 @@ export function endingSoon(plan: Plan, now: Date): Pack[] {
 
 // ---------- Recording purchases ----------
 
-/** Level a card up or down by one copy, within its rarity's range. */
+/** Level a card up or down by one copy, within its rarity's range. Returns whether its level changed. */
 export function stepCard(d: AppState, cardId: string, delta: 1 | -1) {
   const card = d.cards.find((c) => c.id === cardId);
   const rule = card && d.rarities.find((r) => r.id === card.rarityId);
-  if (card && rule) card.fusion = Math.min(maxFusion(rule), Math.max(0, card.fusion + delta));
+  if (!card || !rule) return false;
+  const was = card.fusion;
+  card.fusion = Math.min(maxFusion(rule), Math.max(0, card.fusion + delta));
+  return card.fusion !== was;
 }
 
 /**
@@ -730,14 +736,15 @@ export function kardStep(state: AppState, cardId: string): number | null {
 
 /**
  * Fuse a card one step with Fusion Up Kards, as done in the game: the kards come off the Wallet and the card goes
- * up a level. Returns the kards used, or null when kardStep says the step isn't possible. Ascension steps also
- * take Ascension Kards in the game, which aren't tracked.
+ * up a level. Returns the kards used, or null when kardStep says the step isn't possible, or the step no longer costs
+ * the `expected` kards the button showed (a sync moved the card or the Wallet on). Ascension steps also take
+ * Ascension Kards in the game, which aren't tracked.
  */
-export function fuseWithKards(d: AppState, cardId: string): number | null {
+export function fuseWithKards(d: AppState, cardId: string, expected?: number): number | null {
   const cost = kardStep(d, cardId);
   const card = d.cards.find((c) => c.id === cardId);
   const rule = card && d.rarities.find((r) => r.id === card.rarityId);
-  if (cost == null || !card || !rule) return null;
+  if (cost == null || !card || !rule || (expected != null && cost !== expected)) return null;
   rule.fusionUpKards -= cost;
   card.fusion += 1;
   return cost;
@@ -746,8 +753,8 @@ export function fuseWithKards(d: AppState, cardId: string): number | null {
 /**
  * Buy (delta 1) or take back (delta -1) one purchase of a pack: counts it, moves the cost out of (or back into)
  * the balance, and for a store item, which always gives its card, levels that card. Random packs leave the
- * cards to the "What did you pull?" step. Returns false when nothing was logged: the pack is gone, or a −1 has no
- * purchase left to take back.
+ * cards to the "What did you pull?" step. Returns false when nothing was logged: the pack is gone, a +1 would pass
+ * its purchase limit, or a −1 has no purchase left to take back.
  *
  * A buy the balance doesn't cover takes it below 0 rather than stopping at 0: the typed balance was out of date,
  * and -1 (for a mis-tap) has to give back exactly what the buy took. The planner counts a negative balance as 0.
@@ -755,6 +762,7 @@ export function fuseWithKards(d: AppState, cardId: string): number | null {
 export function recordPurchase(d: AppState, packId: string, delta: 1 | -1) {
   const pack = d.packs.find((x) => x.id === packId);
   if (!pack || (delta < 0 && pack.purchased <= 0)) return false;
+  if (delta > 0 && pack.maxPurchases != null && pack.purchased >= pack.maxPurchases) return false;
   pack.purchased += delta;
   const cur = d.currencies.find((c) => c.id === pack.currencyId);
   if (cur) cur.balance -= delta * pack.cost;
@@ -803,6 +811,8 @@ export function seasonEnd(saved: string | null | undefined, now: Date): string |
  */
 export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: string[]) {
   const from = seasonEnd(s.realmKlashSeasonEnd, now);
+  // Already there (a pull brought the move in from another device): nothing to move. Returns whether it moved.
+  if (from === to) return false;
   const saved = s.realmKlashSeasonEnd;
   const extended = saved && weekEnds?.includes(saved) ? saved : null;
   const changeovers = [from, extended].filter((c): c is string => !!c);
@@ -816,6 +826,7 @@ export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: str
     } else if (changeovers.includes(p.endsAt)) p.endsAt = to;
   }
   s.realmKlashSeasonEnd = to;
+  return true;
 }
 
 /** Whether a pack rotates with the season when the user hasn't said: Blood Ruby items that aren't gear. */

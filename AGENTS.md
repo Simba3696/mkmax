@@ -18,7 +18,7 @@ A change is done when `npm run lint`, `npm test` and `npm run build` all pass. C
 ## Rules
 
 - **Keep `src/engine.ts` pure.** No React, no `fetch`, no `Date.now()`, no `localStorage`. Pass `now` in. New planning logic goes here with tests in `engine.test.ts`.
-- **All state changes go through `update(recipe, undoLabel?)`** in `store.tsx`. Give user actions that change or remove data an undo label.
+- **All state changes go through `update(recipe, undoLabel?)`** in `store.tsx`. Give user actions that change or remove data an undo label. A recipe that finds nothing to change (the card, pack or row a tap was for is gone, or already that way) returns `noChange`, and finds rows by id, never by their place on screen.
 - **Changing the saved shape or meaning means a migration.** Use the `save-migration` skill (`.claude/skills/save-migration/`). Never pull synced data with `version <= 2`.
 - **Update the docs in the same change.** Behaviour goes in `docs/user-guide.md`, scoring and data sources in `docs/how-it-works.md`, structure in `docs/architecture.md`, setup and conventions in `docs/development.md`. Touch the README's Features list only for headline features.
 - **Write like the existing docs and commits.** Plain sentences about what the user sees, no jargon, no `feat:` prefixes. Commit subjects read like "Show how many cards each rarity and source filter option would list". Comments explain why, not what.

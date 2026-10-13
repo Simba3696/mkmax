@@ -182,7 +182,13 @@ export default function CardsView({ sub, onSub }: { sub: CardsPage; onSub: (sub:
           Tower gear
         </button>
       </div>
-      {sub === 'cards' ? <CardList /> : <TowersPanel />}
+      {/* Both stay mounted, so switching pages keeps a half-typed card, a pasted list or a search on the card list. */}
+      <div hidden={sub !== 'cards'}>
+        <CardList />
+      </div>
+      <div hidden={sub !== 'towers'}>
+        <TowersPanel />
+      </div>
     </>
   );
 }
@@ -275,19 +281,17 @@ function CardList() {
   const whichCards = (fixes: typeof rarityFixes) => (fixes.length === 1 ? fixes[0].card.name : cardCount(fixes.length));
   function applyRarityFixes(fixes: typeof rarityFixes) {
     update((d) => {
-      for (const f of fixes) {
-        const c = d.cards.find((x) => x.id === f.card.id);
-        if (c) applyRarityFix(c, f.to, d.rarities);
-      }
+      const found = fixes.map((f) => ({ f, c: d.cards.find((x) => x.id === f.card.id) })).filter((x) => x.c);
+      if (!found.length) return noChange; // a sync removed them
+      for (const { f, c } of found) applyRarityFix(c!, f.to, d.rarities);
     }, `Changed the rarity of ${whichCards(fixes)}`);
   }
 
   function keepRarities(fixes: typeof rarityFixes) {
     update((d) => {
-      for (const f of fixes) {
-        const c = d.cards.find((x) => x.id === f.card.id);
-        if (c) c.keptRarity = f.to;
-      }
+      const found = fixes.map((f) => ({ f, c: d.cards.find((x) => x.id === f.card.id) })).filter((x) => x.c);
+      if (!found.length) return noChange; // a sync removed them
+      for (const { f, c } of found) c!.keptRarity = f.to;
     }, `Kept your rarity for ${whichCards(fixes)}`);
   }
 
@@ -295,18 +299,21 @@ function CardList() {
   const askRarityAgain = (c: Card) =>
     update((d) => {
       const x = d.cards.find((y) => y.id === c.id);
-      if (x) delete x.keptRarity;
+      if (!x) return noChange;
+      delete x.keptRarity;
     }, `Asking about ${c.name}'s rarity again`);
 
+  // Edits find the card by id when they run, and save nothing for a card a sync has removed.
   const patch = (id: string, p: Partial<Card>) =>
     update((d) => {
       const c = d.cards.find((x) => x.id === id);
-      if (c) Object.assign(c, p);
+      if (!c) return noChange;
+      Object.assign(c, p);
     });
 
-  /** Fuse one level with Fusion Up Kards from the Wallet, as done in the game. */
+  /** Fuse one level with Fusion Up Kards from the Wallet, as done in the game: the step the button showed, or none. */
   function fuse(c: Card, cost: number) {
-    update((d) => (fuseWithKards(d, c.id) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${c.name}`);
+    update((d) => (fuseWithKards(d, c.id, cost) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${c.name}`);
   }
 
   function rename(c: Card, text: string) {
@@ -569,7 +576,9 @@ function CardList() {
                   className={btn.ghost}
                   onConfirm={() =>
                     update((d) => {
-                      d.cards = d.cards.filter((x) => x.id !== c.id);
+                      const kept = d.cards.filter((x) => x.id !== c.id);
+                      if (kept.length === d.cards.length) return noChange; // a sync already removed it
+                      d.cards = kept;
                       for (const p of d.packs) p.drops = p.drops.filter((x) => x.cardId !== c.id);
                     }, `Deleted ${c.name}`)
                   }

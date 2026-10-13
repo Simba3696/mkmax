@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useStore, type SyncStatus, type UndoEntry } from './store';
+import { noChange, useStore, type SyncStatus, type UndoEntry } from './store';
 import { btn } from './classes';
 import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
@@ -101,7 +101,8 @@ export default function App() {
     if (!sync.settled) return;
     // Which packs this moves depends on when it runs, so it's a real change that syncs. The exception is a fresh
     // install, which has nothing to move: stamping it would make a new device ask which copy to keep when it joins.
-    update((d) => moveSeasonEnd(d, scheduledEnd, now, season?.weekEnds), undefined, { auto: !state.updatedAt && state.packs.length === 0 });
+    // A pull since this ran may already have brought the move in from another device: then there's nothing to save.
+    update((d) => (moveSeasonEnd(d, scheduledEnd, now, season?.weekEnds) ? undefined : noChange), undefined, { auto: !state.updatedAt && state.packs.length === 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduledEnd, savedEnd, sync.settled]);
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { defaultState } from '../defaults';
 import { StoreProvider, useStore } from '../store';
 import { PlanProvider } from '../planner';
@@ -20,6 +20,12 @@ function UndoLabel() {
       {lastUndo?.label ?? ''}
     </output>
   );
+}
+
+/** Hands the store, as each render sees it, to the test, as any view would use it. */
+function Grab({ onRender }: { onRender: (store: ReturnType<typeof useStore>) => void }) {
+  onRender(useStore());
+  return null;
 }
 
 beforeEach(() => {
@@ -128,5 +134,101 @@ describe('Packs: logging a purchase', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove one purchase' }));
     expect(JSON.parse(localStorage.getItem('mkmax:v1')!).packs.find((p: Pack) => p.id === 'Live Pack').purchased).toBe(0);
     expect(screen.queryByText('What did you pull?')).toBeNull();
+  });
+});
+
+describe('Packs: taps on a screen a sync has changed', () => {
+  let update!: ReturnType<typeof useStore>['update'];
+  /** Packs with the store handed out, and saves counted from the moment it returns. */
+  function renderPacks(tweak?: (s: ReturnType<typeof JSON.parse>) => void) {
+    if (tweak) {
+      const s = JSON.parse(localStorage.getItem('mkmax:v1')!);
+      tweak(s);
+      localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    }
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <PacksView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    return vi.spyOn(SyncLoop.prototype, 'nextStamp');
+  }
+  const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!);
+  const live = () => within(document.getElementById('pack-Live Pack')!);
+
+  // Regression: /ship review of clock-and-gear-taps — stale taps on Packs still saved and synced
+  // Found by /ship on 2026-10-13
+  // Value: protects=Clear expired with nothing left to clear (a sync cleared them) saves nothing and offers no Undo;
+  // fails_when=the change stamps the save anyway; why_new=review (Red Team); seam=SyncLoop.nextStamp spied, a grabbed
+  // update stands in for the sync; no_claim=a real sync
+  it('saves nothing for Clear expired when a sync already cleared them', () => {
+    const stamps = renderPacks();
+    fireEvent.click(screen.getByRole('button', { name: '▸ Expired (3)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear expired' }));
+    stamps.mockClear();
+    act(() => {
+      update((d) => void (d.packs = d.packs.filter((x) => x.id === 'Live Pack' || x.id === 'Shadow Sash item')));
+      screen.getByRole('button', { name: 'Tap again to confirm' }).click();
+    });
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
+
+  // Value: protects=a pull-step − with the card already at nothing, and Delete on a pack a sync removed, save nothing;
+  // fails_when=stepCard's clamp or the delete's filter still stamps the save; why_new=review (Red Team); seam=
+  // SyncLoop.nextStamp spied, a grabbed update stands in for the sync; no_claim=a real sync
+  it('saves nothing for a pull-step − at nothing or Delete on a pack that has gone', () => {
+    const stamps = renderPacks();
+    fireEvent.click(live().getByRole('button', { name: 'I bought one' }));
+    stamps.mockClear();
+    act(() => {
+      update((d) => void (d.cards.find((c) => c.id === 'scorpion')!.fusion = 0));
+      screen.getByRole('button', { name: 'Remove a copy' }).click();
+    });
+    expect(stamps).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(live().getByRole('button', { name: 'Delete' }));
+    stamps.mockClear();
+    const confirm = live().getByRole('button', { name: 'Tap again to confirm' });
+    act(() => {
+      update((d) => void (d.packs = d.packs.filter((x) => x.id !== 'Live Pack')));
+      confirm.click();
+    });
+    expect(stamps).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression: /ship review of clock-and-gear-taps — a −1 a sync had undone left "What did you pull?" open
+  // Found by /ship on 2026-10-13
+  // Value: protects=a −1 closes the pull step even when a sync already took the purchase back; fails_when=the step
+  // closes only when the −1 logged something; why_new=review (adversarial); seam=a grabbed update stands in for the
+  // sync; no_claim=a real sync
+  it('closes "What did you pull?" on a −1 that a sync already took back', () => {
+    const stamps = renderPacks();
+    fireEvent.click(live().getByRole('button', { name: 'I bought one' }));
+    expect(screen.getByText('What did you pull?')).toBeTruthy();
+    stamps.mockClear();
+    const takeBack = live().getByRole('button', { name: 'Remove one purchase' });
+    act(() => {
+      update((d) => void (d.packs.find((x) => x.id === 'Live Pack')!.purchased = 0));
+      takeBack.click();
+    });
+    expect(screen.queryByText('What did you pull?')).toBeNull();
+    expect(stamps).toHaveBeenCalledTimes(1);
+  });
+
+  // Value: protects=a second buy on a pack at its purchase limit (the button still showed it open) logs nothing;
+  // fails_when=only the button's disabled stops a buy past the limit; why_new=review (Red Team); seam=
+  // SyncLoop.nextStamp spied; no_claim=a sync that raised the count
+  it('logs no buy past the purchase limit from a screen drawn before it was reached', () => {
+    const stamps = renderPacks((s) => (s.packs.find((x: Pack) => x.id === 'Live Pack').maxPurchases = 1));
+    const buy = live().getByRole('button', { name: 'I bought one' });
+    act(() => {
+      buy.click();
+      buy.click();
+    });
+    expect(saved().packs.find((x: Pack) => x.id === 'Live Pack').purchased).toBe(1);
+    expect(stamps).toHaveBeenCalledTimes(1);
   });
 });

@@ -24,6 +24,11 @@ afterEach(() => {
 const tab = (name: string) => screen.getByRole('button', { name });
 /** Past App's half-second double-tap window (DOUBLE_TAP_MS, 500), so a tap on the Cards tab counts as deliberate. */
 const later = () => vi.setSystemTime(Date.now() + 600);
+/** Tower gear's page when it's the one showing; both Cards pages stay mounted, the other hidden. */
+const towers = () => {
+  const intro = screen.queryByText(/Tower gear is farmed, not bought/);
+  return intro && !intro.closest('[hidden]') ? intro : null;
+};
 
 describe('the MK MAX logo', () => {
   // Value: protects=the logo goes to the Plan from another tab and scrolls the Plan to the top; fails_when=home() goes
@@ -72,7 +77,6 @@ describe('the Cards tab', () => {
     );
     const nav = within(screen.getByRole('navigation', { name: 'Tabs' }));
     const cardsTab = () => nav.getByRole('button', { name: 'Cards' });
-    const towers = () => screen.queryByText(/Tower gear is farmed, not bought/);
     const pressed = (name: string) => screen.getByRole('button', { name, pressed: true });
 
     fireEvent.click(cardsTab());
@@ -116,7 +120,6 @@ describe('the Cards tab', () => {
     );
     const nav = within(screen.getByRole('navigation', { name: 'Tabs' }));
     const cardsTab = () => nav.getByRole('button', { name: 'Cards' });
-    const towers = () => screen.queryByText(/Tower gear is farmed, not bought/);
     const pressed = (name: string) => screen.getByRole('button', { name, pressed: true });
 
     fireEvent.click(cardsTab());
@@ -148,7 +151,6 @@ describe('the Cards tab', () => {
     );
     const nav = within(screen.getByRole('navigation', { name: 'Tabs' }));
     const cardsTab = () => nav.getByRole('button', { name: 'Cards' });
-    const towers = () => screen.queryByText(/Tower gear is farmed, not bought/);
     document.querySelector<HTMLElement>('[data-scroll-root]')!.scrollTo = vi.fn();
     expect(cardsTab().getAttribute('aria-description')).toBeNull();
 
@@ -168,5 +170,33 @@ describe('the Cards tab', () => {
     vi.setSystemTime(Date.now() - 60 * 60 * 1000);
     fireEvent.click(cardsTab());
     expect(towers()).toBeTruthy();
+  });
+});
+
+describe('the Cards tab keeping what was typed', () => {
+  // Regression: /ship review of clock-and-gear-taps — switching to Tower gear dropped a half-typed card
+  // Found by /ship on 2026-10-13
+  // Value: protects=a name typed in Add card is still there after the tab switches to Tower gear and back; fails_when=the
+  // switch unmounts the card list, dropping its typing; why_new=review (design, adversarial); seam=none; no_claim=what is
+  // kept when leaving the Cards tab altogether
+  it('keeps a half-typed card when switching to Tower gear and back', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const nav = within(screen.getByRole('navigation', { name: 'Tabs' }));
+    const cardsTab = () => nav.getByRole('button', { name: 'Cards' });
+    document.querySelector<HTMLElement>('[data-scroll-root]')!.scrollTo = vi.fn();
+    fireEvent.click(cardsTab());
+    fireEvent.change(screen.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Raiden, Dark' } });
+    later();
+    fireEvent.click(cardsTab());
+    expect(screen.getByRole('button', { name: 'Tower gear', pressed: true })).toBeTruthy();
+    fireEvent.click(cardsTab());
+    expect((screen.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)') as HTMLInputElement).value).toBe('Raiden, Dark');
   });
 });

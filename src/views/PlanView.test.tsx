@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { defaultState } from '../defaults';
 import { StoreProvider, useStore } from '../store';
 import { PlanProvider } from '../planner';
@@ -115,5 +115,33 @@ describe('Plan: Bought one', () => {
     expect(saved.currencies.find((c: { id: string }) => c.id === 'souls').balance).toBe(1000);
     expect(stamps).toHaveBeenCalledTimes(1); // the removal only
     expect(openPack).not.toHaveBeenCalled();
+  });
+});
+
+describe('Plan: Wallet on a screen a sync has changed', () => {
+  // Regression: /ship review of clock-and-gear-taps — Wallet boxes changed a currency by its place on screen
+  // Found by /ship on 2026-10-13
+  // Value: protects=typing in a currency's box changes that currency even after a sync reordered them; fails_when=the box
+  // writes to the currency at its old place; why_new=review (Red Team); seam=a grabbed update stands in for the sync;
+  // no_claim=a real sync
+  it('changes the currency whose box was typed in, after a sync reordered them', () => {
+    localStorage.setItem('mkmax:v1', JSON.stringify(defaultState()));
+    let update!: ReturnType<typeof useStore>['update'];
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <PlanView goto={() => {}} openPack={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const souls = screen.getByLabelText('Souls');
+    act(() => {
+      update((d) => void d.currencies.reverse());
+      fireEvent.change(souls, { target: { value: '123' } });
+    });
+    const saved = JSON.parse(localStorage.getItem('mkmax:v1')!);
+    expect(saved.currencies.find((c: { id: string }) => c.id === 'souls').balance).toBe(123);
+    expect(saved.currencies.filter((c: { balance: number }) => c.balance === 123)).toHaveLength(1);
   });
 });

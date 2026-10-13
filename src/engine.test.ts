@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, moveInGearOrder, targetLevel,
+  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -176,6 +176,21 @@ describe('kameos', () => {
       expect(moveInGearOrder(s, 'Bloody Tomahawk', 'Shadow Sash', -1)).toBeNull();
       // The arrow that still has something to do works as usual.
       expect(moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk', -1)).toEqual(['Shadow Sash', 'Bloody Tomahawk', "Moloch's Ball and Chain"]);
+    });
+
+    // Regression: /ship review of clock-and-gear-taps — a stale tap moved a piece past one a sync had put on sale
+    // Found by /ship on 2026-10-13
+    // Value: protects=given the pieces on sale now, a tap only moves when its neighbour is still the next one on sale;
+    // fails_when=only the side is checked, so the piece also jumps a piece the screen never showed between them; why_new=
+    // review (Codex, adversarial); seam=none; no_claim=the arrows (GearOrder test)
+    it('moves nothing when a sync put another piece on sale between the two', () => {
+      const s = setup(cards(), [item('Shadow Sash'), item("Moloch's Ball and Chain"), item('Bloody Tomahawk')], (s) => {
+        s.gearOrder = ['Shadow Sash', "Moloch's Ball and Chain", 'Bloody Tomahawk'];
+      });
+      const onSale = ['Shadow Sash', "Moloch's Ball and Chain", 'Bloody Tomahawk'];
+      // The screen showed Shadow Sash next to the Tomahawk; Moloch's is on sale between them now.
+      expect(moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk', 1, onSale)).toBeNull();
+      expect(moveInGearOrder(s, 'Shadow Sash', "Moloch's Ball and Chain", 1, onSale)).toEqual(["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk']);
     });
 
     // Regression: review of todo-followups — the arrows swapped two places, so the other piece jumped over waiting ones
@@ -467,6 +482,18 @@ describe('phases', () => {
     expect(kardStep(s, 'gear')).toBeNull(); // Realm Klash gear never takes kards, even with Epic kards in the Wallet
     s.cards[2].name = 'Kori Blade';
     expect(kardStep(s, 'gear')).toBe(5); // the same card off the list takes them
+  });
+
+  // Regression: /ship review of clock-and-gear-taps — a fuse tap after a sync used a different step than the button showed
+  // Found by /ship on 2026-10-13
+  // Value: protects=a fuse only goes ahead when the step still costs what the button showed; fails_when=the expected cost
+  // is ignored, so a sync that moved the card on fuses a dearer step and the Undo label gives the wrong count; why_new=
+  // review (Red Team); seam=none; no_claim=the buttons (PlanView and CardsView tests)
+  it('fuses nothing when the step no longer costs what the button showed', () => {
+    const s = setup([card('d', F(4))], [], (s) => (s.rarities[0].fusionUpKards = 5));
+    expect(fuseWithKards(s, 'd', 1)).toBeNull(); // the button said 1 kard (F3 → F4); F4 → F5 costs 2 now
+    expect([s.cards[0].fusion, s.rarities[0].fusionUpKards]).toEqual([F(4), 5]);
+    expect(fuseWithKards(s, 'd', 2)).toBe(2);
   });
 
   it("uses kards on a Gold ascension step, and not past the card's cap", () => {
@@ -1185,6 +1212,22 @@ describe('buying from the plan', () => {
     expect(recordPurchase(s, 'p', -1)).toBe(false);
   });
 
+  // Regression: /ship review of clock-and-gear-taps — a buy past the purchase limit was logged when the button was stale
+  // Found by /ship on 2026-10-13
+  // Value: protects=a buy at the purchase limit logs nothing, and a pull-step step that clamps reports no change;
+  // fails_when=only the button's disabled stops a buy past the limit, or stepCard can't tell a clamp from a change;
+  // why_new=review (Red Team); seam=none; no_claim=the buttons (PacksView test)
+  it('logs no buy past the purchase limit, and stepCard says when it changed nothing', () => {
+    const s = setup([card('a', F(2))], [pack('p', [{ cardId: 'a', chance: 50 }], { maxPurchases: 1 })], (s) => (s.currencies[0].balance = 500));
+    expect(recordPurchase(s, 'p', 1)).toBe(true);
+    expect(recordPurchase(s, 'p', 1)).toBe(false);
+    expect([s.packs[0].purchased, s.currencies[0].balance]).toEqual([1, 400]);
+    expect(stepCard(s, 'a', 1)).toBe(true);
+    s.cards[0].fusion = 0;
+    expect(stepCard(s, 'a', -1)).toBe(false); // already 0
+    expect(stepCard(s, 'gone', 1)).toBe(false);
+  });
+
   it('gives back exactly what a buy took when the balance was too low for it', () => {
     const s = setup([card('a', F(2))], [pack('p', [{ cardId: 'a', chance: 50 }], { cost: 400 })], (s) => (s.currencies[0].balance = 200));
     recordPurchase(s, 'p', 1);
@@ -1287,6 +1330,19 @@ describe('Realm Klash seasons', () => {
     expect(s.packs.map((p) => p.endsAt)).toEqual(['2026-01-10T11:59', '2025-12-29T20:00', null]);
     expect(packStatus(s.packs[0], NOW)).toBe('expired');
     expect(seasonEnd(s.realmKlashSeasonEnd, NOW)).toBe('2026-01-24T11:59');
+  });
+
+  // Regression: /ship review of clock-and-gear-taps — the schedule's season-end move ran again on a copy that already had it
+  // Found by /ship on 2026-10-13
+  // Value: protects=moveSeasonEnd reports when the season already ends there and leaves the save as it was; fails_when=it
+  // moves (and stamps) again after a pull already brought the move in; why_new=review (Red Team); seam=none;
+  // no_claim=the App effect that calls it
+  it('moves nothing when the season already ends there', () => {
+    const s = setup([], [pack('now', [], { season: true, endsAt: '2026-01-12T20:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-12T20:00'));
+    const before = structuredClone(s);
+    expect(moveSeasonEnd(s, '2026-01-12T20:00', NOW)).toBe(false);
+    expect(s).toEqual(before);
+    expect(moveSeasonEnd(s, '2026-01-13T20:00', NOW)).toBe(true);
   });
 
   it('moves items still on the saved end when the schedule extended the season after that end passed', () => {
