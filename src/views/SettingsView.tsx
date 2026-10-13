@@ -72,7 +72,7 @@ export default function SettingsView() {
 
   // Rows are found by id when the change runs, not by their place on screen: a sync can reorder or remove rarities and
   // currencies while Settings is open, and a change by place would land on the wrong row. A row that's gone saves nothing.
-  const editRarity = (id: string, edit: (r: RarityRule) => void | typeof noChange, undoLabel?: string) =>
+  const editRarity = (id: string, edit: (r: RarityRule) => void | typeof noChange, undoLabel?: string | (() => string)) =>
     update((d) => {
       const r = d.rarities.find((x) => x.id === id);
       if (!r) return noChange;
@@ -144,17 +144,20 @@ export default function SettingsView() {
                             onChange={(e) => {
                               const threshold = e.target.value ? Number(e.target.value) : null;
                               // With no kards there's no threshold to stop at, so the planner tracks to max. Saying so in
-                              // Track until, with Undo, rather than leaving it on a threshold that no longer applies.
-                              const toMax = threshold == null && r.goal === 'threshold';
+                              // Track until, with Undo, rather than leaving it on a threshold that no longer applies. Both
+                              // are decided from the rarity as it is now, which a sync may have changed.
+                              let toMax = false;
                               editRarity(
                                 r.id,
                                 (dr) => {
+                                  toMax = threshold == null && dr.goal === 'threshold';
+                                  if (dr.fusionUpThreshold === threshold && !toMax) return noChange;
                                   dr.fusionUpThreshold = threshold;
                                   if (toMax) dr.goal = 'max';
                                   // Fill in missing costs now, as the next load would, so the plan doesn't change on a reload.
                                   dr.kardsPerLevel = kardTable(dr);
                                 },
-                                toMax ? `${r.label} now tracks to max` : undefined,
+                                () => (toMax ? `${r.label} now tracks to max` : ''),
                               );
                             }}
                           >

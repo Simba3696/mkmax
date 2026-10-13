@@ -349,24 +349,30 @@ function CardList() {
 
   function add() {
     if (!draft.name.trim()) return;
-    const isEquip = draftRule?.kind === 'equipment';
-    const tower = isEquip && draft.source === 'tower' ? draft.sourceNote?.trim() : undefined;
+    // The rarity the form shows: the one picked, or the first once a sync has removed that one (the box shows the first).
+    const rarityId = draftRule?.id ?? '';
     let added = false;
     update((d) => {
-      // Not under a rarity a sync has removed: the card would be hidden everywhere, with no way to delete it.
-      if (!d.rarities.some((r) => r.id === draft.rarityId)) return noChange;
+      // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
+      // delete it. Its kind and steps come from the rarity as it is now.
+      const rule = d.rarities.find((r) => r.id === rarityId);
+      if (!rule) return noChange;
+      const isEquip = rule.kind === 'equipment';
+      const tower = isEquip && draft.source === 'tower' ? draft.sourceNote?.trim() : undefined;
       d.cards.push({
         id: newId(),
         ...draft,
+        rarityId,
         name: draft.name.trim(),
-        guest: !!draftRule?.hasGuests && draft.guest,
-        source: isEquip ? draft.source : initialSource(draft, d.rarities),
+        fusion: Math.min(draft.fusion, maxFusion(rule)),
+        guest: rule.hasGuests && draft.guest,
+        source: isEquip ? draft.source : initialSource({ ...draft, rarityId }, d.rarities),
         sourceNote: tower || undefined,
       });
       added = true;
     });
     // The typed name stays for another try when nothing was added.
-    if (added) setDraft({ ...draft, name: '', fusion: 0, guest: false });
+    if (added) setDraft({ ...draft, rarityId, name: '', fusion: 0, guest: false });
   }
 
   const rarityOrder = (c: Card) => (sortBy === 'name' ? 0 : state.rarities.findIndex((r) => r.id === c.rarityId));

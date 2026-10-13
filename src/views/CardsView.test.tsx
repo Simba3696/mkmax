@@ -200,6 +200,19 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     expect(stamps).toHaveBeenCalledTimes(1);
     expect(name.value).toBe('Raiden, Dark');
   });
+
+  // Regression: /ship review of stale-screens-and-schedule — Add card did nothing at all once a sync removed its rarity
+  // Found by /ship on 2026-10-13
+  // Value: protects=after a sync removes the picked rarity and the form shows the first rarity, Add saves the card under
+  // the rarity shown; fails_when=Add keeps the removed rarity and silently saves nothing on every tap; why_new=review
+  // (Red Team, pass 2); seam=a grabbed update stands in for the sync; no_claim=a real sync
+  it('adds under the rarity shown once a sync removed the one picked', () => {
+    renderWith([]);
+    fireEvent.change(screen.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Raiden, Dark' } });
+    act(() => update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'diamond'))));
+    act(() => screen.getByRole('button', { name: 'Add' }).click());
+    expect(saved().cards.map((c: { name: string; rarityId: string }) => [c.name, c.rarityId])).toEqual([['Raiden, Dark', saved().rarities[0].id]]);
+  });
 });
 
 // Last in the file: the catalog stays loaded once a test has downloaded it.

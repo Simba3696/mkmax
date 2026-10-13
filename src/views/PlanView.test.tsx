@@ -183,4 +183,27 @@ describe('Plan: Wallet on a screen a sync has changed', () => {
     expect(saved.currencies.find((c: { id: string }) => c.id === 'souls').balance).toBe(123);
     expect(saved.currencies.filter((c: { balance: number }) => c.balance === 123)).toHaveLength(1);
   });
+
+  // Value: protects=typing in a rarity's Fusion Up Kards box after a sync removed that rarity saves nothing (it used to
+  // throw); fails_when=the box assumes the rarity is still there; why_new=review (testing, pass 2); seam=a grabbed update
+  // stands in for the sync, SyncLoop.nextStamp spied; no_claim=a real sync
+  it("saves nothing for a kard box whose rarity a sync removed", () => {
+    localStorage.setItem('mkmax:v1', JSON.stringify(defaultState()));
+    let update!: ReturnType<typeof useStore>['update'];
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <PlanView goto={() => {}} openPack={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    const kards = screen.getByLabelText('Diamond Fusion Up Kards');
+    act(() => {
+      update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'diamond')));
+      fireEvent.change(kards, { target: { value: '4' } });
+    });
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
 });

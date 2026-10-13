@@ -157,6 +157,45 @@ describe('Settings Kind on a screen a sync has changed', () => {
   });
 });
 
+// Regression: /ship review of stale-screens-and-schedule — 'No kards' decided Track until from the screen
+// Found by /ship on 2026-10-13
+// Value: protects=choosing No kards moves Track until to max from the rarity as it is now, and saves nothing when a sync
+// already made that change; fails_when=the move is decided from the screen, leaving a threshold goal with no threshold or
+// saving (with an Undo) a change already made; why_new=review (maintainability, pass 2); seam=SyncLoop.nextStamp spied,
+// a grabbed update stands in for the sync; no_claim=a real sync
+describe('Settings kard threshold on a screen a sync has changed', () => {
+  it('tracks to max from the rarity as it is now, and saves nothing when a sync already did it', () => {
+    localStorage.setItem('mkmax:v1', JSON.stringify(defaultState()));
+    let update!: ReturnType<typeof useStore>['update'];
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <SettingsView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!);
+    const rarity = (id: string) => saved().rarities.find((r: { id: string }) => r.id === id);
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    // Diamond shows Track until Max; a sync has just set it to the threshold.
+    const diamond = within(panelOf('Diamond')).getByLabelText('Fusion Up Kards usable from');
+    act(() => {
+      update((d) => void (d.rarities.find((r) => r.id === 'diamond')!.goal = 'threshold'));
+      fireEvent.change(diamond, { target: { value: '' } });
+    });
+    expect([rarity('diamond').fusionUpThreshold, rarity('diamond').goal]).toEqual([null, 'max']);
+    stamps.mockClear();
+    // Rare Equip shows a threshold; a sync has already chosen No kards for it.
+    const rare = within(panelOf('Rare Equip')).getByLabelText('Fusion Up Kards usable from');
+    act(() => {
+      update((d) => void Object.assign(d.rarities.find((r) => r.id === 'rare')!, { fusionUpThreshold: null, goal: 'max' }));
+      fireEvent.change(rare, { target: { value: '' } });
+    });
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
+});
+
 /** The rarity editor with this name: the box that holds both its name and its Remove button. */
 function panelOf(name: string) {
   let el: HTMLElement | null = screen.getByDisplayValue(name);
