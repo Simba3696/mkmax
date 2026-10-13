@@ -139,8 +139,11 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
     update(
       (d) => {
         // Not under a rarity a sync removed after the list was read: those cards would be hidden everywhere, with no way
-        // to delete them. Nor updates to cards a sync removed.
-        const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId));
+        // to delete them. Nor a card a sync has added meanwhile (the same list pasted on another device), which would
+        // then be in twice. Nor updates to cards a sync removed.
+        const cards = newCards.filter(
+          (c) => d.rarities.some((r) => r.id === c.rarityId) && !d.cards.some((x) => cardKey(x.rarityId, x.name) === cardKey(c.rarityId, c.name)),
+        );
         const updates = parsed.updates.flatMap((u) => d.cards.filter((c) => c.id === u.cardId).map((c) => ({ c, patch: u.patch, line: u.line })));
         if (!cards.length && !updates.length) return noChange;
         const fresh = cards.map(

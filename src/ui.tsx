@@ -320,7 +320,11 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
   useEffect(() => {
     if (!armed) return;
     const t = setTimeout(() => setArmed(false), 3000);
-    return () => clearTimeout(t);
+    // A page hidden mid-countdown (Activity) stops its timer here, so disarm too: it would come back armed, a tap from delete.
+    return () => {
+      clearTimeout(t);
+      setArmed(false);
+    };
   }, [armed]);
   // Ghost buttons (btn.ghost, alone or with extra classes after it) stay ghost when armed, as before; only the text changes.
   return (

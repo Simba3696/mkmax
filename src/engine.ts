@@ -861,6 +861,7 @@ export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: str
   // or after `to` (the next season's) keep their dates.
   const still = from === to;
   const changeovers = [...(still ? [] : [from]), ...extended].filter((c): c is string => !!c);
+  let moved = false;
   for (const p of s.packs) {
     if (!p.season || !p.endsAt) continue;
     const start = p.startsAt;
@@ -877,8 +878,15 @@ export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: str
     if (!still && from && start && start >= from) {
       if (start === from) p.startsAt = to;
       p.endsAt = seasonEnd(to, new Date(p.startsAt!));
-    } else if (changeovers.includes(p.endsAt)) p.endsAt = to;
+    } else if (changeovers.includes(p.endsAt)) {
+      p.endsAt = to;
+      moved = true;
+    }
   }
+  // When the end isn't moving and no item was on a stretched week end, there's nothing to save: rewriting the saved end
+  // (it already rolls forward to `to`) would only make every device save, and ask which copy to keep. Leaving it also
+  // lets an item on that week end that syncs in later still be found.
+  if (still && !moved) return false;
   s.realmKlashSeasonEnd = to;
   return true;
 }
