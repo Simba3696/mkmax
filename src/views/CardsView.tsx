@@ -134,8 +134,13 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
         added = cards.length;
         updated = updates.length;
       },
-      () => [added && `Added ${added} cards`, updated && `updated ${updated}`].filter(Boolean).join(', '),
+      () => {
+        const done = [added && `added ${added} card${added === 1 ? '' : 's'}`, updated && `updated ${updated}`].filter(Boolean).join(', ');
+        return done.charAt(0).toUpperCase() + done.slice(1);
+      },
     );
+    // A list with lines a sync left nowhere to go stays, so it isn't lost: the box shows what's left to add.
+    if (added + updated < total) return;
     setText('');
     setOpen(false);
   }
@@ -243,6 +248,10 @@ function CardList() {
   const [draft, setDraft] = useState<Omit<Card, 'id'>>({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0, maxLevel: null, guest: false });
 
   const draftRule = ctx.rules.get(draft.rarityId) ?? state.rarities[0];
+  // What the form shows, and Add card saves: the rarity picked, or the first once a sync has removed that one (the box
+  // shows the first). Falling back starts that rarity's level, goal and cap at their defaults, as picking it would: the
+  // removed rarity's don't fit it (a Gold A2 would be saved at a Diamond's max and deleted at once as maxed).
+  const shown = !draftRule || draftRule.id === draft.rarityId ? draft : { ...draft, rarityId: draftRule.id, fusion: 0, maxLevel: null, goal: undefined };
   // Cards to look up: no art yet, art that stopped loading, or art from an older wiki lookup (some of those are
   // stat screenshots rather than card art), which mkmobilebase usually has a proper card image for.
   const brokenUrls = useBrokenImageUrls();
@@ -275,6 +284,8 @@ function CardList() {
       const keep = missingImages.filter((c) => !found.has(c.id) && c.imageUrl && !brokenUrls.has(c.imageUrl) && c.wikiTitle);
       // The lookup can take minutes: a card whose image a sync changed meanwhile (one pasted on another device) keeps it.
       const lookedUp = new Map(missingImages.map((c) => [c.id, c.imageUrl]));
+      // Counted from the change itself, so cards a sync gave an image meanwhile aren't reported as updated.
+      let updated = 0;
       update((d) => {
         const cards = d.cards.filter((c) => lookedUp.has(c.id) && lookedUp.get(c.id) === c.imageUrl);
         const art = cards.flatMap((c) => (found.has(c.id) ? [{ c, m: found.get(c.id)! }] : []));
@@ -282,6 +293,7 @@ function CardList() {
         if (!art.length && !checked.length) return noChange;
         for (const { c, m } of art) Object.assign(c, m);
         for (const c of checked) c.imagePage = wikiUrl(c.wikiTitle!);
+        updated = art.length;
       });
       const left = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl))).length;
       const leftMsg = !left
@@ -289,7 +301,7 @@ function CardList() {
         : wikiError
           ? ` Couldn't reach the MK Mobile wiki (${wikiError}), so ${left} weren't looked up there. Try again later.`
           : ` ${left} not found online: open "Image" on those cards to paste a URL.`;
-      setImgStatus({ busy: false, msg: `Updated ${found.size} of ${missingImages.length}.${leftMsg}` });
+      setImgStatus({ busy: false, msg: `Updated ${updated} of ${missingImages.length}.${leftMsg}` });
     } catch (e) {
       setImgStatus({ busy: false, msg: `Couldn't look up images: ${(e as Error).message}` });
     }
@@ -366,11 +378,8 @@ function CardList() {
 
   function add() {
     if (!draft.name.trim()) return;
-    // The rarity the form shows: the one picked, or the first once a sync has removed that one (the box shows the first).
-    // Falling back starts that rarity's level, goal and cap at their defaults, as picking it would: the removed rarity's
-    // don't fit it (a Gold A2 would be saved at a Diamond's max and deleted at once as maxed).
-    const rarityId = draftRule?.id ?? '';
-    const base = rarityId === draft.rarityId ? draft : { ...draft, rarityId, fusion: 0, maxLevel: null, goal: undefined };
+    const base = shown;
+    const rarityId = base.rarityId;
     let added = false;
     update((d) => {
       // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
@@ -419,11 +428,11 @@ function CardList() {
           {/* Full width on phones; on wider screens the name shares its line with the other fields. */}
           <label className={`${field} col-span-full md:col-span-2`}>
             <span>Name</span>
-            <input value={draft.name} placeholder="e.g. Sub-Zero, Klassic (name, variant)" onChange={(e) => setDraft({ ...draft, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
+            <input value={shown.name} placeholder="e.g. Sub-Zero, Klassic (name, variant)" onChange={(e) => setDraft({ ...shown, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
           </label>
           <label className={field}>
             <span>Rarity</span>
-            <select value={draft.rarityId} onChange={(e) => setDraft({ ...draft, rarityId: e.target.value, fusion: 0, maxLevel: null })}>
+            <select value={shown.rarityId} onChange={(e) => setDraft({ ...shown, rarityId: e.target.value, fusion: 0, maxLevel: null })}>
               {state.rarities.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.label}
@@ -435,36 +444,36 @@ function CardList() {
           {draftRule && maxFusion(draftRule) > 1 && (
             <label className={field}>
               <span>Current level</span>
-              <select value={draft.fusion} onChange={(e) => setDraft({ ...draft, fusion: Number(e.target.value) })}>
+              <select value={shown.fusion} onChange={(e) => setDraft({ ...shown, fusion: Number(e.target.value) })}>
                 <LevelOptions rule={draftRule} />
               </select>
             </label>
           )}
-          {draftRule && <GoalSelect rule={draftRule} name={draft.name} value={draft.goal} onChange={(v) => setDraft({ ...draft, goal: v })} />}
-          {draftRule && <CapSelect rule={draftRule} value={draft.maxLevel} onChange={(v) => setDraft({ ...draft, maxLevel: v })} />}
+          {draftRule && <GoalSelect rule={draftRule} name={shown.name} value={shown.goal} onChange={(v) => setDraft({ ...shown, goal: v })} />}
+          {draftRule && <CapSelect rule={draftRule} value={shown.maxLevel} onChange={(v) => setDraft({ ...shown, maxLevel: v })} />}
           {draftRule?.hasGuests && (
             <label className={check}>
-              <input type="checkbox" checked={draft.guest} onChange={(e) => setDraft({ ...draft, guest: e.target.checked })} />
+              <input type="checkbox" checked={shown.guest} onChange={(e) => setDraft({ ...shown, guest: e.target.checked })} />
               Guest card
             </label>
           )}
           {draftRule?.kind === 'equipment' && (
             <label className={field}>
               <span>Source</span>
-              <SourceSelect kind="equipment" value={draft.source} onChange={(v) => setDraft({ ...draft, source: v, sourceNote: undefined })} />
+              <SourceSelect kind="equipment" value={shown.source} onChange={(v) => setDraft({ ...shown, source: v, sourceNote: undefined })} />
             </label>
           )}
-          {draftRule?.kind === 'equipment' && draft.source === 'tower' && (
+          {draftRule?.kind === 'equipment' && shown.source === 'tower' && (
             <label className={field}>
               <span>Tower</span>
-              <input value={draft.sourceNote ?? ''} placeholder="e.g. Lin Kuei Tower" onChange={(e) => setDraft({ ...draft, sourceNote: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
+              <input value={shown.sourceNote ?? ''} placeholder="e.g. Lin Kuei Tower" onChange={(e) => setDraft({ ...shown, sourceNote: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
             </label>
           )}
-          <button className={`${btn.primary} md:-col-end-1`} onClick={add} disabled={!draft.name.trim()}>
+          <button className={`${btn.primary} md:-col-end-1`} onClick={add} disabled={!shown.name.trim()}>
             Add
           </button>
         </div>
-        {draftRule && cardGoal(draft as Card, draftRule) === 'threshold' && (
+        {draftRule && cardGoal(shown as Card, draftRule) === 'threshold' && (
           <p className="text-muted text-small">
             {draftRule.label} is tracked only until F{draftRule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.
           </p>

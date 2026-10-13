@@ -80,9 +80,10 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
 
   // The rarity the box shows: the one picked, or the first once a sync has removed that one (its level starts at not owned).
   const newCardRule = state.rarities.find((r) => r.id === newCard.rarityId) ?? state.rarities[0];
+  const newCardFusion = newCardRule?.id === newCard.rarityId ? newCard.fusion : 0;
   function addNewCard() {
     if (!newCard.name.trim() || !newCardRule) return;
-    const fusion = newCardRule.id === newCard.rarityId ? newCard.fusion : 0;
+    const fusion = newCardFusion;
     let card = undefined as Card | undefined;
     update((d) => {
       // Not under a rarity a sync removed after the editor was drawn: the card would be hidden everywhere, with no way
@@ -345,7 +346,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
                   </option>
                 ))}
               </select>
-              <select className="flex-1" value={newCard.fusion} onChange={(e) => setNewCard({ ...newCard, fusion: Number(e.target.value) })}>
+              <select className="flex-1" value={newCardFusion} onChange={(e) => setNewCard({ ...newCard, rarityId: newCardRule?.id ?? '', fusion: Number(e.target.value) })}>
                 <LevelOptions rule={newCardRule} />
               </select>
               <button onClick={addNewCard} disabled={!newCard.name.trim()}>
