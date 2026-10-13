@@ -183,13 +183,18 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
     <div className={subpanel}>
       {/* A readable line length; the textarea below still takes the full width. */}
       <p className="text-muted text-small md:max-w-[80ch]">
-        One card per line. A line can be just a name, like "Jade, Lizard", which goes in as not owned. {live(start.id) || !startLabel ? (
-          <>Those use {startLabel} (the rarity picked above)</>
+        One card per line. A line can be just a name, like "Jade, Lizard", which goes in as not owned.{' '}
+        {!startLabel ? (
+          <>Those need a rarity, and there are none yet: add one in Settings first.</>
+        ) : live(start.id) ? (
+          <>Those use {startLabel} (the rarity picked above) until a line that's just a rarity name, like "Gold Kameo", switches it.</>
         ) : (
-          <>Those would use {startLabel}, which was removed on another device, so they're skipped</>
+          <>
+            Those would use {startLabel}, which was removed on another device, so they're skipped until a line that's just a rarity name, like "Gold Kameo",
+            switches it.
+          </>
         )}{' '}
-        until a
-        line that's just a rarity name, like "Gold Kameo", switches it. A line can also add details after " - ": rarity, where it comes from and level, like
+        A line can also add details after " - ": rarity, where it comes from and level, like
         "Kori Blade - Epic - Lin Kuei Tower - F2" or "Man in Control - Epic - Krypt Gear - Unowned". Cards already in your list get the new level and source. When an
         update makes Gold characters ascendable, add "Stage I" (Max A5) or "Stage II" (Max A10), like "Kenshi, Elder God - Gold - Stage I": a card not in your list
         was maxed, so it comes back at the cap below with 5 copies to go.
