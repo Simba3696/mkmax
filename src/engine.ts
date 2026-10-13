@@ -815,11 +815,16 @@ export function stretchedWeekEnds(saved: string | null | undefined, now: Date, w
   const span = SEASON_DAYS * 24 * 3600_000;
   const steps = Math.floor((Math.min(...ends.map(([, e]) => e)) - t.getTime()) / span) - 1;
   if (steps > 0) t.setDate(t.getDate() + steps * SEASON_DAYS);
-  // The rolled end keeps its local time while the schedule's week ends are fixed instants, so across a clock change
-  // they can be an hour apart: both spellings count, since items may end on either.
+  // The rolled end keeps its local time while the schedule's week ends are fixed instants 2 weeks apart, so after a
+  // clock change since the saved end they're off by exactly that change: both spellings count, since items may end on
+  // either. Nothing else does: a date typed by hand, or set with Ended early, a little after the real changeover
+  // belongs to the season before.
+  const savedOffset = new Date(saved).getTimezoneOffset();
   const found = new Set<string>();
   for (; t <= now; t.setDate(t.getDate() + SEASON_DAYS)) {
-    const near = ends.filter(([, e]) => Math.abs(e - t.getTime()) <= 3600_000);
+    const at = t.getTime();
+    const grid = at + (savedOffset - t.getTimezoneOffset()) * 60_000;
+    const near = ends.filter(([, e]) => e === at || e === grid);
     if (near.length) [toLocalInput(t), ...near.map(([w]) => w)].forEach((c) => found.add(c));
   }
   return [...found].sort().reverse();
@@ -839,8 +844,9 @@ export function stretchedWeekEnds(saved: string | null | undefined, now: Date, w
  *
  * `weekEnds` are the current season's earlier week ends, when the schedule knows them. The schedule can add a week
  * to a season after the saved end has passed, and that season's items still end on the saved date rather than the
- * 2-week guess, so a saved end on one of those week ends moves them too. Only an exact week end counts: a date typed
- * by hand, or set with Ended early, a little after the real changeover belongs to the season before.
+ * 2-week guess, so items ending on one of those week ends (the saved end, or a 2-week changeover it rolled through)
+ * move too. Only a week end counts, give or take a clock change (see stretchedWeekEnds): a date typed by hand, or set
+ * with Ended early, a little after the real changeover belongs to the season before.
  */
 export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: string[]) {
   const from = seasonEnd(s.realmKlashSeasonEnd, now);
@@ -858,7 +864,12 @@ export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: str
     const start = p.startsAt;
     // An item already starting at `to` (or, when `to` isn't moving, after it) is in the season it belongs to, with its own
     // end from the schedule: neither its start nor its end moves.
-    if (start && (still ? start >= to : start === to)) continue;
+    if (start && (still ? start >= to : start === to)) {
+      // Unless its end was the current season's, written in when it was entered ahead (packEndOnSave): it then takes
+      // the 2-week guess from its start, as a re-save would give it.
+      if (!still && changeovers.includes(p.endsAt)) p.endsAt = seasonEnd(to, new Date(start));
+      continue;
+    }
     const ahead = start && changeovers.find((c) => start >= c);
     if (ahead) {
       if (start === ahead) p.startsAt = to;
