@@ -42,8 +42,6 @@ let started = 0;
 let shown = 0;
 // When the download still on its way started, or 0 when none is: a return leaves it to finish for half a minute.
 let loadingSince = 0;
-// Which download that is, so an older one finishing can't clear it (two can start in the same millisecond).
-let loadingNumber = 0;
 // A download that hangs (a phone back on a patchy connection) gives up after this, so the next return can try again.
 const DOWNLOAD_TIMEOUT_MS = 30 * 1000;
 const listeners = new Set<(e: EventSchedule) => void>();
@@ -57,7 +55,6 @@ function loadEvents(): Promise<EventSchedule> {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), DOWNLOAD_TIMEOUT_MS);
   loadingSince = Date.now();
-  loadingNumber = n;
   const load: Promise<EventSchedule> = fetch(`${import.meta.env.BASE_URL}events.json`, { cache: 'no-cache', signal: abort.signal })
     .then((r) => {
       if (!r.ok) throw new Error(`events.json: HTTP ${r.status}`);
@@ -81,7 +78,8 @@ function loadEvents(): Promise<EventSchedule> {
     })
     .finally(() => {
       clearTimeout(timer);
-      if (loadingNumber === n) loadingSince = 0;
+      // Only the latest download clears the mark, so an older one finishing can't (two can start in the same millisecond).
+      if (started === n) loadingSince = 0;
     });
   loaded = load;
   return load;
