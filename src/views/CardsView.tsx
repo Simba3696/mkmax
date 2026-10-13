@@ -111,7 +111,6 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const live = (rarityId: string) => state.rarities.some((r) => r.id === rarityId);
   // Only a rarity the list knew: with no rarities at all, plain lines have none, and the Settings note covers them.
   const isRemoved = (c: (typeof parsed.cards)[number]) => !live(c.rarityId) && rarities.some((r) => r.id === c.rarityId);
-  const removed = parsed.cards.filter(isRemoved);
   const removedLines = parsed.cardLines.filter((_, i) => isRemoved(parsed.cards[i]));
   const newCards = parsed.cards.filter((c) => live(c.rarityId) && !handled.has(keyOf(c.rarityId, c.name)));
   const counts = state.rarities
@@ -165,7 +164,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
     );
     // A list with lines that weren't added (a sync left them nowhere to go, or they were skipped) stays, so they aren't
     // lost; the lines just added are left out from then on, and Done clears the box.
-    if (added + updated < total || removed.length || parsed.problems.length) {
+    if (added + updated < total || removedLines.length || parsed.problems.length) {
       setHandled((h) => new Set([...h, ...saved]));
       setLeftOver(true);
       return;
@@ -209,7 +208,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         {parsed.updates.length > 0 && ` · updating ${parsed.updates.length} already listed (${parsed.updates.map((u) => u.name).join('; ')})`}
         {parsed.duplicates.length > 0 && ` · skipping ${parsed.duplicates.length} already listed (${parsed.duplicates.join('; ')})`}
       </div>
-      {parsed.problems.length + removed.length > 0 && (
+      {parsed.problems.length + removedLines.length > 0 && (
         <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
           {parsed.problems.map((p) => (
             <li key={p.line}>
