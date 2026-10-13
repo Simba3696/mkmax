@@ -95,8 +95,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   // sync can't change what it means. Every rarity and name seen is kept: a line under a rarity another device removed
   // (picked above, a heading or after " - ") is skipped, rather than filed under whichever rarity comes before it or
   // the heading becoming a card, and a heading still matches a rarity renamed since. The rarity picked above changes
-  // only when a rarity is picked in the box above (`pick` counts those), not when a sync removes it and the form
-  // shows the first rarity instead.
+  // when the box opens (to the one the form shows) or a rarity is picked in the box above (`pick` counts those), not
+  // when a sync removes it while the box is open and the form shows the first rarity instead.
   const [known, setKnown] = useState(state.rarities);
   const rarities = useMemo(() => [...state.rarities, ...known.filter((r) => !state.rarities.some((x) => x.id === r.id && x.label === r.label))], [state.rarities, known]);
   const [start, setStart] = useState({ pick, id: startRarityId });
@@ -110,7 +110,9 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const parsed = useMemo(() => parseCardList(text, rarities, start.id, state.cards), [text, rarities, start.id, state.cards]);
   const live = (rarityId: string) => state.rarities.some((r) => r.id === rarityId);
   // Only a rarity the list knew: with no rarities at all, plain lines have none, and the Settings note covers them.
-  const removed = parsed.cards.filter((c) => !live(c.rarityId) && rarities.some((r) => r.id === c.rarityId));
+  const isRemoved = (c: (typeof parsed.cards)[number]) => !live(c.rarityId) && rarities.some((r) => r.id === c.rarityId);
+  const removed = parsed.cards.filter(isRemoved);
+  const removedLines = parsed.cardLines.filter((_, i) => isRemoved(parsed.cards[i]));
   const newCards = parsed.cards.filter((c) => live(c.rarityId) && !handled.has(keyOf(c.rarityId, c.name)));
   const counts = state.rarities
     .map((r) => ({ label: r.label, n: newCards.filter((c) => c.rarityId === r.id).length }))
@@ -178,12 +180,16 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   }
 
   const startLabel = rarities.find((r) => r.id === start.id)?.label ?? '';
-  const startNote = live(start.id) || !startLabel ? 'the rarity picked above' : 'picked above, since removed on another device, so they’re skipped';
   return (
     <div className={subpanel}>
       {/* A readable line length; the textarea below still takes the full width. */}
       <p className="text-muted text-small md:max-w-[80ch]">
-        One card per line. A line can be just a name, like "Jade, Lizard", which goes in as not owned. Those use {startLabel} ({startNote}) until a
+        One card per line. A line can be just a name, like "Jade, Lizard", which goes in as not owned. {live(start.id) || !startLabel ? (
+          <>Those use {startLabel} (the rarity picked above)</>
+        ) : (
+          <>Those would use {startLabel}, which was removed on another device, so they're skipped</>
+        )}{' '}
+        until a
         line that's just a rarity name, like "Gold Kameo", switches it. A line can also add details after " - ": rarity, where it comes from and level, like
         "Kori Blade - Epic - Lin Kuei Tower - F2" or "Man in Control - Epic - Krypt Gear - Unowned". Cards already in your list get the new level and source. When an
         update makes Gold characters ascendable, add "Stage I" (Max A5) or "Stage II" (Max A10), like "Kenshi, Elder God - Gold - Stage I": a card not in your list
@@ -210,8 +216,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
               Skipped "{p.line}": {p.reason}.
             </li>
           ))}
-          {removed.map((c) => (
-            <li key={`removed|${c.name}`}>Skipped "{c.name}": its rarity was removed on another device.</li>
+          {removedLines.map((line) => (
+            <li key={`removed|${line}`}>Skipped "{line}": its rarity was removed on another device.</li>
           ))}
         </ul>
       )}

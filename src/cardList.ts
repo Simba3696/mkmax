@@ -28,6 +28,8 @@ export interface ParsedList {
   duplicates: string[];
   /** Lines that couldn't be used, with why. */
   problems: { line: string; reason: string }[];
+  /** The line each of `cards` came from, in the same order, for messages that quote it. */
+  cardLines: string[];
 }
 
 /** Grades the game has that aren't tracked as cards here. */
@@ -72,7 +74,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
   const byKey = new Map(existing.map((c) => [`${c.rarityId}|${nameKey(c.name)}`, c]));
   const seen = new Set<string>();
   let headingRarityId = startRarityId;
-  const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [] };
+  const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [], cardLines: [] };
   for (const raw of text.split(/\r?\n/)) {
     const trimmed = raw.trim().replace(/\s+/g, ' ');
     if (!trimmed || /^[-=_*\s]+$/.test(trimmed)) continue;
@@ -166,6 +168,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       ...(sourceNote && { sourceNote }),
       ...(maxLevel !== undefined && { maxLevel }),
     });
+    out.cardLines.push(line);
   }
   return out;
 }
