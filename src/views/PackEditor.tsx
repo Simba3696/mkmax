@@ -352,6 +352,9 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
                 Add card
               </button>
             </div>
+            {newCard.rarityId && newCardRule && newCardRule.id !== newCard.rarityId && (
+              <div className="text-small text-muted">The rarity you picked was removed on another device, so this card goes in as {newCardRule.label}.</div>
+            )}
           </div>
         </>
       )}

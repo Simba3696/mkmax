@@ -126,6 +126,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   }
 
   const total = newCards.length + parsed.updates.length;
+  // After an Add, the cards it just saved now match the list: they were added, not skipped, so they aren't listed.
+  const skipped = parsed.duplicates.filter((name) => ![...handled].some((k) => k.endsWith(`|${nameKey(name)}`)));
   function addAll() {
     let added = 0;
     let updated = 0;
@@ -184,16 +186,15 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
       {/* A readable line length; the textarea below still takes the full width. */}
       <p className="text-muted text-small md:max-w-[80ch]">
         One card per line. A line can be just a name, like "Jade, Lizard", which goes in as not owned.{' '}
-        {!startLabel ? (
-          <>Those need a rarity, and there are none yet: add one in Settings first.</>
-        ) : live(start.id) ? (
-          <>Those use {startLabel} (the rarity picked above) until a line that's just a rarity name, like "Gold Kameo", switches it.</>
+        {/* With no rarities at all, the line under the box says to add one. */}
+        {!startLabel ? null : live(start.id) ? (
+          <>Those use {startLabel} (the rarity picked above) until a line that's just a rarity name, like "Gold Kameo", switches it. </>
         ) : (
           <>
             Those would use {startLabel}, which was removed on another device, so they're skipped until a line that's just a rarity name, like "Gold Kameo",
-            switches it.
+            switches it.{' '}
           </>
-        )}{' '}
+        )}
         A line can also add details after " - ": rarity, where it comes from and level, like
         "Kori Blade - Epic - Lin Kuei Tower - F2" or "Man in Control - Epic - Krypt Gear - Unowned". Cards already in your list get the new level and source. When an
         update makes Gold characters ascendable, add "Stage I" (Max A5) or "Stage II" (Max A10), like "Kenshi, Elder God - Gold - Stage I": a card not in your list
@@ -211,7 +212,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
                 ? 'Nothing left to add.'
                 : 'Nothing to add yet.'}
         {parsed.updates.length > 0 && ` · updating ${parsed.updates.length} already listed (${parsed.updates.map((u) => u.name).join('; ')})`}
-        {parsed.duplicates.length > 0 && ` · skipping ${parsed.duplicates.length} already listed (${parsed.duplicates.join('; ')})`}
+        {skipped.length > 0 && ` · skipping ${skipped.length} already listed (${skipped.join('; ')})`}
       </div>
       {parsed.problems.length + removedLines.length > 0 && (
         <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
@@ -537,6 +538,9 @@ function CardList() {
             Add
           </button>
         </div>
+        {draft.rarityId && draftRule && draftRule.id !== draft.rarityId && (
+          <p className="text-muted text-small">The rarity you picked was removed on another device, so this card goes in as {draftRule.label}.</p>
+        )}
         {draftRule && cardGoal(shown as Card, draftRule) === 'threshold' && (
           <p className="text-muted text-small">
             {draftRule.label} is tracked only until F{draftRule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.
