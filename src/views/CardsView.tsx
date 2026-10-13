@@ -203,7 +203,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
           <>Those use {startLabel} (the rarity picked above) until a line that's just a rarity name, like "Gold Kameo", switches it. </>
         ) : (
           <>
-            Those would use {startLabel}, which was removed on another device, so they're skipped until a line that's just a rarity name, like "Gold Kameo",
+            Those would use {startLabel}, which has since been removed, so they're skipped until a line that's just a rarity name, like "Gold Kameo",
             switches it.{' '}
           </>
         )}
@@ -235,7 +235,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
             </li>
           ))}
           {removedLines.map((line, i) => (
-            <li key={`removed|${i}|${line}`}>Skipped "{line}": its rarity was removed on another device.</li>
+            <li key={`removed|${i}|${line}`}>Skipped "{line}": its rarity has since been removed.</li>
           ))}
         </ul>
       )}
@@ -552,7 +552,7 @@ function CardList() {
           </button>
         </div>
         {draft.rarityId && draftRule && draftRule.id !== draft.rarityId && (
-          <p className="text-muted text-small">The rarity you picked was removed on another device, so this card goes in as {draftRule.label}.</p>
+          <p className="text-muted text-small">The rarity picked here has since been removed, so this card goes in as {draftRule.label}.</p>
         )}
         {draftRule && cardGoal(shown as Card, draftRule) === 'threshold' && (
           <p className="text-muted text-small">

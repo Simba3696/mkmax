@@ -79,8 +79,9 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   ].filter(Boolean) as string[];
 
   // The rarity the box shows: the one picked, or the first once a sync has removed that one (its level starts at not owned).
+  // A level a sync has since taken off the rarity shows, and is saved, as not owned too, so Add card isn't greyed out for it.
   const newCardRule = state.rarities.find((r) => r.id === newCard.rarityId) ?? state.rarities[0];
-  const newCardFusion = newCardRule?.id === newCard.rarityId ? newCard.fusion : 0;
+  const newCardFusion = newCardRule?.id === newCard.rarityId && newCard.fusion <= maxFusion(newCardRule) ? newCard.fusion : 0;
   // A level that is already the card's goal: the card would be done (and deleted) as soon as it's saved. Checked with
   // its name too, since Realm Klash gear is tracked to F10 whatever its rarity's Track until.
   const newCardDone = !!newCardRule && isMaxed({ id: '', name: newCard.name.trim(), rarityId: newCardRule.id, fusion: newCardFusion, guest: false }, newCardRule);
@@ -359,7 +360,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
               </button>
             </div>
             {newCard.rarityId && newCardRule && newCardRule.id !== newCard.rarityId && (
-              <div className="text-small text-muted">The rarity you picked was removed on another device, so this card goes in as {newCardRule.label}.</div>
+              <div className="text-small text-muted">The rarity picked here has since been removed, so this card goes in as {newCardRule.label}.</div>
             )}
             {newCardDone && <div className="text-small text-muted">That level is already the card's goal, so it would be done at once: pick a lower level to add it.</div>}
           </div>
