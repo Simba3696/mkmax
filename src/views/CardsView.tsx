@@ -91,20 +91,26 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
   const { state, update } = useStore();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  const parsed = useMemo(() => parseCardList(text, state.rarities, startRarityId, state.cards), [text, state.rarities, startRarityId, state.cards]);
+  // The rarities as they were when the list was typed. If another device removes one the list names (as a heading or
+  // after " - "), its lines are skipped, rather than filed under whichever rarity comes before it.
+  const [typedWith, setTypedWith] = useState(state.rarities);
+  const rarities = useMemo(() => [...state.rarities, ...typedWith.filter((r) => !state.rarities.some((x) => x.id === r.id))], [state.rarities, typedWith]);
+  const parsed = useMemo(() => parseCardList(text, rarities, startRarityId, state.cards), [text, rarities, startRarityId, state.cards]);
+  const removed = parsed.cards.filter((c) => !state.rarities.some((r) => r.id === c.rarityId));
+  const newCards = parsed.cards.filter((c) => !removed.includes(c));
   const counts = state.rarities
-    .map((r) => ({ label: r.label, n: parsed.cards.filter((c) => c.rarityId === r.id).length }))
+    .map((r) => ({ label: r.label, n: newCards.filter((c) => c.rarityId === r.id).length }))
     .filter((x) => x.n > 0);
 
   if (!open) {
     return (
       <div className={actions}>
-        <button onClick={() => setOpen(true)}>Paste a list…</button>
+        <button onClick={() => (setTypedWith(state.rarities), setOpen(true))}>Paste a list…</button>
       </div>
     );
   }
 
-  const total = parsed.cards.length + parsed.updates.length;
+  const total = newCards.length + parsed.updates.length;
   function addAll() {
     let added = 0;
     let updated = 0;
@@ -112,7 +118,7 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
       (d) => {
         // Not under a rarity a sync removed after the list was read: those cards would be hidden everywhere, with no way
         // to delete them. Nor updates to cards a sync removed.
-        const cards = parsed.cards.filter((c) => d.rarities.some((r) => r.id === c.rarityId));
+        const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId));
         const updates = parsed.updates.flatMap((u) => d.cards.filter((c) => c.id === u.cardId).map((c) => ({ c, patch: u.patch })));
         if (!cards.length && !updates.length) return noChange;
         d.cards.push(
@@ -156,26 +162,29 @@ function PasteList({ startRarityId }: { startRarityId: string }) {
         update makes Gold characters ascendable, add "Stage I" (Max A5) or "Stage II" (Max A10), like "Kenshi, Elder God - Gold - Stage I": a card not in your list
         was maxed, so it comes back at the cap below with 5 copies to go.
       </p>
-      <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
+      <textarea value={text} onChange={(e) => (setText(e.target.value), setTypedWith(state.rarities))} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
       <div className="text-small text-muted">
         {counts.length ? `New: ${counts.map((x) => `${x.n} ${x.label}`).join(' · ')}` : parsed.updates.length ? '' : 'Nothing to add yet.'}
         {parsed.updates.length > 0 && ` · updating ${parsed.updates.length} already listed (${parsed.updates.map((u) => u.name).join('; ')})`}
         {parsed.duplicates.length > 0 && ` · skipping ${parsed.duplicates.length} already listed (${parsed.duplicates.join('; ')})`}
       </div>
-      {parsed.problems.length > 0 && (
+      {parsed.problems.length + removed.length > 0 && (
         <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
           {parsed.problems.map((p) => (
             <li key={p.line}>
               Skipped "{p.line}": {p.reason}.
             </li>
           ))}
+          {removed.map((c) => (
+            <li key={`removed|${c.name}`}>Skipped "{c.name}": its rarity was removed on another device.</li>
+          ))}
         </ul>
       )}
       <div className={actions}>
         <button onClick={() => setOpen(false)}>Cancel</button>
         <button className={btn.primary} disabled={!total} onClick={addAll}>
-          {parsed.cards.length > 0 && `Add ${parsed.cards.length}`}
-          {parsed.cards.length > 0 && parsed.updates.length > 0 && ', '}
+          {newCards.length > 0 && `Add ${newCards.length}`}
+          {newCards.length > 0 && parsed.updates.length > 0 && ', '}
           {parsed.updates.length > 0 && `update ${parsed.updates.length}`}
           {!total && 'Add cards'}
         </button>
@@ -377,31 +386,29 @@ function CardList() {
   }
 
   function add() {
-    if (!draft.name.trim()) return;
-    const base = shown;
-    const rarityId = base.rarityId;
+    if (!shown.name.trim()) return;
     let added = false;
     update((d) => {
       // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
       // delete it. Its kind and steps come from the rarity as it is now.
-      const rule = d.rarities.find((r) => r.id === rarityId);
+      const rule = d.rarities.find((r) => r.id === shown.rarityId);
       if (!rule) return noChange;
       const isEquip = rule.kind === 'equipment';
-      const tower = isEquip && base.source === 'tower' ? base.sourceNote?.trim() : undefined;
+      const tower = isEquip && shown.source === 'tower' ? shown.sourceNote?.trim() : undefined;
       d.cards.push({
         id: newId(),
-        ...base,
-        name: base.name.trim(),
+        ...shown,
+        name: shown.name.trim(),
         // A level a sync has since taken off the rarity isn't one the level box can show: it shows (and saves) not owned.
-        fusion: base.fusion <= maxFusion(rule) ? base.fusion : 0,
-        guest: rule.hasGuests && base.guest,
-        source: isEquip ? base.source : initialSource(base, d.rarities),
+        fusion: shown.fusion <= maxFusion(rule) ? shown.fusion : 0,
+        guest: rule.hasGuests && shown.guest,
+        source: isEquip ? shown.source : initialSource(shown, d.rarities),
         sourceNote: tower || undefined,
       });
       added = true;
     });
     // The typed name stays for another try when nothing was added.
-    if (added) setDraft({ ...base, name: '', fusion: 0, guest: false });
+    if (added) setDraft({ ...shown, name: '', fusion: 0, guest: false });
   }
 
   const rarityOrder = (c: Card) => (sortBy === 'name' ? 0 : state.rarities.findIndex((r) => r.id === c.rarityId));

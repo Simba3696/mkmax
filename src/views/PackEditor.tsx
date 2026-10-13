@@ -83,14 +83,13 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   const newCardFusion = newCardRule?.id === newCard.rarityId ? newCard.fusion : 0;
   function addNewCard() {
     if (!newCard.name.trim() || !newCardRule) return;
-    const fusion = newCardFusion;
     let card = undefined as Card | undefined;
     update((d) => {
       // Not under a rarity a sync removed after the editor was drawn: the card would be hidden everywhere, with no way
       // to delete it. A level a sync has since taken off the rarity is saved as not owned.
       const rule = d.rarities.find((r) => r.id === newCardRule.id);
       if (!rule) return noChange;
-      card = { id: newId(), name: newCard.name.trim(), rarityId: rule.id, fusion: fusion <= maxFusion(rule) ? fusion : 0, guest: false };
+      card = { id: newId(), name: newCard.name.trim(), rarityId: rule.id, fusion: newCardFusion <= maxFusion(rule) ? newCardFusion : 0, guest: false };
       const source = initialSource(card, d.rarities);
       if (source) card.source = source;
       d.cards.push(card);
