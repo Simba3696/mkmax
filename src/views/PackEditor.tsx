@@ -81,9 +81,9 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   // The rarity the box shows: the one picked, or the first once a sync has removed that one (its level starts at not owned).
   const newCardRule = state.rarities.find((r) => r.id === newCard.rarityId) ?? state.rarities[0];
   const newCardFusion = newCardRule?.id === newCard.rarityId ? newCard.fusion : 0;
-  // A level that is already the card's goal: the card would be done (and deleted) as soon as it's saved.
+  // A level that is already the card's goal: the card would be done (and deleted) as soon as it's saved. Checked with
+  // its name too, since Realm Klash gear is tracked to F10 whatever its rarity's Track until.
   const newCardDone = !!newCardRule && isMaxed({ id: '', name: newCard.name.trim(), rarityId: newCardRule.id, fusion: newCardFusion, guest: false }, newCardRule);
-  // (By its name too: Realm Klash gear is tracked to F10 at any rarity's Track until.)
   function addNewCard() {
     if (!newCard.name.trim() || !newCardRule) return;
     let card = undefined as Card | undefined;

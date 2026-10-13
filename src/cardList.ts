@@ -30,6 +30,8 @@ export interface ParsedList {
   problems: { line: string; reason: string }[];
   /** The line each of `cards` came from, in the same order, for messages that quote it. */
   cardLines: string[];
+  /** The line each of `updates` came from, in the same order. */
+  updateLines: string[];
   /** Each of `duplicates` as `rarityId|name key`, in the same order, to tell same-named cards of different rarities apart. */
   duplicateKeys: string[];
 }
@@ -76,7 +78,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
   const byKey = new Map(existing.map((c) => [`${c.rarityId}|${nameKey(c.name)}`, c]));
   const seen = new Set<string>();
   let headingRarityId = startRarityId;
-  const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [], cardLines: [], duplicateKeys: [] };
+  const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [], cardLines: [], updateLines: [], duplicateKeys: [] };
   for (const raw of text.split(/\r?\n/)) {
     const trimmed = raw.trim().replace(/\s+/g, ' ');
     if (!trimmed || /^[-=_*\s]+$/.test(trimmed)) continue;
@@ -150,7 +152,10 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       if (fusion != null && fusion !== card.fusion) patch.fusion = fusion;
       if (source && (source !== card.source || sourceNote !== card.sourceNote)) Object.assign(patch, { source, sourceNote });
       if (maxLevel !== undefined && maxLevel !== (card.maxLevel ?? null)) patch.maxLevel = maxLevel;
-      if (Object.keys(patch).length) out.updates.push({ cardId: card.id, name: card.name, patch });
+      if (Object.keys(patch).length) {
+        out.updates.push({ cardId: card.id, name: card.name, patch });
+        out.updateLines.push(line);
+      }
       else {
         out.duplicates.push(name);
         out.duplicateKeys.push(key);

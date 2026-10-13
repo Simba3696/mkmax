@@ -114,9 +114,10 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   // Only a rarity the list knew: with no rarities at all, plain lines have none, and the Settings note covers them.
   const isRemoved = (c: (typeof parsed.cards)[number]) => !live(c.rarityId) && rarities.some((r) => r.id === c.rarityId);
   const removedLines = parsed.cardLines.filter((_, i) => isRemoved(parsed.cards[i]));
-  // By level too, so a line edited down from its goal is offered again.
-  const goneKey = (rarityId: string, name: string, fusion?: number, maxLevel?: number | null) => `${keyOf(rarityId, name)}|${fusion ?? ''}|${maxLevel ?? ''}`;
-  const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(goneKey(c.rarityId, c.name, c.fusion, c.maxLevel)));
+  // `gone` holds the lines as typed, so an edited line (a lower level, say) is offered again, and a line that reads
+  // differently once its card is gone (a Stage line brings a maxed card back) still matches.
+  const cardLine = (c: (typeof parsed.cards)[number]) => parsed.cardLines[parsed.cards.indexOf(c)];
+  const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(cardLine(c)));
   const counts = state.rarities
     .map((r) => ({ label: r.label, n: newCards.filter((c) => c.rarityId === r.id).length }))
     .filter((x) => x.n > 0);
@@ -142,7 +143,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // Not under a rarity a sync removed after the list was read: those cards would be hidden everywhere, with no way
         // to delete them. Nor updates to cards a sync removed.
         const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId));
-        const updates = parsed.updates.flatMap((u) => d.cards.filter((c) => c.id === u.cardId).map((c) => ({ c, patch: u.patch })));
+        const updates = parsed.updates.flatMap((u, i) => d.cards.filter((c) => c.id === u.cardId).map((c) => ({ c, patch: u.patch, line: parsed.updateLines[i] })));
         if (!cards.length && !updates.length) return noChange;
         const fresh = cards.map(
           (c): Card => ({
@@ -163,12 +164,11 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         updated = updates.length;
         const touched = [...fresh, ...updates.map(({ c }) => c)];
         saved = touched.map((c) => keyOf(c.rarityId, c.name));
-        // At their goal now, so the save deletes them as done.
-        // Keyed as the line reads (its level as typed), which is how it would come back as a new card.
+        // At their goal now, so the save deletes them as done: their lines are left out from then on.
         const ruleOf = (c: Card) => d.rarities.find((r) => r.id === c.rarityId)!;
         done = [
-          ...cards.filter((_, i) => isMaxed(fresh[i], ruleOf(fresh[i]))).map((c) => goneKey(c.rarityId, c.name, c.fusion, c.maxLevel)),
-          ...updates.filter(({ c }) => isMaxed(c, ruleOf(c))).map(({ c, patch }) => goneKey(c.rarityId, c.name, patch.fusion, patch.maxLevel)),
+          ...cards.filter((_, i) => isMaxed(fresh[i], ruleOf(fresh[i]))).map(cardLine),
+          ...updates.filter(({ c }) => isMaxed(c, ruleOf(c))).map(({ line }) => line),
         ];
       },
       () => {
