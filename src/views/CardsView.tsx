@@ -6,8 +6,8 @@ import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABEL
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
 import { findCardImages, wikiUrl } from '../wiki';
-import { catalogPageUrl, findInCatalog, loadCatalog, nameKey, rarityMismatches, wantsCatalogImage, type CatalogItem } from '../catalog';
-import { parseCardList } from '../cardList';
+import { catalogPageUrl, findInCatalog, loadCatalog, rarityMismatches, wantsCatalogImage, type CatalogItem } from '../catalog';
+import { cardKey, parseCardList } from '../cardList';
 import { applyRarityFix, initialSource } from '../challenges';
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Card, RarityRule } from '../types';
@@ -108,7 +108,6 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const [leftOver, setLeftOver] = useState(false);
   const [gone, setGone] = useState<Set<string>>(new Set());
   const [justAdded, setJustAdded] = useState<Set<string>>(new Set());
-  const keyOf = (rarityId: string, name: string) => `${rarityId}|${nameKey(name)}`;
   const parsed = useMemo(() => parseCardList(text, rarities, start.id, state.cards), [text, rarities, start.id, state.cards]);
   const live = (rarityId: string) => state.rarities.some((r) => r.id === rarityId);
   // Only a rarity the list knew: with no rarities at all, plain lines have none, and the Settings note covers them.
@@ -163,7 +162,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         added = cards.length;
         updated = updates.length;
         const touched = [...fresh, ...updates.map(({ c }) => c)];
-        saved = touched.map((c) => keyOf(c.rarityId, c.name));
+        saved = touched.map((c) => cardKey(c.rarityId, c.name));
         // At their goal now, so the save deletes them as done: their lines are left out from then on.
         const ruleOf = (c: Card) => d.rarities.find((r) => r.id === c.rarityId)!;
         done = [

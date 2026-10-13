@@ -32,9 +32,12 @@ export interface ParsedList {
   cardLines: string[];
   /** The line each of `updates` came from, in the same order. */
   updateLines: string[];
-  /** Each of `duplicates` as `rarityId|name key`, in the same order, to tell same-named cards of different rarities apart. */
+  /** Each of `duplicates` as its cardKey, in the same order, to tell same-named cards of different rarities apart. */
   duplicateKeys: string[];
 }
+
+/** One card in a list, whatever case, spacing or word order its name is typed in: its rarity and name key. */
+export const cardKey = (rarityId: string, name: string) => `${rarityId}|${nameKey(name)}`;
 
 /** Grades the game has that aren't tracked as cards here. */
 const UNTRACKED_GRADES: Record<string, string> = {
@@ -75,7 +78,7 @@ function parseLevel(word: string, rule: RarityRule | undefined): number | null {
  * with): current entries come first, and a rarity's rules are read from its first entry.
  */
 export function parseCardList(text: string, rarities: RarityRule[], startRarityId: string, existing: Card[]): ParsedList {
-  const byKey = new Map(existing.map((c) => [`${c.rarityId}|${nameKey(c.name)}`, c]));
+  const byKey = new Map(existing.map((c) => [cardKey(c.rarityId, c.name), c]));
   const seen = new Set<string>();
   let headingRarityId = startRarityId;
   const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [], cardLines: [], updateLines: [], duplicateKeys: [] };
@@ -134,7 +137,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       continue;
     }
 
-    const key = `${rarityId}|${nameKey(name)}`;
+    const key = cardKey(rarityId, name);
     if (seen.has(key)) {
       out.duplicates.push(name);
       out.duplicateKeys.push(key);
