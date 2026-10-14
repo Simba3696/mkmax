@@ -1338,20 +1338,23 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     );
     const name = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards.map((c: { name: string }) => c.name);
     const { rerender } = render(page('cards'));
-    const renameAndSwitch = async (text: string) => {
+    // Typed a step at a time, as on a keyboard: each step that isn't blank is saved as it's typed.
+    const renameAndSwitch = async (...steps: string[]) => {
       fireEvent.click(screen.getByTitle('Tap to rename'));
-      fireEvent.change(screen.getByDisplayValue(name()[0]), { target: { value: text } });
+      // The rename box opens focused, and stays the same box while it's typed in.
+      const box = document.activeElement as HTMLInputElement;
+      for (const text of steps) fireEvent.change(box, { target: { value: text } });
       rerender(page('towers'));
       rerender(page('cards'));
       await act(async () => {});
     };
 
-    // A cleared name goes back.
-    await renameAndSwitch('');
+    // A cleared name goes back, though the "K" typed on the way was saved.
+    await renameAndSwitch('K', '');
     expect([screen.queryByTitle('Tap to rename')?.textContent, name()]).toEqual(['Kitana', ['Kitana']]);
 
-    // A typed name is kept.
-    await renameAndSwitch('Kitana, Klassic');
+    // A typed name is kept, without the space it was saved with while typing.
+    await renameAndSwitch('Kitana, Klassic ');
     expect([screen.queryByTitle('Tap to rename')?.textContent, name()]).toEqual(['Kitana, Klassic', ['Kitana, Klassic']]);
   });
 });
