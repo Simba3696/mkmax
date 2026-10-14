@@ -194,17 +194,19 @@ describe('Settings Kind on a screen a sync has changed', () => {
 // Regression: /ship review of stale-screens-and-schedule — 'No kards' decided Track until from the screen
 // Found by /ship on 2026-10-13
 // Value: protects=choosing No kards moves Track until to max from the rarity as it is now, and saves nothing when a sync
-// already made that change; fails_when=the move is decided from the screen, leaving a threshold goal with no threshold or
-// saving (with an Undo) a change already made; why_new=review (maintainability, pass 2); seam=SyncLoop.nextStamp spied,
+// already made that change, with an Undo that says so; fails_when=the move is decided from the screen (or before the
+// change runs), leaving a threshold goal with no threshold, an Undo that doesn't say Track until moved, or saving a
+// change already made; why_new=review (maintainability, pass 2; testing, run 17: the Undo label); seam=SyncLoop.nextStamp spied,
 // a grabbed update stands in for the sync; no_claim=a real sync
 describe('Settings kard threshold on a screen a sync has changed', () => {
   it('tracks to max from the rarity as it is now, and saves nothing when a sync already did it', () => {
     localStorage.setItem('mkmax:v1', JSON.stringify(defaultState()));
     let update!: ReturnType<typeof useStore>['update'];
+    let lastUndo = null as ReturnType<typeof useStore>['lastUndo'];
     render(
       <StoreProvider>
         <PlanProvider>
-          <Grab onRender={(store) => (update = store.update)} />
+          <Grab onRender={(store) => ((update = store.update), (lastUndo = store.lastUndo))} />
           <SettingsView />
         </PlanProvider>
       </StoreProvider>,
@@ -218,7 +220,7 @@ describe('Settings kard threshold on a screen a sync has changed', () => {
       update((d) => void (d.rarities.find((r) => r.id === 'diamond')!.goal = 'threshold'));
       fireEvent.change(diamond, { target: { value: '' } });
     });
-    expect([rarity('diamond').fusionUpThreshold, rarity('diamond').goal]).toEqual([null, 'max']);
+    expect([rarity('diamond').fusionUpThreshold, rarity('diamond').goal, lastUndo?.label]).toEqual([null, 'max', 'Diamond now tracks to max']);
     stamps.mockClear();
     // Rare Equip shows a threshold; a sync has already chosen No kards for it.
     const rare = within(panelOf('Rare Equip')).getByLabelText('Fusion Up Kards usable from');
@@ -294,7 +296,20 @@ describe('Settings level steps on a screen a sync has changed', () => {
       plus.click();
     });
     expect(diamond().dupesPerLevel).toEqual([]);
-    expect(stamps).toHaveBeenCalledTimes(2); // the two sync stand-ins only
+
+    // Extended by /ship test coverage audit on 2026-10-14
+    // Value: protects=+ Level adds no step to a rarity a sync made a Kameo even when its step count still matches the
+    // screen; fails_when=the kind check goes, leaving only the step count, which stopped the Kameo tap above on its own;
+    // why_new=dropping the kind check left this test green; seam=a grabbed update stands in for the sync,
+    // SyncLoop.nextStamp spied; no_claim=how a character came to have no steps (an older or hand-edited save)
+    act(() => update((d) => void (d.rarities.find((r) => r.id === 'gold')!.dupesPerLevel = [])));
+    const goldPlus = within(panelOf('Gold')).getByRole('button', { name: '+ Level' });
+    act(() => {
+      update((d) => void (d.rarities.find((r) => r.id === 'gold')!.kind = 'kameo'));
+      goldPlus.click();
+    });
+    expect(saved().rarities.find((r: { id: string }) => r.id === 'gold').dupesPerLevel).toEqual([]);
+    expect(stamps).toHaveBeenCalledTimes(4); // the four sync stand-ins only
   });
 
   // Value: protects=+ Level and − Level act only on the steps the screen showed: a sync that already added or removed a
@@ -364,6 +379,17 @@ describe('Settings level steps on a screen a sync has changed', () => {
   // SyncLoop.nextStamp spied; no_claim=a real sync
   it('saves no kard threshold goal after a sync turned the kards off, and no levels on a rarity now a Kameo', () => {
     const stamps = renderSettings();
+    // Extended by /ship test coverage audit on 2026-10-14
+    // Value: protects=picking the Track until a sync already set saves nothing (no stamp); fails_when=the same-goal
+    // check goes, so the stale pick writes the goal back, stamping and syncing a change that never happened; why_new=the
+    // picks below are each stopped by the threshold or Kameo check, never by the goal already being set; seam=a grabbed
+    // update stands in for the sync, SyncLoop.nextStamp spied; no_claim=a real sync
+    const rareUntil = within(panelOf('Rare Equip')).getByLabelText('Track until');
+    act(() => {
+      update((d) => void (d.rarities.find((r) => r.id === 'rare')!.goal = 'max'));
+      fireEvent.change(rareUntil, { target: { value: 'max' } });
+    });
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
     const trackUntil = within(panelOf('Diamond')).getByLabelText('Track until');
     act(() => {
       update((d) => void (d.rarities.find((r) => r.id === 'diamond')!.fusionUpThreshold = null));
@@ -381,6 +407,20 @@ describe('Settings level steps on a screen a sync has changed', () => {
       onUsableFrom({ target: { value: '3' } });
     });
     expect([diamond().fusionMax, diamond().fusionUpThreshold]).toEqual([0, null]);
-    expect(stamps).toHaveBeenCalledTimes(2); // the two sync stand-ins only
+    expect(stamps).toHaveBeenCalledTimes(3); // the three sync stand-ins only
+  });
+
+  // Generated by /ship test coverage audit on 2026-10-14
+  // Value: protects=Track until and Highest fusion still save a pick on a rarity a sync left alone; fails_when=their
+  // stale-screen checks turn the ordinary pick down too (a wrong ternary), so the boxes change nothing; why_new=every
+  // Settings test of these boxes checks that a stale pick saves nothing, none that a pick saves; seam=SyncLoop.nextStamp
+  // spied; no_claim=what the planner does with the new goal or levels
+  it('saves a Track until or Highest fusion pick on a rarity a sync left alone', () => {
+    const stamps = renderSettings();
+    const panel = within(panelOf('Diamond'));
+    fireEvent.change(panel.getByLabelText('Track until'), { target: { value: 'threshold' } });
+    fireEvent.change(panel.getByLabelText('Highest fusion (F…), rest are ascension'), { target: { value: '8' } });
+    expect([diamond().goal, diamond().fusionMax]).toEqual(['threshold', 8]);
+    expect(stamps).toHaveBeenCalledTimes(2);
   });
 });
