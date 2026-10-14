@@ -61,9 +61,10 @@ function GoalSelect({ rule, card, onChange }: { rule: RarityRule; card: Card; on
 }
 
 /**
- * The form's Goal for a card Add would save. `hasChoice`: the form offers F3 or Max (gear, or a character rarity tracked
- * to its kard threshold; not Realm Klash gear, always max). The Goal picked counts only then, and a card entered at or
- * past the threshold goes on to its max (entryGoal). `fixed` means the level decides it, so there's no choice to offer.
+ * The form's Goal for a card Add would save. `hasChoice`: this card's Goal can be F3 or Max (gear, or a character rarity
+ * tracked to its kard threshold; not Realm Klash gear, always max), so the form shows a Goal box, and only then does the
+ * Goal picked count. A card entered at or past the threshold goes on to its max (entryGoal): `fixed` is then true, and
+ * the box shows Max as a label instead of the choice.
  */
 function formGoal(card: Card, rule: RarityRule) {
   const hasChoice = rule.fusionUpThreshold != null && (rule.kind === 'equipment' || rule.goal === 'threshold') && !(rule.kind === 'equipment' && isRealmKlashName(card.name));
@@ -80,11 +81,11 @@ function FormGoal({ card, rule, onChange }: { card: Card; rule: RarityRule; onCh
   );
 }
 
-/** Add card's note on the goal Add would save (see formGoal): done at once, tracked on past F3, or stopping at F3. */
+/** Add card's note on the goal Add would save (see formGoal): done at once (Add is greyed out), tracked on past F3, or stopping at F3. */
 function goalNote(card: Card, rule: RarityRule) {
   const { goal, hasChoice, fixed } = formGoal(card, rule);
   const saved = { ...card, goal };
-  if (isMaxed(saved, rule)) return "That level is already this card's goal, so Add would remove it at once as done.";
+  if (isMaxed(saved, rule)) return "That level is already the card's goal, so it would be done at once: pick a lower level to add it.";
   if (!hasChoice) return null;
   if (fixed) return `Already at F${rule.fusionUpThreshold} or past it, so this one is tracked on to ${levelLabel(rule, targetLevel(saved, rule))}.`;
   if (cardGoal(saved, rule) !== 'threshold') return null;
@@ -404,8 +405,8 @@ function CardList() {
   // Diamond's max and deleted at once as maxed).
   const onRarity = !draftRule || draftRule.id === draft.rarityId ? draft : { ...draft, rarityId: draftRule.id, fusion: 0, maxLevel: null, goal: undefined };
   // What the form shows, and Add card saves. A level a sync has since taken off the rarity shows, and is saved, as not
-  // owned, so the Goal and note match it too.
-  const shown = draftRule && onRarity.fusion > maxFusion(draftRule) ? { ...onRarity, fusion: 0 } : onRarity;
+  // owned, so the Goal and note match it too; so does any level once a sync makes the rarity a Kameo (its level box hides).
+  const shown = draftRule && (onRarity.fusion > maxFusion(draftRule) || maxFusion(draftRule) <= 1) ? { ...onRarity, fusion: 0 } : onRarity;
   // Cards to look up: no art yet, art that stopped loading, or art from an older wiki lookup (some of those are
   // stat screenshots rather than card art), which mkmobilebase usually has a proper card image for.
   const brokenUrls = useBrokenImageUrls();
@@ -581,8 +582,11 @@ function CardList() {
         source: isEquip ? shown.source : initialSource(shown, d.rarities),
         sourceNote: tower || undefined,
       };
-      // The goal the form showed for it (see formGoal), worked out with the rarity as it is now.
-      d.cards.push({ ...card, goal: formGoal(card, rule).goal });
+      // The goal the form showed for it (see formGoal), worked out with the rarity as it is now. A card already at it would
+      // be done at once, so it isn't added (Add is greyed out for it; Enter in the name box comes here too).
+      const saved = { ...card, goal: formGoal(card, rule).goal };
+      if (isMaxed(saved, rule)) return noChange;
+      d.cards.push(saved);
       added = true;
     });
     // The typed name stays for another try when nothing was added.
@@ -654,7 +658,7 @@ function CardList() {
               <input value={shown.sourceNote ?? ''} placeholder="e.g. Lin Kuei Tower" onChange={(e) => setDraft({ ...shown, sourceNote: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
             </label>
           )}
-          <button className={`${btn.primary} md:-col-end-1`} onClick={add} disabled={!shown.name.trim()}>
+          <button className={`${btn.primary} md:-col-end-1`} onClick={add} disabled={!shown.name.trim() || (!!draftRule && isMaxed({ ...(shown as Card), goal: formGoal(shown as Card, draftRule).goal }, draftRule))}>
             Add
           </button>
         </div>
