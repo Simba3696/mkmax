@@ -46,7 +46,7 @@ function GoalSelect({ rule, card, onChange }: { rule: RarityRule; card: Card; on
   // Gear always has the choice. A character has it while its rarity tracks only to the threshold, or once it has a goal
   // of its own (one entered past the threshold goes on to max: see entryGoal), so that goal can be seen and changed.
   if (rule.kind !== 'equipment' && rule.goal !== 'threshold' && card.goal == null) return null;
-  if (isRealmKlashName(card.name)) return <span className={`${check} text-muted`}>Realm Klash gear (bought to {levelLabel(rule, maxFusion(rule))} with Blood Rubies)</span>;
+  if (rule.kind === 'equipment' && isRealmKlashName(card.name)) return <span className={`${check} text-muted`}>Realm Klash gear (bought to {levelLabel(rule, maxFusion(rule))} with Blood Rubies)</span>;
   // Max is the card's own: a Gold card capped at A5 goes to A5.
   const max = levelLabel(rule, targetLevel({ ...card, goal: 'max' }, rule));
   return (
@@ -62,13 +62,15 @@ function GoalSelect({ rule, card, onChange }: { rule: RarityRule; card: Card; on
 
 /**
  * The form's Goal for a card Add would save: kept only where the Goal box shows it (gear, or a character rarity tracked to
- * its kard threshold), then moved on to max for a card entered at or past the threshold (entryGoal). `fixed` is that
- * move: the level, not the box, decides the goal then.
+ * its kard threshold), then moved on to max for a card entered at or past the threshold (entryGoal). `fixed` means the
+ * level decides the goal (at or past the threshold it's always max), so there's no choice to offer.
  */
 function formGoal(card: Card, rule: RarityRule) {
   const picked = rule.kind === 'equipment' || rule.goal === 'threshold' ? card.goal : undefined;
   const goal = entryGoal({ ...card, goal: picked }, rule);
-  return { goal, fixed: goal !== picked };
+  const realmKlash = rule.kind === 'equipment' && isRealmKlashName(card.name);
+  const boxShows = rule.kind === 'equipment' || rule.goal === 'threshold' || picked != null;
+  return { goal, fixed: boxShows && !realmKlash && card.fusion >= (thresholdLevel(rule) ?? Infinity) };
 }
 
 /** Add card's Goal box: the choice, or a fixed label once the level picked decides the goal (see formGoal). */
@@ -76,9 +78,7 @@ function FormGoal({ card, rule, onChange }: { card: Card; rule: RarityRule; onCh
   const { goal, fixed } = formGoal(card, rule);
   if (!fixed) return <GoalSelect rule={rule} card={{ ...card, goal }} onChange={onChange} />;
   return (
-    <span className={`${check} text-muted`}>
-      Goal: Max ({levelLabel(rule, targetLevel({ ...card, goal: 'max' }, rule))}), since it's at F{rule.fusionUpThreshold} or past it
-    </span>
+    <span className={`${check} text-muted`}>Goal: Max ({levelLabel(rule, targetLevel({ ...card, goal: 'max' }, rule))})</span>
   );
 }
 
@@ -400,7 +400,9 @@ function CardList() {
   // What the form shows, and Add card saves: the rarity picked, or the first once a sync has removed that one (the box
   // shows the first). Falling back starts that rarity's level, goal and cap at their defaults, since the removed
   // rarity's don't fit it (a Gold A2 would be saved at a Diamond's max and deleted at once as maxed).
-  const shown = !draftRule || draftRule.id === draft.rarityId ? draft : { ...draft, rarityId: draftRule.id, fusion: 0, maxLevel: null, goal: undefined };
+  const picked = !draftRule || draftRule.id === draft.rarityId ? draft : { ...draft, rarityId: draftRule.id, fusion: 0, maxLevel: null, goal: undefined };
+  // A level a sync has since taken off the rarity shows, and is saved, as not owned, so the Goal and note match it too.
+  const shown = draftRule && picked.fusion > maxFusion(draftRule) ? { ...picked, fusion: 0 } : picked;
   // Cards to look up: no art yet, art that stopped loading, or art from an older wiki lookup (some of those are
   // stat screenshots rather than card art), which mkmobilebase usually has a proper card image for.
   const brokenUrls = useBrokenImageUrls();
