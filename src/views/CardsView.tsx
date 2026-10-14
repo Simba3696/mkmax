@@ -141,7 +141,9 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const total = newCards.length + updates.length;
   // After an Add, the cards it just saved now match the list: they were added, not skipped, so they aren't listed (until
   // the list is edited).
-  const skipped = parsed.duplicates.filter((x) => !justAdded.has(x.key)).map((x) => x.name);
+  // One copy per card just added: a line pasted twice still lists its second copy as skipped.
+  const pending = new Set(justAdded);
+  const skipped = parsed.duplicates.filter((x) => !pending.delete(x.key)).map((x) => x.name);
   function addAll() {
     let added = 0;
     let updated = 0;
@@ -325,7 +327,8 @@ function CardList() {
    * The card being renamed, its name before (which comes back if the name is cleared) and what's in the box. A blank
    * box isn't saved, so a card never syncs with no name.
    */
-  const [renaming, setRenaming] = useState<{ id: string; was: string; text: string } | null>(null);
+  // `saved` is the name this rename last wrote (each keystroke that isn't blank is saved as it's typed).
+  const [renaming, setRenaming] = useState<{ id: string; was: string; text: string; saved: string } | null>(null);
   const [imageEditId, setImageEditId] = useState<string | null>(null);
   const [imgStatus, setImgStatus] = useState<{ busy: boolean; msg: string } | null>(null);
   // Cards get their art as soon as they're added, even under the wrong rarity, so the rarity check runs whenever
@@ -470,31 +473,36 @@ function CardList() {
   }
 
   function rename(c: Card, text: string) {
-    setRenaming({ id: c.id, was: renaming?.was ?? c.name, text });
+    const saved = text.trim() ? text : (renaming?.saved ?? c.name);
+    setRenaming({ id: c.id, was: renaming?.was ?? c.name, text, saved });
     if (text.trim()) patch(c.id, { name: text });
   }
 
-  // Activity hides this page without a blur and runs its effects again when it's shown: a rename left open then is
-  // finished as a blur would (a cleared name goes back), since its box no longer has focus to lose.
-  const openRename = useRef(renaming);
-  useEffect(() => void (openRename.current = renaming));
-  useEffect(() => {
-    const r = openRename.current;
-    if (!r) return;
+  // A rename ends with the name trimmed, and a cleared name goes back to the one it had, so there's always something to
+  // tap to rename the card again. Only over the name this rename last saved: one a sync brought in since stands.
+  const saveRename = (r: NonNullable<typeof renaming>) => {
     const name = r.text.trim() || r.was.trim();
     update((d) => {
       const c = d.cards.find((x) => x.id === r.id);
-      if (!c || !name || c.name === name) return noChange;
+      if (!c || !name || c.name !== r.saved || c.name === name) return noChange;
       c.name = name;
     });
-    setRenaming(null);
+  };
+
+  // Hiding this page (Activity, for Tower gear) or leaving the tab gives the box no blur, so a rename left open is
+  // saved then; when the page is shown again its box is closed. (A state change made while hidden isn't kept.)
+  const openRename = useRef(renaming);
+  useEffect(() => void (openRename.current = renaming));
+  useEffect(() => {
+    if (openRename.current) setRenaming(null);
+    return () => {
+      if (openRename.current) saveRename(openRename.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // A cleared name goes back to the name it had, so there's always something to tap to rename the card again.
-  function finishRename(c: Card) {
-    const name = renaming?.text.trim() || renaming?.was.trim() || c.name;
-    if (name !== c.name) patch(c.id, { name });
+  function finishRename() {
+    if (renaming) saveRename(renaming);
     setRenaming(null);
   }
 
@@ -687,9 +695,9 @@ function CardList() {
                 <CardThumb card={c} rule={rule} />
                 <div className={grow}>
                   {renaming?.id === c.id ? (
-                    <input value={renaming.text} autoFocus onChange={(e) => rename(c, e.target.value)} onBlur={() => finishRename(c)} onKeyDown={(e) => e.key === 'Enter' && finishRename(c)} />
+                    <input value={renaming.text} autoFocus onChange={(e) => rename(c, e.target.value)} onBlur={finishRename} onKeyDown={(e) => e.key === 'Enter' && finishRename()} />
                   ) : (
-                    <div className={`${rowTitle} hover:underline decoration-muted underline-offset-2 md:cursor-pointer`} onClick={() => setRenaming({ id: c.id, was: c.name, text: c.name })} title="Tap to rename">
+                    <div className={`${rowTitle} hover:underline decoration-muted underline-offset-2 md:cursor-pointer`} onClick={() => setRenaming({ id: c.id, was: c.name, text: c.name, saved: c.name })} title="Tap to rename">
                       {/* A card synced or saved with no name still needs something to tap. */}
                       {c.name.trim() || <span className="text-muted italic">Unnamed</span>}
                     </div>

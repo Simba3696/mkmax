@@ -1051,6 +1051,22 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Jade, Lizard' } });
     expect(form.getByText(/^(New: |Nothing)/).textContent).toBe('Nothing left to add. · skipping 1 already listed (Jade, Lizard)');
   });
+
+  // Regression: /ship review of stale-screens-and-schedule — an Add hid every skipped copy of a card it just saved
+  // Found by /ship on 2026-10-14
+  // Value: protects=a line pasted twice still lists its second copy as skipped after an Add that kept the box open;
+  // fails_when=the Add's "just added" cards hide every skipped copy of their line, not one, so the status drops "skipping
+  // 1 already listed"; why_new=review (adversarial); seam=none, the screen as a user taps it; no_claim=a real sync, a line
+  // pasted three times
+  it('still lists the second copy of a line pasted twice as skipped after an Add', () => {
+    renderWith([]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    const status = () => form.getByText(/^(New: |Nothing)/).textContent;
+    const add = pasteList('Jade, Lizard\nJade, Lizard\nKitana - Bogus');
+    expect(status()).toBe('New: 1 Diamond · skipping 1 already listed (Jade, Lizard)');
+    act(() => add.click());
+    expect([saved().cards.map((c: { name: string }) => c.name), status()]).toEqual([['Jade, Lizard'], 'Nothing left to add. · skipping 1 already listed (Jade, Lizard)']);
+  });
 });
 
 // Last in the file: the catalog stays loaded once a test has downloaded it.
@@ -1410,5 +1426,77 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     rerender(page('cards'));
     await act(async () => {});
     expect([screen.queryAllByTitle('Tap to rename').map((b) => b.textContent), saved().cards.map((c: { name: string }) => c.name)]).toEqual([['Jade'], ['Jade']]);
+  });
+
+  // Regression: /ship review of stale-screens-and-schedule — finishing a rename saved its name over one a sync brought in
+  // Found by /ship on 2026-10-14
+  // Value: protects=a rename opened and left untouched, or finished by a blur, keeps the name a sync brought in while it
+  // was open, and its box is closed when Cards is shown again; fails_when=finishing the rename saves the box's text (the
+  // old name) whenever it differs from the card's, so another device's rename is undone; why_new=review (adversarial);
+  // seam=rerender switches the page as App does, a grabbed update stands in for the sync; no_claim=a real sync, Enter
+  it('keeps a name a sync brought in while a rename was open, across a page switch and on a blur', async () => {
+    const s = defaultState();
+    s.cards = [{ id: 'kitana', name: 'Kitana', rarityId: 'gold', fusion: 2, guest: false }];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    let update!: ReturnType<typeof useStore>['update'];
+    const page = (sub: 'cards' | 'towers') => (
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <CardsView sub={sub} onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>
+    );
+    const name = () => saved().cards.map((c: { name: string }) => c.name);
+    const { rerender } = render(page('cards'));
+    // Tapped only: nothing typed in the box.
+    fireEvent.click(screen.getByTitle('Tap to rename'));
+    act(() => update((d) => void (d.cards[0].name = 'Kitana, Klassic')));
+    rerender(page('towers'));
+    rerender(page('cards'));
+    await act(async () => {});
+    // The name to tap is back in place of the box.
+    expect([name(), screen.queryByTitle('Tap to rename')?.textContent]).toEqual([['Kitana, Klassic'], 'Kitana, Klassic']);
+
+    // The same on a blur.
+    fireEvent.click(screen.getByTitle('Tap to rename'));
+    const box = document.activeElement as HTMLInputElement;
+    act(() => update((d) => void (d.cards[0].name = 'Kitana, Elder')));
+    fireEvent.blur(box);
+    expect([name(), box.isConnected, screen.queryByTitle('Tap to rename')?.textContent]).toEqual([['Kitana, Elder'], false, 'Kitana, Elder']);
+  });
+
+  // Regression: /ship review of stale-screens-and-schedule — a rename left open when leaving the Cards tab wasn't finished
+  // Found by /ship on 2026-10-14
+  // Value: protects=leaving the Cards tab with a rename open finishes it, a cleared name going back and a typed one saved
+  // without its trailing space; fails_when=only showing the page again finishes a rename, so leaving the tab keeps the
+  // "K" typed on the way to clearing it, or the space; why_new=review (adversarial); seam=rerender drops CardsView inside
+  // the store as App does on a tab switch; no_claim=a real blur, the store unmounting with it
+  it('finishes a rename left open when leaving the Cards tab', () => {
+    const s = defaultState();
+    s.cards = [{ id: 'kitana', name: 'Kitana', rarityId: 'gold', fusion: 2, guest: false }];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    const page = (show: boolean) => (
+      <StoreProvider>
+        <PlanProvider>{show && <CardsView sub="cards" onSub={() => {}} />}</PlanProvider>
+      </StoreProvider>
+    );
+    const name = () => saved().cards.map((c: { name: string }) => c.name);
+    const { rerender } = render(page(true));
+    const renameAndLeave = (...steps: string[]) => {
+      rerender(page(true));
+      fireEvent.click(screen.getByTitle('Tap to rename'));
+      const box = document.activeElement as HTMLInputElement;
+      for (const text of steps) fireEvent.change(box, { target: { value: text } });
+      rerender(page(false));
+    };
+
+    // A cleared name goes back, though the "K" typed on the way was saved.
+    renameAndLeave('K', '');
+    expect(name()).toEqual(['Kitana']);
+
+    // A typed name is saved without its trailing space.
+    renameAndLeave('Kitana, Elder ');
+    expect(name()).toEqual(['Kitana, Elder']);
   });
 });
