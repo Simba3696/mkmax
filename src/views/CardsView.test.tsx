@@ -1067,6 +1067,22 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     act(() => add.click());
     expect([saved().cards.map((c: { name: string }) => c.name), status()]).toEqual([['Jade, Lizard'], 'Nothing left to add. · skipping 1 already listed (Jade, Lizard)']);
   });
+
+  // Regression: /ship review of stale-screens-and-schedule — after Undo of an Add, a line pasted twice lost its skip note
+  // Found by /ship on 2026-10-14
+  // Value: protects=after Undo takes back an Add that kept the box open, a line pasted twice is new once and its second
+  // copy is listed as skipped again; fails_when=the Add's "just added" cards still hide a skipped copy after they're gone,
+  // so the status drops "skipping 1 already listed"; why_new=review (Red Team): the Undo test above pastes each line
+  // once; seam=the grabbed store's undo stands in for App's Undo bar; no_claim=a real sync, a delete of the card
+  it('lists the second copy of a line pasted twice as skipped again after Undo takes back the Add', () => {
+    renderWith([]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    const status = () => form.getByText(/^(New: |Nothing)/).textContent;
+    const add = pasteList('Jade, Lizard\nJade, Lizard\nKitana - Bogus');
+    act(() => add.click());
+    act(() => undo());
+    expect([saved().cards, status()]).toEqual([[], 'New: 1 Diamond · skipping 1 already listed (Jade, Lizard)']);
+  });
 });
 
 // Last in the file: the catalog stays loaded once a test has downloaded it.
@@ -1464,6 +1480,14 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     act(() => update((d) => void (d.cards[0].name = 'Kitana, Elder')));
     fireEvent.blur(box);
     expect([name(), box.isConnected, screen.queryByTitle('Tap to rename')?.textContent]).toEqual([['Kitana, Elder'], false, 'Kitana, Elder']);
+
+    // And after typing: the typed name was saved, but the one the sync brought in over it stands.
+    fireEvent.click(screen.getByTitle('Tap to rename'));
+    const typed = document.activeElement as HTMLInputElement;
+    fireEvent.change(typed, { target: { value: 'Kitana, E' } });
+    act(() => update((d) => void (d.cards[0].name = 'Kitana, Klassic')));
+    fireEvent.blur(typed);
+    expect(name()).toEqual(['Kitana, Klassic']);
   });
 
   // Regression: /ship review of stale-screens-and-schedule — a rename left open when leaving the Cards tab wasn't finished
@@ -1498,5 +1522,38 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     // A typed name is saved without its trailing space.
     renameAndLeave('Kitana, Elder ');
     expect(name()).toEqual(['Kitana, Elder']);
+  });
+
+  // Regression: /ship review of stale-screens-and-schedule — the rename box's Enter wasn't covered
+  // Found by /ship on 2026-10-14
+  // Value: protects=Enter (the phone keyboard's Done) finishes a rename as a blur does: a cleared name goes back, a typed
+  // one is saved trimmed, and the box closes; fails_when=Enter just closes the box, keeping the "K" typed on the way to
+  // clearing it, or the trailing space; why_new=review (testing): the rename tests finish by blur or a page switch;
+  // seam=none, the screen as a user taps it; no_claim=a real keyboard
+  it('finishes a rename with Enter, trimming it and bringing back a cleared name', () => {
+    const s = defaultState();
+    s.cards = [{ id: 'kitana', name: 'Kitana', rarityId: 'gold', fusion: 2, guest: false }];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub="cards" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const name = () => saved().cards.map((c: { name: string }) => c.name);
+    const renameAndEnter = (...steps: string[]) => {
+      fireEvent.click(screen.getByTitle('Tap to rename'));
+      const box = document.activeElement as HTMLInputElement;
+      for (const text of steps) fireEvent.change(box, { target: { value: text } });
+      fireEvent.keyDown(box, { key: 'Enter' });
+      return box;
+    };
+
+    renameAndEnter('K', '');
+    expect([name(), screen.queryByTitle('Tap to rename')?.textContent]).toEqual([['Kitana'], 'Kitana']);
+
+    const box = renameAndEnter('Kitana, Elder ');
+    expect([name(), box.isConnected]).toEqual([['Kitana, Elder'], false]);
   });
 });

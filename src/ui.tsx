@@ -318,8 +318,8 @@ export function FoldCard({ id, title, children }: { id: string; title: string; c
 const CONFIRM_MS = 3000;
 
 export function ConfirmButton({ label, onConfirm, className }: { label: string; onConfirm: () => void; className?: string }) {
-  // When it was armed, not just whether: a page hidden mid-countdown (Activity) stops the timer, and a disarm set while
-  // hidden isn't kept, so the time itself decides. Shown again later, it disarms; a tap after the 3 seconds arms again.
+  // When it was armed, not just whether: a page hidden mid-countdown (Activity) stops the timer, so the time itself
+  // decides. Shown again later, it disarms; a tap after the 3 seconds arms again.
   const [armedAt, setArmedAt] = useState<number | null>(null);
   const armed = armedAt != null;
   useEffect(() => {

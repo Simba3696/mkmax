@@ -139,10 +139,9 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   }
 
   const total = newCards.length + updates.length;
-  // After an Add, the cards it just saved now match the list: they were added, not skipped, so they aren't listed (until
-  // the list is edited).
-  // One copy per card just added: a line pasted twice still lists its second copy as skipped.
-  const pending = new Set(justAdded);
+  // Each card Add just saved, while it's still saved, hides one of its lines from Skipped: a line pasted twice still
+  // lists its second copy.
+  const pending = new Set([...justAdded].filter((k) => state.cards.some((c) => cardKey(c.rarityId, c.name) === k)));
   const skipped = parsed.duplicates.filter((x) => !pending.delete(x.key)).map((x) => x.name);
   function addAll() {
     let added = 0;
@@ -324,10 +323,10 @@ function CardList() {
   const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all');
   const [sortBy, setSortBy] = useDeviceChoice('mkmax:cardSort', CARD_SORTS);
   /**
-   * The card being renamed, its name before (which comes back if the name is cleared) and what's in the box. A blank
-   * box isn't saved, so a card never syncs with no name.
+   * The card being renamed, its name before (which comes back if the name is cleared), what's in the box, and the name
+   * this rename last saved (each keystroke that isn't blank is saved as it's typed), the only name finishing it writes
+   * over. A blank box isn't saved, so a card never syncs with no name.
    */
-  // `saved` is the name this rename last wrote (each keystroke that isn't blank is saved as it's typed).
   const [renaming, setRenaming] = useState<{ id: string; was: string; text: string; saved: string } | null>(null);
   const [imageEditId, setImageEditId] = useState<string | null>(null);
   const [imgStatus, setImgStatus] = useState<{ busy: boolean; msg: string } | null>(null);
@@ -489,8 +488,9 @@ function CardList() {
     });
   };
 
-  // Hiding this page (Activity, for Tower gear) or leaving the tab gives the box no blur, so a rename left open is
-  // saved then; when the page is shown again its box is closed. (A state change made while hidden isn't kept.)
+  // Hiding this page (Activity, for Tower gear) or leaving the tab may give the box no blur, so a rename left open is
+  // saved in the cleanup. Its box is closed when the page is shown again, as that effect runs then; a page left for
+  // another tab is gone, with nothing to close.
   const openRename = useRef(renaming);
   useEffect(() => void (openRename.current = renaming));
   useEffect(() => {
