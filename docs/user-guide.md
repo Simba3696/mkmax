@@ -151,7 +151,7 @@ Pop-ups (like the pack editor) sit above the rest of the app and scroll on their
 
 ### Two-tap buttons
 
-**Delete**, **Clear expired**, **Ended early**, **Disconnect this device**, **Load sample data** and **Erase everything** need two taps. The first tap changes the button to **Tap again to confirm** for 3 seconds.
+**Delete**, **Clear expired**, **Ended early**, **Disconnect this device**, **Load sample data** and **Erase everything** need two taps. The first tap changes the button to **Tap again to confirm** for 3 seconds, and only a second tap within those 3 seconds acts, once: a later tap, or one after switching pages and back, starts over.
 
 ### Undo
 

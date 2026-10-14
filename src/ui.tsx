@@ -330,8 +330,11 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
     return () => clearTimeout(t);
   }, [armedAt]);
   const tap = () => {
-    if (armedAt != null && Date.now() - armedAt < CONFIRM_MS) onConfirm();
-    else setArmedAt(Date.now());
+    if (armedAt != null && Date.now() - armedAt < CONFIRM_MS) {
+      // Once per arm: a button still on screen afterwards (Ended early) would otherwise act again on a quick third tap.
+      setArmedAt(null);
+      onConfirm();
+    } else setArmedAt(Date.now());
   };
   // Ghost buttons (btn.ghost, alone or with extra classes after it) stay ghost when armed, as before; only the text changes.
   return (
