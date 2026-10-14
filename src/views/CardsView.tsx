@@ -387,7 +387,7 @@ function CardList() {
         : wikiError
           ? ` Couldn't reach the MK Mobile wiki (${wikiError}), so ${left} weren't looked up there. Try again later.`
           : ` ${left} not found online: open "Image" on those cards to paste a URL.`;
-      const meanwhileMsg = meanwhile ? ` ${meanwhile} got an image while it looked, and kept it.` : '';
+      const meanwhileMsg = !meanwhile ? '' : meanwhile === 1 ? ' 1 got an image during the lookup and kept it.' : ` ${meanwhile} got images during the lookup and kept them.`;
       setImgStatus({ busy: false, msg: `Updated ${updated} of ${missingImages.length}.${meanwhileMsg}${leftMsg}` });
     } catch (e) {
       setImgStatus({ busy: false, msg: `Couldn't look up images: ${(e as Error).message}` });

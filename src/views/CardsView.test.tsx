@@ -985,7 +985,7 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     expect(release).toBeDefined(); // the catalog was still downloading
     await act(async () => release!());
     // Counted as kept, not as one to paste an image for.
-    await screen.findByText('Updated 0 of 1. 1 got an image while it looked, and kept it.');
+    await screen.findByText('Updated 0 of 1. 1 got an image during the lookup and kept it.');
     expect(saved().cards[0]).toMatchObject({ imageUrl: PASTED });
     expect(saved().cards[0].imagePage).toBeUndefined();
     expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
@@ -1026,7 +1026,7 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     act(() => store.update((d) => void (d.cards.find((c) => c.id === 'a')!.imageUrl = PASTED)));
     await act(async () => failWiki!());
     await screen.findByText(
-      "Updated 0 of 2. 1 got an image while it looked, and kept it. Couldn't reach the MK Mobile wiki (offline), so 1 weren't looked up there. Try again later.",
+      "Updated 0 of 2. 1 got an image during the lookup and kept it. Couldn't reach the MK Mobile wiki (offline), so 1 weren't looked up there. Try again later.",
     );
     expect(saved().cards.map((c: { id: string; imageUrl?: string }) => [c.id, c.imageUrl ?? null])).toEqual([['a', PASTED], ['b', null]]);
   });
