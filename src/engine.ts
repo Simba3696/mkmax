@@ -967,6 +967,9 @@ export function seasonMoveOnSave(o: { seasonal: boolean; pastSeason: boolean; sc
  */
 export function savePack(d: AppState, pack: Pack, moveSeasonTo: string | null, now: Date) {
   const clean: Pack = kasketShape({ ...pack, name: pack.name.trim() });
+  // Not drops for cards a sync deleted while the editor was open: they'd point at nothing, and a store item for one would
+  // never be cleared as done.
+  clean.drops = clean.drops.filter((x) => d.cards.some((c) => c.id === x.cardId));
   if (clean.currencyId === REALM_KLASH_CURRENCY) clean.season = isSeasonal(clean, d);
   else delete clean.season;
   const i = d.packs.findIndex((x) => x.id === clean.id);

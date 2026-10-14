@@ -173,7 +173,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   if (!open) {
     return (
       <div className={actions}>
-        <button onClick={() => (remember(), setStart({ pick, id: startRarityId }), setOpen(true))}>Paste a list…</button>
+        {/* A new list starts from the rarities as they are now: one removed before it was opened isn't a rarity to it. */}
+        <button onClick={() => (setKnown(state.rarities), setStart({ pick, id: startRarityId }), setOpen(true))}>Paste a list…</button>
       </div>
     );
   }

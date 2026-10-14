@@ -331,6 +331,8 @@ Tap **+ Add pack** (or **Edit** on a pack).
 - "Every drop row needs a card." (for a store item, "Choose the item being sold.")
 - "The end time must be after the start time."
 
+If another device removes the pack while you're editing it (or clears a store item once its card is done), **Save pack** is greyed out and the editor says it has since been removed, so saving doesn't bring it back. Drops for cards another device deleted meanwhile are left out when you save.
+
 ### Kaskets
 
 The shop's Kaskets (Kollector's Diamond Kasket, Kollector's Gold Kasket, Event Epic Equipment Kasket and Event Rare Equipment Kasket) give one random card per purchase from one rarity. The app works out their odds from your cards every time, so unlocking a card changes them with nothing to edit.

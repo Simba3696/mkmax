@@ -165,6 +165,25 @@ describe('Packs: taps on a screen a sync has changed', () => {
   // Value: protects=Clear expired with nothing left to clear (a sync cleared them) saves nothing and offers no Undo;
   // fails_when=the change stamps the save anyway; why_new=review (Red Team); seam=SyncLoop.nextStamp spied, a grabbed
   // update stands in for the sync; no_claim=a real sync
+  // Regression: /ship review of stale-screens-and-schedule — Save brought back a pack a sync deleted
+  // Found by /ship on 2026-10-14
+  // Value: protects=the pack editor saves nothing for a pack another device deleted while it was open, says so and greys
+  // out Save; fails_when=Save pushes the deleted pack back with its old purchases; why_new=review (adversarial);
+  // seam=SyncLoop.nextStamp spied, a grabbed update stands in for the sync; no_claim=a real sync
+  it("doesn't bring back a pack a sync deleted while its editor was open", () => {
+    const stamps = renderPacks();
+    fireEvent.click(live().getByRole('button', { name: 'Edit' }));
+    // The Save tap as the screen had it before the sync, for a tap made before the editor redrew.
+    const save = screen.getByRole('button', { name: 'Save pack' });
+    const onSave = (save as unknown as Record<string, { onClick: () => void }>)[Object.keys(save).find((k) => k.startsWith('__reactProps$'))!].onClick;
+    stamps.mockClear();
+    act(() => update((d) => void (d.packs = d.packs.filter((x) => x.id !== 'Live Pack'))));
+    expect([screen.queryByText(/has since been removed on another device/) != null, (screen.getByRole('button', { name: 'Save pack' }) as HTMLButtonElement).disabled]).toEqual([true, true]);
+    act(() => onSave());
+    expect(saved().packs.some((x: { id: string }) => x.id === 'Live Pack')).toBe(false);
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
+
   it('saves nothing for Clear expired when a sync already cleared them', () => {
     const stamps = renderPacks();
     fireEvent.click(screen.getByRole('button', { name: '▸ Expired (3)' }));

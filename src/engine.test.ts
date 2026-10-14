@@ -1087,6 +1087,17 @@ describe('kaskets', () => {
     expect(kasketPool(buildCtx(s), s.packs[0])).toMatchObject({ mode: 'none', cards: [] });
   });
 
+  // Regression: /ship review of stale-screens-and-schedule — Save kept drops for cards a sync deleted
+  // Found by /ship on 2026-10-14
+  // Value: protects=saving a pack keeps only the drops whose cards still exist; fails_when=drops for cards a sync deleted
+  // are saved, pointing at nothing (a store item for one is never cleared as done); why_new=review (adversarial);
+  // seam=none; no_claim=the editor's own Save guard (PacksView.test.tsx)
+  it('saves a pack without the drops for cards a sync deleted', () => {
+    const s = setup([card('a', 0)]);
+    savePack(s, pack('p', [{ cardId: 'a', chance: 40 }, { cardId: 'gone', chance: 60 }]), null, NOW);
+    expect(s.packs[0].drops).toEqual([{ cardId: 'a', chance: 40 }]);
+  });
+
   it('saves a Kasket without the drops or cards per purchase typed before ticking it', () => {
     const s = setup([card('a', 0)]);
     savePack(s, pack('k', [{ cardId: 'a', chance: 40 }], { kasket: 'diamond', rolls: 3 }), null, NOW);

@@ -55,6 +55,10 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   // The pack as it would be saved: Already bought and the end date as they are now, unless changed here.
   const [changed, setChanged] = useState<{ purchased?: boolean; endsAt?: boolean }>({});
   const base = editedPack(p, state.packs.find((x) => x.id === p.id), changed);
+  // A saved pack another device deleted while this was open (or a store item cleared once its card was done) isn't saved
+  // back: Save says so and saves nothing, as any tap on something a sync has removed.
+  const [wasSaved] = useState(() => !!initial && state.packs.some((x) => x.id === initial.id));
+  const gone = wasSaved && !state.packs.some((x) => x.id === p.id);
   // Blood Ruby characters, Kameos and Kameo packs leave with the season; unless the user said otherwise, guess from the item.
   const seasonal = isSeasonal(base, state);
   const pastSeason = fromEndedSeason(base, seasonDraft, now);
@@ -133,7 +137,10 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     // A corrected season end moves every pack that was ending with the old one, but only when it was changed here.
     const moveTo = seasonMoveOnSave({ seasonal, pastSeason, scheduled, edited: seasonEdit, currentEnd: currentSeasonEnd });
     const name = p.name.trim();
-    update((d) => savePack(d, { ...base, endsAt }, moveTo, now), moveTo ? `Saved ${name} and changed the season end` : `Saved ${name}`);
+    update(
+      (d) => (wasSaved && !d.packs.some((x) => x.id === base.id) ? noChange : savePack(d, { ...base, endsAt }, moveTo, now)),
+      moveTo ? `Saved ${name} and changed the season end` : `Saved ${name}`,
+    );
     onClose();
   }
 
@@ -381,9 +388,10 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
           ))}
         </ul>
       )}
+      {gone && <p className="text-muted text-small">This pack has since been removed on another device, so saving it won't bring it back.</p>}
       <div className={modalFoot}>
         <button onClick={onClose}>Cancel</button>
-        <button className={btn.primary} onClick={save} disabled={errors.length > 0}>
+        <button className={btn.primary} onClick={save} disabled={errors.length > 0 || gone}>
           Save pack
         </button>
       </div>

@@ -1320,6 +1320,19 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     expect(saved().cards.map((c: { name: string; fusion: number }) => [c.name, c.fusion])).toEqual([['Frost', 0]]);
   });
 
+  // Regression: /ship review of stale-screens-and-schedule — a list opened after a rarity was removed blamed the removal
+  // Found by /ship on 2026-10-14
+  // Value: protects=a Paste a list box opened after a sync removed a rarity treats its name as not a rarity, not as one
+  // "since removed"; fails_when=opening the box remembers every rarity the page has seen, so lines name a removal that
+  // happened before the list; why_new=review (adversarial); seam=a grabbed update stands in for the sync; no_claim=a real sync
+  it('reads a rarity removed before the box was opened as not a rarity', () => {
+    renderWith([]);
+    act(() => update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'gold'))));
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    pasteList('Jade, Lizard - Gold - F2\nKitana');
+    expect([form.queryByText(/has since been removed/), form.queryByText(/isn.t a rarity, source, level or stage/) != null]).toEqual([null, true]);
+  });
+
   // Regression: /ship review of stale-screens-and-schedule — a character's leftover Goal of Max offered F3 on a Max rarity
   // Found by /ship on 2026-10-14
   // Value: protects=a character with its own Goal of Max (entered past F3 while its rarity tracked to F3) shows no Goal box
