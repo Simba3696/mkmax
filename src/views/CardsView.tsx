@@ -201,8 +201,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         return label.charAt(0).toUpperCase() + label.slice(1);
       },
     );
-    // A list with lines that weren't added (a sync left them nowhere to go, or they were skipped) stays, so they aren't
-    // lost, and Done clears the box.
+    // A list with lines Add couldn't use (a sync left them nowhere to go, a line it can't read, or one under a rarity since
+    // removed) stays, so they aren't lost, and Done clears the box. Lines already listed don't keep it open.
     if (added + updated < total || removedLines.length || parsed.problems.length) {
       setGone((g) => new Set([...g, ...done]));
       setJustAdded((j) => new Set([...j, ...saved]));

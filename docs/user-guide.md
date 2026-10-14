@@ -151,7 +151,7 @@ Pop-ups (like the pack editor) sit above the rest of the app and scroll on their
 
 ### Two-tap buttons
 
-**Delete**, **Clear expired**, **Ended early**, **Disconnect this device**, **Load sample data** and **Erase everything** need two taps. The first tap changes the button to **Tap again to confirm** for 3 seconds, and only a second tap within those 3 seconds acts, once: a later tap, or one after switching pages and back, starts over.
+**Delete**, **Clear expired**, **Ended early**, **Disconnect this device**, **Load sample data** and **Erase everything** need two taps. The first tap changes the button to **Tap again to confirm** for 3 seconds, and only a second tap within those 3 seconds acts, once: a later tap starts over, and so does one after going to another tab and back. Cards and Tower gear stay open behind each other, so a quick switch between those two keeps the 3 seconds running.
 
 ### Undo
 
@@ -320,7 +320,7 @@ Tap **+ Add pack** (or **Edit** on a pack).
 
 **Even pools:** for odds like "9% for one random Rare tower item", tap **+ Even pool…**, tick the cards you want, and enter the 9% and how many items the whole pool has (every item, the ticked ones included; nothing is added to or taken off that count). Each ticked card gets 9% ÷ that number. If you leave the pool size blank, it divides by the number of cards you ticked, so leave it blank only when the ticked cards are the whole pool. If you enter fewer items than you ticked, it uses the number ticked. Ticks stay when you switch the rarity list, so a pool can mix rarities. A card that's already listed, like one with its own 1.5% line, gets its pool share added to that chance, and the editor shows the before and after first.
 
-**Adding a card from the editor:** under "Card not in your list yet? Add it here:", **Add card** adds a card to Cards straight away, even if you then cancel the pack. It joins the drops at 0%, so type its real chance (in a store item it becomes the item). It only asks for name, rarity and level, so set **Goal**, **Max**, **Guest** and **Source** on the card in Cards afterwards. Realm Klash gear is kept at any level below F10, since it's always tracked to F10. A level that is already the card's goal (gear at its rarity's kard threshold when **Track until** is that threshold, any card at its top level, or an owned Kameo) would be done at once, so **Add card** is greyed out and says to pick a lower level.
+**Adding a card from the editor:** under "Card not in your list yet? Add it here:", **Add card** adds a card to Cards straight away, even if you then cancel the pack. It joins the drops at 0%, so type its real chance (in a store item it becomes the item). It only asks for name, rarity and level, so set **Goal**, **Max**, **Guest** and **Source** on the card in Cards afterwards. Realm Klash gear is kept at any level below F10, since it's always tracked to F10. A level at or past the card's goal (at or above its rarity's kard threshold when **Track until** is that threshold, any card at its top level, or an owned Kameo) would be done at once, so **Add card** is greyed out and says to pick a lower level.
 
 **What stops Save pack:** the editor lists what's missing:
 
