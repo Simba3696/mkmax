@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addPool, ascensionCaps, buildCtx, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -71,6 +71,26 @@ describe('goals and caps', () => {
     expect(targetLevel(rk, epic)).toBe(F(10));
     expect(copiesToMax(rk, epic)).toBe(3);
     expect(isMaxed(rk, epic)).toBe(false);
+  });
+
+  // Value: protects=a card entered at or past its kard threshold while tracked only that far is tracked to its max, and
+  // every other card keeps its goal; fails_when=it keeps the F3 goal (done the moment it's saved), or a card below the
+  // threshold, one already set to Max, or a rarity with no threshold gets Max too; why_new=new rule (user request,
+  // 2026-10-14); seam=none; no_claim=the screens that call it (CardsView and PacksView tests)
+  it('tracks a card entered at or past its threshold on to its max', () => {
+    const epic = rules().get('epic')!;
+    const gold = { ...rules().get('gold')!, goal: 'threshold' as const };
+    expect(entryGoal(card('e', F(2), { rarityId: 'epic' }), epic)).toBeUndefined();
+    expect(entryGoal(card('e', F(3), { rarityId: 'epic' }), epic)).toBe('max');
+    expect(entryGoal(card('e', F(7), { rarityId: 'epic', goal: 'threshold' }), epic)).toBe('max');
+    expect(entryGoal(card('e', F(7), { rarityId: 'epic', goal: 'max' }), epic)).toBe('max');
+    // A Gold card goes on to its own cap.
+    const a5 = card('g', F(4), { rarityId: 'gold', maxLevel: A(5) });
+    expect(entryGoal(a5, gold)).toBe('max');
+    expect(targetLevel({ ...a5, goal: entryGoal(a5, gold) }, gold)).toBe(A(5));
+    // A rarity tracked to Max, or one with no kards, keeps what it had.
+    expect(entryGoal(card('d', F(5), { rarityId: 'diamond' }), rules().get('diamond')!)).toBeUndefined();
+    expect(entryGoal(card('k', 1, { rarityId: 'kameo-gold' }), rules().get('kameo-gold')!)).toBeUndefined();
   });
 });
 

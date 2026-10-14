@@ -39,6 +39,16 @@ export const thresholdLevel = (rule: RarityRule) => (rule.fusionUpThreshold == n
 /** The card's goal: max for Realm Klash gear (always bought to max), else its own override, else the rarity's. */
 export const cardGoal = (card: Card, rule: RarityRule) => (rule.kind === 'equipment' && isRealmKlashName(card.name) ? 'max' : (card.goal ?? rule.goal));
 
+/**
+ * The goal a card gets as it's entered (Add card, Paste a list, the pack editor). One typed in already at or past its kard
+ * threshold, while tracked only that far, would be done the moment it's saved, so it's tracked on to its next target
+ * instead: its max (F10, or a Gold card's own cap). A card levelled up to the threshold later still finishes there.
+ */
+export function entryGoal(card: Card, rule: RarityRule): Card['goal'] {
+  const thr = thresholdLevel(rule);
+  return cardGoal(card, rule) === 'threshold' && thr != null && card.fusion >= thr ? 'max' : card.goal;
+}
+
 /** The level this card is being worked toward: rarity max, per-card cap, or the kard threshold. */
 export function targetLevel(card: Card, rule: RarityRule) {
   let t = maxFusion(rule);

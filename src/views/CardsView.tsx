@@ -1,7 +1,7 @@
 import { Activity, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel } from '../engine';
+import { ascensionCaps, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -184,6 +184,11 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
             ...(c.maxLevel != null && { maxLevel: c.maxLevel }),
           }),
         );
+        // As Add card does: one pasted at or past its kard threshold, while tracked only that far, goes on to its max.
+        for (const f of fresh) {
+          const goal = entryGoal(f, d.rarities.find((r) => r.id === f.rarityId)!);
+          if (goal) f.goal = goal;
+        }
         d.cards.push(...fresh);
         for (const { c, patch } of saving) Object.assign(c, patch);
         added = cards.length;
@@ -527,18 +532,19 @@ function CardList() {
       if (!rule) return noChange;
       const isEquip = rule.kind === 'equipment';
       const tower = isEquip && shown.source === 'tower' ? shown.sourceNote?.trim() : undefined;
-      d.cards.push({
+      const card: Card = {
         id: newId(),
         ...shown,
         name: shown.name.trim(),
         // A level a sync has since taken off the rarity isn't one the level box can show: it shows (and saves) not owned.
         fusion: shown.fusion <= maxFusion(rule) ? shown.fusion : 0,
         guest: rule.hasGuests && shown.guest,
-        // Only gear has a Goal: a character always goes to max.
+        // Only gear has a Goal box; a character takes its rarity's.
         goal: isEquip ? shown.goal : undefined,
         source: isEquip ? shown.source : initialSource(shown, d.rarities),
         sourceNote: tower || undefined,
-      });
+      };
+      d.cards.push({ ...card, goal: entryGoal(card, rule) });
       added = true;
     });
     // The typed name stays for another try when nothing was added.
@@ -619,7 +625,9 @@ function CardList() {
         )}
         {draftRule && cardGoal(shown as Card, draftRule) === 'threshold' && (
           <p className="text-muted text-small">
-            {draftRule.label} is tracked only until F{draftRule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.
+            {shown.fusion >= (thresholdLevel(draftRule) ?? Infinity)
+              ? `Already at F${draftRule.fusionUpThreshold} or past it, so this one is tracked on to ${levelLabel(draftRule, targetLevel({ ...(shown as Card), goal: 'max' }, draftRule))}.`
+              : `${draftRule.label} is tracked only until F${draftRule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.`}
           </p>
         )}
         <PasteList pick={picks} startRarityId={draftRule?.id ?? ''} />

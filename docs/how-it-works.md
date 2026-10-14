@@ -14,7 +14,7 @@ The phase depends on which copy it is:
 - **To Kard threshold**: copies that get the card to F3, where Fusion Up Kards become usable.
 - **Fusion**: a normal copy.
 - **Kards cover it**: copies your Fusion Up Kards would supply anyway, so they're worth less.
-- **Done**: worth 0. Cards that reach their goal are removed, so they never get scored.
+- **Done**: worth 0. Cards that reach their goal are removed, so they never get scored. A card entered (Add card, Paste a list or the pack editor) already at or past its kard threshold, while its rarity is tracked only that far, is saved with a goal of Max instead (`entryGoal` in `src/engine.ts`), so it isn't done the moment it's saved.
 
 Fusion Up Kards aren't one per level. Each step costs more, and each rarity (Diamond, Gold, Epic, Rare) has its own kards and its own cost table, editable in Settings → Fusion rules. The Diamond and gear costs come from the game: Diamond 1, 2, 3, 4, 5, 7, 10 and Epic and Rare gear 1, 3, 5, 7, 9, 12, 15. Gold uses the Diamond costs to F10, then the game's ascension costs: 10, 11, 12, 13, 15, 22, 24, 26, 28, 30.
 

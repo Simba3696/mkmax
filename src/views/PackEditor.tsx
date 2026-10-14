@@ -3,12 +3,18 @@ import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { LevelOptions, Modal, NumInput, kasketLine } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
-import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, isMaxed, isSeasonal, kasketPool, maxFusion, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
+import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, entryGoal, isMaxed, isSeasonal, kasketPool, maxFusion, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
 import { initialSource } from '../challenges';
 import { scheduledSeason, scheduledSeasonEnd, useEvents } from '../events';
 import { kasketFor } from '../kaskets';
-import type { Card, Pack } from '../types';
+import type { Card, Pack, RarityRule } from '../types';
 import CardPicker from './CardPicker';
+
+/** A card as Add card here saves it: with the goal it's entered with (see `entryGoal`). */
+const entered = (card: Card, rule: RarityRule): Card => {
+  const goal = entryGoal(card, rule);
+  return goal ? { ...card, goal } : card;
+};
 
 /** A line of inputs: a drop's card and chance, or the pool and new-card controls. */
 const dropRow = 'flex gap-[0.4rem] items-center my-[0.35rem]';
@@ -83,8 +89,9 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   const newCardRule = state.rarities.find((r) => r.id === newCard.rarityId) ?? state.rarities[0];
   const newCardFusion = newCardRule?.id === newCard.rarityId && newCard.fusion <= maxFusion(newCardRule) ? newCard.fusion : 0;
   // A level that is already the card's goal: the card would be done (and deleted) as soon as it's saved. Checked with
-  // its name too, since Realm Klash gear is tracked to F10 whatever its rarity's Track until.
-  const newCardDone = !!newCardRule && isMaxed({ id: '', name: newCard.name.trim(), rarityId: newCardRule.id, fusion: newCardFusion, guest: false }, newCardRule);
+  // its name too, since Realm Klash gear is tracked to F10 whatever its rarity's Track until, and with the goal it's
+  // saved with: one at or past its kard threshold goes on to its max.
+  const newCardDone = !!newCardRule && isMaxed(entered({ id: '', name: newCard.name.trim(), rarityId: newCardRule.id, fusion: newCardFusion, guest: false }, newCardRule), newCardRule);
   function addNewCard() {
     if (!newCard.name.trim() || !newCardRule) return;
     let card = undefined as Card | undefined;
@@ -93,7 +100,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       // to delete it. A level a sync has since taken off the rarity is saved as not owned.
       const rule = d.rarities.find((r) => r.id === newCardRule.id);
       if (!rule) return noChange;
-      const made: Card = { id: newId(), name: newCard.name.trim(), rarityId: rule.id, fusion: newCardFusion <= maxFusion(rule) ? newCardFusion : 0, guest: false };
+      const made = entered({ id: newId(), name: newCard.name.trim(), rarityId: rule.id, fusion: newCardFusion <= maxFusion(rule) ? newCardFusion : 0, guest: false }, rule);
       // A card already at its goal is done: the save would delete it at once and leave the pack a drop for nothing.
       if (isMaxed(made, rule)) return noChange;
       const source = initialSource(made, d.rarities);
