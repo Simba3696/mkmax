@@ -326,7 +326,12 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
   // Value: protects=Add card's guest flag and tower source come from the rarity as it is at the tap, not as drawn;
   // fails_when=add() reads the kind or Has guest cards from the screen, saving tower gear as a character or a guest flag;
   // why_new=the Add tests above change a rarity's existence or steps, never its kind or guests; seam=none; no_claim=a real sync
-  it("saves Add card's guest flag and tower source from the rarity as a sync left it", () => {
+  // Extended by /ship test coverage audit on 2026-10-14 (the Goal picked for the gear)
+  // Value: protects=a Goal picked for gear isn't saved on a card a sync made a character tracked to Max before the tap, so
+  // it takes its rarity's; fails_when=add() keeps the form's Goal for such a character, a hidden override no Goal box
+  // shows; why_new=the Goal reset on a Rarity pick covers picks, not a kind a sync changed; seam=a grabbed update stands
+  // in for the sync; no_claim=a real sync
+  it("saves Add card's guest flag, tower source and Goal from the rarity as a sync left it", () => {
     renderWith([]);
     const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
     const name = form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)');
@@ -343,16 +348,18 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
     fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
     fireEvent.change(form.getByPlaceholderText('e.g. Lin Kuei Tower'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.change(form.getByLabelText('Goal'), { target: { value: 'max' } });
     const addGear = form.getByRole('button', { name: 'Add' });
     act(() => {
-      // Epic made a character rarity on another device: a character tagged as tower gear would drop out of the plan.
-      update((d) => void (d.rarities.find((r) => r.id === 'epic')!.kind = 'character'));
+      // Epic made a character rarity tracked to Max on another device: a character tagged as tower gear would drop out
+      // of the plan, and one with the gear's Goal would carry a goal no Goal box shows.
+      update((d) => void Object.assign(d.rarities.find((r) => r.id === 'epic')!, { kind: 'character', goal: 'max' }));
       addGear.click();
     });
-    const cards = saved().cards.map((c: { name: string; guest: boolean; source?: string; sourceNote?: string }) => [c.name, c.guest, c.source ?? null, c.sourceNote ?? null]);
+    const cards = saved().cards.map((c: { name: string; guest: boolean; source?: string; sourceNote?: string; goal?: string }) => [c.name, c.guest, c.source ?? null, c.sourceNote ?? null, c.goal ?? null]);
     expect(cards).toEqual([
-      ['Raiden, Dark', false, null, null],
-      ['Kori Blade', false, null, null],
+      ['Raiden, Dark', false, null, null, null],
+      ['Kori Blade', false, null, null, null],
     ]);
   });
 
@@ -1169,13 +1176,34 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
     fireEvent.change(form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Lin Kuei Gloves' } });
     fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
-    fireEvent.change(form.getByLabelText('Current level'), { target: { value: '5' } }); // F4
+    fireEvent.change(form.getByLabelText('Current level'), { target: { value: '11' } }); // F10, its max
+    expect(form.queryByText("That level is already this card's goal, so Add would remove it at once as done.")).not.toBeNull();
+    fireEvent.change(form.getByLabelText('Current level'), { target: { value: '4' } }); // F3
     expect(form.queryByText('Already at F3 or past it, so this one is tracked on to F10.')).not.toBeNull();
+    expect((form.getByLabelText('Goal') as HTMLSelectElement).value).toBe('max');
     act(() => form.getByRole('button', { name: 'Add' }).click());
     const add = pasteList('Kori Blade - Epic - F3');
     act(() => add.click());
     const cards = saved().cards.map((c: { name: string; fusion: number; goal?: string }) => [c.name, c.fusion, c.goal]);
-    expect(cards).toEqual([['Lin Kuei Gloves', 5, 'max'], ['Kori Blade', 4, 'max']]);
+    expect(cards).toEqual([['Lin Kuei Gloves', 4, 'max'], ['Kori Blade', 4, 'max']]);
+  });
+
+  // Generated for the entry goal rule (review, 2026-10-14)
+  // Value: protects=a character entered past its rarity's F3 Track until shows its Goal of Max, which can be set back to
+  // F3 once a mistyped level is lowered; fails_when=characters never show a Goal box, so the entry-made Max can't be seen
+  // or undone; why_new=review (maintainability, Red Team); seam=none, the screen as a user taps it; no_claim=Paste a list
+  it("shows a character's entry-made Goal of Max, and lets it go back to F3", () => {
+    renderWith([], 'cards', (s) => void (s.rarities.find((r) => r.id === 'diamond')!.goal = 'threshold'));
+    const addCard = screen.getByRole('heading', { name: 'Add card' }).closest('section')!;
+    const form = within(addCard);
+    fireEvent.change(form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Scorpion' } });
+    fireEvent.change(form.getByLabelText('Current level'), { target: { value: '4' } }); // F3, meant to be F2
+    act(() => form.getByRole('button', { name: 'Add' }).click());
+    const rowGoal = () => screen.getAllByLabelText('Goal').find((el) => !addCard.contains(el)) as HTMLSelectElement;
+    expect([saved().cards[0].goal, rowGoal().value]).toEqual(['max', 'max']);
+    fireEvent.click(screen.getByRole('button', { name: 'Lower level' }));
+    fireEvent.change(rowGoal(), { target: { value: 'threshold' } });
+    expect([saved().cards[0].fusion, saved().cards[0].goal]).toEqual([3, undefined]);
   });
 
   // Generated by /ship review fixes on 2026-10-14

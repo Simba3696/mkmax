@@ -42,8 +42,10 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
  * a label instead of a choice (see isRealmKlashName).
  */
 function GoalSelect({ rule, name, value, onChange }: { rule: RarityRule; name: string; value: Card['goal']; onChange: (v: Card['goal']) => void }) {
-  // Only equipment switches between "F3, Kards finish it" and buying to max; characters are always maxed.
-  if (rule.kind !== 'equipment' || rule.fusionUpThreshold == null) return null;
+  if (rule.fusionUpThreshold == null) return null;
+  // Gear always has the choice. A character has it while its rarity tracks only to the threshold, or once it has a goal
+  // of its own (one entered past the threshold goes on to max: see entryGoal), so that goal can be seen and changed.
+  if (rule.kind !== 'equipment' && rule.goal !== 'threshold' && value == null) return null;
   const max = levelLabel(rule, maxFusion(rule));
   if (isRealmKlashName(name)) return <span className={`${check} text-muted`}>Realm Klash gear (bought to {max} with Blood Rubies)</span>;
   return (
@@ -55,6 +57,15 @@ function GoalSelect({ rule, name, value, onChange }: { rule: RarityRule; name: s
       </select>
     </label>
   );
+}
+
+/** Add card's note for a card tracked only to its kard threshold, at the level picked. */
+function thresholdNote(card: Card, rule: RarityRule) {
+  if (card.fusion < (thresholdLevel(rule) ?? Infinity)) return `${rule.label} is tracked only until F${rule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.`;
+  // Past the threshold it goes on to its max (entryGoal); at its max it's done as soon as it's saved.
+  const onTo = targetLevel({ ...card, goal: 'max' }, rule);
+  if (card.fusion < onTo) return `Already at F${rule.fusionUpThreshold} or past it, so this one is tracked on to ${levelLabel(rule, onTo)}.`;
+  return "That level is already this card's goal, so Add would remove it at once as done.";
 }
 
 /**
@@ -539,8 +550,9 @@ function CardList() {
         // A level a sync has since taken off the rarity isn't one the level box can show: it shows (and saves) not owned.
         fusion: shown.fusion <= maxFusion(rule) ? shown.fusion : 0,
         guest: rule.hasGuests && shown.guest,
-        // Only gear has a Goal box; a character takes its rarity's.
-        goal: isEquip ? shown.goal : undefined,
+        // The form's Goal only where the Goal box shows it (gear, or a character rarity tracked to its kard threshold); a
+        // card entered at or past the threshold then goes on to its max (entryGoal, below).
+        goal: isEquip || rule.goal === 'threshold' ? shown.goal : undefined,
         source: isEquip ? shown.source : initialSource(shown, d.rarities),
         sourceNote: tower || undefined,
       };
@@ -596,7 +608,7 @@ function CardList() {
               </select>
             </label>
           )}
-          {draftRule && <GoalSelect rule={draftRule} name={shown.name} value={shown.goal} onChange={(v) => setDraft({ ...shown, goal: v })} />}
+          {draftRule && <GoalSelect rule={draftRule} name={shown.name} value={entryGoal(shown as Card, draftRule)} onChange={(v) => setDraft({ ...shown, goal: v })} />}
           {draftRule && <CapSelect rule={draftRule} value={shown.maxLevel} onChange={(v) => setDraft({ ...shown, maxLevel: v })} />}
           {draftRule?.hasGuests && (
             <label className={check}>
@@ -623,13 +635,7 @@ function CardList() {
         {draft.rarityId && draftRule && draftRule.id !== draft.rarityId && (
           <p className="text-muted text-small">The rarity picked here has since been removed, so this card goes in as {draftRule.label}.</p>
         )}
-        {draftRule && cardGoal(shown as Card, draftRule) === 'threshold' && (
-          <p className="text-muted text-small">
-            {shown.fusion >= (thresholdLevel(draftRule) ?? Infinity)
-              ? `Already at F${draftRule.fusionUpThreshold} or past it, so this one is tracked on to ${levelLabel(draftRule, targetLevel({ ...(shown as Card), goal: 'max' }, draftRule))}.`
-              : `${draftRule.label} is tracked only until F${draftRule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.`}
-          </p>
-        )}
+        {draftRule && cardGoal(shown as Card, draftRule) === 'threshold' && <p className="text-muted text-small">{thresholdNote(shown as Card, draftRule)}</p>}
         <PasteList pick={picks} startRarityId={draftRule?.id ?? ''} />
       </section>
 
