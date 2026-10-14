@@ -354,6 +354,8 @@ function SeasonBar() {
         </label>
         {end && (
           <ConfirmButton
+            // Armed for this season only: a new season shown (a sync, or the changeover passing) starts the button over.
+            key={end}
             label="Ended early"
             // Only the season the button showed: once a sync has ended it, the season shown next is a new one, and ending
             // that would expire everything entered for it.
