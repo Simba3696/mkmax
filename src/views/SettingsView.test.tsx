@@ -358,9 +358,10 @@ describe('Settings level steps on a screen a sync has changed', () => {
   // kards off
   // Found by /ship on 2026-10-14
   // Value: protects=Track until saves nothing when a sync turned the rarity's kards off (no threshold to stop at), and
-  // Highest fusion saves nothing on a rarity a sync made a Kameo; fails_when=the recipe trusts the screen, saving a
+  // Highest fusion and Fusion Up Kards usable from save nothing on a rarity a sync made a Kameo; fails_when=the recipe trusts the screen, saving a
   // threshold goal with no threshold (its kards drop out of the plan) or levels on a Kameo; why_new=review (adversarial);
-  // seam=a grabbed update stands in for the sync, SyncLoop.nextStamp spied; no_claim=a real sync
+  // seam=a grabbed update stands in for the sync, the hidden boxes' handlers called as the screen had them,
+  // SyncLoop.nextStamp spied; no_claim=a real sync
   it('saves no kard threshold goal after a sync turned the kards off, and no levels on a rarity now a Kameo', () => {
     const stamps = renderSettings();
     const trackUntil = within(panelOf('Diamond')).getByLabelText('Track until');
@@ -369,12 +370,17 @@ describe('Settings level steps on a screen a sync has changed', () => {
       fireEvent.change(trackUntil, { target: { value: 'threshold' } });
     });
     expect(diamond().goal).toBe('max');
-    const highest = within(panelOf('Diamond')).getByLabelText('Highest fusion (F…), rest are ascension');
+    // A Kameo's level and kard boxes are hidden, so they're gone once the sync draws: the taps are the handlers the screen
+    // had when they were made, as with a tap the browser queued before the sync landed.
+    const onChangeOf = (el: Element) => (el as unknown as Record<string, { onChange: (e: unknown) => void }>)[Object.keys(el).find((k) => k.startsWith('__reactProps$'))!].onChange;
+    const onHighest = onChangeOf(within(panelOf('Diamond')).getByLabelText('Highest fusion (F…), rest are ascension'));
+    const onUsableFrom = onChangeOf(within(panelOf('Diamond')).getByLabelText('Fusion Up Kards usable from'));
+    act(() => update((d) => void Object.assign(d.rarities.find((r) => r.id === 'diamond')!, { kind: 'kameo', dupesPerLevel: [], fusionMax: 0 })));
     act(() => {
-      update((d) => void Object.assign(d.rarities.find((r) => r.id === 'diamond')!, { kind: 'kameo', dupesPerLevel: [], fusionMax: 0 }));
-      fireEvent.change(highest, { target: { value: '7' } });
+      onHighest({ target: { value: '7' } });
+      onUsableFrom({ target: { value: '3' } });
     });
-    expect(diamond().fusionMax).toBe(0);
+    expect([diamond().fusionMax, diamond().fusionUpThreshold]).toEqual([0, null]);
     expect(stamps).toHaveBeenCalledTimes(2); // the two sync stand-ins only
   });
 });

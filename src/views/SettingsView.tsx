@@ -150,6 +150,9 @@ export default function SettingsView() {
                               editRarity(
                                 r.id,
                                 (dr) => {
+                                  // Not on a rarity a sync has since made a Kameo: its kard settings are hidden, and would come
+                                  // back switched on if it were made a character or gear again.
+                                  if (dr.kind === 'kameo') return noChange;
                                   toMax = threshold == null && dr.goal === 'threshold';
                                   if (dr.fusionUpThreshold === threshold && !toMax) return noChange;
                                   dr.fusionUpThreshold = threshold;
