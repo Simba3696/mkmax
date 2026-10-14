@@ -844,8 +844,8 @@ describe('kaskets', () => {
 
   it("gives an even share of the cards you don't own, leaving out the newest from the latest update", () => {
     const fresh = Array.from({ length: 9 }, (_, i) => card(`d${i}`, 0));
-    // The excluded cards spelled the way the user might type them: word order and MKII don't matter.
-    const excluded = [card('x1', 0, { name: 'MK1 Sub-Zero' }), card('x2', 0, { name: 'MKII Movie Scorpion' })];
+    // The excluded cards spelled the way the user might type them: word order and punctuation don't matter.
+    const excluded = [card('x1', 0, { name: 'MK1 Noob Saibot' }), card('x2', 0, { name: 'Mileena, Assassin' })];
     const s = setup([...fresh, card('guest', 0, { guest: true }), ...excluded, card('owned', F(3))], [kasket('diamond')]);
     const ctx = buildCtx(s);
     const pool = kasketPool(ctx, s.packs[0]);
@@ -870,8 +870,8 @@ describe('kaskets', () => {
         card('ascending', A(2), { rarityId: 'gold', maxLevel: A(5) }),
         card('fusing', F(5), { rarityId: 'gold' }),
         card('capped', A(5), { rarityId: 'gold', maxLevel: A(5) }),
-        // Flame Forged Will is the newest Epic gear, not Gold, so a Gold card of that name is still in the pool.
-        card('x', F(2), { rarityId: 'gold', name: 'Flame Forged Will' }),
+        // Havik's Patronage is the newest Epic gear, not Gold, so a Gold card of that name is still in the pool.
+        card('x', F(2), { rarityId: 'gold', name: "Havik's Patronage" }),
       ],
       [kasket('gold')],
     );
@@ -884,13 +884,15 @@ describe('kaskets', () => {
   // card of another rarity is left out of its Kasket, or the newest card isn't; why_new=the list now carries rarities;
   // seam=none; no_claim=the list's contents (patch-notes skill)
   it('leaves out the newest cards by name and rarity', () => {
-    expect(isKasketExcluded({ name: 'Flame Forged Will', rarityId: 'epic' })).toBe(true);
-    expect(isKasketExcluded({ name: 'flame forged will', rarityId: 'epic' })).toBe(true);
-    expect(isKasketExcluded({ name: 'Flame Forged Will', rarityId: 'rare' })).toBe(false);
-    expect(isKasketExcluded({ name: 'Sub-Zero MK1', rarityId: 'gold' })).toBe(false);
+    expect(isKasketExcluded({ name: "Havik's Patronage", rarityId: 'epic' })).toBe(true);
+    expect(isKasketExcluded({ name: 'havik’s patronage', rarityId: 'epic' })).toBe(true);
+    expect(isKasketExcluded({ name: "Havik's Patronage", rarityId: 'rare' })).toBe(false);
+    expect(isKasketExcluded({ name: 'Noob Saibot MK1', rarityId: 'gold' })).toBe(false);
     // A rarity of your own (or Diamond rebuilt under a new id) can't be matched by id, so the name decides.
-    expect(isKasketExcluded({ name: 'Sub-Zero MK1', rarityId: 'r-custom' })).toBe(true);
-    expect(isKasketExcluded({ name: 'Klassic Sub-Zero', rarityId: 'r-custom' })).toBe(false);
+    expect(isKasketExcluded({ name: 'Noob Saibot MK1', rarityId: 'r-custom' })).toBe(true);
+    expect(isKasketExcluded({ name: 'Klassic Noob Saibot', rarityId: 'r-custom' })).toBe(false);
+    // The update before's newest cards are back in the pool.
+    expect(isKasketExcluded({ name: 'Sub-Zero MK1', rarityId: 'diamond' })).toBe(false);
   });
 
   it("isn't valued once you own every piece of gear tracked only to the kard threshold, unless it's tracked to max", () => {
@@ -902,7 +904,7 @@ describe('kaskets', () => {
   });
 
   it("isn't valued when only excluded cards are left, or its rarity is gone", () => {
-    const s = setup([card('x1', F(4), { name: 'Sub-Zero MK1' }), card('x2', 0, { name: 'Scorpion MK2 Movie' })], [kasket('diamond'), kasket('gone', { id: 'k2' })]);
+    const s = setup([card('x1', F(4), { name: 'Noob Saibot MK1' }), card('x2', 0, { name: 'Mileena Assassin' })], [kasket('diamond'), kasket('gone', { id: 'k2' })]);
     const ctx = buildCtx(s);
     expect(kasketPool(ctx, s.packs[0])).toMatchObject({ mode: 'none', cards: [] });
     expect(kasketPool(ctx, s.packs[1])).toEqual({ mode: 'none', cards: [] });
@@ -962,15 +964,15 @@ describe('kaskets', () => {
     expect(line([card('a', F(2), { rarityId: 'gold' }), card('b', F(4), { rarityId: 'gold' })], 'gold')).toBe("You own them all: 1 in 2 of your Gold characters you haven't maxed");
     expect(line([card('a', 0)], 'diamond')).toBe("New card: the only Diamond character you don't own");
     expect(line([card('a', F(2), { rarityId: 'gold' })], 'gold')).toBe("You own them all: your only Gold character you haven't maxed");
-    expect(line([card('e', F(2), { rarityId: 'epic' }), card('x', 0, { rarityId: 'epic', name: 'Man in Control' })], 'epic')).toBe(
+    expect(line([card('e', F(2), { rarityId: 'epic' }), card('x', 0, { rarityId: 'epic', name: 'Khaotizator' })], 'epic')).toBe(
       "You own every Epic gear piece it gives, so this isn't valued",
     );
-    expect(line([card('x', F(3), { name: 'Sub-Zero MK1' })], 'diamond')).toBe('Nothing left in this Kasket that MK Max tracks');
+    expect(line([card('x', F(3), { name: 'Noob Saibot MK1' })], 'diamond')).toBe('Nothing left in this Kasket that MK Max tracks');
     expect(line([], 'gone')).toBe("This Kasket's rarity no longer exists, so it isn't valued");
   });
 
   it("offers every card of a Kasket's rarity in its pull search, the ones it can give first", () => {
-    const cards = [card('new', 0), card('owned', F(2)), card('newest', 0, { name: 'Sub-Zero MK1' }), card('g', 0, { rarityId: 'gold' })];
+    const cards = [card('new', 0), card('owned', F(2)), card('newest', 0, { name: 'Noob Saibot MK1' }), card('g', 0, { rarityId: 'gold' })];
     const s = setup(cards, [kasket('diamond'), kasket('gone')]);
     const ctx = buildCtx(s);
     const pull = kasketPullCards(ctx, s.packs[0]);

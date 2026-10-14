@@ -15,17 +15,21 @@ type KasketRarity = (typeof KASKET_RARITY)[keyof typeof KASKET_RARITY];
 
 /**
  * The newest characters and gear, which Kaskets leave out until the next update, with each one's rarity, so a
- * same-named card of another rarity still counts. From the 22 July 2026 update (7.3). Replace the list each update
+ * same-named card of another rarity still counts. From the 14 October 2026 update (7.4): its two Diamonds and the Tower
+ * of Khaos gear. Replace the list each update
  * via the patch-notes skill.
  */
 // Typed by KASKET_RARITY's ids, so a misspelt rarity in a new update's list fails the build instead of matching nothing.
 const KASKET_EXCLUDED: [name: string, rarityId: KasketRarity][] = [
-  ['Sub-Zero MK1', 'diamond'],
-  ['Scorpion MK2 Movie', 'diamond'],
-  ['Man in Control', 'epic'],
-  ['Flame Forged Will', 'epic'],
-  ['Man in the Sky', 'rare'],
-  ['Flame Forged Ferocity', 'rare'],
+  ['Noob Saibot MK1', 'diamond'],
+  ['Mileena Assassin', 'diamond'],
+  ["Havik's Patronage", 'epic'],
+  ['Khaotizator', 'epic'],
+  ["Banshee's Fatal Thrust", 'epic'],
+  ['Mercenary Bandolier', 'epic'],
+  ['Khaos Ignition', 'rare'],
+  ["Banshee's Majestic Aura", 'rare'],
+  ['Mercenary Assault Rifle', 'rare'],
 ];
 
 const RARITY_BY_KEY = new Map(Object.entries(KASKET_RARITY).map(([name, rarity]) => [nameKey(name), rarity]));
