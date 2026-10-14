@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { newId, normalize, useStore } from '../store';
+import { newId, noChange, normalize, useStore } from '../store';
 import { kardTable } from '../normalize';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
@@ -9,7 +9,7 @@ import { fromNewerApp } from '../sync';
 import { checkForAppUpdate } from '../appUpdate';
 import SyncPanel from './SyncPanel';
 import GearOrder from './GearOrder';
-import type { RarityRule, Weights } from '../types';
+import type { AppState, RarityRule, Weights } from '../types';
 
 const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'belowThreshold', label: 'Reaching the Kard threshold', help: 'Multiplier for copies that get a card to the level where Fusion Up Kards can be used.' },
@@ -70,15 +70,30 @@ export default function SettingsView() {
     }
   }
 
+  // Rows are found by id when the change runs, not by their place on screen: a sync can reorder or remove rarities and
+  // currencies while Settings is open, and a change by place would land on the wrong row. A row that's gone saves nothing.
+  const editRarity = (id: string, edit: (r: RarityRule) => void | typeof noChange, undoLabel?: string | (() => string)) =>
+    update((d) => {
+      const r = d.rarities.find((x) => x.id === id);
+      if (!r) return noChange;
+      return edit(r);
+    }, undoLabel);
+  const editCurrency = (id: string, edit: (c: AppState['currencies'][number]) => void) =>
+    update((d) => {
+      const c = d.currencies.find((x) => x.id === id);
+      if (!c) return noChange;
+      edit(c);
+    });
+
   /**
    * Kameos only need owning, so a Kameo rarity has no fusion steps or kards (normalize enforces the steps on load).
    * Applying that here removes the rarity's owned cards now, with Undo, rather than silently on the next load.
    */
-  function setKind(ri: number, kind: RarityRule['kind']) {
-    const r = state.rarities[ri];
-    update(
-      (d) => {
-        const dr = d.rarities[ri];
+  function setKind(r: RarityRule, kind: RarityRule['kind']) {
+    editRarity(
+      r.id,
+      (dr) => {
+        if (dr.kind === kind) return noChange; // a sync already made it that kind
         dr.kind = kind;
         if (kind === 'kameo') Object.assign(dr, { dupesPerLevel: [], fusionMax: 0, goal: 'max', fusionUpThreshold: null, fusionUpKards: 0 });
         else if (dr.dupesPerLevel.length === 0) {
@@ -111,14 +126,14 @@ export default function SettingsView() {
             which left the two column tops out of line.
           */}
           <div className="lg:columns-2 lg:gap-3 lg:[&>div]:break-inside-avoid lg:[&>div]:mt-0 lg:[&>div]:mb-3">
-            {state.rarities.map((r, ri) => {
+            {state.rarities.map((r) => {
               const kameo = r.kind === 'kameo';
               return (
                 <div key={r.id} className={subpanel}>
                   <div className={form}>
                     <label className={field}>
                       <span>Name</span>
-                      <input value={r.label} onChange={(e) => update((d) => void (d.rarities[ri].label = e.target.value))} />
+                      <input value={r.label} onChange={(e) => editRarity(r.id, (x) => void (x.label = e.target.value))} />
                     </label>
                     {!kameo && (
                       <>
@@ -129,17 +144,23 @@ export default function SettingsView() {
                             onChange={(e) => {
                               const threshold = e.target.value ? Number(e.target.value) : null;
                               // With no kards there's no threshold to stop at, so the planner tracks to max. Saying so in
-                              // Track until, with Undo, rather than leaving it on a threshold that no longer applies.
-                              const toMax = threshold == null && r.goal === 'threshold';
-                              update(
-                                (d) => {
-                                  const dr = d.rarities[ri];
+                              // Track until, with Undo, rather than leaving it on a threshold that no longer applies. Both
+                              // are decided from the rarity as it is now, which a sync may have changed.
+                              let toMax = false;
+                              editRarity(
+                                r.id,
+                                (dr) => {
+                                  // Not on a rarity a sync has since made a Kameo: its kard settings are hidden, and would come
+                                  // back switched on if it were made a character or gear again.
+                                  if (dr.kind === 'kameo') return noChange;
+                                  toMax = threshold == null && dr.goal === 'threshold';
+                                  if (dr.fusionUpThreshold === threshold && !toMax) return noChange;
                                   dr.fusionUpThreshold = threshold;
                                   if (toMax) dr.goal = 'max';
                                   // Fill in missing costs now, as the next load would, so the plan doesn't change on a reload.
                                   dr.kardsPerLevel = kardTable(dr);
                                 },
-                                toMax ? `${r.label} now tracks to max` : undefined,
+                                () => (toMax ? `${r.label} now tracks to max` : ''),
                               );
                             }}
                           >
@@ -153,7 +174,15 @@ export default function SettingsView() {
                         </label>
                         <label className={field}>
                           <span>Track until</span>
-                          <select value={r.goal} onChange={(e) => update((d) => void (d.rarities[ri].goal = e.target.value as 'max' | 'threshold'))}>
+                          <select
+                            value={r.goal}
+                            onChange={(e) => {
+                              const goal = e.target.value as 'max' | 'threshold';
+                              // Not a threshold a sync has since taken away (kards turned off), nor on a rarity now a Kameo:
+                              // a goal with no threshold to stop at would drop its kards from the plan.
+                              editRarity(r.id, (x) => (x.goal === goal || x.kind === 'kameo' || (goal === 'threshold' && x.fusionUpThreshold == null) ? noChange : void (x.goal = goal)));
+                            }}
+                          >
                             <option value="max">Max</option>
                             <option value="threshold" disabled={r.fusionUpThreshold == null}>
                               Kard threshold (F{r.fusionUpThreshold ?? '?'})
@@ -162,25 +191,25 @@ export default function SettingsView() {
                         </label>
                         <label className={field}>
                           <span>Highest fusion (F…), rest are ascension</span>
-                          <NumInput value={r.fusionMax} min={1} step={1} onChange={(v) => update((d) => void (d.rarities[ri].fusionMax = v ?? 10))} />
+                          <NumInput value={r.fusionMax} min={1} step={1} onChange={(v) => editRarity(r.id, (x) => (x.kind === 'kameo' ? noChange : void (x.fusionMax = v ?? 10)))} />
                         </label>
                       </>
                     )}
                     <label className={field}>
                       <span>Kind</span>
-                      <select value={r.kind} onChange={(e) => setKind(ri, e.target.value as RarityRule['kind'])}>
+                      <select value={r.kind} onChange={(e) => setKind(r, e.target.value as RarityRule['kind'])}>
                         <option value="character">Character</option>
                         <option value="equipment">Equipment</option>
                         <option value="kameo">Kameo (only need one copy)</option>
                       </select>
                     </label>
                     <label className={check}>
-                      <input type="checkbox" checked={r.hasGuests} onChange={(e) => update((d) => void (d.rarities[ri].hasGuests = e.target.checked))} />
+                      <input type="checkbox" checked={r.hasGuests} onChange={(e) => editRarity(r.id, (x) => void (x.hasGuests = e.target.checked))} />
                       Has guest cards
                     </label>
                     <label className={field}>
                       <span>Color</span>
-                      <input type="color" value={r.color} onChange={(e) => update((d) => void (d.rarities[ri].color = e.target.value))} />
+                      <input type="color" value={r.color} onChange={(e) => editRarity(r.id, (x) => void (x.color = e.target.value))} />
                     </label>
                   </div>
                   {/* Kameos have no fusion steps; a step added here would be wiped on the next load, deleting owned Kameos. */}
@@ -193,7 +222,13 @@ export default function SettingsView() {
                             <span className={note}>
                               {levelLabel(r, li + 1)}→{levelLabel(r, li + 2)}
                             </span>
-                            <NumInput value={n} min={0} step={1} onChange={(v) => update((d) => void (d.rarities[ri].dupesPerLevel[li] = v ?? 0))} />
+                            <NumInput
+                              value={n}
+                              min={0}
+                              step={1}
+                              // Not past the end of a list a sync has shortened: that would leave holes, or bring a step back.
+                              onChange={(v) => editRarity(r.id, (x) => (li < x.dupesPerLevel.length ? void (x.dupesPerLevel[li] = v ?? 0) : noChange))}
+                            />
                           </label>
                         ))}
                       </div>
@@ -206,8 +241,9 @@ export default function SettingsView() {
                       <>
                         <button
                           onClick={() =>
-                            update((d) => {
-                              const dr = d.rarities[ri];
+                            editRarity(r.id, (dr) => {
+                              // Only to the steps on screen: not again if a sync already added one, nor to a rarity it made a Kameo.
+                              if (dr.kind === 'kameo' || dr.dupesPerLevel.length !== r.dupesPerLevel.length) return noChange;
                               dr.dupesPerLevel.push(1);
                               // Give the new step its kard cost now, as the next load would, so the plan doesn't change on a reload.
                               dr.kardsPerLevel = kardTable(dr);
@@ -216,7 +252,14 @@ export default function SettingsView() {
                         >
                           + Level
                         </button>
-                        <button disabled={r.dupesPerLevel.length <= 1} onClick={() => update((d) => void d.rarities[ri].dupesPerLevel.pop())}>
+                        <button
+                          disabled={r.dupesPerLevel.length <= 1}
+                          onClick={() =>
+                            // Only from the steps on screen, and never the last one: a sync that already took steps away
+                            // could leave none, and every owned card of the rarity would count as maxed and be deleted.
+                            editRarity(r.id, (x) => (x.dupesPerLevel.length > 1 && x.dupesPerLevel.length === r.dupesPerLevel.length ? void x.dupesPerLevel.pop() : noChange))
+                          }
+                        >
                           − Level
                         </button>
                         <span className={`${note} lg:flex-1 lg:min-w-0`}>
@@ -229,7 +272,19 @@ export default function SettingsView() {
                       className={btn.ghost}
                       disabled={state.cards.some((c) => c.rarityId === r.id)}
                       title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : withKaskets('Remove rarity', state.packs.filter((p) => p.kasket === r.id).length)}
-                      onClick={() => update((d) => removeRarity(d, r.id), withKaskets(`Removed ${r.label}`, state.packs.filter((p) => p.kasket === r.id).length))}
+                      onClick={() => {
+                        // The Kaskets counted as the change removes them: a sync may have added or removed some since.
+                        let kaskets = 0;
+                        // Not if a sync already removed it, or brought in cards that use it.
+                        update(
+                          (d) => {
+                            if (!d.rarities.some((x) => x.id === r.id) || d.cards.some((c) => c.rarityId === r.id)) return noChange;
+                            kaskets = d.packs.filter((p) => p.kasket === r.id).length;
+                            removeRarity(d, r.id);
+                          },
+                          () => withKaskets(`Removed ${r.label}`, kaskets),
+                        );
+                      }}
                     >
                       Remove
                     </button>
@@ -250,8 +305,10 @@ export default function SettingsView() {
                               min={0}
                               step={1}
                               onChange={(v) =>
-                                update((d) => {
-                                  const costs = d.rarities[ri].kardsPerLevel;
+                                editRarity(r.id, (x) => {
+                                  // Not for a step a sync has taken away: fewer levels, the rarity now a Kameo, or its kards turned off.
+                                  if (x.fusionUpThreshold == null || !kardSteps(x).includes(f)) return noChange;
+                                  const costs = x.kardsPerLevel;
                                   while (costs.length <= f) costs.push(0);
                                   costs[f] = v ?? 0;
                                 })
@@ -282,19 +339,26 @@ export default function SettingsView() {
       <FoldCard id="settings-currencies" title="Currencies">
         {/* Two per line on tablets and laptops so the name and per-day boxes don't stretch across the page. */}
         <div className="md:grid md:grid-cols-2 md:gap-x-6 2xl:block">
-          {state.currencies.map((c, i) => {
+          {state.currencies.map((c) => {
             const used = state.packs.some((p) => p.currencyId === c.id);
             return (
               <div key={c.id} className="flex gap-[0.4rem] items-center my-[0.35rem]">
-                <input className="flex-1 min-w-0" value={c.name} onChange={(e) => update((d) => void (d.currencies[i].name = e.target.value))} aria-label="Name" />
+                <input className="flex-1 min-w-0" value={c.name} onChange={(e) => editCurrency(c.id, (x) => void (x.name = e.target.value))} aria-label="Name" />
                 <NumInput
                   className="flex-1"
                   value={c.perDay ?? null}
                   min={0}
                   placeholder="per day"
-                  onChange={(v) => update((d) => void (v == null || v <= 0 ? delete d.currencies[i].perDay : (d.currencies[i].perDay = v)))}
+                  onChange={(v) => editCurrency(c.id, (x) => void (v == null || v <= 0 ? delete x.perDay : (x.perDay = v)))}
                 />
-                <button className={btn.ghost} disabled={used} title={used ? 'Used by a pack' : 'Remove'} onClick={() => update((d) => void d.currencies.splice(i, 1), `Removed ${c.name}`)}>
+                <button className={btn.ghost} disabled={used} title={used ? 'Used by a pack' : 'Remove'} onClick={() =>
+                    update((d) => {
+                      // Not if a sync removed it, or a pack now uses it.
+                      const i = d.currencies.findIndex((x) => x.id === c.id);
+                      if (i < 0 || d.packs.some((p) => p.currencyId === c.id)) return noChange;
+                      d.currencies.splice(i, 1);
+                    }, `Removed ${c.name}`)
+                  }>
                   ✕
                 </button>
               </div>

@@ -92,7 +92,7 @@ const canonical = (v: unknown) =>
 export const sameData = (a: AppState, b: AppState) => canonical({ ...a, updatedAt: 0 }) === canonical({ ...b, updatedAt: 0 });
 
 /**
- * Builds up to 19ef952 (2026-09-28) wrote version 2 and treated any other version as the old F1-based format,
+ * Builds up to 9d1ef68 (2026-09-28) wrote version 2 and treated any other version as the old F1-based format,
  * so a copy of one still open on another device raised every level by one when it pulled newer data, then
  * synced that back as version 2. Data saved as version 2 or lower is from one of those builds and never pulled.
  */

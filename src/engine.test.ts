@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, suggestSeason, moveInGearOrder, targetLevel,
+  addPool, ascensionCaps, buildCtx, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -71,6 +71,26 @@ describe('goals and caps', () => {
     expect(targetLevel(rk, epic)).toBe(F(10));
     expect(copiesToMax(rk, epic)).toBe(3);
     expect(isMaxed(rk, epic)).toBe(false);
+  });
+
+  // Value: protects=a card entered at or past its kard threshold while tracked only that far is tracked to its max, and
+  // every other card keeps its goal; fails_when=it keeps the F3 goal (done the moment it's saved), or a card below the
+  // threshold, one already set to Max, or a rarity with no threshold gets Max too; why_new=new rule (user request,
+  // 2026-10-14); seam=none; no_claim=the screens that call it (CardsView and PacksView tests)
+  it('tracks a card entered at or past its threshold on to its max', () => {
+    const epic = rules().get('epic')!;
+    const gold = { ...rules().get('gold')!, goal: 'threshold' as const };
+    expect(entryGoal(card('e', F(2), { rarityId: 'epic' }), epic)).toBeUndefined();
+    expect(entryGoal(card('e', F(3), { rarityId: 'epic' }), epic)).toBe('max');
+    expect(entryGoal(card('e', F(7), { rarityId: 'epic', goal: 'threshold' }), epic)).toBe('max');
+    expect(entryGoal(card('e', F(7), { rarityId: 'epic', goal: 'max' }), epic)).toBe('max');
+    // A Gold card goes on to its own cap.
+    const a5 = card('g', F(4), { rarityId: 'gold', maxLevel: A(5) });
+    expect(entryGoal(a5, gold)).toBe('max');
+    expect(targetLevel({ ...a5, goal: entryGoal(a5, gold) }, gold)).toBe(A(5));
+    // A rarity tracked to Max, or one with no kards, keeps what it had.
+    expect(entryGoal(card('d', F(5), { rarityId: 'diamond' }), rules().get('diamond')!)).toBeUndefined();
+    expect(entryGoal(card('k', 1, { rarityId: 'kameo-gold' }), rules().get('kameo-gold')!)).toBeUndefined();
   });
 });
 
@@ -176,6 +196,34 @@ describe('kameos', () => {
       expect(moveInGearOrder(s, 'Bloody Tomahawk', 'Shadow Sash', -1)).toBeNull();
       // The arrow that still has something to do works as usual.
       expect(moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk', -1)).toEqual(['Shadow Sash', 'Bloody Tomahawk', "Moloch's Ball and Chain"]);
+    });
+
+    // Regression: /ship review of clock-and-gear-taps — a stale tap moved a piece past one a sync had put on sale
+    // Found by /ship on 2026-10-13
+    // Value: protects=given the pieces on sale now, a tap only moves when its neighbour is still the next one on sale;
+    // fails_when=only the side is checked, so the piece also jumps a piece the screen never showed between them; why_new=
+    // review (Codex, adversarial); seam=none; no_claim=the arrows (GearOrder test)
+    it('moves nothing when a sync put another piece on sale between the two', () => {
+      const s = setup(cards(), [item('Shadow Sash'), item("Moloch's Ball and Chain"), item('Bloody Tomahawk')], (s) => {
+        s.gearOrder = ['Shadow Sash', "Moloch's Ball and Chain", 'Bloody Tomahawk'];
+      });
+      const onSale = ['Shadow Sash', "Moloch's Ball and Chain", 'Bloody Tomahawk'];
+      // The screen showed Shadow Sash next to the Tomahawk; Moloch's is on sale between them now.
+      expect(moveInGearOrder(s, 'Shadow Sash', 'Bloody Tomahawk', 1, onSale)).toBeNull();
+      expect(moveInGearOrder(s, 'Shadow Sash', "Moloch's Ball and Chain", 1, onSale)).toEqual(["Moloch's Ball and Chain", 'Shadow Sash', 'Bloody Tomahawk']);
+    });
+
+    // Regression: /review of stale-screens-and-schedule — ↓ still moved a piece a sync had taken off sale
+    // Found by /review on 2026-10-13
+    // Value: protects=a tap on a piece that's no longer on sale moves nothing, whichever arrow; fails_when=only the
+    // neighbour is checked, so ↓ moves the off-sale piece when its neighbour is first on sale; why_new=review (testing,
+    // maintainability, adversarial); seam=none; no_claim=the arrows (GearOrder test)
+    it('moves nothing when a sync took the tapped piece off sale', () => {
+      const s = setup(cards(), [item("Moloch's Ball and Chain"), item('Bloody Tomahawk')], (s) => {
+        s.gearOrder = ['Shadow Sash', "Moloch's Ball and Chain", 'Bloody Tomahawk'];
+      });
+      const onSale = ["Moloch's Ball and Chain", 'Bloody Tomahawk'];
+      expect(moveInGearOrder(s, 'Shadow Sash', "Moloch's Ball and Chain", 1, onSale)).toBeNull();
     });
 
     // Regression: review of todo-followups — the arrows swapped two places, so the other piece jumped over waiting ones
@@ -467,6 +515,34 @@ describe('phases', () => {
     expect(kardStep(s, 'gear')).toBeNull(); // Realm Klash gear never takes kards, even with Epic kards in the Wallet
     s.cards[2].name = 'Kori Blade';
     expect(kardStep(s, 'gear')).toBe(5); // the same card off the list takes them
+  });
+
+  // Regression: /ship review of clock-and-gear-taps — a fuse tap after a sync used a different step than the button showed
+  // Found by /ship on 2026-10-13
+  // Value: protects=a fuse only goes ahead when the step still costs what the button showed; fails_when=the expected cost
+  // is ignored, so a sync that moved the card on fuses a dearer step and the Undo label gives the wrong count; why_new=
+  // review (Red Team); seam=none; no_claim=the buttons (PlanView and CardsView tests)
+  it('fuses nothing when the step no longer costs what the button showed', () => {
+    const s = setup([card('d', F(4))], [], (s) => (s.rarities[0].fusionUpKards = 5));
+    expect(fuseWithKards(s, 'd', 1)).toBeNull(); // the button said 1 kard (F3 → F4); F4 → F5 costs 2 now
+    expect([s.cards[0].fusion, s.rarities[0].fusionUpKards]).toEqual([F(4), 5]);
+    expect(fuseWithKards(s, 'd', 2)).toBe(2);
+  });
+
+  // Regression: /review of stale-screens-and-schedule — a stale fuse tap fused a second level when the next step cost the same
+  // Found by /review on 2026-10-13
+  // Value: protects=a fuse goes ahead only from the level the button showed; fails_when=only the cost is checked, so a
+  // sync that already made the step lets the tap make the next one, which costs the same, and spend the kards twice;
+  // why_new=review (Red Team); seam=none; no_claim=the buttons (PlanView and CardsView tests)
+  it('fuses nothing when a sync already made the step the button showed, even if the next costs the same', () => {
+    const s = setup([card('d', F(5))], [], (s) => {
+      s.rarities[0].fusionUpKards = 10;
+      s.rarities[0].kardsPerLevel = [0, 0, 0, 2, 2, 2, 2, 2, 2, 2];
+    });
+    // The button was drawn at F4 (2 kards); a sync already fused it to F5, whose step also costs 2.
+    expect(fuseWithKards(s, 'd', 2, F(4))).toBeNull();
+    expect([s.cards[0].fusion, s.rarities[0].fusionUpKards]).toEqual([F(5), 10]);
+    expect(fuseWithKards(s, 'd', 2, F(5))).toBe(2);
   });
 
   it("uses kards on a Gold ascension step, and not past the card's cap", () => {
@@ -1013,6 +1089,21 @@ describe('kaskets', () => {
     expect(kasketPool(buildCtx(s), s.packs[0])).toMatchObject({ mode: 'none', cards: [] });
   });
 
+  // Regression: /ship review of stale-screens-and-schedule — Save kept drops for cards a sync deleted
+  // Found by /ship on 2026-10-14
+  // Value: protects=saving a pack keeps only the drops whose cards still exist; fails_when=drops for cards a sync deleted
+  // are saved, pointing at nothing (a store item for one is never cleared as done); why_new=review (adversarial);
+  // seam=none; no_claim=the editor's own Save guard (PacksView.test.tsx)
+  it('saves a pack without the drops for cards a sync deleted', () => {
+    const s = setup([card('a', 0)]);
+    savePack(s, pack('p', [{ cardId: 'a', chance: 40 }, { cardId: 'gone', chance: 60 }]), null, NOW);
+    expect(s.packs[0].drops).toEqual([{ cardId: 'a', chance: 40 }]);
+    // A store item left selling nothing isn't saved at all, nor one passed in with no item.
+    expect(savePack(s, pack('item', [{ cardId: 'gone', chance: 100 }], { store: true }), null, NOW)).toBe(false);
+    expect(savePack(s, pack('empty', [], { store: true }), null, NOW)).toBe(false);
+    expect(s.packs.map((x) => x.id)).toEqual(['p']);
+  });
+
   it('saves a Kasket without the drops or cards per purchase typed before ticking it', () => {
     const s = setup([card('a', 0)]);
     savePack(s, pack('k', [{ cardId: 'a', chance: 40 }], { kasket: 'diamond', rolls: 3 }), null, NOW);
@@ -1187,6 +1278,22 @@ describe('buying from the plan', () => {
     expect(recordPurchase(s, 'p', -1)).toBe(false);
   });
 
+  // Regression: /ship review of clock-and-gear-taps — a buy past the purchase limit was logged when the button was stale
+  // Found by /ship on 2026-10-13
+  // Value: protects=a buy at the purchase limit logs nothing, and a pull-step step that clamps reports no change;
+  // fails_when=only the button's disabled stops a buy past the limit, or stepCard can't tell a clamp from a change;
+  // why_new=review (Red Team); seam=none; no_claim=the buttons (PacksView test)
+  it('logs no buy past the purchase limit, and stepCard says when it changed nothing', () => {
+    const s = setup([card('a', F(2))], [pack('p', [{ cardId: 'a', chance: 50 }], { maxPurchases: 1 })], (s) => (s.currencies[0].balance = 500));
+    expect(recordPurchase(s, 'p', 1)).toBe(true);
+    expect(recordPurchase(s, 'p', 1)).toBe(false);
+    expect([s.packs[0].purchased, s.currencies[0].balance]).toEqual([1, 400]);
+    expect(stepCard(s, 'a', 1)).toBe(true);
+    s.cards[0].fusion = 0;
+    expect(stepCard(s, 'a', -1)).toBe(false); // already 0
+    expect(stepCard(s, 'gone', 1)).toBe(false);
+  });
+
   it('gives back exactly what a buy took when the balance was too low for it', () => {
     const s = setup([card('a', F(2))], [pack('p', [{ cardId: 'a', chance: 50 }], { cost: 400 })], (s) => (s.currencies[0].balance = 200));
     recordPurchase(s, 'p', 1);
@@ -1291,6 +1398,19 @@ describe('Realm Klash seasons', () => {
     expect(seasonEnd(s.realmKlashSeasonEnd, NOW)).toBe('2026-01-24T11:59');
   });
 
+  // Regression: /ship review of clock-and-gear-taps — the schedule's season-end move ran again on a copy that already had it
+  // Found by /ship on 2026-10-13
+  // Value: protects=moveSeasonEnd reports when the season already ends there and leaves the save as it was; fails_when=it
+  // moves (and stamps) again after a pull already brought the move in; why_new=review (Red Team); seam=none;
+  // no_claim=the App effect that calls it
+  it('moves nothing when the season already ends there', () => {
+    const s = setup([], [pack('now', [], { season: true, endsAt: '2026-01-12T20:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-12T20:00'));
+    const before = structuredClone(s);
+    expect(moveSeasonEnd(s, '2026-01-12T20:00', NOW)).toBe(false);
+    expect(s).toEqual(before);
+    expect(moveSeasonEnd(s, '2026-01-13T20:00', NOW)).toBe(true);
+  });
+
   it('moves items still on the saved end when the schedule extended the season after that end passed', () => {
     // The schedule listed one week of a season ending Jan 10 11:00; a second week was added after it passed.
     const s = setup([], [
@@ -1304,11 +1424,264 @@ describe('Realm Klash seasons', () => {
     expect(s.realmKlashSeasonEnd).toBe('2026-01-17T11:00');
   });
 
+  // Regression: /review of stale-screens-and-schedule — a season stretched by exactly 2 weeks left its items expired
+  // Found by /review on 2026-10-13
+  // Value: protects=when the schedule's new end is the saved end rolled forward 2 weeks, items still ending on the saved
+  // week end move too; fails_when=matching the rolled-forward end counts as nothing to move; why_new=review (Red Team,
+  // adversarial, maintainability); seam=none; no_claim=the App effect that calls it
+  it('moves items still on the saved end when the schedule extended the season by exactly 2 weeks', () => {
+    const s = setup([], [
+      pack('this', [], { season: true, endsAt: '2026-01-10T11:00' }),
+      pack('before', [], { season: true, endsAt: '2026-01-03T11:00' }),
+      // The next season, already dated by the schedule as one week long: the changeover at Jan 24 hasn't moved.
+      pack('next', [], { season: true, startsAt: '2026-01-24T11:00', endsAt: '2026-01-31T11:00' }),
+    ], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
+    // Rolled forward 2 weeks, the saved Jan 10 end is Jan 24: the same date the schedule now gives.
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', NOW, ['2026-01-10T11:00'])).toBe(true);
+    expect(s.packs.map((p) => p.endsAt)).toEqual(['2026-01-24T11:00', '2026-01-03T11:00', '2026-01-31T11:00']);
+    expect(s.realmKlashSeasonEnd).toBe('2026-01-24T11:00');
+    // Once moved, the same schedule has nothing left to move.
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', NOW, ['2026-01-10T11:00'])).toBe(false);
+  });
+
+  // Regression: /ship review of stale-screens-and-schedule — a 2-week stretch with nothing to move still saved
+  // Found by /ship on 2026-10-14
+  // Value: protects=a 2-week stretch with no item on the passed week end saves nothing, leaving the saved end as it was;
+  // fails_when=the season end is rewritten anyway, so every device saves and two opening together ask which copy to keep;
+  // why_new=review (adversarial); seam=none; no_claim=the App effect that calls it
+  it('saves nothing for a 2-week stretch when no item ends on the passed week end', () => {
+    const s = setup([], [
+      // Next season's item, already dated by the schedule: it doesn't move either way.
+      pack('next', [], { season: true, startsAt: '2026-01-24T11:00', endsAt: '2026-01-31T11:00' }),
+    ], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
+    const before = structuredClone(s);
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', NOW, ['2026-01-10T11:00'])).toBe(false);
+    expect(s).toEqual(before);
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=when the schedule stretches the season by exactly 2 weeks, an item on sale since the saved week end
+  // keeps its start and ends with the season; fails_when=a start on a stretched week end counts as entered ahead, so an
+  // item already in the store moves to the new end and drops out of the plan; why_new=review (adversarial): store items
+  // can't be entered ahead; seam=none; no_claim=the App effect that calls it
+  it('keeps the start of an item on sale since the saved end when the schedule extended the season by exactly 2 weeks', () => {
+    const s = setup([], [
+      // In the store since the saved week end (the shop lists items from their real start), ending on the 2-week guess.
+      pack('onSale', [], { season: true, startsAt: '2026-01-10T11:00', endsAt: seasonEnd('2026-01-10T11:00', new Date('2026-01-10T11:00'))! }),
+    ], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
+    expect(s.packs[0].endsAt).toBe('2026-01-24T11:00');
+    // It already ends with the season, so there's nothing to move or save.
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', NOW, ['2026-01-10T11:00'])).toBe(false);
+    expect([s.packs[0].startsAt, s.packs[0].endsAt]).toEqual(['2026-01-10T11:00', '2026-01-24T11:00']);
+  });
+
+  // Generated by /ship test coverage audit on 2026-10-13
+  // Value: protects=a 2-week stretch leaves an item starting after the unmoved end (next season's mid-season item) on its
+  // own dates; fails_when=only items starting exactly at the end are left alone, so a short item gets the 2-week guess;
+  // why_new=the stretch tests above have items starting at the end, none after it; seam=none; no_claim=the App effect
+  it("leaves next season's mid-season item alone when the schedule stretched the season by exactly 2 weeks", () => {
+    const s = setup([], [
+      pack('this', [], { season: true, endsAt: '2026-01-10T11:00' }),
+      // The schedule's 3-day item in the second week of next season.
+      pack('next', [], { season: true, startsAt: '2026-01-31T11:00', endsAt: '2026-02-03T11:00' }),
+    ], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', NOW, ['2026-01-10T11:00'])).toBe(true);
+    expect(s.packs.map((p) => [p.startsAt ?? null, p.endsAt])).toEqual([
+      [null, '2026-01-24T11:00'],
+      ['2026-01-31T11:00', '2026-02-03T11:00'],
+    ]);
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=a schedule stretching the season a week after its mid-season changeover passed moves items still on
+  // it, though the saved end is the season's start; fails_when=only the saved end itself is checked as a week end, so
+  // the item stays expired and next season's item starts at the old changeover; why_new=the stretch tests above all
+  // save the week end itself; seam=none; no_claim=the App effect that calls it
+  it('moves items on an earlier week end the saved end rolled through when the schedule extends the season a week', () => {
+    // Saved at the season's start (the app only rewrites it when the date changes); the schedule then stretched the
+    // season ending Jan 17 to Jan 24, after Jan 17 had passed.
+    const now = new Date('2026-01-18T12:00:00');
+    const s = setup([], [
+      pack('this', [], { season: true, endsAt: '2026-01-17T11:00' }),
+      // On sale since the old changeover, added after it with the end the app then had for the season.
+      pack('onSale', [], { season: true, startsAt: '2026-01-17T11:00', endsAt: '2026-01-31T11:00' }),
+    ], (s) => (s.realmKlashSeasonEnd = '2026-01-03T11:00'));
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', now, ['2026-01-17T11:00', '2026-01-10T11:00'])).toBe(true);
+    // Both end with the season; the item on sale keeps its start.
+    expect(s.packs.map((p) => [p.startsAt ?? null, p.endsAt])).toEqual([
+      [null, '2026-01-24T11:00'],
+      ['2026-01-17T11:00', '2026-01-24T11:00'],
+    ]);
+    expect(s.realmKlashSeasonEnd).toBe('2026-01-24T11:00');
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=a 2-week stretch whose new end is the saved season start rolled forward still moves items on the
+  // earlier week end it rolled through; fails_when=the rolled-forward match counts as already there and nothing moves;
+  // why_new=the exact-2-week test above saves the week end itself; seam=none; no_claim=the App effect that calls it
+  it('moves items on an earlier week end the saved end rolled through when the schedule extends the season 2 weeks', () => {
+    const now = new Date('2026-01-18T12:00:00');
+    const s = setup([], [
+      pack('this', [], { season: true, endsAt: '2026-01-17T11:00' }),
+      // On sale since the old changeover: it already ends with the season.
+      pack('onSale', [], { season: true, startsAt: '2026-01-17T11:00', endsAt: '2026-01-31T11:00' }),
+    ], (s) => (s.realmKlashSeasonEnd = '2026-01-03T11:00'));
+    // Rolled forward, the saved Jan 3 start is Jan 31: the same date the schedule now gives.
+    expect(seasonEnd(s.realmKlashSeasonEnd, now)).toBe('2026-01-31T11:00');
+    expect(moveSeasonEnd(s, '2026-01-31T11:00', now, ['2026-01-17T11:00', '2026-01-10T11:00'])).toBe(true);
+    expect(s.packs.map((p) => [p.startsAt ?? null, p.endsAt])).toEqual([
+      [null, '2026-01-31T11:00'],
+      ['2026-01-17T11:00', '2026-01-31T11:00'],
+    ]);
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=when the end moves and the season was stretched, an item already starting at the new end keeps its
+  // own dates while one on sale since the stretched week end keeps its start and ends with the season; fails_when=the start-at-to check runs only when
+  // the end stays, so the next season's item gets the 2-week guess; why_new=the stretch tests above have no item at `to`;
+  // seam=none; no_claim=the App effect that calls it
+  it('keeps the dates of an item already starting at the new end when a stretched season moves', () => {
+    const now = new Date('2026-01-18T12:00:00');
+    const s = setup([], [
+      pack('onSale', [], { season: true, startsAt: '2026-01-17T11:00', endsAt: '2026-01-31T11:00' }),
+      // Already dated by the schedule: the season after starts at the new end and runs three weeks.
+      pack('listed', [], { season: true, startsAt: '2026-01-24T11:00', endsAt: '2026-02-14T11:00' }),
+    ], (s) => (s.realmKlashSeasonEnd = '2026-01-03T11:00'));
+    // Rolled forward, the saved end is Jan 31, so the end moves (to Jan 24) and Jan 17 is a stretched week end.
+    expect(seasonEnd(s.realmKlashSeasonEnd, now)).toBe('2026-01-31T11:00');
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', now, ['2026-01-17T11:00', '2026-01-10T11:00'])).toBe(true);
+    expect(s.packs.map((p) => [p.startsAt, p.endsAt])).toEqual([
+      ['2026-01-17T11:00', '2026-01-24T11:00'],
+      ['2026-01-24T11:00', '2026-02-14T11:00'],
+    ]);
+  });
+
+  // Generated by /ship test coverage audit on 2026-10-14
+  // Value: protects=an item on sale since mid-week after a stretched week end keeps its start, and its own short end
+  // unless that was the season's; fails_when=a start after a stretched week end counts as entered ahead, so a 2-day item
+  // gets the 2-week guess; why_new=the stretch tests above start items on a week end, never between; seam=none;
+  // no_claim=the App effect that calls it
+  it('keeps the dates of an item on sale since mid-week after a stretched week end, ending only the season-long one with it', () => {
+    const now = new Date('2026-01-18T12:00:00');
+    const s = setup([], [
+      // The schedule's 2-day item, in the store since the day after the passed week end.
+      pack('flash', [], { season: true, startsAt: '2026-01-19T11:00', endsAt: '2026-01-21T11:00' }),
+      // Added the same day with the end the app then had for the season (the saved end rolled forward).
+      pack('onSale', [], { season: true, startsAt: '2026-01-19T11:00', endsAt: '2026-01-31T11:00' }),
+    ], (s) => (s.realmKlashSeasonEnd = '2026-01-03T11:00'));
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', now, ['2026-01-17T11:00', '2026-01-10T11:00'])).toBe(true);
+    expect(s.packs.map((p) => [p.startsAt, p.endsAt])).toEqual([
+      ['2026-01-19T11:00', '2026-01-21T11:00'],
+      ['2026-01-19T11:00', '2026-01-24T11:00'],
+    ]);
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=an item starting at the new end whose end is the old current end (written in by packEndOnSave)
+  // takes the 2-week guess from its start; fails_when=it keeps the old end or is moved to its own start and expires
+  // unseen; why_new=the test above gives the item an end no changeover has; seam=none; no_claim=the App effect that calls it
+  it('gives an item starting at the new end the 2-week guess when it ends on the old rolled-forward end', () => {
+    const now = new Date('2026-01-18T12:00:00');
+    // Entered ahead against the old current end (Jan 31, the saved end rolled forward), so it was given that end.
+    const s = setup([], [pack('listed', [], { season: true, startsAt: '2026-01-24T11:00', endsAt: '2026-01-31T11:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-03T11:00'));
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', now, ['2026-01-17T11:00', '2026-01-10T11:00'])).toBe(true);
+    expect([s.packs[0].startsAt, s.packs[0].endsAt]).toEqual(['2026-01-24T11:00', seasonEnd('2026-01-24T11:00', new Date('2026-01-24T11:00'))]);
+    expect(s.packs[0].endsAt).toBe('2026-02-07T11:00');
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=an ordinary season whose mid-season week end is listed moves nothing when the schedule gives its
+  // usual end; fails_when=every listed week end counts, not just changeovers the saved end rolled through, so a normal
+  // season keeps moving; why_new=the stretch tests above all have a stretch; seam=none; no_claim=the App effect
+  it('moves nothing in a normal season whose mid-season week end the schedule lists', () => {
+    const s = setup([], [pack('this', [], { season: true, endsAt: '2026-01-17T11:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-03T11:00'));
+    const before = structuredClone(s);
+    expect(moveSeasonEnd(s, '2026-01-17T11:00', new Date('2026-01-12T12:00:00'), ['2026-01-10T11:00'])).toBe(false);
+    expect(s).toEqual(before);
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=stretchedWeekEnds lists the passed changeovers the schedule calls earlier week ends, latest first,
+  // and none for a future or missing end; fails_when=it checks only the saved end, includes a future one, or loses the
+  // order; why_new=the helper is new; seam=none; no_claim=the moves themselves (tests above)
+  it('lists the changeovers the saved end rolled through that the schedule calls earlier week ends', () => {
+    const weekEnds = ['2026-01-17T11:00', '2026-01-10T11:00'];
+    const at = new Date('2026-01-18T12:00:00');
+    expect([
+      stretchedWeekEnds('2026-01-10T11:00', NOW, ['2026-01-10T11:00']), // the saved end itself, just passed
+      stretchedWeekEnds('2026-01-03T11:00', at, weekEnds), // a season back: rolled through Jan 17
+      stretchedWeekEnds('2025-12-20T11:00', at, ['2026-01-03T11:00', '2026-01-17T11:00']), // two of them, latest first
+      stretchedWeekEnds('2026-01-17T11:00', NOW, weekEnds), // still in the future
+      stretchedWeekEnds('2026-01-03T11:00', at, []),
+      stretchedWeekEnds('2026-01-03T11:00', at, undefined),
+      stretchedWeekEnds(null, at, weekEnds),
+    ]).toEqual([['2026-01-10T11:00'], ['2026-01-17T11:00'], ['2026-01-17T11:00', '2026-01-03T11:00'], [], [], [], []]);
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=stretchedWeekEnds matches no week end an hour or two off a rolled changeover with no clock change
+  // between; fails_when=any week end within an hour counts, so a hand-typed end moves the season before; why_new=the
+  // rows above all match exactly; seam=none; no_claim=a real clock change (the London test below)
+  it("doesn't match a week end an hour off a rolled changeover with no clock change between", () => {
+    const at = new Date('2026-01-18T12:00:00');
+    expect([
+      stretchedWeekEnds('2026-01-03T11:00', at, ['2026-01-17T12:00', '2026-01-10T11:00']), // an hour later
+      stretchedWeekEnds('2026-01-03T11:00', at, ['2026-01-17T10:00', '2026-01-10T11:00']), // an hour earlier
+      stretchedWeekEnds('2026-01-03T11:00', at, ['2026-01-17T13:00', '2026-01-10T11:00']), // two hours: another time
+    ]).toEqual([[], [], []]);
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=across a real clock change (London, March and October) a rolled changeover matches the schedule's
+  // week end an hour off and returns both spellings; fails_when=only an exact instant counts, so items stay expired;
+  // why_new=the rows above have no clock change; seam=process.env.TZ set to Europe/London for this test;
+  // no_claim=other zones, a clock change that isn't an hour
+  it('matches a week end an hour off a rolled changeover across a clock change, returning both spellings', () => {
+    const before = process.env.TZ;
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    process.env.TZ = 'Europe/London';
+    try {
+      // Saved in winter time; rolled 2 weeks it keeps 11:00 local, now in summer time, while the real changeover is
+      // still 11:00 UTC, which the schedule spells 12:00. October is the other way round.
+      expect(new Date('2026-04-04T11:00').getTime() - new Date('2026-03-21T11:00').getTime()).toBe((14 * 24 - 1) * 3600_000);
+      expect([
+        stretchedWeekEnds('2026-03-21T11:00', new Date('2026-04-05T12:00'), ['2026-04-04T12:00']),
+        stretchedWeekEnds('2026-10-17T11:00', new Date('2026-11-01T12:00'), ['2026-10-31T10:00']),
+      ]).toEqual([['2026-04-04T12:00', '2026-04-04T11:00'], ['2026-10-31T11:00', '2026-10-31T10:00']]);
+    } finally {
+      // Setting TZ back to the zone in use before resets the clock; then unset it if it wasn't set.
+      process.env.TZ = before ?? zone;
+      if (before === undefined) delete process.env.TZ;
+    }
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=stretchedWeekEnds rolls a saved end years back onto the right 2-week changeover, and a mistyped
+  // future year finds none; fails_when=the skip ahead lands off the saved end's grid or past a week end it should match;
+  // why_new=the rows above save ends a season or two back; seam=none; no_claim=how long the old step-by-step loop took
+  it('finds the right changeover from a saved end years back, and none from a mistyped future year', () => {
+    const at = new Date('2026-01-18T12:00:00');
+    const weekEnds = ['2026-01-17T11:00', '2026-01-10T11:00'];
+    // Jan 10 2026 is 157 seasons (2,198 days) after Jan 4 2020; Jan 17 is half a season off that grid.
+    expect([stretchedWeekEnds('2020-01-04T11:00', at, weekEnds), stretchedWeekEnds('2062-01-10T11:00', at, weekEnds)]).toEqual([['2026-01-10T11:00'], []]);
+  });
+
   it("leaves the last season's items alone when its end was set a little after the real changeover", () => {
     // Ended early tapped at 11:00; the schedule then lists a new season that started at 10:00.
     const s = setup([], [pack('last', [], { season: true, endsAt: '2026-01-10T11:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
     moveSeasonEnd(s, '2026-01-17T10:00', NOW, []);
     expect(s.packs[0].endsAt).toBe('2026-01-10T11:00');
+  });
+
+  // Generated by /ship review fixes on 2026-10-13
+  // Value: protects=a hand-set end an hour after a week end the schedule lists, with no clock change between, moves
+  // nothing from the season before; fails_when=any week end within an hour counts as the saved end; why_new=the test
+  // above lists no week ends; seam=none; no_claim=a real clock change (the London stretchedWeekEnds test)
+  it("leaves the last season's items alone when the schedule lists a week end an hour before the end set by hand", () => {
+    // Ended early tapped at 11:00; the schedule lists 10:00 that day as a week end.
+    const s = setup([], [pack('last', [], { season: true, endsAt: '2026-01-10T11:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
+    expect(moveSeasonEnd(s, '2026-01-17T10:00', NOW, ['2026-01-10T10:00'])).toBe(true);
+    expect([s.packs[0].endsAt, s.realmKlashSeasonEnd]).toEqual(['2026-01-10T11:00', '2026-01-17T10:00']);
   });
 
   it('keeps an item entered ahead in the season it starts in when the current season moves', () => {
@@ -1342,10 +1715,11 @@ describe('Realm Klash seasons', () => {
     expect([s.packs[0].startsAt, s.packs[0].endsAt]).toEqual(['2026-01-19T20:00', '2026-02-02T20:00']);
   });
 
-  it('moves an item entered ahead when the schedule extends the season after its saved end passed', () => {
-    const s = setup([], [pack('next', [], { season: true, startsAt: '2026-01-10T11:00', endsAt: '2026-01-24T11:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
+  it('keeps the start of an item on sale since the saved end when the schedule extends the season after it passed', () => {
+    // Store items can't be entered ahead, so one starting on the passed week end has been on sale since then.
+    const s = setup([], [pack('onSale', [], { season: true, startsAt: '2026-01-10T11:00', endsAt: '2026-01-24T11:00' })], (s) => (s.realmKlashSeasonEnd = '2026-01-10T11:00'));
     moveSeasonEnd(s, '2026-01-17T11:00', NOW, ['2026-01-10T11:00']);
-    expect([s.packs[0].startsAt, s.packs[0].endsAt]).toEqual(['2026-01-17T11:00', '2026-01-31T11:00']);
+    expect([s.packs[0].startsAt, s.packs[0].endsAt]).toEqual(['2026-01-10T11:00', '2026-01-17T11:00']);
   });
 
   it('assumes Blood Ruby characters, Kameos and Kameo packs rotate, but not the gear', () => {

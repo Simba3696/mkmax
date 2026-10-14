@@ -1,14 +1,20 @@
 import { useState } from 'react';
-import { newId, useStore } from '../store';
+import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { LevelOptions, Modal, NumInput, kasketLine } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
-import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, isSeasonal, kasketPool, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
+import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, entryGoal, isMaxed, isSeasonal, kasketPool, maxFusion, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
 import { initialSource } from '../challenges';
 import { scheduledSeason, scheduledSeasonEnd, useEvents } from '../events';
 import { kasketFor } from '../kaskets';
-import type { Card, Pack } from '../types';
+import type { Card, Pack, RarityRule } from '../types';
 import CardPicker from './CardPicker';
+
+/** A card as Add card here saves it: with the goal it's entered with (see `entryGoal`). */
+const entered = (card: Card, rule: RarityRule): Card => {
+  const goal = entryGoal(card, rule);
+  return goal ? { ...card, goal } : card;
+};
 
 /** A line of inputs: a drop's card and chance, or the pool and new-card controls. */
 const dropRow = 'flex gap-[0.4rem] items-center my-[0.35rem]';
@@ -16,9 +22,11 @@ const pctInput = 'w-[80px]';
 
 export default function PackEditor({ initial, onClose }: { initial: Pack | null; onClose: () => void }) {
   const { state, update } = useStore();
+  // A store item left with no item (Delete on its card keeps it) opens with an empty item picker, so one is chosen
+  // before it's saved.
   const [p, setP] = useState<Pack>(
     () =>
-      initial ?? {
+      (initial?.store && initial.drops.length === 0 ? { ...initial, drops: [{ cardId: '', chance: 100 }] } : initial) ?? {
         id: newId(),
         name: '',
         currencyId: state.currencies[0]?.id ?? '',
@@ -49,6 +57,14 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   // The pack as it would be saved: Already bought and the end date as they are now, unless changed here.
   const [changed, setChanged] = useState<{ purchased?: boolean; endsAt?: boolean }>({});
   const base = editedPack(p, state.packs.find((x) => x.id === p.id), changed);
+  // A saved pack another device deleted while this was open (or a store item cleared once its card was done) isn't saved
+  // back: Save says so and saves nothing, as any tap on something a sync has removed.
+  const [wasSaved] = useState(() => !!initial && state.packs.some((x) => x.id === initial.id));
+  const gone = wasSaved && !state.packs.some((x) => x.id === p.id);
+  // A store item whose card a sync deletes while this is open would sell nothing, so it isn't saved either, until
+  // another item is chosen. An item not chosen yet isn't one that was removed: the errors ask for it.
+  const sold = p.drops.filter((x) => x.cardId);
+  const itemGone = !!p.store && sold.length > 0 && sold.every((x) => !state.cards.some((c) => c.id === x.cardId));
   // Blood Ruby characters, Kameos and Kameo packs leave with the season; unless the user said otherwise, guess from the item.
   const seasonal = isSeasonal(base, state);
   const pastSeason = fromEndedSeason(base, seasonDraft, now);
@@ -74,18 +90,42 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     !(p.cost > 0) && 'Cost must be more than 0.',
     p.kasket === undefined && !(p.rolls >= 1) && 'Cards per purchase must be at least 1.',
     p.kasket !== undefined && !kasketRule && "Choose the Kasket's rarity.",
-    p.kasket === undefined && p.drops.some((d) => !d.cardId) && (p.store ? 'Choose the item being sold.' : 'Every drop row needs a card.'),
+    // A drop whose card has since gone (deleted, or maxed and removed, on another device) shows no card, so it asks too.
+    p.kasket === undefined &&
+      p.drops.some((d) => !d.cardId || (!p.store && !state.cards.some((c) => c.id === d.cardId))) &&
+      (p.store ? 'Choose the item being sold.' : 'Every drop row needs a card.'),
     p.startsAt && endsAt && p.startsAt >= endsAt && 'The end time must be after the start time.',
   ].filter(Boolean) as string[];
 
+  // The rarity the box shows: the one picked, or the first once a sync has removed that one (its level starts at not owned).
+  // A level a sync has since taken off the rarity shows, and is saved, as not owned too, so Add card isn't greyed out for it.
+  const newCardRule = state.rarities.find((r) => r.id === newCard.rarityId) ?? state.rarities[0];
+  const newCardFusion = newCardRule?.id === newCard.rarityId && newCard.fusion <= maxFusion(newCardRule) ? newCard.fusion : 0;
+  // A level that is already the card's goal: the card would be done (and deleted) as soon as it's saved. Checked with
+  // its name too, since Realm Klash gear is tracked to F10 whatever its rarity's Track until, and with the goal it's
+  // saved with: one at or past its kard threshold goes on to its max.
+  const newCardDone = !!newCardRule && isMaxed(entered({ id: '', name: newCard.name.trim(), rarityId: newCardRule.id, fusion: newCardFusion, guest: false }, newCardRule), newCardRule);
   function addNewCard() {
-    if (!newCard.name.trim()) return;
-    const card: Card = { id: newId(), name: newCard.name.trim(), rarityId: newCard.rarityId, fusion: newCard.fusion, guest: false };
-    const source = initialSource(card, state.rarities);
-    if (source) card.source = source;
-    update((d) => void d.cards.push(card));
-    setP((x) => ({ ...x, drops: x.store ? [{ cardId: card.id, chance: 100 }] : [...x.drops, { cardId: card.id, chance: 0 }] }));
-    setNewCard((n) => ({ ...n, name: '', fusion: 0 }));
+    if (!newCard.name.trim() || !newCardRule) return;
+    let card = undefined as Card | undefined;
+    update((d) => {
+      // Not under a rarity a sync removed after the editor was drawn: the card would be hidden everywhere, with no way
+      // to delete it. A level a sync has since taken off the rarity is saved as not owned.
+      const rule = d.rarities.find((r) => r.id === newCardRule.id);
+      if (!rule) return noChange;
+      const made = entered({ id: newId(), name: newCard.name.trim(), rarityId: rule.id, fusion: newCardFusion <= maxFusion(rule) ? newCardFusion : 0, guest: false }, rule);
+      // A card already at its goal is done: the save would delete it at once and leave the pack a drop for nothing.
+      if (isMaxed(made, rule)) return noChange;
+      const source = initialSource(made, d.rarities);
+      if (source) made.source = source;
+      d.cards.push(made);
+      card = made;
+    });
+    // The typed name stays for another try when nothing was added.
+    if (!card) return;
+    const id = card.id;
+    setP((x) => ({ ...x, drops: x.store ? [{ cardId: id, chance: 100 }] : [...x.drops, { cardId: id, chance: 0 }] }));
+    setNewCard((n) => ({ ...n, rarityId: newCardRule.id, name: '', fusion: 0 }));
   }
 
   // The pool's total is shared by every item in it, not only the ones picked, so each card gets total ÷ pool size.
@@ -106,12 +146,18 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     // A corrected season end moves every pack that was ending with the old one, but only when it was changed here.
     const moveTo = seasonMoveOnSave({ seasonal, pastSeason, scheduled, edited: seasonEdit, currentEnd: currentSeasonEnd });
     const name = p.name.trim();
-    update((d) => savePack(d, { ...base, endsAt }, moveTo, now), moveTo ? `Saved ${name} and changed the season end` : `Saved ${name}`);
-    onClose();
+    let saved = false;
+    update(
+      (d) => ((wasSaved && !d.packs.some((x) => x.id === base.id)) || !(saved = savePack(d, { ...base, endsAt }, moveTo, now)) ? noChange : undefined),
+      moveTo ? `Saved ${name} and changed the season end` : `Saved ${name}`,
+    );
+    // A tap that saved nothing (a sync removed the pack or its item just before it) leaves the editor open, so its note
+    // shows and nothing typed is lost.
+    if (saved) onClose();
   }
 
   return (
-    <Modal title={initial && state.packs.some((x) => x.id === initial.id) ? 'Edit pack' : 'New pack'} onClose={onClose} wide>
+    <Modal title={wasSaved ? 'Edit pack' : 'New pack'} onClose={onClose} wide>
       {/* The wide modal fits four columns: the name takes two and the store checkbox the other two rather than stretching a 900px input. */}
       <div className={`${form} lg:grid-cols-4`}>
         <label className={`${field} col-span-full lg:col-span-2`}>
@@ -325,20 +371,24 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
             <div className="text-small text-muted">Card not in your list yet? Add it here:</div>
             <div className={`${dropRow} flex-wrap`}>
               <input className="flex-1 lg:flex-[2]" value={newCard.name} placeholder="Card name" onChange={(e) => setNewCard({ ...newCard, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addNewCard()} />
-              <select className="flex-1" value={newCard.rarityId} onChange={(e) => setNewCard({ ...newCard, rarityId: e.target.value })}>
+              <select className="flex-1" value={newCardRule?.id ?? ''} onChange={(e) => setNewCard({ ...newCard, rarityId: e.target.value })}>
                 {state.rarities.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.label}
                   </option>
                 ))}
               </select>
-              <select className="flex-1" value={newCard.fusion} onChange={(e) => setNewCard({ ...newCard, fusion: Number(e.target.value) })}>
-                <LevelOptions rule={state.rarities.find((r) => r.id === newCard.rarityId)} />
+              <select className="flex-1" value={newCardFusion} onChange={(e) => setNewCard({ ...newCard, rarityId: newCardRule?.id ?? '', fusion: Number(e.target.value) })}>
+                <LevelOptions rule={newCardRule} />
               </select>
-              <button onClick={addNewCard} disabled={!newCard.name.trim()}>
+              <button onClick={addNewCard} disabled={!newCard.name.trim() || newCardDone}>
                 Add card
               </button>
             </div>
+            {newCard.rarityId && newCardRule && newCardRule.id !== newCard.rarityId && (
+              <div className="text-small text-muted">The rarity picked here has since been removed, so this card goes in as {newCardRule.label}.</div>
+            )}
+            {newCardDone && <div className="text-small text-muted">That level is already the card's goal, so it would be done at once: pick a lower level to add it.</div>}
           </div>
         </>
       )}
@@ -350,9 +400,11 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
           ))}
         </ul>
       )}
+      {gone && <p className="text-muted text-small">This pack has since been removed on another device, so saving it won't bring it back.</p>}
+      {!gone && itemGone && <p className="text-muted text-small">The card this item sells has since been removed: choose another item to save it.</p>}
       <div className={modalFoot}>
         <button onClick={onClose}>Cancel</button>
-        <button className={btn.primary} onClick={save} disabled={errors.length > 0}>
+        <button className={btn.primary} onClick={save} disabled={errors.length > 0 || gone || itemGone}>
           Save pack
         </button>
       </div>

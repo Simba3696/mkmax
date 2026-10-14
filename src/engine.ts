@@ -39,6 +39,16 @@ export const thresholdLevel = (rule: RarityRule) => (rule.fusionUpThreshold == n
 /** The card's goal: max for Realm Klash gear (always bought to max), else its own override, else the rarity's. */
 export const cardGoal = (card: Card, rule: RarityRule) => (rule.kind === 'equipment' && isRealmKlashName(card.name) ? 'max' : (card.goal ?? rule.goal));
 
+/**
+ * The goal a card gets as it's entered (Add card, Paste a list, the pack editor). One typed in already at or past its kard
+ * threshold, while tracked only that far, would be done the moment it's saved, so it's tracked on to its next target
+ * instead: its max (F10, or a Gold card's own cap). A card levelled up to the threshold later still finishes there.
+ */
+export function entryGoal(card: Card, rule: RarityRule): Card['goal'] {
+  const thr = thresholdLevel(rule);
+  return cardGoal(card, rule) === 'threshold' && thr != null && card.fusion >= thr ? 'max' : card.goal;
+}
+
 /** The level this card is being worked toward: rarity max, per-card cap, or the kard threshold. */
 export function targetLevel(card: Card, rule: RarityRule) {
   let t = maxFusion(rule);
@@ -553,9 +563,10 @@ function gearOrderCompare(state: AppState) {
  * The gear order to save after moving piece `id` up (-1) or down (1) past its on-sale neighbour `past` (Settings' ↑/↓),
  * or null when there's nothing to move. Every Realm Klash piece is saved in its place, on sale or not, and only the
  * tapped piece moves: the two aren't swapped, since pieces waiting for their store item can sit between them, and
- * swapping would push the other one past those too.
+ * swapping would push the other one past those too. `onSale` is the pieces on sale now, in buying order (gearQueue):
+ * when given, the tapped piece must still be on sale and `past` still the next one in the arrow's direction.
  */
-export function moveInGearOrder(state: AppState, id: string, past: string, by: -1 | 1): string[] | null {
+export function moveInGearOrder(state: AppState, id: string, past: string, by: -1 | 1, onSale?: string[]): string[] | null {
   const ids = state.cards
     .filter((c) => isRealmKlashGear(state, c))
     .sort(gearOrderCompare(state))
@@ -565,6 +576,12 @@ export function moveInGearOrder(state: AppState, id: string, past: string, by: -
   // Already on the side the arrow points to: the order changed (a sync) after the screen showed it. Moving by where
   // the pieces sit now would send the piece back over its neighbour and undo the last move.
   if (from < 0 || to < 0 || id === past || (by > 0) !== (from < to)) return null;
+  // A sync took the tapped piece off sale (it keeps its place), or put another piece on sale between the two since the
+  // screen was drawn (moving would jump that one too).
+  if (onSale) {
+    const at = onSale.indexOf(id);
+    if (at < 0 || onSale[at + by] !== past) return null;
+  }
   ids.splice(from, 1);
   const at = ids.indexOf(past);
   ids.splice(by > 0 ? at + 1 : at, 0, id);
@@ -708,11 +725,14 @@ export function endingSoon(plan: Plan, now: Date): Pack[] {
 
 // ---------- Recording purchases ----------
 
-/** Level a card up or down by one copy, within its rarity's range. */
+/** Level a card up or down by one copy, within its rarity's range. Returns whether its level changed. */
 export function stepCard(d: AppState, cardId: string, delta: 1 | -1) {
   const card = d.cards.find((c) => c.id === cardId);
   const rule = card && d.rarities.find((r) => r.id === card.rarityId);
-  if (card && rule) card.fusion = Math.min(maxFusion(rule), Math.max(0, card.fusion + delta));
+  if (!card || !rule) return false;
+  const was = card.fusion;
+  card.fusion = Math.min(maxFusion(rule), Math.max(0, card.fusion + delta));
+  return card.fusion !== was;
 }
 
 /**
@@ -730,14 +750,16 @@ export function kardStep(state: AppState, cardId: string): number | null {
 
 /**
  * Fuse a card one step with Fusion Up Kards, as done in the game: the kards come off the Wallet and the card goes
- * up a level. Returns the kards used, or null when kardStep says the step isn't possible. Ascension steps also
- * take Ascension Kards in the game, which aren't tracked.
+ * up a level. Returns the kards used, or null when kardStep says the step isn't possible, or the step isn't the one
+ * the button showed: a different cost than the `expected` kards, or a card no longer at level `from` (a sync already
+ * made the step, and the next may cost the same). Ascension steps also take Ascension Kards in the game, which aren't
+ * tracked.
  */
-export function fuseWithKards(d: AppState, cardId: string): number | null {
+export function fuseWithKards(d: AppState, cardId: string, expected?: number, from?: number): number | null {
   const cost = kardStep(d, cardId);
   const card = d.cards.find((c) => c.id === cardId);
   const rule = card && d.rarities.find((r) => r.id === card.rarityId);
-  if (cost == null || !card || !rule) return null;
+  if (cost == null || !card || !rule || (expected != null && cost !== expected) || (from != null && card.fusion !== from)) return null;
   rule.fusionUpKards -= cost;
   card.fusion += 1;
   return cost;
@@ -746,8 +768,8 @@ export function fuseWithKards(d: AppState, cardId: string): number | null {
 /**
  * Buy (delta 1) or take back (delta -1) one purchase of a pack: counts it, moves the cost out of (or back into)
  * the balance, and for a store item, which always gives its card, levels that card. Random packs leave the
- * cards to the "What did you pull?" step. Returns false when nothing was logged: the pack is gone, or a −1 has no
- * purchase left to take back.
+ * cards to the "What did you pull?" step. Returns false when nothing was logged: the pack is gone, a +1 would pass
+ * its purchase limit, or a −1 has no purchase left to take back.
  *
  * A buy the balance doesn't cover takes it below 0 rather than stopping at 0: the typed balance was out of date,
  * and -1 (for a mis-tap) has to give back exactly what the buy took. The planner counts a negative balance as 0.
@@ -755,6 +777,7 @@ export function fuseWithKards(d: AppState, cardId: string): number | null {
 export function recordPurchase(d: AppState, packId: string, delta: 1 | -1) {
   const pack = d.packs.find((x) => x.id === packId);
   if (!pack || (delta < 0 && pack.purchased <= 0)) return false;
+  if (delta > 0 && pack.maxPurchases != null && pack.purchased >= pack.maxPurchases) return false;
   pack.purchased += delta;
   const cur = d.currencies.find((c) => c.id === pack.currencyId);
   if (cur) cur.balance -= delta * pack.cost;
@@ -787,8 +810,41 @@ export function seasonEnd(saved: string | null | undefined, now: Date): string |
 }
 
 /**
+ * The changeovers the saved season end has already rolled through (itself, then every 2 weeks, up to now) that the
+ * schedule lists as earlier week ends of the current season: the season was stretched after they passed, so items
+ * still ending on them belong to the season that's still on. The saved end is usually a season or more back (it's only
+ * rewritten when the date changes), so checking the saved end alone misses most stretched seasons. Latest first.
+ */
+export function stretchedWeekEnds(saved: string | null | undefined, now: Date, weekEnds?: string[]): string[] {
+  if (!saved || !weekEnds?.length) return [];
+  const t = new Date(saved);
+  if (isNaN(t.getTime())) return [];
+  const ends = weekEnds.map((w) => [w, new Date(w).getTime()] as const);
+  // A saved end long ago (or with a mistyped year) would take many 2-week steps to roll forward: skip to a season
+  // before the earliest week end. setDate keeps the local time across clock changes.
+  const span = SEASON_DAYS * 24 * 3600_000;
+  const steps = Math.floor((Math.min(...ends.map(([, e]) => e)) - t.getTime()) / span) - 1;
+  if (steps > 0) t.setDate(t.getDate() + steps * SEASON_DAYS);
+  // The rolled end keeps its local time while the schedule's week ends are fixed instants 2 weeks apart, so after a
+  // clock change since the saved end they're off by exactly that change: both spellings count, since items may end on
+  // either. Nothing else does: a date typed by hand, or set with Ended early, a little after the real changeover
+  // belongs to the season before.
+  const savedOffset = new Date(saved).getTimezoneOffset();
+  const found = new Set<string>();
+  for (; t <= now; t.setDate(t.getDate() + SEASON_DAYS)) {
+    const at = t.getTime();
+    const grid = at + (savedOffset - t.getTimezoneOffset()) * 60_000;
+    const near = ends.filter(([, e]) => e === at || e === grid);
+    if (near.length) [toLocalInput(t), ...near.map(([w]) => w)].forEach((c) => found.add(c));
+  }
+  return [...found].sort().reverse();
+}
+
+/**
  * Change the current season's end (a corrected timer, or a season that ended early). Every seasonal pack that
- * was ending with it moves too; packs from earlier seasons keep their dates. Mutates the state.
+ * was ending with it moves too; packs from earlier seasons keep their dates. Mutates the state, and returns whether
+ * anything moved: false when the current season end (the saved one rolled forward, see seasonEnd) is already `to`
+ * and none of the season's earlier week ends need moving (see stretchedWeekEnds).
  *
  * An item entered ahead for a later season (see packEndOnSave) starts once the season it was saved against is over,
  * so it moves with that changeover to stay in the season it starts in, and its end becomes the 2-week guess from the
@@ -798,24 +854,51 @@ export function seasonEnd(saved: string | null | undefined, now: Date): string |
  *
  * `weekEnds` are the current season's earlier week ends, when the schedule knows them. The schedule can add a week
  * to a season after the saved end has passed, and that season's items still end on the saved date rather than the
- * 2-week guess, so a saved end on one of those week ends moves them too. Only an exact week end counts: a date typed
- * by hand, or set with Ended early, a little after the real changeover belongs to the season before.
+ * 2-week guess, so items ending on one of those week ends (the saved end, or a 2-week changeover it rolled through)
+ * move too. Only a week end counts, give or take a clock change (see stretchedWeekEnds): a date typed by hand, or set
+ * with Ended early, a little after the real changeover belongs to the season before. An item starting on or after
+ * one of those week ends is on sale in the season that's still on (store items only show up once they're in the
+ * store), so it keeps its start.
  */
 export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: string[]) {
   const from = seasonEnd(s.realmKlashSeasonEnd, now);
-  const saved = s.realmKlashSeasonEnd;
-  const extended = saved && weekEnds?.includes(saved) ? saved : null;
-  const changeovers = [from, extended].filter((c): c is string => !!c);
+  const extended = stretchedWeekEnds(s.realmKlashSeasonEnd, now, weekEnds);
+  // Already there (often a pull brought the move in from another device): nothing to move. Unless the schedule
+  // stretched the season by exactly 2 weeks: the saved end rolled forward is then the new end, but items still ending
+  // on one of the season's earlier week ends have to move.
+  if (from === to && !extended.length) return false;
+  // When `to` is the current end, that changeover isn't moving: only the earlier week ends do, and items starting at
+  // or after `to` (the next season's) keep their dates.
+  const still = from === to;
+  const changeovers = [...(still ? [] : [from]), ...extended].filter((c): c is string => !!c);
+  let moved = false;
   for (const p of s.packs) {
     if (!p.season || !p.endsAt) continue;
     const start = p.startsAt;
-    const ahead = start && changeovers.find((c) => start >= c);
-    if (ahead) {
-      if (start === ahead) p.startsAt = to;
+    // An item already starting at `to` (or, when `to` isn't moving, after it) is in the season it belongs to, with its own
+    // end from the schedule: neither its start nor its end moves.
+    if (start && (still ? start >= to : start === to)) {
+      // Unless its end was the current season's, written in when it was entered ahead (packEndOnSave): it then takes
+      // the 2-week guess from its start, as a re-save would give it.
+      if (!still && changeovers.includes(p.endsAt)) p.endsAt = seasonEnd(to, new Date(start));
+      continue;
+    }
+    // Only the current end, when it moves, has items entered ahead past it. A stretched week end has passed while the
+    // season went on, so an item starting there is on sale now: it keeps its start, and ends with the season.
+    if (!still && from && start && start >= from) {
+      if (start === from) p.startsAt = to;
       p.endsAt = seasonEnd(to, new Date(p.startsAt!));
-    } else if (changeovers.includes(p.endsAt)) p.endsAt = to;
+    } else if (changeovers.includes(p.endsAt)) {
+      p.endsAt = to;
+      moved = true;
+    }
   }
+  // When the end isn't moving and no item was on a stretched week end, there's nothing to save: rewriting the saved end
+  // (it already rolls forward to `to`) would only make every device save, and ask which copy to keep. Leaving it also
+  // lets an item on that week end that syncs in later still be found.
+  if (still && !moved) return false;
   s.realmKlashSeasonEnd = to;
+  return true;
 }
 
 /** Whether a pack rotates with the season when the user hasn't said: Blood Ruby items that aren't gear. */
@@ -881,15 +964,21 @@ export function seasonMoveOnSave(o: { seasonal: boolean; pastSeason: boolean; sc
 /**
  * Save an edited pack (already through editedPack and packEndOnSave), adding it if it's new. `moveSeasonTo` comes
  * from seasonMoveOnSave: every pack ending with the current season moves to it (see moveSeasonEnd). Mutates the state.
+ * Returns false, saving nothing, for a store item that would sell nothing (its card deleted while the editor was open).
  */
 export function savePack(d: AppState, pack: Pack, moveSeasonTo: string | null, now: Date) {
   const clean: Pack = kasketShape({ ...pack, name: pack.name.trim() });
+  // Not drops for cards a sync deleted while the editor was open: they'd point at nothing. A store item left selling
+  // nothing isn't saved at all, as it would never be cleared as done.
+  clean.drops = clean.drops.filter((x) => d.cards.some((c) => c.id === x.cardId));
+  if (clean.store && clean.drops.length === 0) return false;
   if (clean.currencyId === REALM_KLASH_CURRENCY) clean.season = isSeasonal(clean, d);
   else delete clean.season;
   const i = d.packs.findIndex((x) => x.id === clean.id);
   if (i >= 0) d.packs[i] = clean;
   else d.packs.push(clean);
   if (moveSeasonTo) moveSeasonEnd(d, moveSeasonTo, now);
+  return true;
 }
 
 /** Each card's share of an even pool: its total ÷ every item in the pool, which is at least the cards picked. */

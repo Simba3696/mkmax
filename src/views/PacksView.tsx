@@ -110,7 +110,11 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
       },
       delta > 0 ? `Bought ${p.name}` : undefined,
     );
-    if (done && !p.store) setPulling(delta > 0 ? p.id : null);
+    // A buy that logged nothing doesn't open the pull step; a −1 closes this pack's, even one a sync had already taken
+    // back, and leaves another pack's open.
+    if (p.store) return;
+    if (delta > 0 && done) setPulling(p.id);
+    else if (delta < 0 && pulling === p.id) setPulling(null);
   };
 
   /** A pulled card's row in "What did you pull?": + and − step its level. */
@@ -122,11 +126,11 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         <CardThumb card={card} rule={rule} size={36} />
         <span className={grow}>{card.name}</span>
         <div className={stepper}>
-          <button onClick={() => update((s) => stepCard(s, card.id, -1))} disabled={card.fusion <= 0} aria-label="Remove a copy">
+          <button onClick={() => update((s) => (stepCard(s, card.id, -1) ? undefined : noChange))} disabled={card.fusion <= 0} aria-label="Remove a copy">
             −
           </button>
           <span className={stepperVal}>{card.fusion === 0 ? '—' : levelLabel(rule, card.fusion)}</span>
-          <button onClick={() => update((s) => stepCard(s, card.id, 1))} disabled={card.fusion >= maxFusion(rule)} aria-label="Add a copy">
+          <button onClick={() => update((s) => (stepCard(s, card.id, 1) ? undefined : noChange))} disabled={card.fusion >= maxFusion(rule)} aria-label="Add a copy">
             +
           </button>
         </div>
@@ -185,7 +189,16 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         )}
         <button onClick={() => setEditing(p)}>Edit</button>
         <button onClick={() => duplicate(p)}>Rerun</button>
-        <ConfirmButton label="Delete" onConfirm={() => update((d) => void (d.packs = d.packs.filter((x) => x.id !== p.id)), `Deleted ${p.name}`)} />
+        <ConfirmButton
+          label="Delete"
+          onConfirm={() =>
+            update((d) => {
+              const kept = d.packs.filter((x) => x.id !== p.id);
+              if (kept.length === d.packs.length) return noChange; // a sync already removed it
+              d.packs = kept;
+            }, `Deleted ${p.name}`)
+          }
+        />
       </div>
       {pulling === p.id && (
         <div className={subpanel}>
@@ -263,10 +276,11 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
                   (d) => {
                     const kept = d.packs.filter((p) => packStatus(p, now) !== 'expired' || keepWhenExpired(d, p));
                     cleared = d.packs.length - kept.length;
+                    // A sync had already cleared them.
+                    if (!cleared) return noChange;
                     d.packs = kept;
                   },
-                  // Nothing to undo if a sync had already cleared them.
-                  () => (cleared ? `Cleared ${cleared} expired pack${cleared === 1 ? '' : 's'}` : ''),
+                  () => `Cleared ${cleared} expired pack${cleared === 1 ? '' : 's'}`,
                 );
               }}
             />
@@ -300,7 +314,7 @@ function SeasonBar() {
   const [draft, setDraft] = useState<string | null>(null);
   // Once the schedule covers the season, its date wins and the box is gone, so a leftover draft is dropped.
   const commit = () => {
-    if (!scheduled && draft && draft !== end && !isNaN(new Date(draft).getTime())) update((d) => moveSeasonEnd(d, draft, now), 'Changed the Realm Klash season end');
+    if (!scheduled && draft && draft !== end && !isNaN(new Date(draft).getTime())) update((d) => (moveSeasonEnd(d, draft, now) ? undefined : noChange), 'Changed the Realm Klash season end');
     setDraft(null);
   };
   // Leaving Packs (a swipe after picking a date) can remove the box without a blur, so apply the draft then too.
@@ -340,8 +354,12 @@ function SeasonBar() {
         </label>
         {end && (
           <ConfirmButton
+            // Armed for this season only: a new season shown (a sync, or the changeover passing) starts the button over.
+            key={end}
             label="Ended early"
-            onConfirm={() => update((d) => moveSeasonEnd(d, toLocalInput(now), now), 'Ended the Realm Klash season early')}
+            // Only the season the button showed: once a sync has ended it, the season shown next is a new one, and ending
+            // that would expire everything entered for it.
+            onConfirm={() => update((d) => (seasonEnd(d.realmKlashSeasonEnd, now) === end && moveSeasonEnd(d, toLocalInput(now), now) ? undefined : noChange), 'Ended the Realm Klash season early')}
           />
         )}
       </div>
@@ -412,7 +430,10 @@ function ShopSuggestions({ onAdd }: { onAdd: (p: Pack) => void }) {
                   )}
                   <button
                     className={btn.ghost}
-                    onClick={() => update((d) => void (d.dismissedShopPacks = [...(d.dismissedShopPacks ?? []), sp.name]), `Hid ${packName(sp)}`)}
+                    onClick={() =>
+                      // Not again if a sync already hid it.
+                      update((d) => (d.dismissedShopPacks?.includes(sp.name) ? noChange : void (d.dismissedShopPacks = [...(d.dismissedShopPacks ?? []), sp.name])), `Hid ${packName(sp)}`)
+                    }
                   >
                     Not needed
                   </button>

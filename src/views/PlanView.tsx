@@ -95,10 +95,21 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
 
   const wallet = (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-[0.6rem] md:items-end">
-      {state.currencies.map((c, i) => (
+      {state.currencies.map((c) => (
         <label key={c.id} className={field}>
           <span>{c.name}</span>
-          <NumInput value={c.balance} min={0} onChange={(v) => update((d) => void (d.currencies[i].balance = v ?? 0))} />
+          <NumInput
+            value={c.balance}
+            min={0}
+            onChange={(v) =>
+              // By id, not place: a sync can reorder or remove currencies while the box is on screen.
+              update((d) => {
+                const x = d.currencies.find((y) => y.id === c.id);
+                if (!x) return noChange;
+                x.balance = v ?? 0;
+              })
+            }
+          />
         </label>
       ))}
       {kardRarities.map((r) => (
@@ -108,7 +119,13 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
             value={r.fusionUpKards}
             min={0}
             step={1}
-            onChange={(v) => update((d) => void (d.rarities.find((x) => x.id === r.id)!.fusionUpKards = v ?? 0))}
+            onChange={(v) =>
+              update((d) => {
+                const x = d.rarities.find((y) => y.id === r.id);
+                if (!x) return noChange;
+                x.fusionUpKards = v ?? 0;
+              })
+            }
           />
         </label>
       ))}
@@ -237,7 +254,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                         {/* One step per tap, as kards are used in the game; the plan updates after each. */}
                         {cost != null && (
                           <button
-                            onClick={() => update((d) => (fuseWithKards(d, a.cardId) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${name}`)}
+                            onClick={() => update((d) => (fuseWithKards(d, a.cardId, cost, a.from) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${name}`)}
                             title={`Fuse ${name} to ${levelLabel(r, a.from + 1)} with ${cost} kard${cost === 1 ? '' : 's'} from the Wallet`}
                           >
                             Use {cost}

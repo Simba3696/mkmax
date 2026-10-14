@@ -51,6 +51,22 @@ export function nameKey(name: string) {
   return [...new Set(words)].sort().join(' ');
 }
 
+// The catalog's items by kind and name key, in catalog order. Built once per catalog, so checking a few hundred cards
+// (the rarity check runs on every save, Tower gear taps included) doesn't rescan every item for each one.
+const indexes = new WeakMap<CatalogItem[], Map<string, CatalogItem[]>>();
+function catalogIndex(items: CatalogItem[]) {
+  let index = indexes.get(items);
+  if (!index) {
+    index = new Map();
+    for (const i of items) {
+      const k = `${i.kind}|${nameKey(i.name)}`;
+      index.set(k, [...(index.get(k) ?? []), i]);
+    }
+    indexes.set(items, index);
+  }
+  return index;
+}
+
 /**
  * The catalog entry for a card: same kind and name words. The app says "Kold" where the site says "Kold War",
  * and the site lists some original variants without a variant name (the Diamond "Jason Voorhees" is the wiki's
@@ -58,13 +74,13 @@ export function nameKey(name: string) {
  */
 export function findInCatalog(card: Card, rule: RarityRule | undefined, items: CatalogItem[]): CatalogItem | undefined {
   const kind = rule?.kind ?? 'character';
-  const same = items.filter((i) => i.kind === kind);
-  const key = nameKey(card.name);
-  const exact = same.find((i) => nameKey(i.name) === key) ?? same.find((i) => nameKey(i.name) === nameKey(card.name.replace(/\bKold\b/i, 'Kold War')));
+  const index = catalogIndex(items);
+  const named = (name: string) => index.get(`${kind}|${nameKey(name)}`) ?? [];
+  const exact = named(card.name)[0] ?? named(card.name.replace(/\bKold\b/i, 'Kold War'))[0];
   if (exact) return exact;
   const base = card.name.split(',')[0].trim();
   if (base === card.name.trim()) return undefined;
-  return same.find((i) => nameKey(i.name) === nameKey(base) && (i.rarity === card.rarityId || `${i.kind}-${i.rarity}` === card.rarityId));
+  return named(base).find((i) => i.rarity === card.rarityId || `${i.kind}-${i.rarity}` === card.rarityId);
 }
 
 /** A card has no art yet, or art from an older wiki lookup that MK Mobile Base may have a proper card image for. */

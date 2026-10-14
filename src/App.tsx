@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useStore, type SyncStatus, type UndoEntry } from './store';
+import { noChange, useStore, type SyncStatus, type UndoEntry } from './store';
 import { btn } from './classes';
 import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
-import { endingSoon, moveSeasonEnd, seasonEnd } from './engine';
+import { endingSoon, moveSeasonEnd, seasonEnd, stretchedWeekEnds } from './engine';
 import { refreshEvents, scheduledSeason, useEvents } from './events';
 import { checkForAppUpdate } from './appUpdate';
 import { usePlan } from './planner';
@@ -78,8 +78,16 @@ export default function App() {
     loadCatalog().then(
       (items) => {
         if (cancelled) return;
-        const updates = catalogImageUpdates(state.cards, new Map(state.rarities.map((r) => [r.id, r])), items);
-        if (updates.size) update((d) => d.cards.forEach((c) => Object.assign(c, updates.get(c.id) ?? {})), undefined, { auto: true });
+        // From the save as it is once the catalog is in: a sync meanwhile may have given a card an image pasted by hand.
+        update(
+          (d) => {
+            const updates = catalogImageUpdates(d.cards, new Map(d.rarities.map((r) => [r.id, r])), items);
+            if (!updates.size) return noChange;
+            d.cards.forEach((c) => Object.assign(c, updates.get(c.id) ?? {}));
+          },
+          undefined,
+          { auto: true },
+        );
       },
       () => {}, // offline or no catalog: Find images still works later
     );
@@ -94,16 +102,20 @@ export default function App() {
   const season = scheduledSeason(events, now);
   const scheduledEnd = season?.end ?? null;
   const savedEnd = seasonEnd(state.realmKlashSeasonEnd, now);
+  // The saved end rolled through one of the season's earlier week ends: the schedule added weeks after it passed, and
+  // items still end on it, even when the saved end rolls forward to the scheduled end (a 2-week extension).
+  const extendedEnd = stretchedWeekEnds(state.realmKlashSeasonEnd, now, season?.weekEnds).length > 0;
   useEffect(() => {
-    if (!scheduledEnd || scheduledEnd === savedEnd) return;
+    if (!scheduledEnd || (scheduledEnd === savedEnd && !extendedEnd)) return;
     // Wait for this launch's first sync: another device has often made the move already, and moving first would
     // turn its pull into a "which copy" prompt.
     if (!sync.settled) return;
     // Which packs this moves depends on when it runs, so it's a real change that syncs. The exception is a fresh
     // install, which has nothing to move: stamping it would make a new device ask which copy to keep when it joins.
-    update((d) => moveSeasonEnd(d, scheduledEnd, now, season?.weekEnds), undefined, { auto: !state.updatedAt && state.packs.length === 0 });
+    // A pull since this ran may already have brought the move in from another device: then there's nothing to save.
+    update((d) => (moveSeasonEnd(d, scheduledEnd, now, season?.weekEnds) ? undefined : noChange), undefined, { auto: !state.updatedAt && state.packs.length === 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scheduledEnd, savedEnd, sync.settled]);
+  }, [scheduledEnd, savedEnd, extendedEnd, sync.settled]);
 
   const pageRef = useRef<HTMLDivElement>(null);
   /** Direction the next tab change should slide in from, set by go() and used once the new tab has rendered. */

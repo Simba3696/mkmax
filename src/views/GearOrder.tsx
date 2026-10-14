@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { REALM_KLASH_CURRENCY, gearForecast, gearQueue, gearWaiting, levelLabel, moveInGearOrder, targetLevel } from '../engine';
+import { REALM_KLASH_CURRENCY, buildCtx, gearForecast, gearQueue, gearWaiting, levelLabel, moveInGearOrder, targetLevel } from '../engine';
 import { CardThumb, daysFromNow, FoldCard, fmt, FusionLabel } from '../ui';
 import { grow, hint, row, rowTitle } from '../classes';
 
@@ -14,7 +14,7 @@ function useGear() {
   const rubies = state.currencies.find((c) => c.id === REALM_KLASH_CURRENCY);
   const done = useMemo(() => gearForecast(gear, rubies?.balance ?? 0, rubies?.perDay), [gear, rubies?.balance, rubies?.perDay]);
   const onDay = (days: number) => (days === 0 ? 'now' : `around ${daysFromNow(days, now)}`);
-  return { state, update, ctx, gear, waiting, rubies, done, onDay, rubyName: rubies?.name ?? 'Blood Rubies' };
+  return { state, update, now, ctx, gear, waiting, rubies, done, onDay, rubyName: rubies?.name ?? 'Blood Rubies' };
 }
 
 /** Realm Klash pieces nothing plans right now, since no store item for them is on sale. */
@@ -56,13 +56,15 @@ export function GearSummary() {
 
 /** Settings: the order Blood Rubies max the Realm Klash gear in, with each piece's date. Gone once it's all maxed. */
 export default function GearOrder() {
-  const { update, ctx, gear, done, onDay, rubyName, waiting } = useGear();
+  const { update, now, ctx, gear, done, onDay, rubyName, waiting } = useGear();
   if (!gear.length && !waiting.length) return null;
   // Move a gear piece past its neighbour and save the whole order, so the list stays as shown. A tap with nothing left
-  // to move (the pieces have gone, or a sync already put them that way round) saves nothing.
+  // to move (the pieces have gone, a sync already put them that way round, or put another piece on sale between them)
+  // saves nothing.
   const move = (i: number, by: -1 | 1) =>
     update((d) => {
-      const order = moveInGearOrder(d, gear[i].card.id, gear[i + by].card.id, by);
+      const onSale = gearQueue(buildCtx(d), now).map((g) => g.card.id);
+      const order = moveInGearOrder(d, gear[i].card.id, gear[i + by].card.id, by, onSale);
       if (!order) return noChange;
       d.gearOrder = order;
     });

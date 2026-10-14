@@ -40,13 +40,22 @@ let fetchedAt = 0;
 // Downloads are numbered as they start, so one that finishes late can't replace a newer schedule already shown.
 let started = 0;
 let shown = 0;
+// When the download still on its way started, or 0 when none is: a return leaves it to finish for half a minute.
+let loadingSince = 0;
+// A download that hangs (a phone back on a patchy connection) gives up after this, so the next return can try again.
+const DOWNLOAD_TIMEOUT_MS = 30 * 1000;
 const listeners = new Set<(e: EventSchedule) => void>();
 
 /** The schedule, fetched once and shared; refreshEvents() fetches it again. */
 function loadEvents(): Promise<EventSchedule> {
   if (loaded) return loaded;
   const n = ++started;
-  const load: Promise<EventSchedule> = fetch(`${import.meta.env.BASE_URL}events.json`, { cache: 'no-cache' })
+  // A timer rather than AbortSignal.timeout, which older Safari lacks: there a hung download would never be cancelled,
+  // and each return after half a minute would add another.
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), DOWNLOAD_TIMEOUT_MS);
+  loadingSince = Date.now();
+  const load: Promise<EventSchedule> = fetch(`${import.meta.env.BASE_URL}events.json`, { cache: 'no-cache', signal: abort.signal })
     .then((r) => {
       if (!r.ok) throw new Error(`events.json: HTTP ${r.status}`);
       return r.json() as Promise<EventSchedule>;
@@ -66,6 +75,11 @@ function loadEvents(): Promise<EventSchedule> {
       // Only if no newer download has started since, so a failed one can't cancel it.
       if (loaded === load) loaded = null;
       throw e;
+    })
+    .finally(() => {
+      clearTimeout(timer);
+      // Only the latest download clears the mark, so an older one finishing can't (two can start in the same millisecond).
+      if (started === n) loadingSince = 0;
     });
   loaded = load;
   return load;
@@ -83,23 +97,19 @@ export function refreshEvents(): Promise<unknown> {
 // Coming back to the app after an hour or more also picks up a newer schedule, including a restore from the
 // back-forward cache that sends only pageshow, and tries again if no download has worked yet.
 if (typeof document !== 'undefined') {
-  // A restore can send both events at once, so one download at a time, unless that one has hung for half a minute
-  // (a phone back on a patchy connection), which would otherwise stop every later return from refreshing.
-  let refreshingSince = 0;
   const refreshIfOld = () => {
     if (document.visibilityState !== 'visible') return;
-    const busy = Date.now() - refreshingSince;
-    if (refreshingSince && busy >= 0 && busy < 30 * 1000) return;
-    // A download time later than now means the device clock went back: that counts as old.
+    // One download at a time, whoever started it (the app opening, a pull to refresh, an earlier return), so a restore
+    // that sends two events, or a quick switch during a slow first load, doesn't start a second. Once one has run half a
+    // minute it has hung (its timeout should have ended it by then): try again. A start later than now means the device
+    // clock went back: not one to wait for.
+    const busy = Date.now() - loadingSince;
+    if (loadingSince && busy >= 0 && busy < DOWNLOAD_TIMEOUT_MS) return;
+    // Never downloaded (the first one failed or hung), or downloaded over an hour ago. A download time later than now
+    // means the device clock went back: that counts as old too.
     const age = Date.now() - fetchedAt;
-    // Never downloaded (the first one failed or is still hanging): always try again.
-    const old = !fetchedAt || age < 0 || age > 60 * 60 * 1000;
-    if (!old) return;
-    const startedAt = Date.now();
-    refreshingSince = startedAt;
-    void refreshEvents().finally(() => {
-      if (refreshingSince === startedAt) refreshingSince = 0;
-    });
+    if (fetchedAt && age >= 0 && age <= 60 * 60 * 1000) return;
+    void refreshEvents();
   };
   document.addEventListener('visibilitychange', refreshIfOld);
   window.addEventListener('pageshow', (e) => e.persisted && refreshIfOld());

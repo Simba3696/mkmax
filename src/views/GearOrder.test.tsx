@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { defaultState } from '../defaults';
-import { StoreProvider } from '../store';
+import { StoreProvider, useStore } from '../store';
 import { PlanProvider } from '../planner';
 import { SyncLoop } from '../syncLoop';
 import GearOrder, { GearSummary } from './GearOrder';
@@ -42,6 +42,12 @@ function renderWith(cards: Card[], packs: Pack[] = []) {
       </PlanProvider>
     </StoreProvider>,
   );
+}
+
+/** Hands the store, as each render sees it, to the test, as any view would use it. */
+function Grab({ onRender }: { onRender: (store: ReturnType<typeof useStore>) => void }) {
+  onRender(useStore());
+  return null;
 }
 
 beforeEach(() => {
@@ -132,5 +138,37 @@ describe('Realm Klash gear with no store item on sale', () => {
     expect(JSON.parse(localStorage.getItem('mkmax:v1')!).gearOrder).toEqual(['sash', 'dev', 'mol']);
     expect(screen.getByTestId('settings').textContent).toMatch(/1\. Devastator.*2\. Moloch/);
     expect(stamps).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Realm Klash gear order on a screen a sync has changed', () => {
+  // Regression: /ship review of clock-and-gear-taps — a stale tap moved a piece past one a sync had put on sale
+  // Found by /ship on 2026-10-13
+  // Value: protects=↓ moves nothing when a sync put another piece on sale between the two on screen; fails_when=the
+  // arrow doesn't pass the pieces on sale now, so the piece jumps one the screen never showed; why_new=review (Codex,
+  // adversarial); seam=SyncLoop.nextStamp spied, a grabbed update stands in for the sync; no_claim=a real sync
+  it('moves nothing when a sync put a piece on sale between the two', () => {
+    const s = defaultState();
+    s.cards = [gear('sash', 'Shadow Sash'), gear('mol', "Moloch's Ball and Chain"), gear('dev', 'Devastator')];
+    s.packs = [item('sash'), item('dev')];
+    s.gearOrder = ['sash', 'mol', 'dev'];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    let update!: ReturnType<typeof useStore>['update'];
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <GearOrder />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    const down = screen.getAllByLabelText('Move down')[0];
+    act(() => {
+      update((d) => void d.packs.push(item('mol')));
+      down.click();
+    });
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).gearOrder).toEqual(['sash', 'mol', 'dev']);
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
   });
 });

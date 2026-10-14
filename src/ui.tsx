@@ -111,11 +111,12 @@ export function useBrokenImageUrls(): ReadonlySet<string> {
 const thumb = 'flex-none max-w-none rounded-panel border-2 border-line object-cover bg-panel-2';
 
 export function CardThumb({ card, rule, size = 44 }: { card: Card; rule?: RarityRule; size?: number }) {
-  const [broken, setBroken] = useState(false);
-  useEffect(() => setBroken(false), [card.imageUrl]);
+  // The URL that failed, rather than a flag reset by an effect: effects run again when a hidden page (Activity) is shown,
+  // which would ask for dead art again each time. A new URL still gets its own try.
+  const [failed, setFailed] = useState<string | null>(null);
   const style = { width: size, height: size, borderColor: rule?.color };
-  if (card.imageUrl && !broken) {
-    return <img className={thumb} style={style} src={card.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => (setBroken(true), markBroken(card.imageUrl!))} />;
+  if (card.imageUrl && card.imageUrl !== failed) {
+    return <img className={thumb} style={style} src={card.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => (setFailed(card.imageUrl!), markBroken(card.imageUrl!))} />;
   }
   const initials = card.name
     .split(/[\s,/]+/)
@@ -314,16 +315,33 @@ export function FoldCard({ id, title, children }: { id: string; title: string; c
   );
 }
 
+const CONFIRM_MS = 3000;
+
 export function ConfirmButton({ label, onConfirm, className }: { label: string; onConfirm: () => void; className?: string }) {
-  const [armed, setArmed] = useState(false);
+  // When it was armed, not just whether: a page hidden mid-countdown (Activity) stops the timer, so the time itself
+  // decides. Shown again later, it disarms; a tap after the 3 seconds arms again.
+  const [armedAt, setArmedAt] = useState<number | null>(null);
+  const armed = armedAt != null;
   useEffect(() => {
-    if (!armed) return;
-    const t = setTimeout(() => setArmed(false), 3000);
+    if (armedAt == null) return;
+    const elapsed = Date.now() - armedAt;
+    // A clock set back since the first tap (elapsed below 0) disarms too, rather than leaving it armed until it catches up.
+    if (elapsed < 0 || elapsed >= CONFIRM_MS) return void setArmedAt(null);
+    const left = CONFIRM_MS - elapsed;
+    const t = setTimeout(() => setArmedAt(null), left);
     return () => clearTimeout(t);
-  }, [armed]);
+  }, [armedAt]);
+  const tap = () => {
+    const elapsed = armedAt == null ? -1 : Date.now() - armedAt;
+    if (elapsed >= 0 && elapsed < CONFIRM_MS) {
+      // Once per arm: a button still on screen afterwards (Ended early) would otherwise act again on a quick third tap.
+      setArmedAt(null);
+      onConfirm();
+    } else setArmedAt(Date.now());
+  };
   // Ghost buttons (btn.ghost, alone or with extra classes after it) stay ghost when armed, as before; only the text changes.
   return (
-    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={() => (armed ? onConfirm() : setArmed(true))}>
+    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={tap}>
       {armed ? 'Tap again to confirm' : label}
     </button>
   );
