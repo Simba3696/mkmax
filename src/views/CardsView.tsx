@@ -111,7 +111,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   // After an Add that left lines behind, the box stays until Done. A card that Add saved at its goal is deleted at once
   // as done, so its line would read as new again: it's left out (`gone`). The other cards Add saved now match the list
   // and aren't listed as skipped (`justAdded`) until the list is edited, when they read as already listed like any other.
-  // An Undo or a delete brings their lines back as new.
+  // An Undo, a delete or a sync offers their lines again (as new, or as an update).
   const [leftOver, setLeftOver] = useState(false);
   const [gone, setGone] = useState<Set<string>>(new Set());
   const [justAdded, setJustAdded] = useState<Set<string>>(new Set());
