@@ -41,21 +41,44 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
  * to max. Stored only when it differs from the rarity's goal. Realm Klash gear is always bought to max, so it gets
  * a label instead of a choice (see isRealmKlashName).
  */
-function GoalSelect({ rule, name, value, onChange }: { rule: RarityRule; name: string; value: Card['goal']; onChange: (v: Card['goal']) => void }) {
+function GoalSelect({ rule, card, onChange }: { rule: RarityRule; card: Card; onChange: (v: Card['goal']) => void }) {
   if (rule.fusionUpThreshold == null) return null;
   // Gear always has the choice. A character has it while its rarity tracks only to the threshold, or once it has a goal
   // of its own (one entered past the threshold goes on to max: see entryGoal), so that goal can be seen and changed.
-  if (rule.kind !== 'equipment' && rule.goal !== 'threshold' && value == null) return null;
-  const max = levelLabel(rule, maxFusion(rule));
-  if (isRealmKlashName(name)) return <span className={`${check} text-muted`}>Realm Klash gear (bought to {max} with Blood Rubies)</span>;
+  if (rule.kind !== 'equipment' && rule.goal !== 'threshold' && card.goal == null) return null;
+  if (isRealmKlashName(card.name)) return <span className={`${check} text-muted`}>Realm Klash gear (bought to {levelLabel(rule, maxFusion(rule))} with Blood Rubies)</span>;
+  // Max is the card's own: a Gold card capped at A5 goes to A5.
+  const max = levelLabel(rule, targetLevel({ ...card, goal: 'max' }, rule));
   return (
     <label className={check}>
       Goal
-      <select value={value ?? rule.goal} onChange={(e) => onChange(e.target.value === rule.goal ? undefined : (e.target.value as Card['goal']))}>
+      <select value={card.goal ?? rule.goal} onChange={(e) => onChange(e.target.value === rule.goal ? undefined : (e.target.value as Card['goal']))}>
         <option value="threshold">F{rule.fusionUpThreshold} (Kards finish it)</option>
         <option value="max">{`Max (${max})`}</option>
       </select>
     </label>
+  );
+}
+
+/**
+ * The form's Goal for a card Add would save: kept only where the Goal box shows it (gear, or a character rarity tracked to
+ * its kard threshold), then moved on to max for a card entered at or past the threshold (entryGoal). `fixed` is that
+ * move: the level, not the box, decides the goal then.
+ */
+function formGoal(card: Card, rule: RarityRule) {
+  const picked = rule.kind === 'equipment' || rule.goal === 'threshold' ? card.goal : undefined;
+  const goal = entryGoal({ ...card, goal: picked }, rule);
+  return { goal, fixed: goal !== picked };
+}
+
+/** Add card's Goal box: the choice, or a fixed label once the level picked decides the goal (see formGoal). */
+function FormGoal({ card, rule, onChange }: { card: Card; rule: RarityRule; onChange: (v: Card['goal']) => void }) {
+  const { goal, fixed } = formGoal(card, rule);
+  if (!fixed) return <GoalSelect rule={rule} card={{ ...card, goal }} onChange={onChange} />;
+  return (
+    <span className={`${check} text-muted`}>
+      Goal: Max ({levelLabel(rule, targetLevel({ ...card, goal: 'max' }, rule))}), since it's at F{rule.fusionUpThreshold} or past it
+    </span>
   );
 }
 
@@ -550,13 +573,11 @@ function CardList() {
         // A level a sync has since taken off the rarity isn't one the level box can show: it shows (and saves) not owned.
         fusion: shown.fusion <= maxFusion(rule) ? shown.fusion : 0,
         guest: rule.hasGuests && shown.guest,
-        // The form's Goal only where the Goal box shows it (gear, or a character rarity tracked to its kard threshold); a
-        // card entered at or past the threshold then goes on to its max (entryGoal, below).
-        goal: isEquip || rule.goal === 'threshold' ? shown.goal : undefined,
         source: isEquip ? shown.source : initialSource(shown, d.rarities),
         sourceNote: tower || undefined,
       };
-      d.cards.push({ ...card, goal: entryGoal(card, rule) });
+      // The goal the form showed for it (see formGoal), worked out with the rarity as it is now.
+      d.cards.push({ ...card, goal: formGoal(card, rule).goal });
       added = true;
     });
     // The typed name stays for another try when nothing was added.
@@ -608,7 +629,7 @@ function CardList() {
               </select>
             </label>
           )}
-          {draftRule && <GoalSelect rule={draftRule} name={shown.name} value={entryGoal(shown as Card, draftRule)} onChange={(v) => setDraft({ ...shown, goal: v })} />}
+          {draftRule && <FormGoal card={shown as Card} rule={draftRule} onChange={(v) => setDraft({ ...shown, goal: v })} />}
           {draftRule && <CapSelect rule={draftRule} value={shown.maxLevel} onChange={(v) => setDraft({ ...shown, maxLevel: v })} />}
           {draftRule?.hasGuests && (
             <label className={check}>
@@ -766,7 +787,7 @@ function CardList() {
                     Use {kardCost} kard{kardCost === 1 ? '' : 's'}
                   </button>
                 )}
-                <GoalSelect rule={rule} name={c.name} value={c.goal} onChange={(v) => patch(c.id, { goal: v })} />
+                <GoalSelect rule={rule} card={c} onChange={(v) => patch(c.id, { goal: v })} />
                 <CapSelect rule={rule} value={c.maxLevel} onChange={(v) => patch(c.id, { maxLevel: v })} />
                 {rule.hasGuests && (
                   <label className={check}>
