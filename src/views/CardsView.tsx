@@ -1,4 +1,4 @@
-import { Activity, useEffect, useMemo, useState } from 'react';
+import { Activity, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { ascensionCaps, cardGoal, copiesToMax, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel } from '../engine';
@@ -148,7 +148,11 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // then be in twice. Nor updates to cards a sync removed.
         const have = new Set(d.cards.map((x) => cardKey(x.rarityId, x.name)));
         const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name)));
-        const updates = parsed.updates.flatMap((u) => d.cards.filter((c) => c.id === u.cardId).map((c) => ({ c, patch: u.patch, line: u.line })));
+        // Nor to a card left without its rarity (an older build or an imported file can leave one): it has no rules to
+        // check its goal against.
+        const updates = parsed.updates.flatMap((u) =>
+          d.cards.filter((c) => c.id === u.cardId && d.rarities.some((r) => r.id === c.rarityId)).map((c) => ({ c, patch: u.patch, line: u.line })),
+        );
         if (!cards.length && !updates.length) return noChange;
         const fresh = cards.map(
           (c): Card => ({
@@ -219,7 +223,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         update makes Gold characters ascendable, add "Stage I" (Max A5) or "Stage II" (Max A10), like "Kenshi, Elder God - Gold - Stage I": a card not in your list
         was maxed, so it comes back at the cap below with 5 copies to go.
       </p>
-      <textarea value={text} onChange={(e) => (setText(e.target.value), remember())} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
+      <textarea value={text} onChange={(e) => (setText(e.target.value), setJustAdded(new Set()), remember())} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
       <div className="text-small text-muted">
         {!state.rarities.length
           ? 'Add a rarity in Settings first: every card needs one.'
@@ -463,6 +467,23 @@ function CardList() {
     setRenaming({ id: c.id, was: renaming?.was ?? c.name, text });
     if (text.trim()) patch(c.id, { name: text });
   }
+
+  // Activity hides this page without a blur and runs its effects again when it's shown: a rename left open then is
+  // finished as a blur would (a cleared name goes back), since its box no longer has focus to lose.
+  const openRename = useRef(renaming);
+  useEffect(() => void (openRename.current = renaming));
+  useEffect(() => {
+    const r = openRename.current;
+    if (!r) return;
+    const name = r.text.trim() || r.was.trim();
+    update((d) => {
+      const c = d.cards.find((x) => x.id === r.id);
+      if (!c || !name || c.name === name) return noChange;
+      c.name = name;
+    });
+    setRenaming(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // A cleared name goes back to the name it had, so there's always something to tap to rename the card again.
   function finishRename(c: Card) {
