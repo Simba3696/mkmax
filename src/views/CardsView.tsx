@@ -133,8 +133,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   // sync can't change what it means. Every rarity and name seen is kept: a line under a rarity another device removed
   // (picked above, a heading or after " - ") is skipped, rather than filed under whichever rarity comes before it or
   // the heading becoming a card, and a heading still matches a rarity renamed since. The rarity picked above changes
-  // when the box opens (to the one the form shows) or a rarity is picked in the box above (`pick` counts those), not
-  // when a sync removes it while the box is open and the form shows the first rarity instead.
+  // when an empty box opens (to the one the form shows) or a rarity is picked in the box above (`pick` counts those,
+  // even while the box is closed), not when a sync removes it and the form shows the first rarity instead.
   const [known, setKnown] = useState(state.rarities);
   const rarities = useMemo(() => [...state.rarities, ...known.filter((r) => !state.rarities.some((x) => x.id === r.id && x.label === r.label))], [state.rarities, known]);
   const [start, setStart] = useState({ pick, id: startRarityId });
