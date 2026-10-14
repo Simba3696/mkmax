@@ -43,9 +43,10 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
  */
 function GoalSelect({ rule, card, onChange }: { rule: RarityRule; card: Card; onChange: (v: Card['goal']) => void }) {
   if (rule.fusionUpThreshold == null) return null;
-  // Gear always has the choice. A character has it while its rarity tracks only to the threshold, or once it has a goal
-  // of its own (one entered past the threshold goes on to max: see entryGoal), so that goal can be seen and changed.
-  if (rule.kind !== 'equipment' && rule.goal !== 'threshold' && card.goal == null) return null;
+  // Gear always has the choice. A character has it while its rarity tracks only to the threshold (where one entered past
+  // it shows its Max: see entryGoal), or while its own goal is F3 on a rarity tracked to Max, so that can be cleared. A Max
+  // of its own there is the rarity's anyway, and offering F3 would let one tap remove a character at F3 or above.
+  if (rule.kind !== 'equipment' && rule.goal !== 'threshold' && card.goal !== 'threshold') return null;
   if (rule.kind === 'equipment' && isRealmKlashName(card.name)) return <span className={`${check} text-muted`}>Realm Klash gear (bought to {levelLabel(rule, maxFusion(rule))} with Blood Rubies)</span>;
   // Max is the card's own: a Gold card capped at A5 goes to A5.
   const max = levelLabel(rule, targetLevel({ ...card, goal: 'max' }, rule));
