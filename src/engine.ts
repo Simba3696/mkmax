@@ -965,17 +965,20 @@ export function seasonMoveOnSave(o: { seasonal: boolean; pastSeason: boolean; sc
  * Save an edited pack (already through editedPack and packEndOnSave), adding it if it's new. `moveSeasonTo` comes
  * from seasonMoveOnSave: every pack ending with the current season moves to it (see moveSeasonEnd). Mutates the state.
  */
+/** Saves a pack from the editor, or nothing (returning false) for a store item whose card a sync has deleted. */
 export function savePack(d: AppState, pack: Pack, moveSeasonTo: string | null, now: Date) {
   const clean: Pack = kasketShape({ ...pack, name: pack.name.trim() });
-  // Not drops for cards a sync deleted while the editor was open: they'd point at nothing, and a store item for one would
-  // never be cleared as done.
+  // Not drops for cards a sync deleted while the editor was open: they'd point at nothing. A store item left selling
+  // nothing isn't saved at all, as it would never be cleared as done.
   clean.drops = clean.drops.filter((x) => d.cards.some((c) => c.id === x.cardId));
+  if (clean.store && pack.drops.length > 0 && clean.drops.length === 0) return false;
   if (clean.currencyId === REALM_KLASH_CURRENCY) clean.season = isSeasonal(clean, d);
   else delete clean.season;
   const i = d.packs.findIndex((x) => x.id === clean.id);
   if (i >= 0) d.packs[i] = clean;
   else d.packs.push(clean);
   if (moveSeasonTo) moveSeasonEnd(d, moveSeasonTo, now);
+  return true;
 }
 
 /** Each card's share of an even pool: its total ÷ every item in the pool, which is at least the cards picked. */

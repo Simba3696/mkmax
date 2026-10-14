@@ -173,8 +173,9 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   if (!open) {
     return (
       <div className={actions}>
-        {/* A new list starts from the rarities as they are now: one removed before it was opened isn't a rarity to it. */}
-        <button onClick={() => (setKnown(state.rarities), setStart({ pick, id: startRarityId }), setOpen(true))}>Paste a list…</button>
+        {/* A new list starts from the rarities as they are now: one removed before it was opened isn't a rarity to it. Text
+            kept by Cancel keeps the rarities it was typed with, so a heading a sync removed meanwhile still reads as one. */}
+        <button onClick={() => (text ? remember() : setKnown(state.rarities), setStart({ pick, id: startRarityId }), setOpen(true))}>Paste a list…</button>
       </div>
     );
   }

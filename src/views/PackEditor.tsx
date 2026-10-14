@@ -59,6 +59,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   // back: Save says so and saves nothing, as any tap on something a sync has removed.
   const [wasSaved] = useState(() => !!initial && state.packs.some((x) => x.id === initial.id));
   const gone = wasSaved && !state.packs.some((x) => x.id === p.id);
+  // A store item whose card a sync has deleted (a Rerun of one, say) would sell nothing, so it isn't saved either.
+  const itemGone = !!p.store && p.drops.length > 0 && p.drops.every((x) => !state.cards.some((c) => c.id === x.cardId));
   // Blood Ruby characters, Kameos and Kameo packs leave with the season; unless the user said otherwise, guess from the item.
   const seasonal = isSeasonal(base, state);
   const pastSeason = fromEndedSeason(base, seasonDraft, now);
@@ -138,14 +140,14 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     const moveTo = seasonMoveOnSave({ seasonal, pastSeason, scheduled, edited: seasonEdit, currentEnd: currentSeasonEnd });
     const name = p.name.trim();
     update(
-      (d) => (wasSaved && !d.packs.some((x) => x.id === base.id) ? noChange : savePack(d, { ...base, endsAt }, moveTo, now)),
+      (d) => (wasSaved && !d.packs.some((x) => x.id === base.id)) || !savePack(d, { ...base, endsAt }, moveTo, now) ? noChange : undefined,
       moveTo ? `Saved ${name} and changed the season end` : `Saved ${name}`,
     );
     onClose();
   }
 
   return (
-    <Modal title={initial && state.packs.some((x) => x.id === initial.id) ? 'Edit pack' : 'New pack'} onClose={onClose} wide>
+    <Modal title={wasSaved ? 'Edit pack' : 'New pack'} onClose={onClose} wide>
       {/* The wide modal fits four columns: the name takes two and the store checkbox the other two rather than stretching a 900px input. */}
       <div className={`${form} lg:grid-cols-4`}>
         <label className={`${field} col-span-full lg:col-span-2`}>
@@ -389,9 +391,10 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
         </ul>
       )}
       {gone && <p className="text-muted text-small">This pack has since been removed on another device, so saving it won't bring it back.</p>}
+      {!gone && itemGone && <p className="text-muted text-small">The card this item sells has since been removed, so there's nothing to save.</p>}
       <div className={modalFoot}>
         <button onClick={onClose}>Cancel</button>
-        <button className={btn.primary} onClick={save} disabled={errors.length > 0 || gone}>
+        <button className={btn.primary} onClick={save} disabled={errors.length > 0 || gone || itemGone}>
           Save pack
         </button>
       </div>
