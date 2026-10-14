@@ -100,8 +100,12 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const [known, setKnown] = useState(state.rarities);
   const rarities = useMemo(() => [...state.rarities, ...known.filter((r) => !state.rarities.some((x) => x.id === r.id && x.label === r.label))], [state.rarities, known]);
   const [start, setStart] = useState({ pick, id: startRarityId });
-  // A box opened with no rarities follows the first one a sync brings in, or its plain lines would have none.
-  if (start.pick !== pick || (!start.id && startRarityId)) setStart({ pick, id: startRarityId });
+  // A box opened with no rarities follows the first one a sync brings in, or its plain lines would have none. It's
+  // remembered too, so a sync that removes it before the next keystroke still has its lines listed as skipped.
+  if (start.pick !== pick || (!start.id && startRarityId)) {
+    if (!start.id) setKnown(rarities);
+    setStart({ pick, id: startRarityId });
+  }
   const remember = () => setKnown(rarities);
   // After an Add that left lines behind, the box stays until Done. A card that Add saved at its goal is deleted at once
   // as done, so its line would read as new again: it's left out (`gone`). The other cards Add saved now match the list

@@ -295,8 +295,8 @@ export default function SettingsView() {
                               step={1}
                               onChange={(v) =>
                                 editRarity(r.id, (x) => {
-                                  // Not for a step a sync has taken away (fewer levels, or the rarity is now a Kameo).
-                                  if (!kardSteps(x).includes(f)) return noChange;
+                                  // Not for a step a sync has taken away: fewer levels, the rarity now a Kameo, or its kards turned off.
+                                  if (x.fusionUpThreshold == null || !kardSteps(x).includes(f)) return noChange;
                                   const costs = x.kardsPerLevel;
                                   while (costs.length <= f) costs.push(0);
                                   costs[f] = v ?? 0;

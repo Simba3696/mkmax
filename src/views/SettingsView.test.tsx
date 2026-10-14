@@ -335,4 +335,22 @@ describe('Settings level steps on a screen a sync has changed', () => {
     expect(diamond().kardsPerLevel).toEqual(before);
     expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
   });
+
+  // Regression: /ship review of stale-screens-and-schedule — a kard cost box saved after a sync turned the kards off
+  // Found by /ship on 2026-10-14
+  // Value: protects=a kard cost box edited after a sync turned the rarity's kards off saves nothing; fails_when=the step
+  // check counts every level when there's no threshold, so the stale box still saves with Undo; why_new=review
+  // (maintainability): the test above takes steps away, not the threshold; seam=a grabbed update stands in for the sync,
+  // SyncLoop.nextStamp spied; no_claim=a real sync
+  it("saves nothing for a kard cost box after a sync turned the rarity's kards off", () => {
+    const stamps = renderSettings();
+    const before = diamond().kardsPerLevel;
+    const lastKard = within(panelOf('Diamond')).getAllByText('F9→F10').at(-1)!.closest('label')!.querySelector('input')!;
+    act(() => {
+      update((d) => void (d.rarities.find((r) => r.id === 'diamond')!.fusionUpThreshold = null));
+      fireEvent.change(lastKard, { target: { value: '42' } });
+    });
+    expect(diamond().kardsPerLevel).toEqual(before);
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
 });
