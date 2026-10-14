@@ -1083,6 +1083,63 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     act(() => undo());
     expect([saved().cards, status()]).toEqual([[], 'New: 1 Diamond · skipping 1 already listed (Jade, Lizard)']);
   });
+
+  // Regression: /ship review of stale-screens-and-schedule — after Undo of a pasted update, a line pasted twice lost its
+  // skip note
+  // Found by /ship on 2026-10-14
+  // Value: protects=after Undo takes back an update that kept the box open, an update line pasted twice is offered once
+  // and its second copy listed as skipped again; fails_when=the update's card is still saved, so it still hides a skipped
+  // copy though its line is offered again; why_new=review (testing, maintainability): the Undo test above adds a new
+  // card; seam=the grabbed store's undo stands in for App's Undo bar; no_claim=a real sync
+  it('lists the second copy of an update line pasted twice as skipped again after Undo takes back the update', () => {
+    renderWith([{ id: 'kori', name: 'Kori Blade', rarityId: 'epic', fusion: 1, guest: false }]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Kori Blade - Epic - F2\nKori Blade - Epic - F2\nKitana - Bogus' } });
+    act(() => form.getByRole('button', { name: 'update 1' }).click());
+    act(() => undo());
+    expect(saved().cards[0].fusion).toBe(1);
+    expect(form.queryByText(/updating 1 already listed \(Kori Blade\) · skipping 1 already listed \(Kori Blade\)/)).not.toBeNull();
+  });
+
+  // Regression: /ship review of stale-screens-and-schedule — Add saved a pasted update a sync had already made
+  // Found by /ship on 2026-10-14
+  // Value: protects=Paste a list's Add saves nothing, and keeps the last Undo, for an update a sync made after the list was
+  // read; fails_when=the patch is applied whether or not it changes anything, so the save is stamped and synced and Undo
+  // becomes "Updated 1"; why_new=review (Red Team): the sync-race tests above add new cards; seam=a grabbed update stands in
+  // for the sync, SyncLoop.nextStamp spied; no_claim=a real sync
+  it('saves nothing for a pasted update a sync made just before Add', () => {
+    const stamps = renderWith([{ id: 'kori', name: 'Kori Blade', rarityId: 'epic', fusion: 1, guest: false }]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Kori Blade - Epic - F2' } });
+    const add = form.getByRole('button', { name: 'update 1' });
+    act(() => {
+      update((d) => void (d.cards[0].fusion = 3));
+      add.click();
+    });
+    expect([saved().cards[0].fusion, lastUndo]).toEqual([3, null]);
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
+
+  // Regression: /ship review of stale-screens-and-schedule — lines under a rarity a sync brought in and then took away
+  // vanished from the paste box
+  // Found by /ship on 2026-10-14
+  // Value: protects=plain lines under a rarity picked above after a sync brought it in are listed as skipped when a sync
+  // removes it before the next keystroke; fails_when=only a box with no rarity remembers the one it moves to, so the
+  // lines are neither new nor skipped; why_new=review (Red Team): the test above starts with no rarities; seam=grabbed
+  // updates stand in for the syncs; no_claim=a real sync
+  it('lists pasted lines as skipped when a sync removes a rarity it brought in and that was then picked', () => {
+    renderWith([]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Jade, Lizard' } });
+    act(() => update((d) => void d.rarities.push({ ...defaultState().rarities[0], id: 'mythic', label: 'Mythic' })));
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'mythic' } });
+    expect(form.getByText(/^New: /).textContent).toBe('New: 1 Mythic');
+    act(() => update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'mythic'))));
+    expect(form.queryByText('Skipped "Jade, Lizard": its rarity has since been removed.')).not.toBeNull();
+  });
 });
 
 // Last in the file: the catalog stays loaded once a test has downloaded it.

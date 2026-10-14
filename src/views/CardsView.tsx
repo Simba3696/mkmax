@@ -100,10 +100,11 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const [known, setKnown] = useState(state.rarities);
   const rarities = useMemo(() => [...state.rarities, ...known.filter((r) => !state.rarities.some((x) => x.id === r.id && x.label === r.label))], [state.rarities, known]);
   const [start, setStart] = useState({ pick, id: startRarityId });
-  // A box opened with no rarities follows the first one a sync brings in, or its plain lines would have none. It's
-  // remembered too, so a sync that removes it before the next keystroke still has its lines listed as skipped.
+  // A box opened with no rarities follows the first one a sync brings in, or its plain lines would have none. The
+  // rarity it moves to is remembered, so a sync that removes it before the next keystroke (one a sync brought in and
+  // then picked above, say) still has its lines listed as skipped.
   if (start.pick !== pick || (!start.id && startRarityId)) {
-    if (!start.id) setKnown(rarities);
+    setKnown(rarities);
     setStart({ pick, id: startRarityId });
   }
   const remember = () => setKnown(rarities);
@@ -139,9 +140,13 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   }
 
   const total = newCards.length + updates.length;
-  // Each card Add just saved, while it's still saved, hides one of its lines from Skipped: a line pasted twice still
-  // lists its second copy.
-  const pending = new Set([...justAdded].filter((k) => state.cards.some((c) => cardKey(c.rarityId, c.name) === k)));
+  // Each card Add just saved hides one of its lines from Skipped (a line pasted twice still lists its second copy), until
+  // it's gone or its line is offered again (an Undo, a delete or a sync), when its other copies read as skipped again.
+  const offered = new Set([
+    ...newCards.map((c) => cardKey(c.rarityId, c.name)),
+    ...updates.flatMap((u) => state.cards.filter((c) => c.id === u.cardId).map((c) => cardKey(c.rarityId, c.name))),
+  ]);
+  const pending = new Set([...justAdded].filter((k) => !offered.has(k) && state.cards.some((c) => cardKey(c.rarityId, c.name) === k)));
   const skipped = parsed.duplicates.filter((x) => !pending.delete(x.key)).map((x) => x.name);
   function addAll() {
     let added = 0;
@@ -156,9 +161,13 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         const have = new Set(d.cards.map((x) => cardKey(x.rarityId, x.name)));
         const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name)));
         // Nor to a card left without its rarity (an older build or an imported file can leave one): it has no rules to
-        // check its goal against.
+        // check its goal against. Nor one a sync has already updated that way (the same list pasted on another device).
+        const changes = (c: Card, patch: (typeof updates)[number]['patch']) =>
+          Object.entries(patch).some(([k, v]) => (k === 'maxLevel' ? (c.maxLevel ?? null) : c[k as keyof typeof patch]) !== v);
         const saving = updates.flatMap((u) =>
-          d.cards.filter((c) => c.id === u.cardId && d.rarities.some((r) => r.id === c.rarityId)).map((c) => ({ c, patch: u.patch, line: u.line })),
+          d.cards
+            .filter((c) => c.id === u.cardId && d.rarities.some((r) => r.id === c.rarityId) && changes(c, u.patch))
+            .map((c) => ({ c, patch: u.patch, line: u.line })),
         );
         if (!cards.length && !saving.length) return noChange;
         const fresh = cards.map(
