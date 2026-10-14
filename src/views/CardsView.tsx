@@ -109,7 +109,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const remember = () => setKnown(rarities);
   // After an Add that left lines behind, the box stays until Done. A card that Add saved at its goal is deleted at once
   // as done, so its line would read as new again: it's left out (`gone`). The other cards Add saved now match the list
-  // and aren't listed as skipped (`justAdded`). An Undo or a delete brings their lines back as new.
+  // and aren't listed as skipped (`justAdded`) until the list is edited, when they read as already listed like any other.
+  // An Undo or a delete brings their lines back as new.
   const [leftOver, setLeftOver] = useState(false);
   const [gone, setGone] = useState<Set<string>>(new Set());
   const [justAdded, setJustAdded] = useState<Set<string>>(new Set());
@@ -117,7 +118,11 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const live = (rarityId: string) => state.rarities.some((r) => r.id === rarityId);
   // Only a rarity the list knew: with no rarities at all, plain lines have none, and the Settings note covers them.
   const isRemoved = (c: (typeof parsed.cards)[number]) => !live(c.rarityId) && rarities.some((r) => r.id === c.rarityId);
-  const removedLines = parsed.cards.filter(isRemoved).map((c) => c.line);
+  // An update to a card a sync left without its rarity can't be saved (there are no rules to check its goal against), so
+  // it's skipped with the other lines whose rarity has gone, not offered as an update that does nothing.
+  const isOrphan = (u: (typeof parsed.updates)[number]) => state.cards.some((c) => c.id === u.cardId && !live(c.rarityId));
+  const updates = parsed.updates.filter((u) => !isOrphan(u));
+  const removedLines = [...parsed.cards.filter(isRemoved).map((c) => c.line), ...parsed.updates.filter(isOrphan).map((u) => u.line)];
   // `gone` holds the lines as typed, so an edited line (a lower level, say) is offered again, and a line that reads
   // differently once its card is gone (a Stage line brings a maxed card back) still matches.
   const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(c.line));
@@ -133,8 +138,9 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
     );
   }
 
-  const total = newCards.length + parsed.updates.length;
-  // After an Add, the cards it just saved now match the list: they were added, not skipped, so they aren't listed.
+  const total = newCards.length + updates.length;
+  // After an Add, the cards it just saved now match the list: they were added, not skipped, so they aren't listed (until
+  // the list is edited).
   const skipped = parsed.duplicates.filter((x) => !justAdded.has(x.key)).map((x) => x.name);
   function addAll() {
     let added = 0;
@@ -150,10 +156,10 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name)));
         // Nor to a card left without its rarity (an older build or an imported file can leave one): it has no rules to
         // check its goal against.
-        const updates = parsed.updates.flatMap((u) =>
+        const saving = updates.flatMap((u) =>
           d.cards.filter((c) => c.id === u.cardId && d.rarities.some((r) => r.id === c.rarityId)).map((c) => ({ c, patch: u.patch, line: u.line })),
         );
-        if (!cards.length && !updates.length) return noChange;
+        if (!cards.length && !saving.length) return noChange;
         const fresh = cards.map(
           (c): Card => ({
             id: newId(),
@@ -168,16 +174,16 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
           }),
         );
         d.cards.push(...fresh);
-        for (const { c, patch } of updates) Object.assign(c, patch);
+        for (const { c, patch } of saving) Object.assign(c, patch);
         added = cards.length;
-        updated = updates.length;
-        const touched = [...fresh, ...updates.map(({ c }) => c)];
+        updated = saving.length;
+        const touched = [...fresh, ...saving.map(({ c }) => c)];
         saved = touched.map((c) => cardKey(c.rarityId, c.name));
         // At their goal now, so the save deletes them as done: their lines are left out from then on.
         const ruleOf = (c: Card) => d.rarities.find((r) => r.id === c.rarityId)!;
         done = [
           ...cards.filter((_, i) => isMaxed(fresh[i], ruleOf(fresh[i]))).map((c) => c.line),
-          ...updates.filter(({ c }) => isMaxed(c, ruleOf(c))).map(({ line }) => line),
+          ...saving.filter(({ c }) => isMaxed(c, ruleOf(c))).map(({ line }) => line),
         ];
       },
       () => {
@@ -229,12 +235,12 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
           ? 'Add a rarity in Settings first: every card needs one.'
           : counts.length
             ? `New: ${counts.map((x) => `${x.n} ${x.label}`).join(' · ')}`
-            : parsed.updates.length
+            : updates.length
               ? ''
               : leftOver
                 ? 'Nothing left to add.'
                 : 'Nothing to add yet.'}
-        {parsed.updates.length > 0 && ` · updating ${parsed.updates.length} already listed (${parsed.updates.map((u) => u.name).join('; ')})`}
+        {updates.length > 0 && ` · updating ${updates.length} already listed (${updates.map((u) => u.name).join('; ')})`}
         {skipped.length > 0 && ` · skipping ${skipped.length} already listed (${skipped.join('; ')})`}
       </div>
       {parsed.problems.length + removedLines.length > 0 && (
@@ -262,8 +268,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         {(!leftOver || total > 0) && (
           <button className={btn.primary} disabled={!total} onClick={addAll}>
             {newCards.length > 0 && `Add ${newCards.length}`}
-            {newCards.length > 0 && parsed.updates.length > 0 && ', '}
-            {parsed.updates.length > 0 && `update ${parsed.updates.length}`}
+            {newCards.length > 0 && updates.length > 0 && ', '}
+            {updates.length > 0 && `update ${updates.length}`}
             {!total && 'Add cards'}
           </button>
         )}

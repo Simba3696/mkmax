@@ -996,6 +996,25 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
   });
 
+  // Regression: /ship review of stale-screens-and-schedule — a pasted update to a card without its rarity was offered,
+  // and did nothing
+  // Found by /ship on 2026-10-14
+  // Value: protects=once a sync leaves a pasted update's card without its rarity, the line is listed as skipped and no
+  // update is offered; fails_when=the screen still counts it ("updating 1", an "update 1" button that saves nothing);
+  // why_new=review (Red Team): the test above taps before the screen redraws; seam=a grabbed update stands in for the
+  // sync; no_claim=a real sync
+  it('lists a pasted update as skipped once a sync left its card without its rarity', () => {
+    renderWith([{ id: 'kori', name: 'Kori Blade', rarityId: 'epic', fusion: 1, guest: false }]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Kori Blade - Epic - F2' } });
+    expect(form.queryByRole('button', { name: 'update 1' })).not.toBeNull();
+    act(() => update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'epic'))));
+    expect(form.queryByText('Skipped "Kori Blade - Epic - F2": its rarity has since been removed.')).not.toBeNull();
+    expect(form.queryByRole('button', { name: 'update 1' })).toBeNull();
+    expect(form.queryByText(/updating 1 already listed/)).toBeNull();
+  });
+
   // Regression: /ship review of stale-screens-and-schedule — a list typed after an Add hid the cards that Add saved
   // Found by /ship on 2026-10-14
   // Value: protects=after an Add that kept the box open, a new list typed in it lists a card that Add saved as skipped;
