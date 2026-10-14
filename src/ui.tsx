@@ -324,13 +324,16 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
   const armed = armedAt != null;
   useEffect(() => {
     if (armedAt == null) return;
-    const left = armedAt + CONFIRM_MS - Date.now();
-    if (left <= 0) return void setArmedAt(null);
+    const elapsed = Date.now() - armedAt;
+    // A clock set back since the first tap (elapsed below 0) disarms too, rather than leaving it armed until it catches up.
+    if (elapsed < 0 || elapsed >= CONFIRM_MS) return void setArmedAt(null);
+    const left = CONFIRM_MS - elapsed;
     const t = setTimeout(() => setArmedAt(null), left);
     return () => clearTimeout(t);
   }, [armedAt]);
   const tap = () => {
-    if (armedAt != null && Date.now() - armedAt < CONFIRM_MS) {
+    const elapsed = armedAt == null ? -1 : Date.now() - armedAt;
+    if (elapsed >= 0 && elapsed < CONFIRM_MS) {
       // Once per arm: a button still on screen afterwards (Ended early) would otherwise act again on a quick third tap.
       setArmedAt(null);
       onConfirm();

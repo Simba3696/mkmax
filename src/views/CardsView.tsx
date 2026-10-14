@@ -100,7 +100,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const [known, setKnown] = useState(state.rarities);
   const rarities = useMemo(() => [...state.rarities, ...known.filter((r) => !state.rarities.some((x) => x.id === r.id && x.label === r.label))], [state.rarities, known]);
   const [start, setStart] = useState({ pick, id: startRarityId });
-  if (start.pick !== pick) setStart({ pick, id: startRarityId });
+  // A box opened with no rarities follows the first one a sync brings in, or its plain lines would have none.
+  if (start.pick !== pick || (!start.id && startRarityId)) setStart({ pick, id: startRarityId });
   const remember = () => setKnown(rarities);
   // After an Add that left lines behind, the box stays until Done. A card that Add saved at its goal is deleted at once
   // as done, so its line would read as new again: it's left out (`gone`). The other cards Add saved now match the list
@@ -370,10 +371,13 @@ function CardList() {
       // one to paste an image for.
       let updated = 0;
       let meanwhile = 0;
+      // Of the cards looked up, those still in the save: a sync may have deleted some during the lookup.
+      let total = missingImages.length;
       let left = 0;
       update((d) => {
         const cards = d.cards.filter((c) => lookedUp.has(c.id) && lookedUp.get(c.id) === c.imageUrl);
         meanwhile = d.cards.filter((c) => lookedUp.has(c.id) && lookedUp.get(c.id) !== c.imageUrl).length;
+        total = d.cards.filter((c) => lookedUp.has(c.id)).length;
         left = cards.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl))).length;
         const art = cards.flatMap((c) => (found.has(c.id) ? [{ c, m: found.get(c.id)! }] : []));
         const checked = cards.filter((c) => keep.some((k) => k.id === c.id) && c.wikiTitle && c.imagePage !== wikiUrl(c.wikiTitle));
@@ -388,7 +392,7 @@ function CardList() {
           ? ` Couldn't reach the MK Mobile wiki (${wikiError}), so ${left} weren't looked up there. Try again later.`
           : ` ${left} not found online: open "Image" on those cards to paste a URL.`;
       const meanwhileMsg = !meanwhile ? '' : meanwhile === 1 ? ' 1 got an image during the lookup and kept it.' : ` ${meanwhile} got images during the lookup and kept them.`;
-      setImgStatus({ busy: false, msg: `Updated ${updated} of ${missingImages.length}.${meanwhileMsg}${leftMsg}` });
+      setImgStatus({ busy: false, msg: `Updated ${updated} of ${total}.${meanwhileMsg}${leftMsg}` });
     } catch (e) {
       setImgStatus({ busy: false, msg: `Couldn't look up images: ${(e as Error).message}` });
     }

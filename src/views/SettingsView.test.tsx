@@ -317,4 +317,22 @@ describe('Settings level steps on a screen a sync has changed', () => {
     expect(diamond().dupesPerLevel).toHaveLength(9);
     expect(stamps).toHaveBeenCalledTimes(2); // the two sync stand-ins only
   });
+
+  // Regression: /ship review of stale-screens-and-schedule — a kard cost box saved a step a sync had taken away
+  // Found by /ship on 2026-10-14
+  // Value: protects=a Fusion Up Kard cost box for a step a sync has taken away saves nothing; fails_when=the box writes
+  // its cost by its place on screen, keeping a cost for a level the rarity no longer has; why_new=review (adversarial);
+  // seam=a grabbed update stands in for the sync, SyncLoop.nextStamp spied; no_claim=a real sync, a rarity now a Kameo
+  it('saves nothing for a kard cost box whose step a sync took away', () => {
+    const stamps = renderSettings();
+    const before = diamond().kardsPerLevel;
+    // The last of the two F9→F10 boxes: copies per step come first, then the kard costs.
+    const lastKard = within(panelOf('Diamond')).getAllByText('F9→F10').at(-1)!.closest('label')!.querySelector('input')!;
+    act(() => {
+      update((d) => void (d.rarities.find((r) => r.id === 'diamond')!.dupesPerLevel = [1, 1, 1, 1, 1]));
+      fireEvent.change(lastKard, { target: { value: '42' } });
+    });
+    expect(diamond().kardsPerLevel).toEqual(before);
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
 });
