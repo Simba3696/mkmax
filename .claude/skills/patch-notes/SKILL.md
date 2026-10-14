@@ -99,5 +99,5 @@ Ask about anything the notes leave out. Never guess a number the notes don't giv
   - tests for engine and normalize changes;
   - the docs updated in the same change, including the game-rules list in AGENTS.md when a rule changed;
   - `npm run lint`, `npm test` and `npm run build` all passing.
-- Commit with a plain subject saying what the user sees, like the existing history (for example "Give Gold ascension the game's Fusion Up Kard costs …").
+- Commit with a Conventional Commits type, then a plain lowercase sentence saying what the user sees, as AGENTS.md describes (for example "fix: give Gold ascension the game's Fusion Up Kard costs …").
 - Give the user the Paste a list block last, with a sentence on where to paste it (Cards → **Paste a list…**).
