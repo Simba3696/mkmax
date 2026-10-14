@@ -353,4 +353,28 @@ describe('Settings level steps on a screen a sync has changed', () => {
     expect(diamond().kardsPerLevel).toEqual(before);
     expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
   });
+
+  // Regression: /ship review of stale-screens-and-schedule — Track until saved the kard threshold after a sync turned the
+  // kards off
+  // Found by /ship on 2026-10-14
+  // Value: protects=Track until saves nothing when a sync turned the rarity's kards off (no threshold to stop at), and
+  // Highest fusion saves nothing on a rarity a sync made a Kameo; fails_when=the recipe trusts the screen, saving a
+  // threshold goal with no threshold (its kards drop out of the plan) or levels on a Kameo; why_new=review (adversarial);
+  // seam=a grabbed update stands in for the sync, SyncLoop.nextStamp spied; no_claim=a real sync
+  it('saves no kard threshold goal after a sync turned the kards off, and no levels on a rarity now a Kameo', () => {
+    const stamps = renderSettings();
+    const trackUntil = within(panelOf('Diamond')).getByLabelText('Track until');
+    act(() => {
+      update((d) => void (d.rarities.find((r) => r.id === 'diamond')!.fusionUpThreshold = null));
+      fireEvent.change(trackUntil, { target: { value: 'threshold' } });
+    });
+    expect(diamond().goal).toBe('max');
+    const highest = within(panelOf('Diamond')).getByLabelText('Highest fusion (F…), rest are ascension');
+    act(() => {
+      update((d) => void Object.assign(d.rarities.find((r) => r.id === 'diamond')!, { kind: 'kameo', dupesPerLevel: [], fusionMax: 0 }));
+      fireEvent.change(highest, { target: { value: '7' } });
+    });
+    expect(diamond().fusionMax).toBe(0);
+    expect(stamps).toHaveBeenCalledTimes(2); // the two sync stand-ins only
+  });
 });

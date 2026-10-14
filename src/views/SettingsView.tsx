@@ -171,7 +171,15 @@ export default function SettingsView() {
                         </label>
                         <label className={field}>
                           <span>Track until</span>
-                          <select value={r.goal} onChange={(e) => editRarity(r.id, (x) => void (x.goal = e.target.value as 'max' | 'threshold'))}>
+                          <select
+                            value={r.goal}
+                            onChange={(e) => {
+                              const goal = e.target.value as 'max' | 'threshold';
+                              // Not a threshold a sync has since taken away (kards turned off), nor on a rarity now a Kameo:
+                              // a goal with no threshold to stop at would drop its kards from the plan.
+                              editRarity(r.id, (x) => (x.goal === goal || x.kind === 'kameo' || (goal === 'threshold' && x.fusionUpThreshold == null) ? noChange : void (x.goal = goal)));
+                            }}
+                          >
                             <option value="max">Max</option>
                             <option value="threshold" disabled={r.fusionUpThreshold == null}>
                               Kard threshold (F{r.fusionUpThreshold ?? '?'})
@@ -180,7 +188,7 @@ export default function SettingsView() {
                         </label>
                         <label className={field}>
                           <span>Highest fusion (F…), rest are ascension</span>
-                          <NumInput value={r.fusionMax} min={1} step={1} onChange={(v) => editRarity(r.id, (x) => void (x.fusionMax = v ?? 10))} />
+                          <NumInput value={r.fusionMax} min={1} step={1} onChange={(v) => editRarity(r.id, (x) => (x.kind === 'kameo' ? noChange : void (x.fusionMax = v ?? 10)))} />
                         </label>
                       </>
                     )}
