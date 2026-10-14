@@ -22,9 +22,11 @@ const pctInput = 'w-[80px]';
 
 export default function PackEditor({ initial, onClose }: { initial: Pack | null; onClose: () => void }) {
   const { state, update } = useStore();
+  // A store item left with no item (Delete on its card keeps it) opens with an empty item picker, so one is chosen
+  // before it's saved.
   const [p, setP] = useState<Pack>(
     () =>
-      initial ?? {
+      (initial?.store && initial.drops.length === 0 ? { ...initial, drops: [{ cardId: '', chance: 100 }] } : initial) ?? {
         id: newId(),
         name: '',
         currencyId: state.currencies[0]?.id ?? '',
@@ -59,7 +61,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   // back: Save says so and saves nothing, as any tap on something a sync has removed.
   const [wasSaved] = useState(() => !!initial && state.packs.some((x) => x.id === initial.id));
   const gone = wasSaved && !state.packs.some((x) => x.id === p.id);
-  // A store item whose card a sync has deleted (a Rerun of one, say) would sell nothing, so it isn't saved either.
+  // A store item whose card a sync deletes while this is open would sell nothing, so it isn't saved either.
   const itemGone = !!p.store && p.drops.length > 0 && p.drops.every((x) => !state.cards.some((c) => c.id === x.cardId));
   // Blood Ruby characters, Kameos and Kameo packs leave with the season; unless the user said otherwise, guess from the item.
   const seasonal = isSeasonal(base, state);

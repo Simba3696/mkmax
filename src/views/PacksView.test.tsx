@@ -208,6 +208,39 @@ describe('Packs: taps on a screen a sync has changed', () => {
     ]);
   });
 
+  // Regression: /ship review of stale-screens-and-schedule — a store item whose card was deleted saved selling nothing
+  // Found by /ship on 2026-10-14
+  // Value: protects=a store item saves while its card exists, saves nothing (Save greyed out, with a note) once a sync
+  // deletes the card while it's open, and opens with an empty item to choose once it has none; fails_when=the guard
+  // greys out live store items, or the item is saved selling nothing; why_new=review (testing, completeness); seam=
+  // SyncLoop.nextStamp spied, a grabbed update stands in for the sync; no_claim=what savePack writes (engine.test.ts)
+  it('saves a store item only while it sells something', () => {
+    const stamps = renderPacks();
+    const item = () => within(document.getElementById('pack-Shadow Sash item')!);
+    const saveButton = () => screen.getByRole('button', { name: 'Save pack' }) as HTMLButtonElement;
+    fireEvent.click(screen.getByRole('button', { name: '▸ Expired (3)' }));
+    fireEvent.click(item().getByRole('button', { name: 'Edit' }));
+    expect([screen.queryByText(/The card this item sells has since been removed/), saveButton().disabled]).toEqual([null, false]);
+    fireEvent.change(screen.getByLabelText('Cost'), { target: { value: '600' } });
+    fireEvent.click(saveButton());
+    expect(saved().packs.find((x: Pack) => x.id === 'Shadow Sash item').cost).toBe(600);
+    fireEvent.click(item().getByRole('button', { name: 'Edit' }));
+    // The Save tap as the screen had it before the sync, for a tap made before the editor redrew.
+    const onSave = (saveButton() as unknown as Record<string, { onClick: () => void }>)[Object.keys(saveButton()).find((k) => k.startsWith('__reactProps$'))!].onClick;
+    stamps.mockClear();
+    // Another device deleted the card, which also takes it out of the item.
+    act(() => update((d) => {
+      d.cards = d.cards.filter((c) => c.id !== 'sash');
+      for (const x of d.packs) x.drops = x.drops.filter((y) => y.cardId !== 'sash');
+    }));
+    expect([screen.queryByText(/The card this item sells has since been removed/) != null, saveButton().disabled]).toEqual([true, true]);
+    act(() => onSave());
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+    // The tap closed the editor. Left with no item, the item opens with one to choose.
+    fireEvent.click(item().getByRole('button', { name: 'Edit' }));
+    expect([screen.queryByText('Choose the item being sold.') != null, saveButton().disabled]).toEqual([true, true]);
+  });
+
   // Regression: /ship review of clock-and-gear-taps — stale taps on Packs still saved and synced
   // Found by /ship on 2026-10-13
   // Value: protects=Clear expired with nothing left to clear (a sync cleared them) saves nothing and offers no Undo;

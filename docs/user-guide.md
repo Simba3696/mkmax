@@ -245,7 +245,7 @@ If another device changes your rarities while the box is open, the list keeps th
 - **Goal**, **Max** and **Guest**, as in Add card.
 - **Source:** you can change a card's source on the card itself. Equipment has From packs/store, Krypt gear and Tower gear; Kameos have From packs/store and Elder challenge; characters have none. Tower gear also has a **Tower** box for the tower's name, which saves as you type. Changing the source clears the tower name. A character or Kameo that an older pasted list tagged as Krypt or tower gear shows that source marked "not for this rarity", so you can set it back to From packs/store.
 - **Image:** paste an image URL. Lookups never replace a working URL you pasted. If a pasted image stops loading, **Find images** may replace it. When the art came from MK Mobile Base or the wiki, a link opens the page it came from. Clearing the box on a card MK Mobile Base has brings its art back.
-- **Delete** (two taps) removes the card and takes it out of every drop list, with Undo. Unlike removal at the goal, it keeps a store item that only sold that card, which is left with no item.
+- **Delete** (two taps) removes the card and takes it out of every drop list, with Undo. Unlike removal at the goal, it keeps a store item that only sold that card, which is left with no item: its editor opens with an empty item picker, so choose one before saving it.
 
 With no cards, or none that match, the list says "No cards match."
 
@@ -331,7 +331,7 @@ Tap **+ Add pack** (or **Edit** on a pack).
 - "Every drop row needs a card." (for a store item, "Choose the item being sold.")
 - "The end time must be after the start time."
 
-If another device removes the pack while you're editing it (or clears a store item once its card is done), **Save pack** is greyed out and the editor says it has since been removed, so saving doesn't bring it back. Drops for cards another device deleted meanwhile are left out when you save, and a store item whose card was deleted (a Rerun of one, say) can't be saved at all: it would sell nothing, so the editor says so and **Save pack** is greyed out.
+If another device removes the pack while you're editing it (or clears a store item once its card is done), **Save pack** is greyed out and the editor says it has since been removed, so saving doesn't bring it back. Drops for cards another device deleted meanwhile are left out when you save, and a store item whose card another device deletes meanwhile can't be saved at all: it would sell nothing, so the editor says so and **Save pack** is greyed out.
 
 ### Kaskets
 
