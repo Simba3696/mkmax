@@ -115,6 +115,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const [leftOver, setLeftOver] = useState(false);
   const [gone, setGone] = useState<Set<string>>(new Set());
   const [justAdded, setJustAdded] = useState<Set<string>>(new Set());
+  const savedKeys = useMemo(() => (justAdded.size ? new Set(state.cards.map((c) => cardKey(c.rarityId, c.name))) : new Set<string>()), [justAdded, state.cards]);
   const parsed = useMemo(() => parseCardList(text, rarities, start.id, state.cards), [text, rarities, start.id, state.cards]);
   const live = (rarityId: string) => state.rarities.some((r) => r.id === rarityId);
   // Only a rarity the list knew: with no rarities at all, plain lines have none, and the Settings note covers them.
@@ -146,7 +147,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
     ...newCards.map((c) => cardKey(c.rarityId, c.name)),
     ...updates.flatMap((u) => state.cards.filter((c) => c.id === u.cardId).map((c) => cardKey(c.rarityId, c.name))),
   ]);
-  const pending = new Set([...justAdded].filter((k) => !offered.has(k) && state.cards.some((c) => cardKey(c.rarityId, c.name) === k)));
+  const pending = new Set([...justAdded].filter((k) => !offered.has(k) && savedKeys.has(k)));
   const skipped = parsed.duplicates.filter((x) => !pending.delete(x.key)).map((x) => x.name);
   function addAll() {
     let added = 0;
@@ -201,8 +202,9 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         return label.charAt(0).toUpperCase() + label.slice(1);
       },
     );
-    // A list with lines Add couldn't use (a sync left them nowhere to go, a line it can't read, or one under a rarity since
-    // removed) stays, so they aren't lost, and Done clears the box. Lines already listed don't keep it open.
+    // A list with lines Add couldn't use (a sync left them nowhere to go or had already added or updated them, a line it
+    // can't read, or one under a rarity since removed) stays, so they aren't lost, and Done clears the box. Lines that
+    // were already listed when Add was tapped don't keep it open.
     if (added + updated < total || removedLines.length || parsed.problems.length) {
       setGone((g) => new Set([...g, ...done]));
       setJustAdded((j) => new Set([...j, ...saved]));
@@ -532,6 +534,8 @@ function CardList() {
         // A level a sync has since taken off the rarity isn't one the level box can show: it shows (and saves) not owned.
         fusion: shown.fusion <= maxFusion(rule) ? shown.fusion : 0,
         guest: rule.hasGuests && shown.guest,
+        // Only gear has a Goal: a character always goes to max.
+        goal: isEquip ? shown.goal : undefined,
         source: isEquip ? shown.source : initialSource(shown, d.rarities),
         sourceNote: tower || undefined,
       });
@@ -569,7 +573,7 @@ function CardList() {
           </label>
           <label className={field}>
             <span>Rarity</span>
-            <select value={shown.rarityId} onChange={(e) => (setDraft({ ...shown, rarityId: e.target.value, fusion: 0, maxLevel: null }), setPicks((n) => n + 1))}>
+            <select value={shown.rarityId} onChange={(e) => (setDraft({ ...shown, rarityId: e.target.value, fusion: 0, maxLevel: null, goal: undefined }), setPicks((n) => n + 1))}>
               {state.rarities.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.label}
