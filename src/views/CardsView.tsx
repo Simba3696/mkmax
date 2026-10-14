@@ -61,15 +61,14 @@ function GoalSelect({ rule, card, onChange }: { rule: RarityRule; card: Card; on
 }
 
 /**
- * The form's Goal for a card Add would save: kept only where the Goal box shows it (gear, or a character rarity tracked to
- * its kard threshold), then moved on to max for a card entered at or past the threshold (entryGoal, `moved`). `fixed`
- * means the level decides the goal (at or past the threshold it's always max), so there's no choice to offer.
+ * The form's Goal for a card Add would save. `hasChoice`: the form offers F3 or Max (gear, or a character rarity tracked
+ * to its kard threshold; not Realm Klash gear, always max). The Goal picked counts only then, and a card entered at or
+ * past the threshold goes on to its max (entryGoal). `fixed` means the level decides it, so there's no choice to offer.
  */
 function formGoal(card: Card, rule: RarityRule) {
-  const boxShows = rule.fusionUpThreshold != null && (rule.kind === 'equipment' || rule.goal === 'threshold') && !(rule.kind === 'equipment' && isRealmKlashName(card.name));
-  const picked = rule.kind === 'equipment' || rule.goal === 'threshold' ? card.goal : undefined;
-  const goal = entryGoal({ ...card, goal: picked }, rule);
-  return { goal, boxShows, moved: goal !== picked, fixed: boxShows && card.fusion >= (thresholdLevel(rule) ?? Infinity) };
+  const hasChoice = rule.fusionUpThreshold != null && (rule.kind === 'equipment' || rule.goal === 'threshold') && !(rule.kind === 'equipment' && isRealmKlashName(card.name));
+  const goal = entryGoal({ ...card, goal: hasChoice ? card.goal : undefined }, rule);
+  return { goal, hasChoice, fixed: hasChoice && card.fusion >= (thresholdLevel(rule) ?? Infinity) };
 }
 
 /** Add card's Goal box: the choice, or a fixed label once the level picked decides the goal (see formGoal). */
@@ -81,15 +80,17 @@ function FormGoal({ card, rule, onChange }: { card: Card; rule: RarityRule; onCh
   );
 }
 
-/** Add card's note on the goal Add would save (see formGoal), where the form has a Goal: none elsewhere. */
+/** Add card's note on the goal Add would save (see formGoal): done at once, tracked on past F3, or stopping at F3. */
 function goalNote(card: Card, rule: RarityRule) {
-  const { goal, boxShows, moved } = formGoal(card, rule);
-  if (!boxShows) return null;
+  const { goal, hasChoice, fixed } = formGoal(card, rule);
   const saved = { ...card, goal };
   if (isMaxed(saved, rule)) return "That level is already this card's goal, so Add would remove it at once as done.";
-  if (moved) return `Already at F${rule.fusionUpThreshold} or past it, so this one is tracked on to ${levelLabel(rule, targetLevel(saved, rule))}.`;
-  if (cardGoal(saved, rule) === 'threshold') return `${rule.label} is tracked only until F${rule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.`;
-  return null;
+  if (!hasChoice) return null;
+  if (fixed) return `Already at F${rule.fusionUpThreshold} or past it, so this one is tracked on to ${levelLabel(rule, targetLevel(saved, rule))}.`;
+  if (cardGoal(saved, rule) !== 'threshold') return null;
+  // Its own Goal of F3 on a rarity tracked to Max is about this card, not the rarity.
+  const who = goal === 'threshold' ? 'This card' : rule.label;
+  return `${who} is tracked only until F${rule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.`;
 }
 
 /**

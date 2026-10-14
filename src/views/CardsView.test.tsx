@@ -1263,13 +1263,20 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     const note = () => form.queryByText(/tracked only until|tracked on to|Add would remove it/)?.textContent ?? null;
     fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
     fireEvent.change(form.getByLabelText('Goal'), { target: { value: 'threshold' } });
-    expect(note()).toBe('Epic Equip is tracked only until F3. After that, your Fusion Up Kards can max it.');
+    // Epic tracks to Max, so the F3 is this card's own Goal.
+    expect(note()).toBe('This card is tracked only until F3. After that, your Fusion Up Kards can max it.');
     // Epic made a character rarity tracked to Max: no Goal box, so Add saves it to max and the F3 note goes.
     act(() => update((d) => void (d.rarities.find((r) => r.id === 'epic')!.kind = 'character')));
     expect([note(), form.queryByLabelText('Goal')]).toEqual([null, null]);
     act(() => update((d) => void (d.rarities.find((r) => r.id === 'epic')!.kind = 'equipment')));
     fireEvent.change(form.getByLabelText('Goal'), { target: { value: 'max' } });
+    fireEvent.change(form.getByLabelText('Current level'), { target: { value: '6' } }); // F5, Goal Max picked first
+    expect(note()).toBe('Already at F3 or past it, so this one is tracked on to F10.');
     fireEvent.change(form.getByLabelText('Current level'), { target: { value: '11' } }); // F10
+    expect(note()).toBe("That level is already this card's goal, so Add would remove it at once as done.");
+    // A card with no Goal choice says so too: Diamond at F10.
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'diamond' } });
+    fireEvent.change(form.getByLabelText('Current level'), { target: { value: '11' } });
     expect(note()).toBe("That level is already this card's goal, so Add would remove it at once as done.");
   });
 
