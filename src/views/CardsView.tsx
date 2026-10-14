@@ -62,15 +62,14 @@ function GoalSelect({ rule, card, onChange }: { rule: RarityRule; card: Card; on
 
 /**
  * The form's Goal for a card Add would save: kept only where the Goal box shows it (gear, or a character rarity tracked to
- * its kard threshold), then moved on to max for a card entered at or past the threshold (entryGoal). `fixed` means the
- * level decides the goal (at or past the threshold it's always max), so there's no choice to offer.
+ * its kard threshold), then moved on to max for a card entered at or past the threshold (entryGoal, `moved`). `fixed`
+ * means the level decides the goal (at or past the threshold it's always max), so there's no choice to offer.
  */
 function formGoal(card: Card, rule: RarityRule) {
+  const boxShows = rule.fusionUpThreshold != null && (rule.kind === 'equipment' || rule.goal === 'threshold') && !(rule.kind === 'equipment' && isRealmKlashName(card.name));
   const picked = rule.kind === 'equipment' || rule.goal === 'threshold' ? card.goal : undefined;
   const goal = entryGoal({ ...card, goal: picked }, rule);
-  const realmKlash = rule.kind === 'equipment' && isRealmKlashName(card.name);
-  const boxShows = rule.kind === 'equipment' || rule.goal === 'threshold' || picked != null;
-  return { goal, fixed: boxShows && !realmKlash && card.fusion >= (thresholdLevel(rule) ?? Infinity) };
+  return { goal, boxShows, moved: goal !== picked, fixed: boxShows && card.fusion >= (thresholdLevel(rule) ?? Infinity) };
 }
 
 /** Add card's Goal box: the choice, or a fixed label once the level picked decides the goal (see formGoal). */
@@ -82,13 +81,15 @@ function FormGoal({ card, rule, onChange }: { card: Card; rule: RarityRule; onCh
   );
 }
 
-/** Add card's note for a card tracked only to its kard threshold, at the level picked. */
-function thresholdNote(card: Card, rule: RarityRule) {
-  if (card.fusion < (thresholdLevel(rule) ?? Infinity)) return `${rule.label} is tracked only until F${rule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.`;
-  // Past the threshold it goes on to its max (entryGoal); at its max it's done as soon as it's saved.
-  const onTo = targetLevel({ ...card, goal: 'max' }, rule);
-  if (card.fusion < onTo) return `Already at F${rule.fusionUpThreshold} or past it, so this one is tracked on to ${levelLabel(rule, onTo)}.`;
-  return "That level is already this card's goal, so Add would remove it at once as done.";
+/** Add card's note on the goal Add would save (see formGoal), where the form has a Goal: none elsewhere. */
+function goalNote(card: Card, rule: RarityRule) {
+  const { goal, boxShows, moved } = formGoal(card, rule);
+  if (!boxShows) return null;
+  const saved = { ...card, goal };
+  if (isMaxed(saved, rule)) return "That level is already this card's goal, so Add would remove it at once as done.";
+  if (moved) return `Already at F${rule.fusionUpThreshold} or past it, so this one is tracked on to ${levelLabel(rule, targetLevel(saved, rule))}.`;
+  if (cardGoal(saved, rule) === 'threshold') return `${rule.label} is tracked only until F${rule.fusionUpThreshold}. After that, your Fusion Up Kards can max it.`;
+  return null;
 }
 
 /**
@@ -397,12 +398,13 @@ function CardList() {
   const [picks, setPicks] = useState(0);
 
   const draftRule = ctx.rules.get(draft.rarityId) ?? state.rarities[0];
-  // What the form shows, and Add card saves: the rarity picked, or the first once a sync has removed that one (the box
-  // shows the first). Falling back starts that rarity's level, goal and cap at their defaults, since the removed
-  // rarity's don't fit it (a Gold A2 would be saved at a Diamond's max and deleted at once as maxed).
-  const picked = !draftRule || draftRule.id === draft.rarityId ? draft : { ...draft, rarityId: draftRule.id, fusion: 0, maxLevel: null, goal: undefined };
-  // A level a sync has since taken off the rarity shows, and is saved, as not owned, so the Goal and note match it too.
-  const shown = draftRule && picked.fusion > maxFusion(draftRule) ? { ...picked, fusion: 0 } : picked;
+  // The rarity picked, or the first once a sync has removed that one (the box shows the first). Falling back starts that
+  // rarity's level, goal and cap at their defaults, since the removed rarity's don't fit it (a Gold A2 would be saved at a
+  // Diamond's max and deleted at once as maxed).
+  const onRarity = !draftRule || draftRule.id === draft.rarityId ? draft : { ...draft, rarityId: draftRule.id, fusion: 0, maxLevel: null, goal: undefined };
+  // What the form shows, and Add card saves. A level a sync has since taken off the rarity shows, and is saved, as not
+  // owned, so the Goal and note match it too.
+  const shown = draftRule && onRarity.fusion > maxFusion(draftRule) ? { ...onRarity, fusion: 0 } : onRarity;
   // Cards to look up: no art yet, art that stopped loading, or art from an older wiki lookup (some of those are
   // stat screenshots rather than card art), which mkmobilebase usually has a proper card image for.
   const brokenUrls = useBrokenImageUrls();
@@ -572,7 +574,7 @@ function CardList() {
         id: newId(),
         ...shown,
         name: shown.name.trim(),
-        // A level a sync has since taken off the rarity isn't one the level box can show: it shows (and saves) not owned.
+        // Not a level a sync took off the rarity after the form was drawn either (the form's own clamp is on `shown`).
         fusion: shown.fusion <= maxFusion(rule) ? shown.fusion : 0,
         guest: rule.hasGuests && shown.guest,
         source: isEquip ? shown.source : initialSource(shown, d.rarities),
@@ -658,7 +660,7 @@ function CardList() {
         {draft.rarityId && draftRule && draftRule.id !== draft.rarityId && (
           <p className="text-muted text-small">The rarity picked here has since been removed, so this card goes in as {draftRule.label}.</p>
         )}
-        {draftRule && cardGoal(shown as Card, draftRule) === 'threshold' && <p className="text-muted text-small">{thresholdNote(shown as Card, draftRule)}</p>}
+        {draftRule && goalNote(shown as Card, draftRule) && <p className="text-muted text-small">{goalNote(shown as Card, draftRule)}</p>}
         <PasteList pick={picks} startRarityId={draftRule?.id ?? ''} />
       </section>
 
