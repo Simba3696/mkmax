@@ -315,20 +315,27 @@ export function FoldCard({ id, title, children }: { id: string; title: string; c
   );
 }
 
+const CONFIRM_MS = 3000;
+
 export function ConfirmButton({ label, onConfirm, className }: { label: string; onConfirm: () => void; className?: string }) {
-  const [armed, setArmed] = useState(false);
+  // When it was armed, not just whether: a page hidden mid-countdown (Activity) stops the timer, and a disarm set while
+  // hidden isn't kept, so the time itself decides. Shown again later, it disarms; a tap after the 3 seconds arms again.
+  const [armedAt, setArmedAt] = useState<number | null>(null);
+  const armed = armedAt != null;
   useEffect(() => {
-    if (!armed) return;
-    const t = setTimeout(() => setArmed(false), 3000);
-    // A page hidden mid-countdown (Activity) stops its timer here, so disarm too: it would come back armed, a tap from delete.
-    return () => {
-      clearTimeout(t);
-      setArmed(false);
-    };
-  }, [armed]);
+    if (armedAt == null) return;
+    const left = armedAt + CONFIRM_MS - Date.now();
+    if (left <= 0) return void setArmedAt(null);
+    const t = setTimeout(() => setArmedAt(null), left);
+    return () => clearTimeout(t);
+  }, [armedAt]);
+  const tap = () => {
+    if (armedAt != null && Date.now() - armedAt < CONFIRM_MS) onConfirm();
+    else setArmedAt(Date.now());
+  };
   // Ghost buttons (btn.ghost, alone or with extra classes after it) stay ghost when armed, as before; only the text changes.
   return (
-    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={() => (armed ? onConfirm() : setArmed(true))}>
+    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={tap}>
       {armed ? 'Tap again to confirm' : label}
     </button>
   );

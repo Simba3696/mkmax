@@ -1130,10 +1130,11 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
 
   // Regression: /ship review of stale-screens-and-schedule — a Delete tapped once stayed armed across a page switch
   // Found by /ship on 2026-10-14
-  // Value: protects=a card's Delete tapped once is back to Delete after the Cards tab switches to Tower gear and back;
-  // fails_when=hiding the page only stops the 3-second timer, so it comes back armed and one tap deletes; why_new=review
-  // (adversarial, after the switch to Activity); seam=none; no_claim=the 3-second timeout itself
-  it('disarms a Delete tapped once when the page switches away and back', async () => {
+  // Value: protects=a card's Delete tapped once is back to Delete after the Cards tab spends 3 seconds on Tower gear, and a
+  // tap then arms it again rather than deleting; fails_when=hiding the page only stops the 3-second timer, so it comes
+  // back armed and one tap deletes; why_new=review (adversarial, then /ship QA in a browser); seam=Date.now spied for the
+  // time hidden; no_claim=React deferring a state update made while hidden (seen in the browser, not in jsdom)
+  it('disarms a Delete tapped once when the page switches away for 3 seconds and back', async () => {
     const s = defaultState();
     s.cards = [{ id: 'kitana', name: 'Kitana', rarityId: 'gold', fusion: 2, guest: false }];
     localStorage.setItem('mkmax:v1', JSON.stringify(s));
@@ -1148,9 +1149,14 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.queryByRole('button', { name: 'Tap again to confirm' })).not.toBeNull();
     rerender(page('towers'));
+    const later = Date.now() + 4000;
+    vi.spyOn(Date, 'now').mockReturnValue(later);
     rerender(page('cards'));
     await act(async () => {});
     expect(screen.queryByRole('button', { name: 'Tap again to confirm' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeNull();
+    // A tap now arms it again: the card stays.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).cards.map((c: { id: string }) => c.id)).toEqual(['kitana']);
+    expect(screen.queryByRole('button', { name: 'Tap again to confirm' })).not.toBeNull();
   });
 });
