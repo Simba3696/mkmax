@@ -51,11 +51,6 @@ export function nameKey(name: string) {
   return [...new Set(words)].sort().join(' ');
 }
 
-/**
- * The catalog entry for a card: same kind and name words. The app says "Kold" where the site says "Kold War",
- * and the site lists some original variants without a variant name (the Diamond "Jason Voorhees" is the wiki's
- * "Jason Voorhees/Nightmare"), so a no-variant entry of the card's own rarity is accepted as a last resort.
- */
 // The catalog's items by kind and name key, in catalog order. Built once per catalog, so checking a few hundred cards
 // (the rarity check runs on every save, Tower gear taps included) doesn't rescan every item for each one.
 const indexes = new WeakMap<CatalogItem[], Map<string, CatalogItem[]>>();
@@ -72,6 +67,11 @@ function catalogIndex(items: CatalogItem[]) {
   return index;
 }
 
+/**
+ * The catalog entry for a card: same kind and name words. The app says "Kold" where the site says "Kold War",
+ * and the site lists some original variants without a variant name (the Diamond "Jason Voorhees" is the wiki's
+ * "Jason Voorhees/Nightmare"), so a no-variant entry of the card's own rarity is accepted as a last resort.
+ */
 export function findInCatalog(card: Card, rule: RarityRule | undefined, items: CatalogItem[]): CatalogItem | undefined {
   const kind = rule?.kind ?? 'character';
   const index = catalogIndex(items);
