@@ -90,7 +90,10 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     !(p.cost > 0) && 'Cost must be more than 0.',
     p.kasket === undefined && !(p.rolls >= 1) && 'Cards per purchase must be at least 1.',
     p.kasket !== undefined && !kasketRule && "Choose the Kasket's rarity.",
-    p.kasket === undefined && p.drops.some((d) => !d.cardId) && (p.store ? 'Choose the item being sold.' : 'Every drop row needs a card.'),
+    // A drop whose card has since gone (deleted, or maxed and removed, on another device) shows no card, so it asks too.
+    p.kasket === undefined &&
+      p.drops.some((d) => !d.cardId || (!p.store && !state.cards.some((c) => c.id === d.cardId))) &&
+      (p.store ? 'Choose the item being sold.' : 'Every drop row needs a card.'),
     p.startsAt && endsAt && p.startsAt >= endsAt && 'The end time must be after the start time.',
   ].filter(Boolean) as string[];
 
@@ -143,11 +146,14 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
     // A corrected season end moves every pack that was ending with the old one, but only when it was changed here.
     const moveTo = seasonMoveOnSave({ seasonal, pastSeason, scheduled, edited: seasonEdit, currentEnd: currentSeasonEnd });
     const name = p.name.trim();
+    let saved = false;
     update(
-      (d) => (wasSaved && !d.packs.some((x) => x.id === base.id)) || !savePack(d, { ...base, endsAt }, moveTo, now) ? noChange : undefined,
+      (d) => ((wasSaved && !d.packs.some((x) => x.id === base.id)) || !(saved = savePack(d, { ...base, endsAt }, moveTo, now)) ? noChange : undefined),
       moveTo ? `Saved ${name} and changed the season end` : `Saved ${name}`,
     );
-    onClose();
+    // A tap that saved nothing (a sync removed the pack or its item just before it) leaves the editor open, so its note
+    // shows and nothing typed is lost.
+    if (saved) onClose();
   }
 
   return (

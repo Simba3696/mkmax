@@ -236,7 +236,10 @@ describe('Packs: taps on a screen a sync has changed', () => {
     expect([screen.queryByText(/The card this item sells has since been removed/) != null, saveButton().disabled]).toEqual([true, true]);
     act(() => onSave());
     expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
-    // The tap closed the editor. Left with no item, the item opens with one to choose.
+    // The tap saved nothing, so the editor stays open with its note.
+    expect(screen.queryByText(/The card this item sells has since been removed/)).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    // Left with no item, the item opens with one to choose.
     fireEvent.click(item().getByRole('button', { name: 'Edit' }));
     // Not chosen yet isn't removed.
     expect([screen.queryByText('Choose the item being sold.') != null, screen.queryByText(/has since been removed/), saveButton().disabled]).toEqual([true, null, true]);
@@ -245,6 +248,22 @@ describe('Packs: taps on a screen a sync has changed', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ Add pack' }));
     fireEvent.click(screen.getByLabelText(/^Store item/));
     expect([screen.queryByText('Choose the item being sold.') != null, screen.queryByText(/has since been removed/)]).toEqual([true, null]);
+  });
+
+  // Regression: /ship review of stale-screens-and-schedule — a drop whose card a sync deleted was dropped from a pack
+  // without a word
+  // Found by /ship on 2026-10-14
+  // Value: protects=a random pack's drop row whose card a sync deleted while the editor was open asks to be removed
+  // before saving; fails_when=the row shows no card, counts in the total and Save quietly leaves it out; why_new=review
+  // (adversarial); seam=a grabbed update stands in for the sync; no_claim=a real sync
+  it('asks to remove a drop whose card a sync deleted while the editor was open', () => {
+    renderPacks();
+    fireEvent.click(live().getByRole('button', { name: 'Edit' }));
+    expect(screen.queryByText('Every drop row needs a card.')).toBeNull();
+    act(() => update((d) => void (d.cards = d.cards.filter((c) => c.id !== 'scorpion'))));
+    expect([screen.queryByText('Every drop row needs a card.') != null, (screen.getByRole('button', { name: 'Save pack' }) as HTMLButtonElement).disabled]).toEqual([true, true]);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove drop' }));
+    expect((screen.getByRole('button', { name: 'Save pack' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   // Regression: /ship review of clock-and-gear-taps — stale taps on Packs still saved and synced

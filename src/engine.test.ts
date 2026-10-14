@@ -1096,8 +1096,9 @@ describe('kaskets', () => {
     const s = setup([card('a', 0)]);
     savePack(s, pack('p', [{ cardId: 'a', chance: 40 }, { cardId: 'gone', chance: 60 }]), null, NOW);
     expect(s.packs[0].drops).toEqual([{ cardId: 'a', chance: 40 }]);
-    // A store item left selling nothing isn't saved at all.
+    // A store item left selling nothing isn't saved at all, nor one passed in with no item.
     expect(savePack(s, pack('item', [{ cardId: 'gone', chance: 100 }], { store: true }), null, NOW)).toBe(false);
+    expect(savePack(s, pack('empty', [], { store: true }), null, NOW)).toBe(false);
     expect(s.packs.map((x) => x.id)).toEqual(['p']);
   });
 

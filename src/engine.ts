@@ -964,14 +964,14 @@ export function seasonMoveOnSave(o: { seasonal: boolean; pastSeason: boolean; sc
 /**
  * Save an edited pack (already through editedPack and packEndOnSave), adding it if it's new. `moveSeasonTo` comes
  * from seasonMoveOnSave: every pack ending with the current season moves to it (see moveSeasonEnd). Mutates the state.
- * Returns false, saving nothing, for a store item whose card a sync deleted while the editor was open.
+ * Returns false, saving nothing, for a store item that would sell nothing (its card deleted while the editor was open).
  */
 export function savePack(d: AppState, pack: Pack, moveSeasonTo: string | null, now: Date) {
   const clean: Pack = kasketShape({ ...pack, name: pack.name.trim() });
   // Not drops for cards a sync deleted while the editor was open: they'd point at nothing. A store item left selling
   // nothing isn't saved at all, as it would never be cleared as done.
   clean.drops = clean.drops.filter((x) => d.cards.some((c) => c.id === x.cardId));
-  if (clean.store && pack.drops.length > 0 && clean.drops.length === 0) return false;
+  if (clean.store && clean.drops.length === 0) return false;
   if (clean.currencyId === REALM_KLASH_CURRENCY) clean.season = isSeasonal(clean, d);
   else delete clean.season;
   const i = d.packs.findIndex((x) => x.id === clean.id);
