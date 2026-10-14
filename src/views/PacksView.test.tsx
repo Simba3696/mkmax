@@ -238,7 +238,13 @@ describe('Packs: taps on a screen a sync has changed', () => {
     expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
     // The tap closed the editor. Left with no item, the item opens with one to choose.
     fireEvent.click(item().getByRole('button', { name: 'Edit' }));
-    expect([screen.queryByText('Choose the item being sold.') != null, saveButton().disabled]).toEqual([true, true]);
+    // Not chosen yet isn't removed.
+    expect([screen.queryByText('Choose the item being sold.') != null, screen.queryByText(/has since been removed/), saveButton().disabled]).toEqual([true, null, true]);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    // Nor is a new pack's item, the moment Store item is ticked.
+    fireEvent.click(screen.getByRole('button', { name: '+ Add pack' }));
+    fireEvent.click(screen.getByLabelText(/^Store item/));
+    expect([screen.queryByText('Choose the item being sold.') != null, screen.queryByText(/has since been removed/)]).toEqual([true, null]);
   });
 
   // Regression: /ship review of clock-and-gear-taps — stale taps on Packs still saved and synced

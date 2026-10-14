@@ -331,7 +331,7 @@ Tap **+ Add pack** (or **Edit** on a pack).
 - "Every drop row needs a card." (for a store item, "Choose the item being sold.")
 - "The end time must be after the start time."
 
-If another device removes the pack while you're editing it (or clears a store item once its card is done), **Save pack** is greyed out and the editor says it has since been removed, so saving doesn't bring it back. Drops for cards another device deleted meanwhile are left out when you save, and a store item whose card another device deletes meanwhile can't be saved at all: it would sell nothing, so the editor says so and **Save pack** is greyed out.
+If another device removes the pack while you're editing it (or clears a store item once its card is done), **Save pack** is greyed out and the editor says it has since been removed, so saving doesn't bring it back. Drops for cards another device deleted meanwhile are left out when you save, and a store item whose card another device deletes meanwhile would sell nothing: the editor says so and **Save pack** is greyed out until you choose another item.
 
 ### Kaskets
 

@@ -61,8 +61,10 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   // back: Save says so and saves nothing, as any tap on something a sync has removed.
   const [wasSaved] = useState(() => !!initial && state.packs.some((x) => x.id === initial.id));
   const gone = wasSaved && !state.packs.some((x) => x.id === p.id);
-  // A store item whose card a sync deletes while this is open would sell nothing, so it isn't saved either.
-  const itemGone = !!p.store && p.drops.length > 0 && p.drops.every((x) => !state.cards.some((c) => c.id === x.cardId));
+  // A store item whose card a sync deletes while this is open would sell nothing, so it isn't saved either, until
+  // another item is chosen. An item not chosen yet isn't one that was removed: the errors ask for it.
+  const sold = p.drops.filter((x) => x.cardId);
+  const itemGone = !!p.store && sold.length > 0 && sold.every((x) => !state.cards.some((c) => c.id === x.cardId));
   // Blood Ruby characters, Kameos and Kameo packs leave with the season; unless the user said otherwise, guess from the item.
   const seasonal = isSeasonal(base, state);
   const pastSeason = fromEndedSeason(base, seasonDraft, now);
@@ -393,7 +395,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
         </ul>
       )}
       {gone && <p className="text-muted text-small">This pack has since been removed on another device, so saving it won't bring it back.</p>}
-      {!gone && itemGone && <p className="text-muted text-small">The card this item sells has since been removed, so there's nothing to save.</p>}
+      {!gone && itemGone && <p className="text-muted text-small">The card this item sells has since been removed: choose another item to save it.</p>}
       <div className={modalFoot}>
         <button onClick={onClose}>Cancel</button>
         <button className={btn.primary} onClick={save} disabled={errors.length > 0 || gone || itemGone}>

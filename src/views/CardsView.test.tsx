@@ -1350,6 +1350,25 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     expect(form.queryByText('Skipped "Jade, Lizard": its rarity has since been removed.')).not.toBeNull();
   });
 
+  // Regression: /ship review of stale-screens-and-schedule — a list reopened after Cancel filed its plain lines under
+  // another rarity
+  // Found by /ship on 2026-10-14
+  // Value: protects=plain lines kept by Cancel stay under the rarity picked above when they were typed, so once a sync
+  // removes it they're skipped; fails_when=reopening restarts the list from the rarity the form now shows, saving the
+  // lines under it; why_new=review (Red Team): the test above covers a heading, not the rarity picked above; seam=a
+  // grabbed update stands in for the sync; no_claim=a real sync
+  it('keeps the rarity picked above for plain lines reopened after Cancel', () => {
+    renderWith([]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'kameo-gold' } });
+    pasteList('Jade, Lizard');
+    expect(form.getByText(/^New: /).textContent).toBe('New: 1 Gold Kameo');
+    fireEvent.click(form.getByRole('button', { name: 'Cancel' }));
+    act(() => update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'kameo-gold'))));
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    expect([form.queryByText('Skipped "Jade, Lizard": its rarity has since been removed.') != null, form.queryByText(/^New: /)]).toEqual([true, null]);
+  });
+
   // Regression: /ship review of stale-screens-and-schedule — a character's leftover Goal of Max offered F3 on a Max rarity
   // Found by /ship on 2026-10-14
   // Value: protects=a character with its own Goal of Max (entered past F3 while its rarity tracked to F3) shows no Goal box
