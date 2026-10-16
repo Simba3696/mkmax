@@ -61,7 +61,7 @@ Jade, Lizard
 - A line that's just a rarity's full name (`Gold Kameo`) sets the rarity for the plain names after it.
 - Cards already in the app get the new level and source instead of being added twice, but only within the same rarity.
 - Use the game's card names. Matching ignores word order and punctuation, so `Sub-Zero, Klassic` and `Klassic Sub-Zero` are the same card.
-- Paste a list can't change a card's rarity, goal or guest flag. For those, tell the user what to change on the card.
+- Paste a list can't change a card's rarity, goal, guest flag or **No kards** box (for a card the game won't take Fusion Up Kards on). For those, tell the user what to change on the card.
 - **Existing characters made Stage I or Stage II ascendable:** add a line for each Gold character the notes name, like `Kenshi, Elder God - Gold - Stage I`, with no level. Stage I is a Max of A5, Stage II A10. Paste a list handles both cases the user has:
   - a card still in their list keeps its level and gets the new Max;
   - a card missing from their list was maxed and removed, so it's added back at the cap below (F10 for Stage I, A5 for Stage II), with 5 copies to go.
