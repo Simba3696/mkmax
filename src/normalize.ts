@@ -115,7 +115,14 @@ export function normalize(input: unknown): AppState {
       kardsPerLevel: kardTable(r),
     })),
     currencies: s.currencies?.length ? s.currencies : base.currencies,
-    cards: s.cards!,
+    // No kards counts only when it's exactly true: any other value (a hand-edited backup's "false", say) is dropped, as
+    // it would otherwise turn the flag on, or differ from a card without it and look like a sync conflict.
+    cards: s.cards!.map((c) => {
+      if (c.noKards === undefined || c.noKards === true) return c;
+      const out = { ...c };
+      delete out.noKards;
+      return out;
+    }),
     packs: s.packs!,
     weights: { ...defaultWeights, ...s.weights },
     realmKlashSeasonEnd: s.realmKlashSeasonEnd ?? null,

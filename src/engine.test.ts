@@ -451,6 +451,9 @@ describe('save migration', () => {
     const s = normalize(v15);
     expect([s.version, s.cards.map((c) => [c.id, c.noKards ?? null, c.goal ?? null])]).toEqual([16, [['a', null, null], ['nk', true, null]]]);
     expect(normalize(s).cards).toEqual(s.cards);
+    // Only an exact true counts: anything else from a hand-edited file is dropped rather than read as on.
+    const odd = normalize({ ...v15, cards: [card('f', F(1), { noKards: false }), { ...card('s', F(1)), noKards: 'false' } as unknown as Card] });
+    expect(odd.cards.map((c) => 'noKards' in c)).toEqual([false, false]);
   });
 
   // Value: protects=an import marking a pack both a store item and a Kasket keeps the store item if it has a drop, else
