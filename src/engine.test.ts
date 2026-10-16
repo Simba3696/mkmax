@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addPool, ascensionCaps, buildCtx, cardGoal, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -443,6 +443,19 @@ describe('save migration', () => {
     expect(shape(v14.rarities.map((r) => (r.id === 'diamond' ? { ...r, kind: 'kameo' as const } : r)))).toEqual([['kd', undefined, 1], ['kg', 'gold', 0]]);
   });
 
+  // Value: protects=version 16 (No kards) loads older saves unchanged and keeps the flag; fails_when=the version isn't
+  // bumped, so an older build pulls No kards data and plans kards on those cards or deletes a No kards piece at F3;
+  // why_new=the bump has no migration step to test otherwise; seam=none; no_claim=sync's refusal (fromNewerApp, sync tests)
+  it('moves saves to version 16 without changing them, and keeps No kards', () => {
+    const v15 = { ...defaultState(), version: 15, cards: [card('a', F(2)), card('nk', F(5), { rarityId: 'epic', noKards: true })] } as unknown as AppState;
+    const s = normalize(v15);
+    expect([s.version, s.cards.map((c) => [c.id, c.noKards ?? null, c.goal ?? null])]).toEqual([16, [['a', null, null], ['nk', true, null]]]);
+    expect(normalize(s).cards).toEqual(s.cards);
+    // Only an exact true counts: anything else from a hand-edited file is dropped rather than read as on.
+    const odd = normalize({ ...v15, cards: [card('f', F(1), { noKards: false }), { ...card('s', F(1)), noKards: 'false' } as unknown as Card] });
+    expect(odd.cards.map((c) => 'noKards' in c)).toEqual([false, false]);
+  });
+
   // Value: protects=an import marking a pack both a store item and a Kasket keeps the store item if it has a drop, else
   // the Kasket; fails_when=the store item is dropped, so Realm Klash gear leaves the gear queue without a word, or a pack
   // with no drops becomes a store item of nothing; why_new=store now wins; seam=none; no_claim=the pack editor
@@ -480,6 +493,53 @@ describe('phases', () => {
     expect(copyPhase(ctx, c('mid'))).toBe('normal'); // 5 to max; 7 kards buy F5→F6 (3) + F6→F7 (4), covering 2
     expect(copyPhase(ctx, c('mid'), 3)).toBe('kardCovered');
     expect(copyPhase(ctx, c('max'))).toBe('maxed');
+  });
+
+  // Value: protects=every copy of a No kards card after its first is valued at the threshold weight, and kards are never
+  // planned or offered for it; fails_when=its copies past F3 drop to normal or kard-covered value, or the plan or Use
+  // button spends kards on it; why_new=No kards is new; seam=none; no_claim=the box on Cards (CardsView.test.tsx)
+  it('values every copy of a No kards card like those to the threshold, and plans and offers it no kards', () => {
+    const s = setup([card('noob', F(5), { noKards: true }), card('mid', F(5))], [], (s) => (s.rarities[0].fusionUpKards = 7));
+    const ctx = buildCtx(s);
+    const c = (id: string) => ctx.cards.get(id)!;
+    expect([copyPhase(ctx, c('noob')), copyPhase(ctx, c('noob'), 4), copyPhase(ctx, c('mid'), 3)]).toEqual(['noKards', 'noKards', 'kardCovered']);
+    // Value: protects=a copy past a No kards card's max is worth nothing; fails_when=the No kards check moves above the
+    // maxed check, so a pack's later rolls value copies he can't use; why_new=only copies short of max were checked;
+    // seam=none; no_claim=none beyond protects
+    expect(copyPhase(ctx, c('noob'), 5)).toBe('maxed');
+    expect(ctx.kardPlan.get('diamond')).toEqual({ assignments: [{ cardId: 'mid', from: F(5), to: F(7), kards: 7 }], left: 0, cards: 1, cheapest: 3, realmKlash: 0, noKards: 1 });
+    expect([kardStep(s, 'noob'), kardStep(s, 'mid')]).toEqual([null, 3]);
+    // Unowned, the first copy is still an unlock.
+    expect(copyPhase(buildCtx(setup([card('new', 0, { noKards: true })])), card('new', 0, { noKards: true }))).toBe('unlock');
+    // A pack that can drop him is worth the threshold weight (1.5) over the same pack dropping an ordinary Diamond at F3.
+    const t = setup([card('noob', F(3), { noKards: true }), card('plain', F(3))], [pack('a', [{ cardId: 'noob', chance: 50 }]), pack('b', [{ cardId: 'plain', chance: 50 }])]);
+    const tc = buildCtx(t);
+    expect(packEV(tc, t.packs[0]) / packEV(tc, t.packs[1])).toBeCloseTo(t.weights.belowThreshold);
+    // Realm Klash gear is bought with Blood Rubies, so a No kards flag left on it changes nothing.
+    const rk = setup([card('rk', F(5), { rarityId: 'epic', name: 'Shadow Sash', noKards: true })]);
+    expect(copyPhase(buildCtx(rk), rk.cards[0])).toBe('normal');
+  });
+
+  // Value: protects=gear kards finish ordinary pieces around a No kards piece and never pick it as the next piece;
+  // fails_when=the gear branch still spends kards on, or names, the No kards piece; why_new=the No kards test above uses a
+  // Diamond character, not gear's finish-one-piece path; seam=none
+  it('finishes gear with kards around a No kards piece', () => {
+    const s = setup([card('nk', F(9), { rarityId: 'epic', noKards: true }), card('g', F(5), { rarityId: 'epic' })], [], (s) => {
+      const epic = s.rarities.find((r) => r.id === 'epic')!;
+      epic.goal = 'max';
+      epic.fusionUpKards = 200;
+    });
+    const plan = buildCtx(s).kardPlan.get('epic')!;
+    expect([plan.assignments.map((a) => a.cardId), plan.noKards, plan.next, plan.left]).toEqual([['g'], 1, undefined, 152]);
+  });
+
+  // Value: protects=a No kards piece is worked toward max and shows no copies to F3, so one at F5 isn't removed as done;
+  // fails_when=it keeps the rarity's F3 goal and pruneDone deletes it; why_new=No kards is new; seam=none
+  it("works a No kards piece toward max, so one past F3 isn't done there", () => {
+    const s = setup([card('e', F(5), { rarityId: 'epic', noKards: true })]);
+    const epic = s.rarities.find((r) => r.id === 'epic')!;
+    expect([cardGoal(s.cards[0], epic), isMaxed(s.cards[0], epic), copiesToThreshold(card('x', F(1), { noKards: true }), rules().get('diamond')!)]).toEqual(['max', false, 0]);
+    expect(pruneDone(s)).toEqual([]);
   });
 
   it('charges the Diamond kard curve per step', () => {
@@ -1172,6 +1232,18 @@ describe('kard plan notes', () => {
         plan({ cards: 0, left: 60, realmKlash: 1 }),
         epic,
         ['No Epic Equip card at F3 or higher that kards can go to yet, so these kards wait. Realm Klash gear gets none.'],
+      ],
+      [
+        'no card but Realm Klash gear and a No kards piece',
+        plan({ cards: 0, left: 60, realmKlash: 1, noKards: 1 }),
+        epic,
+        ['No Epic Equip card at F3 or higher that kards can go to yet, so these kards wait. Realm Klash gear gets none. Cards marked No kards get none.'],
+      ],
+      [
+        'no card but a No kards card',
+        plan({ cards: 0, left: 60, noKards: 2 }),
+        epic,
+        ['No Epic Equip card at F3 or higher that kards can go to yet, so these kards wait. Cards marked No kards get none.'],
       ],
       [
         'not enough to finish a piece',

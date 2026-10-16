@@ -102,7 +102,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 15,
+    version: 16,
     rarities: s.rarities!.map((r) => ({
       ...r,
       // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
@@ -115,7 +115,14 @@ export function normalize(input: unknown): AppState {
       kardsPerLevel: kardTable(r),
     })),
     currencies: s.currencies?.length ? s.currencies : base.currencies,
-    cards: s.cards!,
+    // No kards counts only when it's exactly true: any other value (a hand-edited backup's "false", say) is dropped, as
+    // it would otherwise turn the flag on, or differ from a card without it and look like a sync conflict.
+    cards: s.cards!.map((c) => {
+      if (c.noKards === undefined || c.noKards === true) return c;
+      const out = { ...c };
+      delete out.noKards;
+      return out;
+    }),
     packs: s.packs!,
     weights: { ...defaultWeights, ...s.weights },
     realmKlashSeasonEnd: s.realmKlashSeasonEnd ?? null,
@@ -177,6 +184,9 @@ export function normalize(input: unknown): AppState {
       return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
     });
   }
+  // Version 16 adds No kards on cards (`noKards`), so nothing in an older save changes. The bump is what matters: a build
+  // from before it would ignore the flag, plan kards on those cards and delete a No kards piece at F3, so it mustn't
+  // pull or import a save that uses it (see fromNewerApp in sync.ts; builds from 2026-10-07 on refuse it).
   // Every load, not once: an import or a save synced from another device can still give a Kasket drops, extra
   // cards per purchase or a null rarity.
   out.packs = out.packs.map(kasketShape);

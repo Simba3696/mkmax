@@ -11,12 +11,13 @@ import { btn, card, field, grow, hint, row, rowTitle, type ChipTone } from '../c
 const PHASE_LABEL: Record<Phase, string> = {
   unlock: 'Unlock',
   toThreshold: 'To Kard threshold',
+  noKards: 'Packs only (no kards)',
   normal: 'Fusion',
   kardCovered: 'Kards cover it',
   maxed: 'Maxed',
   skip: 'Skip',
 };
-const PHASE_TONE: Record<Phase, ChipTone> = { unlock: 'unlock', toThreshold: 'warn', normal: 'plain', kardCovered: 'good', maxed: 'plain', skip: 'plain' };
+const PHASE_TONE: Record<Phase, ChipTone> = { unlock: 'unlock', toThreshold: 'warn', noKards: 'warn', normal: 'plain', kardCovered: 'good', maxed: 'plain', skip: 'plain' };
 
 /** A plan row: centred items, divider between consecutive rows. */
 const planRow = `${row} items-center`;

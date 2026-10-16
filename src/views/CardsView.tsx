@@ -39,7 +39,7 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
 /**
  * Goal for rarities with a Fusion Up Kard threshold: stop at the threshold (kards finish it) or buy all the way
  * to max. Stored only when it differs from the rarity's goal. Realm Klash gear is always bought to max, so it gets
- * a label instead of a choice (see isRealmKlashName).
+ * a label instead of a choice (see isRealmKlashName), and so does a card marked No kards (see cardGoal).
  */
 function GoalSelect({ rule, card, onChange }: { rule: RarityRule; card: Card; onChange: (v: Card['goal']) => void }) {
   if (rule.fusionUpThreshold == null) return null;
@@ -48,6 +48,8 @@ function GoalSelect({ rule, card, onChange }: { rule: RarityRule; card: Card; on
   // of its own there is the rarity's anyway, and offering F3 would let one tap remove a character at F3 or above.
   if (rule.kind !== 'equipment' && rule.goal !== 'threshold' && card.goal !== 'threshold') return null;
   if (rule.kind === 'equipment' && isRealmKlashName(card.name)) return <span className={`${check} text-muted`}>Realm Klash gear (bought to {levelLabel(rule, maxFusion(rule))} with Blood Rubies)</span>;
+  // Kards can't finish a card that can't take them, so it's always worked toward max (see cardGoal).
+  if (card.noKards) return <span className={`${check} text-muted`}>Goal: Max ({levelLabel(rule, targetLevel(card, rule))}), no kards</span>;
   // Max is the card's own: a Gold card capped at A5 goes to A5.
   const max = levelLabel(rule, targetLevel({ ...card, goal: 'max' }, rule));
   return (
@@ -522,6 +524,24 @@ function CardList() {
       Object.assign(c, p);
     });
 
+  // Saved on the card as it is now. Unticking keeps a card at or past F3 on Max, as when one is entered there (see
+  // entryGoal); otherwise a piece tracked only to F3 would be removed as done the moment kards were allowed again.
+  const setNoKards = (c: Card, on: boolean) =>
+    update(
+      (d) => {
+        const x = d.cards.find((y) => y.id === c.id);
+        const r = x && d.rarities.find((y) => y.id === x.rarityId);
+        if (!x || !r || !!x.noKards === on) return noChange;
+        if (on) x.noKards = true;
+        else {
+          delete x.noKards;
+          const goal = entryGoal(x, r);
+          if (goal !== x.goal) x.goal = goal;
+        }
+      },
+      on ? `${c.name}: no Fusion Up Kards` : `${c.name}: Fusion Up Kards allowed`,
+    );
+
   // A level tap steps from the level it showed: saving that level ± 1 would undo a level a sync has added since.
   const stepLevel = (c: Card, by: 1 | -1) =>
     update((d) => (d.cards.find((x) => x.id === c.id)?.fusion === c.fusion && stepCard(d, c.id, by) ? undefined : noChange));
@@ -806,6 +826,14 @@ function CardList() {
                   <label className={check}>
                     <input type="checkbox" checked={c.guest} onChange={(e) => patch(c.id, { guest: e.target.checked })} />
                     Guest
+                  </label>
+                )}
+                {/* Only where kards apply: Realm Klash gear never takes them anyway. A card left marked (on a rarity without
+                    kards, or renamed to a Realm Klash piece) still shows the box, so it can be unticked. */}
+                {(c.noKards || (rule.fusionUpThreshold != null && !(rule.kind === 'equipment' && isRealmKlashName(c.name)))) && (
+                  <label className={check} title="The game won't take Fusion Up Kards on this card, so every copy comes from packs">
+                    <input type="checkbox" checked={!!c.noKards} onChange={(e) => setNoKards(c, e.target.checked)} />
+                    No kards
                   </label>
                 )}
                 {(rule.kind !== 'character' || c.source) && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v, sourceNote: undefined })} />}

@@ -1916,3 +1916,110 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     expect([name(), box.isConnected]).toEqual([['Kitana, Elder'], false]);
   });
 });
+
+describe('Cards: No kards', () => {
+  let update!: ReturnType<typeof useStore>['update'];
+  let lastUndo: ReturnType<typeof useStore>['lastUndo'] = null;
+  function renderWith(cards: ReturnType<typeof defaultState>['cards'], kards = 0) {
+    const s = defaultState();
+    s.cards = cards;
+    s.rarities.find((r) => r.id === 'diamond')!.fusionUpKards = kards;
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => ((update = store.update), (lastUndo = store.lastUndo))} />
+          <CardsView sub="cards" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    return vi.spyOn(SyncLoop.prototype, 'nextStamp');
+  }
+  const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!);
+  const box = () => screen.getByLabelText('No kards') as HTMLInputElement;
+  /** The card's own block in the list: the nearest one holding its Delete button. */
+  const rowOf = (name: string) => {
+    let el: HTMLElement | null = screen.getByText(name);
+    while (el && !within(el).queryByRole('button', { name: 'Delete' })) el = el.parentElement;
+    return within(el!);
+  };
+
+  // Value: protects=the No kards box shows only where kards apply; fails_when=it shows on Realm Klash gear (which never
+  // takes kards) or a Kameo, or is missing on a character or gear; why_new=No kards is new; seam=none
+  it('offers No kards on characters and gear, not on Realm Klash gear or Kameos', () => {
+    renderWith([
+      { id: 'scorpion', name: 'Scorpion', rarityId: 'diamond', fusion: 2, guest: false },
+      { id: 'kunai', name: 'Kombat Kunai', rarityId: 'epic', fusion: 2, guest: false },
+      { id: 'sash', name: 'Shadow Sash', rarityId: 'epic', fusion: 2, guest: false },
+      { id: 'jade', name: 'Jade', rarityId: 'kameo-gold', fusion: 0, guest: false },
+    ]);
+    expect(['Scorpion', 'Kombat Kunai', 'Shadow Sash', 'Jade'].map((n) => rowOf(n).queryByLabelText('No kards') != null)).toEqual([true, true, false, false]);
+  });
+
+  // Value: protects=a card left marked No kards where the box wouldn't normally show (a rarity without kards) can still be
+  // unticked; fails_when=the box shows only on rarities with a kard threshold, so the flag can't be cleared; why_new=
+  // review (testing); seam=none
+  it('still offers No kards to untick on a rarity without kards', () => {
+    renderWith([{ id: 'u', name: 'Kombat Gloves', rarityId: 'uncommon', fusion: 2, guest: false, noKards: true }]);
+    expect(box().checked).toBe(true);
+    fireEvent.click(box());
+    expect(saved().cards[0].noKards).toBeUndefined();
+  });
+
+  // Value: protects=a No kards tap a sync already made saves nothing; fails_when=the recipe's already-that-way check goes, so
+  // the tap stamps a save (and works the goal out again); why_new=review (testing): only a deleted card was covered;
+  // seam=the box's handler as the screen had it before the sync, a grabbed update stands in for the sync,
+  // SyncLoop.nextStamp spied; no_claim=a real sync
+  it('saves nothing for an untick a sync already made', () => {
+    const stamps = renderWith([{ id: 'noob', name: 'Noob Saibot MK1', rarityId: 'diamond', fusion: 1, guest: false, noKards: true }]);
+    const el = box();
+    const onChange = (el as unknown as Record<string, { onChange: (e: unknown) => void }>)[Object.keys(el).find((k) => k.startsWith('__reactProps$'))!].onChange;
+    stamps.mockClear();
+    act(() => update((d) => void delete d.cards[0].noKards));
+    act(() => onChange({ target: { checked: false } }));
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
+
+  // Value: protects=ticking No kards saves it with an Undo and takes away the card's Use N kards button and "to F3" chip;
+  // fails_when=the button stays (kards spent on a card the game won't take them on) or nothing is saved; why_new=No kards
+  // is new; seam=none; no_claim=the planner's values (engine.test.ts)
+  it('saves No kards with an Undo and stops offering kards on the card', () => {
+    renderWith([{ id: 'noob', name: 'Noob Saibot MK1', rarityId: 'diamond', fusion: 4, guest: false }], 1);
+    expect(screen.queryByRole('button', { name: 'Use 1 kard' })).not.toBeNull();
+    fireEvent.click(box());
+    expect([saved().cards[0].noKards, lastUndo?.label, screen.queryByRole('button', { name: 'Use 1 kard' })]).toEqual([true, 'Noob Saibot MK1: no Fusion Up Kards', null]);
+  });
+
+  // Value: protects=a No kards piece shows its Max goal, and unticking keeps one past F3 on Max; fails_when=unticking puts
+  // it back on the rarity's F3 goal and it's removed as done at once; why_new=No kards is new; seam=none
+  it('keeps a piece past F3 on Max when No kards is unticked', () => {
+    renderWith([{ id: 'kunai', name: 'Kombat Kunai', rarityId: 'epic', fusion: 6, guest: false, noKards: true }]);
+    expect(screen.queryByText('Goal: Max (F10), no kards')).not.toBeNull();
+    fireEvent.click(box());
+    expect(saved().cards.map((c: { id: string; goal?: string; noKards?: boolean }) => [c.id, c.goal, c.noKards])).toEqual([['kunai', 'max', undefined]]);
+    expect(lastUndo?.label).toBe('Kombat Kunai: Fusion Up Kards allowed');
+  });
+
+  // Value: protects=unticking No kards on a piece below F3 leaves its goal alone, so it's tracked to F3 again; fails_when=
+  // unticking always saves Goal Max, so packs are bought for copies kards would give; why_new=only a piece past F3 was
+  // unticked; seam=none; no_claim=a piece with a Goal of its own
+  it('puts a piece below F3 back on its F3 goal when No kards is unticked', () => {
+    renderWith([{ id: 'kori', name: 'Kori Blade', rarityId: 'epic', fusion: 2, guest: false, noKards: true }]);
+    fireEvent.click(box());
+    expect(saved().cards.map((c: { id: string; goal?: string; noKards?: boolean }) => [c.id, c.goal, c.noKards])).toEqual([['kori', undefined, undefined]]);
+    expect([screen.queryByText('2 to F3') != null, lastUndo?.label]).toEqual([true, 'Kori Blade: Fusion Up Kards allowed']);
+  });
+
+  // Value: protects=a No kards tap on a card a sync deleted saves nothing; fails_when=the recipe stamps the save anyway;
+  // why_new=No kards is new; seam=the box's handler as the screen had it before the sync, a grabbed update stands in for
+  // the sync, SyncLoop.nextStamp spied; no_claim=a real sync
+  it('saves nothing for No kards on a card a sync deleted', () => {
+    const stamps = renderWith([{ id: 'noob', name: 'Noob Saibot MK1', rarityId: 'diamond', fusion: 1, guest: false }]);
+    const el = box();
+    const onChange = (el as unknown as Record<string, { onChange: (e: unknown) => void }>)[Object.keys(el).find((k) => k.startsWith('__reactProps$'))!].onChange;
+    stamps.mockClear();
+    act(() => update((d) => void (d.cards = [])));
+    act(() => onChange({ target: { checked: true } }));
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+  });
+});

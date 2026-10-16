@@ -36,8 +36,12 @@ export function ascensionCaps(rule: RarityRule) {
 /** Stored level where Fusion Up Kards become usable, or null. */
 export const thresholdLevel = (rule: RarityRule) => (rule.fusionUpThreshold == null ? null : fLevel(rule.fusionUpThreshold));
 
-/** The card's goal: max for Realm Klash gear (always bought to max), else its own override, else the rarity's. */
-export const cardGoal = (card: Card, rule: RarityRule) => (rule.kind === 'equipment' && isRealmKlashName(card.name) ? 'max' : (card.goal ?? rule.goal));
+/**
+ * The card's goal: max for Realm Klash gear (always bought to max) and for a card that can't take kards (stopping at
+ * the kard threshold only makes sense when kards finish it), else its own override, else the rarity's.
+ */
+export const cardGoal = (card: Card, rule: RarityRule) =>
+  (rule.kind === 'equipment' && isRealmKlashName(card.name)) || card.noKards ? 'max' : (card.goal ?? rule.goal);
 
 /**
  * The goal a card gets as it's entered (Add card, Paste a list, the pack editor). One typed in already at or past its kard
@@ -61,9 +65,10 @@ export function targetLevel(card: Card, rule: RarityRule) {
 export const copiesToMax = (card: Card, rule: RarityRule) =>
   Math.max(0, copiesAtFusion(rule, targetLevel(card, rule)) - copiesAtFusion(rule, card.fusion));
 
+/** Copies to the kard threshold; none for a card that can't take kards, as the threshold means nothing to it. */
 export function copiesToThreshold(card: Card, rule: RarityRule) {
   const thr = thresholdLevel(rule);
-  if (thr == null) return 0;
+  if (thr == null || card.noKards) return 0;
   return Math.max(0, copiesAtFusion(rule, thr) - copiesAtFusion(rule, card.fusion));
 }
 
@@ -109,6 +114,8 @@ export interface KardPlan {
   cheapest: number | null;
   /** Realm Klash gear at the threshold or higher and short of its goal, left out of `cards`. */
   realmKlash: number;
+  /** Other cards marked No kards at the threshold or higher and short of their goal, left out of `cards`; unset when none. */
+  noKards?: number;
   /** Gear only: the first piece the kards left can't finish, and all the kards it needs to reach its goal. */
   next?: { cardId: string; needs: number };
   /** Gear only: pieces kards can't take all the way to their goal, because a step on the way has no kard cost. */
@@ -193,7 +200,8 @@ export function kardCost(rule: RarityRule, level: number): number | null {
  * 10 kards, F3→F4 costs 1), and every step saves one pack copy, so the next kard always goes to the cheapest
  * step available, weighted up for guest cards. Ties go to the card with the fewest steps left to its goal, so a
  * card gets finished before another is started (opening a Gold ascension also takes Ascension Kards, untracked).
- * Kards work from the threshold (F3) up, through fusion and on into Gold ascension. Realm Klash gear gets none.
+ * Kards work from the threshold (F3) up, through fusion and on into Gold ascension. Realm Klash gear gets none, nor
+ * does a card marked No kards.
  * Gear is different: its special effect only comes at its goal (F10), so a part-fused piece is worth nothing
  * extra. Its kards finish one piece at a time, the one needing fewest kards first, and what's left waits for the
  * next piece rather than going part of the way.
@@ -207,7 +215,9 @@ function allocateKards(state: AppState) {
     if (thr == null || rule.goal !== 'max' || rule.fusionUpKards <= 0) continue;
     const cap = (c: Card) => targetLevel(c, rule);
     const open = state.cards.filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c));
-    const cards = open.filter((c) => !isRealmKlashGear(state, c));
+    const realmKlash = open.filter((c) => isRealmKlashGear(state, c)).length;
+    const cards = open.filter((c) => !isRealmKlashGear(state, c) && !c.noKards);
+    const noKards = open.length - realmKlash - cards.length;
     const costs = cards.map((c) => kardCost(rule, c.fusion)).filter((k): k is number => k != null);
     const level = new Map(cards.map((c) => [c.id, c.fusion]));
     const spent = new Map<string, number>();
@@ -269,7 +279,7 @@ function allocateKards(state: AppState) {
     // Gear rows follow the finishing order (fewest kards first), so the top row is the piece to fuse first.
     if (rule.kind === 'equipment') assignments.sort((a, b) => finishOrder.get(a.cardId)! - finishOrder.get(b.cardId)!);
     else assignments.sort((a, b) => b.to - a.to || b.kards - a.kards);
-    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash: open.length - cards.length, ...(next && { next }), ...(stuck.length > 0 && { stuck }) });
+    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash, ...(noKards > 0 && { noKards }), ...(next && { next }), ...(stuck.length > 0 && { stuck }) });
   }
   return { kardCopies, kardPlan };
 }
@@ -282,7 +292,7 @@ export function buildCtx(state: AppState): Ctx {
 
 // ---------- Value of a copy ----------
 
-export type Phase = 'unlock' | 'toThreshold' | 'normal' | 'kardCovered' | 'maxed' | 'skip';
+export type Phase = 'unlock' | 'toThreshold' | 'noKards' | 'normal' | 'kardCovered' | 'maxed' | 'skip';
 
 /** Which phase the copy at position `g` (copies already gained beyond current) falls into. */
 export function copyPhase(ctx: Ctx, card: Card, g = 0): Phase {
@@ -293,6 +303,10 @@ export function copyPhase(ctx: Ctx, card: Card, g = 0): Phase {
   const pos = copiesAtFusion(rule, card.fusion) + g;
   if (pos < 1) return 'unlock';
   const thr = thresholdLevel(rule);
+  // Kards can't stand in for any copy of a card that can't take them, so every copy to its max is valued like those
+  // to the threshold: packs are the only way to get it. Not Realm Klash gear, bought with Blood Rubies, whatever a
+  // flag left on it says.
+  if (thr != null && card.noKards && !(rule.kind === 'equipment' && isRealmKlashName(card.name))) return 'noKards';
   if (thr != null && pos < copiesAtFusion(rule, thr)) return 'toThreshold';
   if (g >= remaining - (ctx.kardCopies.get(card.id) ?? 0)) return 'kardCovered';
   return 'normal';
@@ -303,7 +317,7 @@ function copyValue(ctx: Ctx, card: Card, g = 0): number {
   if (phase === 'skip' || phase === 'maxed') return 0;
   const w = ctx.state.weights;
   const rule = ctx.rules.get(card.rarityId)!;
-  const mult = { unlock: w.unlock, toThreshold: w.belowThreshold, kardCovered: w.coveredByKards, normal: 1 }[phase];
+  const mult = { unlock: w.unlock, toThreshold: w.belowThreshold, noKards: w.belowThreshold, kardCovered: w.coveredByKards, normal: 1 }[phase];
   const progress = (copiesAtFusion(rule, card.fusion) + g) / copiesAtFusion(rule, targetLevel(card, rule));
   return cardWeight(ctx.state, card) * mult * (1 + w.closenessBonus * progress);
 }
@@ -737,13 +751,13 @@ export function stepCard(d: AppState, cardId: string, delta: 1 | -1) {
 
 /**
  * The Fusion Up Kards this card's next step would take from the Wallet now, or null when kards can't do it: below
- * the threshold (F3), already at its goal, Realm Klash gear (bought to max, never kards), a rarity not tracked to max
- * (it has no kard box), a step with no kard cost, or more kards than the Wallet holds.
+ * the threshold (F3), already at its goal, Realm Klash gear (bought to max, never kards), a card marked No kards, a
+ * rarity not tracked to max (it has no kard box), a step with no kard cost, or more kards than the Wallet holds.
  */
 export function kardStep(state: AppState, cardId: string): number | null {
   const card = state.cards.find((c) => c.id === cardId);
   const rule = card && state.rarities.find((r) => r.id === card.rarityId);
-  if (!card || !rule || rule.goal !== 'max' || card.fusion >= targetLevel(card, rule) || isRealmKlashGear(state, card)) return null;
+  if (!card || !rule || rule.goal !== 'max' || card.noKards || card.fusion >= targetLevel(card, rule) || isRealmKlashGear(state, card)) return null;
   const cost = kardCost(rule, card.fusion);
   return cost != null && cost <= rule.fusionUpKards ? cost : null;
 }

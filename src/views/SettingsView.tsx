@@ -12,7 +12,7 @@ import GearOrder from './GearOrder';
 import type { AppState, RarityRule, Weights } from '../types';
 
 const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
-  { key: 'belowThreshold', label: 'Reaching the Kard threshold', help: 'Multiplier for copies that get a card to the level where Fusion Up Kards can be used.' },
+  { key: 'belowThreshold', label: 'Reaching the Kard threshold', help: 'Multiplier for copies that get a card to the level where Fusion Up Kards can be used, and for every copy of a card marked No kards, since packs are the only way to get those.' },
   { key: 'unlock', label: 'Unlocking a new card', help: "Multiplier for the first copy of a card you don't own." },
   { key: 'guest', label: 'Guest / limited card', help: 'Multiplier for guest cards, since they only show up during limited events.' },
   { key: 'kameo', label: 'Kameos', help: 'Multiplier for Kameo copies. Kept low so your currency goes to gear and characters first, and to Kameos once those are done.' },
