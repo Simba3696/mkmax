@@ -179,7 +179,7 @@ export function normalize(input: unknown): AppState {
   }
   // Version 16 adds No kards on cards (`noKards`), so nothing in an older save changes. The bump is what matters: a build
   // from before it would ignore the flag, plan kards on those cards and delete a No kards piece at F3, so it mustn't
-  // pull or import a save that uses it (see fromNewerApp in sync.ts).
+  // pull or import a save that uses it (see fromNewerApp in sync.ts; builds from 2026-10-07 on refuse it).
   // Every load, not once: an import or a save synced from another device can still give a Kasket drops, extra
   // cards per purchase or a null rarity.
   out.packs = out.packs.map(kasketShape);
