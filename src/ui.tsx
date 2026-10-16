@@ -353,12 +353,15 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
  * either way, since "not enough kards" would be wrong for it.
  */
 export function kardNotes(plan: KardPlan, rule: RarityRule, cards: Map<string, Card>): string[] {
-  if (plan.cards === 0)
+  if (plan.cards === 0) {
+    // Cards at the threshold that kards can't go to are named, or "no card at F3" would be wrong.
+    const none = [plan.realmKlash > 0 && 'Realm Klash gear gets none.', plan.noKards && 'Cards marked No kards get none.'].filter(Boolean).join(' ');
     return [
-      plan.realmKlash > 0
-        ? `No ${rule.label} card at F${rule.fusionUpThreshold} or higher that kards can go to yet, so these kards wait. Realm Klash gear gets none.`
+      none
+        ? `No ${rule.label} card at F${rule.fusionUpThreshold} or higher that kards can go to yet, so these kards wait. ${none}`
         : `No ${rule.label} card at F${rule.fusionUpThreshold} or higher yet, so these kards wait.`,
     ];
+  }
   const next = plan.next && cards.get(plan.next.cardId);
   const nextGoal = next && levelLabel(rule, targetLevel(next, rule));
   const short = plan.next ? plan.next.needs - plan.left : 0;

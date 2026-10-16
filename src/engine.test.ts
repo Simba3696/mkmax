@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addPool, ascensionCaps, buildCtx, cardGoal, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -480,6 +480,33 @@ describe('phases', () => {
     expect(copyPhase(ctx, c('mid'))).toBe('normal'); // 5 to max; 7 kards buy F5→F6 (3) + F6→F7 (4), covering 2
     expect(copyPhase(ctx, c('mid'), 3)).toBe('kardCovered');
     expect(copyPhase(ctx, c('max'))).toBe('maxed');
+  });
+
+  // Value: protects=every copy of a No kards card after its first is valued at the threshold weight, and kards are never
+  // planned or offered for it; fails_when=its copies past F3 drop to normal or kard-covered value, or the plan or Use
+  // button spends kards on it; why_new=No kards is new; seam=none; no_claim=the box on Cards (CardsView.test.tsx)
+  it('values every copy of a No kards card like those to the threshold, and plans and offers it no kards', () => {
+    const s = setup([card('noob', F(5), { noKards: true }), card('mid', F(5))], [], (s) => (s.rarities[0].fusionUpKards = 7));
+    const ctx = buildCtx(s);
+    const c = (id: string) => ctx.cards.get(id)!;
+    expect([copyPhase(ctx, c('noob')), copyPhase(ctx, c('noob'), 4), copyPhase(ctx, c('mid'), 3)]).toEqual(['noKards', 'noKards', 'kardCovered']);
+    expect(ctx.kardPlan.get('diamond')).toEqual({ assignments: [{ cardId: 'mid', from: F(5), to: F(7), kards: 7 }], left: 0, cards: 1, cheapest: 3, realmKlash: 0, noKards: 1 });
+    expect([kardStep(s, 'noob'), kardStep(s, 'mid')]).toEqual([null, 3]);
+    // Unowned, the first copy is still an unlock.
+    expect(copyPhase(buildCtx(setup([card('new', 0, { noKards: true })])), card('new', 0, { noKards: true }))).toBe('unlock');
+    // A pack that can drop him is worth the threshold weight (1.5) over the same pack dropping an ordinary Diamond at F3.
+    const t = setup([card('noob', F(3), { noKards: true }), card('plain', F(3))], [pack('a', [{ cardId: 'noob', chance: 50 }]), pack('b', [{ cardId: 'plain', chance: 50 }])]);
+    const tc = buildCtx(t);
+    expect(packEV(tc, t.packs[0]) / packEV(tc, t.packs[1])).toBeCloseTo(1.5);
+  });
+
+  // Value: protects=a No kards piece is worked toward max and shows no copies to F3, so one at F5 isn't removed as done;
+  // fails_when=it keeps the rarity's F3 goal and pruneDone deletes it; why_new=No kards is new; seam=none
+  it("works a No kards piece toward max, so one past F3 isn't done there", () => {
+    const s = setup([card('e', F(5), { rarityId: 'epic', noKards: true })]);
+    const epic = s.rarities.find((r) => r.id === 'epic')!;
+    expect([cardGoal(s.cards[0], epic), isMaxed(s.cards[0], epic), copiesToThreshold(card('x', F(1), { noKards: true }), rules().get('diamond')!)]).toEqual(['max', false, 0]);
+    expect(pruneDone(s)).toEqual([]);
   });
 
   it('charges the Diamond kard curve per step', () => {
@@ -1172,6 +1199,18 @@ describe('kard plan notes', () => {
         plan({ cards: 0, left: 60, realmKlash: 1 }),
         epic,
         ['No Epic Equip card at F3 or higher that kards can go to yet, so these kards wait. Realm Klash gear gets none.'],
+      ],
+      [
+        'no card but Realm Klash gear and a No kards piece',
+        plan({ cards: 0, left: 60, realmKlash: 1, noKards: 1 }),
+        epic,
+        ['No Epic Equip card at F3 or higher that kards can go to yet, so these kards wait. Realm Klash gear gets none. Cards marked No kards get none.'],
+      ],
+      [
+        'no card but a No kards card',
+        plan({ cards: 0, left: 60, noKards: 2 }),
+        epic,
+        ['No Epic Equip card at F3 or higher that kards can go to yet, so these kards wait. Cards marked No kards get none.'],
       ],
       [
         'not enough to finish a piece',

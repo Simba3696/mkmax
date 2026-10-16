@@ -40,6 +40,11 @@ export interface Card {
   /** Guest / limited-event card — only obtainable for a short time. */
   guest: boolean;
   /**
+   * The game won't take Fusion Up Kards on this card (a summon exclusive, say), so every copy to its max comes from
+   * packs: no kards are planned or offered for it, and it's always worked toward max.
+   */
+  noKards?: boolean;
+  /**
    * Where it comes from besides packs: Krypt or tower gear, or a Kameo from an Elder challenge. Tracked, but not
    * planned for unless a pack sells it.
    */
