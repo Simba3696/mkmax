@@ -102,7 +102,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 15,
+    version: 16,
     rarities: s.rarities!.map((r) => ({
       ...r,
       // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
@@ -177,6 +177,9 @@ export function normalize(input: unknown): AppState {
       return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
     });
   }
+  // Version 16 adds No kards on cards (`noKards`), so nothing in an older save changes. The bump is what matters: a build
+  // from before it would ignore the flag, plan kards on those cards and delete a No kards piece at F3, so it mustn't
+  // pull or import a save that uses it (see fromNewerApp in sync.ts).
   // Every load, not once: an import or a save synced from another device can still give a Kasket drops, extra
   // cards per purchase or a null rarity.
   out.packs = out.packs.map(kasketShape);

@@ -304,8 +304,9 @@ export function copyPhase(ctx: Ctx, card: Card, g = 0): Phase {
   if (pos < 1) return 'unlock';
   const thr = thresholdLevel(rule);
   // Kards can't stand in for any copy of a card that can't take them, so every copy to its max is valued like those
-  // to the threshold: packs are the only way to get it.
-  if (thr != null && card.noKards) return 'noKards';
+  // to the threshold: packs are the only way to get it. Not Realm Klash gear, bought with Blood Rubies, whatever a
+  // flag left on it says.
+  if (thr != null && card.noKards && !(rule.kind === 'equipment' && isRealmKlashName(card.name))) return 'noKards';
   if (thr != null && pos < copiesAtFusion(rule, thr)) return 'toThreshold';
   if (g >= remaining - (ctx.kardCopies.get(card.id) ?? 0)) return 'kardCovered';
   return 'normal';

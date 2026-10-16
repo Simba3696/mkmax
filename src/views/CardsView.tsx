@@ -39,7 +39,7 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
 /**
  * Goal for rarities with a Fusion Up Kard threshold: stop at the threshold (kards finish it) or buy all the way
  * to max. Stored only when it differs from the rarity's goal. Realm Klash gear is always bought to max, so it gets
- * a label instead of a choice (see isRealmKlashName).
+ * a label instead of a choice (see isRealmKlashName), and so does a card marked No kards (see cardGoal).
  */
 function GoalSelect({ rule, card, onChange }: { rule: RarityRule; card: Card; onChange: (v: Card['goal']) => void }) {
   if (rule.fusionUpThreshold == null) return null;
@@ -828,9 +828,9 @@ function CardList() {
                     Guest
                   </label>
                 )}
-                {/* Only where kards apply: Realm Klash gear never takes them anyway. A card left marked on a rarity without
-                    kards still shows the box, so it can be unticked. */}
-                {(rule.fusionUpThreshold != null || c.noKards) && !(rule.kind === 'equipment' && isRealmKlashName(c.name)) && (
+                {/* Only where kards apply: Realm Klash gear never takes them anyway. A card left marked (on a rarity without
+                    kards, or renamed to a Realm Klash piece) still shows the box, so it can be unticked. */}
+                {(c.noKards || (rule.fusionUpThreshold != null && !(rule.kind === 'equipment' && isRealmKlashName(c.name)))) && (
                   <label className={check} title="The game won't take Fusion Up Kards on this card, so every copy comes from packs">
                     <input type="checkbox" checked={!!c.noKards} onChange={(e) => setNoKards(c, e.target.checked)} />
                     No kards
