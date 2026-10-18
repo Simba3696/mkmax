@@ -101,7 +101,8 @@ const dayOf = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).
  * reads `split`). One at its top level (its
  * own max, or owned for a Kameo) also goes on the Maxed record, dated `now` when given; one done at its kard threshold
  * isn't maxed yet, since kards finish it in the game. `split`, when given, gets the removed cards' names sorted into
- * maxed and only done at their kard threshold, card by card (two cards can share a name), for the Undo. With `record`
+ * maxed and only done (at their kard threshold, or removed by a rule change), card by card (two cards can share a
+ * name), for the Undo. With `record`
  * false (a Settings rule change), nothing goes on the record: the rules changed, not what was done in the game.
  *
  * Realm Klash gear also gets a stored goal of max first. The name already makes it max here, but a copy of the app

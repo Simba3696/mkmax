@@ -132,7 +132,7 @@ export default function MaxedPanel() {
               <div className={rowTitle}>{m.name}</div>
               <div className="text-small">
                 <RarityBadge rule={rule} />
-                {m.at && <span className="text-muted">maxed {dayLabel(m.at, now)}</span>}
+                {m.at && <span className="text-muted">{' '}maxed {dayLabel(m.at, now)}</span>}
               </div>
             </div>
             <ConfirmButton label="Remove" className={btn.ghost} onConfirm={() => remove(m)} />
@@ -188,7 +188,8 @@ function PasteMaxed() {
       },
       () => `Added ${added} to Maxed`,
     );
-    if (added) {
+    // As Paste a list does: lines listed as skipped with a reason stay, so they can be fixed and added.
+    if (added && !parsed.problems.length) {
       setText('');
       setOpen(false);
     }
@@ -228,14 +229,8 @@ function PasteMaxed() {
         </ul>
       )}
       <div className={actions}>
-        <button
-          onClick={() => {
-            setText('');
-            setOpen(false);
-          }}
-        >
-          Cancel
-        </button>
+        {/* As Paste a list does: Cancel closes the box and keeps the text for next time. */}
+        <button onClick={() => setOpen(false)}>Cancel</button>
         <button className={btn.primary} onClick={add} disabled={fresh.length === 0}>
           {fresh.length ? `Add ${fresh.length}` : 'Add maxed cards'}
         </button>

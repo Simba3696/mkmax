@@ -169,7 +169,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   // A card on the Maxed record is maxed, at whatever level its line gives (a roster, or a pack's drops): skipped. Only a
   // Stage line brings one back, as the game does when an update makes a Gold card ascendable.
   const isMaxedLine = (c: (typeof parsed.cards)[number]) => c.maxLevel === undefined && onMaxedRecord(state, c);
-  const maxedLines = parsed.cards.filter((c) => live(c.rarityId) && isMaxedLine(c));
+  // Not the lines Add just saved at their top level (`gone`): those went on the record, so they aren't "skipped".
+  const maxedLines = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(c.line) && isMaxedLine(c));
   // `gone` holds the lines as typed, so an edited line (a lower level, say) is offered again, and a line that reads
   // differently once its card is gone (a Stage line brings a maxed card back) still matches.
   const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(c.line) && !isMaxedLine(c));

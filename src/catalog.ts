@@ -70,7 +70,7 @@ function catalogIndex(items: CatalogItem[]) {
 }
 
 /**
- * The catalog entry for a card: same kind and name words. The app says "Kold" where the site says "Kold War",
+ * The catalog entry for a card: same kind and name words (nameKey reads "Kold" and the site's "Kold War" as one),
  * and the site lists some original variants without a variant name (the Diamond "Jason Voorhees" is the wiki's
  * "Jason Voorhees/Nightmare"), so a no-variant entry of the card's own rarity is accepted as a last resort.
  */
@@ -78,7 +78,7 @@ export function findInCatalog(card: Card, rule: RarityRule | undefined, items: C
   const kind = rule?.kind ?? 'character';
   const index = catalogIndex(items);
   const named = (name: string) => index.get(`${kind}|${nameKey(name)}`) ?? [];
-  const exact = named(card.name)[0] ?? named(card.name.replace(/\bKold\b/i, 'Kold War'))[0];
+  const exact = named(card.name)[0];
   if (exact) return exact;
   const base = card.name.split(',')[0].trim();
   if (base === card.name.trim()) return undefined;

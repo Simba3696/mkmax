@@ -254,11 +254,14 @@ export function daysFromNow(days: number, now: Date) {
 }
 
 /** A saved day (YYYY-MM-DD, local) shown as daysFromNow shows dates: "Oct 16", or "Feb 6, 2027" in another year. */
+// Made once: a long Maxed list redraws every row's day.
+const thisYearDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+const otherYearDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 export function dayLabel(day: string, now: Date) {
   const [y, m, d] = day.split('-').map(Number);
   const date = new Date(y, m - 1, d);
   if (Number.isNaN(date.getTime())) return day;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(y !== now.getFullYear() && { year: 'numeric' }) });
+  return (y === now.getFullYear() ? thisYearDay : otherYearDay).format(date);
 }
 
 /**

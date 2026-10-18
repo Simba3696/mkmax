@@ -155,7 +155,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!opts?.auto) draft.updatedAt = loop.nextStamp();
     stateRef.current = draft;
     setState(draft);
-    // Gear done at its kard threshold isn't maxed (it's not on the Maxed page), so it's only "done".
+    // Gear done at its kard threshold isn't maxed (it's not on the Maxed page), and nor is a card a Settings rule change
+    // removes, so those are only "done".
     const gone = (names: string[], how: string) => names.length > 0 && `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} ${how} and removed`;
     const label = [typeof undoLabel === 'function' ? undoLabel() : undoLabel, gone(split.maxed, 'maxed'), gone(split.done, 'done')].filter(Boolean).join(' · ');
     if (label) setLastUndo({ label, prev, at: Date.now() });

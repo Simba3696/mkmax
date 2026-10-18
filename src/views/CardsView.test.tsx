@@ -833,6 +833,8 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     const add = pasteList('Kori Blade - Epic - F10\nKitana - Bogus');
     act(() => add.click());
     expect([saved().cards, form.queryByRole('button', { name: 'Add 1' })]).toEqual([[], null]);
+    // The line Add just saved isn't listed as skipped: it went on the record (added by the /ship review on 2026-10-18).
+    expect(form.queryByText(/already maxed/)).toBeNull();
     // Changed by /ship review fixes (cycle 3) on 2026-10-18: saved at its top level, Kori Blade went on the Maxed record,
     // so an edited line for it is skipped as already maxed (only a Stage line brings a maxed card back); the paste's Undo
     // is how a slip like this is put right.
