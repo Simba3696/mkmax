@@ -292,12 +292,13 @@ export default function SettingsView() {
                       };
                       // Its Maxed history goes with it, and the tooltip doesn't show on phones: two taps, with the count on
                       // the button. Otherwise one tap, with Undo, as before.
-                      if (!used && maxedHere > 0) return <ConfirmButton label={`Remove (${maxedHere} maxed)`} className={btn.ghost} onConfirm={remove} />;
+                      const kaskets = state.packs.filter((p) => p.kasket === r.id).length;
+                      if (!used && maxedHere > 0) return <ConfirmButton label={`Remove (${maxedHere} maxed)`} className={btn.ghost} onConfirm={remove} title={withRemoved('Remove rarity', kaskets, maxedHere)} />;
                       return (
                         <button
                           className={btn.ghost}
                           disabled={used}
-                          title={used ? 'Cards use this rarity' : withRemoved('Remove rarity', state.packs.filter((p) => p.kasket === r.id).length)}
+                          title={used ? 'Cards use this rarity' : withRemoved('Remove rarity', kaskets)}
                           onClick={remove}
                         >
                           Remove

@@ -262,13 +262,13 @@ export function dayLabel(day: string, now: Date) {
 }
 
 /**
- * Why Add card and the pack editor won't add a card on the Maxed record as not owned (see onMaxedRecord in engine.ts). A
- * Kameo has no level to give (owning one is its top level), so the only way is to take it off the record.
+ * Why Add card and the pack editor won't add a card on the Maxed record (see onMaxedRecord in engine.ts). A Gold card an
+ * update made ascendable comes back by pasting it with its Stage; a Kameo only needs owning, so it never comes back.
  */
 export const onMaxedNote = (rule: RarityRule | undefined) =>
   rule?.kind === 'kameo'
-    ? 'That Kameo is on your Maxed record, so you own it already. Remove it from Maxed first to add it as not owned.'
-    : 'That card is on your Maxed record: pick the level you have it at to add it back, or remove it from Maxed first.';
+    ? 'That Kameo is on your Maxed record, so you own it already. Remove it from Maxed first to add it again.'
+    : 'That card is on your Maxed record. Remove it from Maxed first to add it again; a Gold card made ascendable comes back by pasting it with its Stage.';
 
 /**
  * A display choice remembered on this device (a list's sort order), not synced. Falls back to the first option
@@ -334,7 +334,7 @@ export function FoldCard({ id, title, children }: { id: string; title: string; c
 
 const CONFIRM_MS = 3000;
 
-export function ConfirmButton({ label, onConfirm, className }: { label: string; onConfirm: () => void; className?: string }) {
+export function ConfirmButton({ label, onConfirm, className, title }: { label: string; onConfirm: () => void; className?: string; title?: string }) {
   // When it was armed, not just whether: a page hidden mid-countdown (Activity) stops the timer, so the time itself
   // decides. Shown again later, it disarms; a tap after the 3 seconds arms again.
   const [armedAt, setArmedAt] = useState<number | null>(null);
@@ -358,7 +358,7 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
   };
   // Ghost buttons (btn.ghost, alone or with extra classes after it) stay ghost when armed, as before; only the text changes.
   return (
-    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={tap}>
+    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={tap} title={title}>
       {armed ? 'Tap again to confirm' : label}
     </button>
   );

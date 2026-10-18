@@ -106,7 +106,7 @@ export default function MaxedPanel() {
             ))}
             {done.unlisted.length > 0 && (
               <p className="text-muted text-small">
-                {done.unlisted.length === 1 ? "1 maxed card isn't" : `${done.unlisted.length} maxed cards aren't`} on MK Mobile Base's list under that rarity yet, so{' '}
+                {done.unlisted.length === 1 ? "1 maxed card isn't" : `${done.unlisted.length} maxed cards aren't`} on MK Mobile Base's list under {done.unlisted.length === 1 ? 'its' : 'their'} rarity yet, so{' '}
                 {done.unlisted.length === 1 ? "it isn't" : "they aren't"} counted: {done.unlisted.map((m) => m.name).join(', ')}.
               </p>
             )}
@@ -168,8 +168,8 @@ function PasteMaxed() {
   const onRecord = maxedKeys(state);
   const inList = new Set(state.cards.map((c) => cardKey(c.rarityId, c.name)));
   const fresh = parsed.cards.filter((c) => !onRecord.has(cardKey(c.rarityId, c.name)));
-  const already = parsed.cards.length - fresh.length;
-  const stillListed = parsed.updates.length + parsed.duplicates.filter((d) => inList.has(d.key)).length;
+  const already = parsed.cards.filter((c) => onRecord.has(cardKey(c.rarityId, c.name))).map((c) => c.name);
+  const stillListed = [...parsed.updates.map((u) => u.name), ...parsed.duplicates.filter((d) => inList.has(d.key)).map((d) => d.name)];
 
   function add() {
     let added = 0;
@@ -197,8 +197,8 @@ function PasteMaxed() {
   // As Paste a list words it: what's new, then what's skipped.
   const status = [
     fresh.length ? `New: ${fresh.length}` : 'Nothing to add yet.',
-    already > 0 && `skipping ${already} already on Maxed`,
-    stillListed > 0 && `skipping ${stillListed} still in your card list, so not maxed yet`,
+    already.length > 0 && `skipping ${already.length} already on Maxed (${already.join('; ')})`,
+    stillListed.length > 0 && `skipping ${stillListed.length} still in your card list, so not maxed yet (${stillListed.join('; ')})`,
   ].filter(Boolean);
   return (
     <div className={subpanel}>

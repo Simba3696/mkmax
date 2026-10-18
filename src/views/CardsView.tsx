@@ -1,7 +1,7 @@
 import { Activity, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, recordedCap, stepCard, targetLevel, thresholdLevel, unmarkMaxed } from '../engine';
+import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, unmarkMaxed } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -166,11 +166,10 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const isOrphan = (u: (typeof parsed.updates)[number]) => state.cards.some((c) => c.id === u.cardId && !live(c.rarityId));
   const updates = parsed.updates.filter((u) => !isOrphan(u));
   const removedLines = [...parsed.cards.filter(isRemoved).map((c) => c.line), ...parsed.updates.filter(isOrphan).map((u) => u.line)];
-  // A card on the Maxed record pasted as not owned (a list of a pack's drops, say) isn't one to start again: skipped.
-  const isMaxedLine = (c: (typeof parsed.cards)[number]) => onMaxedRecord(state, { ...c, fusion: c.fusion ?? 0 });
+  // A card on the Maxed record is maxed, at whatever level its line gives (a roster, or a pack's drops): skipped. Only a
+  // Stage line brings one back, as the game does when an update makes a Gold card ascendable.
+  const isMaxedLine = (c: (typeof parsed.cards)[number]) => c.maxLevel === undefined && onMaxedRecord(state, c);
   const maxedLines = parsed.cards.filter((c) => live(c.rarityId) && isMaxedLine(c));
-  // A Kameo on the record is owned already: no level brings one back, so the hint is only for other cards.
-  const levelHint = maxedLines.some((c) => state.rarities.find((r) => r.id === c.rarityId)?.kind !== 'kameo');
   // `gone` holds the lines as typed, so an edited line (a lower level, say) is offered again, and a line that reads
   // differently once its card is gone (a Stage line brings a maxed card back) still matches.
   const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(c.line) && !isMaxedLine(c));
@@ -209,10 +208,10 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // to delete them. Nor a card a sync has added meanwhile (the same list pasted on another device), which would
         // then be in twice. Nor updates to cards a sync removed.
         const have = new Set(d.cards.map((x) => cardKey(x.rarityId, x.name)));
+        // Nor one on the Maxed record without a Stage, a sync's entry included.
+        const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name)) && !(c.maxLevel === undefined && onMaxedRecord(d, c)));
         // As Add card does: a level a sync has since taken off the rarity is saved as not owned.
         const levelOf = (c: (typeof newCards)[number]) => ((c.fusion ?? 0) <= maxFusion(d.rarities.find((r) => r.id === c.rarityId)!) ? (c.fusion ?? 0) : 0);
-        // Nor, as not owned (at the level it would be saved at), one on the Maxed record, a sync's entry included.
-        const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name)) && !onMaxedRecord(d, { ...c, fusion: levelOf(c) }));
         // Nor to a card left without its rarity (an older build or an imported file can leave one): it has no rules to
         // check its goal against. Nor one a sync has already updated that way (the same list pasted on another device).
         const changes = (c: Card, patch: (typeof updates)[number]['patch']) =>
@@ -241,16 +240,11 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
           if (goal) f.goal = goal;
         }
         const ruleOf = (c: Card) => d.rarities.find((r) => r.id === c.rarityId)!;
-        // A maxed Gold card pasted back at its own cap with no Stage is maxed there still (a Stage line brings one back).
-        cards.forEach((c, i) => {
-          const cap = c.maxLevel === undefined ? recordedCap(d, fresh[i], ruleOf(fresh[i])) : undefined;
-          if (cap !== undefined) fresh[i].maxLevel = cap;
-        });
         d.cards.push(...fresh);
-        // One pasted already maxed goes on the record with no day (when it was maxed isn't known), or keeps the entry it
-        // has. One pasted back with copies to go (a Gold card made ascendable again, say) comes off it.
+        // One pasted already maxed goes on the record with no day (when it was maxed isn't known). One pasted back with a
+        // Stage (a Gold card made ascendable) comes off it, since it has copies to go again.
         recordMaxed(d, fresh.filter((f) => atTopLevel(f, ruleOf(f))));
-        unmarkMaxed(d, fresh);
+        unmarkMaxed(d, fresh.filter((f, i) => cards[i].maxLevel !== undefined && !atTopLevel(f, ruleOf(f))));
         for (const { c, patch } of saving) Object.assign(c, patch);
         added = cards.length;
         updated = saving.length;
@@ -319,7 +313,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
                 : 'Nothing to add yet.'}
         {updates.length > 0 && ` · updating ${updates.length} already listed (${updates.map((u) => u.name).join('; ')})`}
         {skipped.length > 0 && ` · skipping ${skipped.length} already listed (${skipped.join('; ')})`}
-        {maxedLines.length > 0 && ` · skipping ${maxedLines.length} already maxed (${maxedLines.map((c) => c.name).join('; ')})${levelHint ? ': give the level you have to bring one back' : ''}`}
+        {maxedLines.length > 0 && ` · skipping ${maxedLines.length} already maxed (${maxedLines.map((c) => c.name).join('; ')})`}
       </div>
       {parsed.problems.length + removedLines.length > 0 && (
         <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
@@ -642,10 +636,9 @@ function CardList() {
       // The goal the form showed for it (see formGoal), worked out with the rarity as it is now. A card already at it would
       // be done at once, so it isn't added (Add is greyed out for it; Enter in the name box comes here too).
       const saved = { ...card, goal: formGoal(card, rule).goal };
-      // Nor, as not owned, a card on the Maxed record (Add is greyed out for that too).
+      // Nor a card on the Maxed record (Add is greyed out for that too).
       if (isMaxed(saved, rule) || onMaxedRecord(d, saved)) return noChange;
       d.cards.push(saved);
-      unmarkMaxed(d, [saved]);
       added = true;
     });
     // The typed name stays for another try when nothing was added.
@@ -665,7 +658,7 @@ function CardList() {
   const rarityCount = (value: string) => state.cards.filter((c) => matchesSearch(c) && inSource(c, sourceFilter) && inOwned(c, ownedFilter) && inRarity(c, value)).length;
   const sourceCount = (value: Source | 'all') => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inOwned(c, ownedFilter) && inSource(c, value)).length;
   const ownedCount = (value: typeof ownedFilter) => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && inOwned(c, value)).length;
-  const addsMaxed = !!shown.name.trim() && !!draftRule && onMaxedRecord(state, { ...shown, name: shown.name.trim(), rarityId: draftRule.id });
+  const addsMaxed = !!shown.name.trim() && !!draftRule && onMaxedRecord(state, { name: shown.name.trim(), rarityId: draftRule.id });
   const cards = state.cards
     .filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && (inOwned(c, ownedFilter) || tapped.has(c.id)))
     // Rarity then name by default, so a card doesn't jump around while you edit it. By fusion, ties keep that order.

@@ -70,7 +70,7 @@ describe('Cards: the Maxed page', () => {
   it("names maxed cards MK Mobile Base doesn't list under their rarity", async () => {
     renderMaxed((s) => (s.maxed = [{ name: 'Noob Saibot, MK1', rarityId: 'diamond' }, { name: 'Sub-Zero, MK1', rarityId: 'diamond' }]));
     expect(await screen.findByText(/of every card MK Mobile Base lists: 1 of 3 maxed/)).not.toBeNull();
-    expect(screen.queryByText("1 maxed card isn't on MK Mobile Base's list under that rarity yet, so it isn't counted: Noob Saibot, MK1.")).not.toBeNull();
+    expect(screen.queryByText("1 maxed card isn't on MK Mobile Base's list under its rarity yet, so it isn't counted: Noob Saibot, MK1.")).not.toBeNull();
   });
 
   // Changed by /ship review fixes on 2026-10-18
@@ -151,7 +151,7 @@ describe('Cards: the Maxed page', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Paste maxed cards…' }));
     fireEvent.change(screen.getByLabelText('Maxed cards'), { target: { value: 'Sub-Zero MK1\nScorpion MK2 Movie\nKori Blade - Epic' } });
-    expect(screen.queryByText('New: 1 · skipping 1 already on Maxed · skipping 1 still in your card list, so not maxed yet')).not.toBeNull();
+    expect(screen.queryByText('New: 1 · skipping 1 already on Maxed (Scorpion MK2 Movie) · skipping 1 still in your card list, so not maxed yet (Sub-Zero MK1)')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Add 1' }));
     expect([saved().maxed.map((m: { name: string }) => m.name), lastUndo?.label]).toEqual([['Scorpion, MKII Movie', 'Kori Blade'], 'Added 1 to Maxed']);
   });
