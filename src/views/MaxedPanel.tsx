@@ -188,8 +188,9 @@ function PasteMaxed() {
       },
       () => `Added ${added} to Maxed`,
     );
-    // As Paste a list does: lines listed as skipped with a reason stay, so they can be fixed and added.
-    if (added && !parsed.problems.length) {
+    // Lines skipped with a reason stay in the box, on their own, so they can be fixed and added; the rest are done.
+    if (added && parsed.problems.length) setText(parsed.problems.map((p) => p.line).join('\n'));
+    else if (added) {
       setText('');
       setOpen(false);
     }
