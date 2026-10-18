@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { LevelOptions, Modal, NumInput, ON_MAXED_NOTE, kasketLine } from '../ui';
+import { LevelOptions, Modal, NumInput, kasketLine, onMaxedNote } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
 import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, entryGoal, isMaxed, isSeasonal, kasketPool, maxFusion, onMaxedRecord, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave, unmarkMaxed } from '../engine';
 import { initialSource } from '../challenges';
@@ -393,7 +393,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
               <div className="text-small text-muted">The rarity picked here has since been removed, so this card goes in as {newCardRule.label}.</div>
             )}
             {newCardDone && <div className="text-small text-muted">That level is already the card's goal, so it would be done at once: pick a lower level to add it.</div>}
-            {newCardMaxed && <div className="text-small text-muted">{ON_MAXED_NOTE}</div>}
+            {newCardMaxed && <div className="text-small text-muted">{onMaxedNote(newCardRule)}</div>}
           </div>
         </>
       )}

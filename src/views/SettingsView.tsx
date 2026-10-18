@@ -23,9 +23,9 @@ const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
 ];
 
 /** Removing a rarity also removes its Kaskets and its Maxed record entries (removeRarity), so the button and its Undo say so. */
-function withKaskets(text: string, kaskets: number, maxed = 0) {
-  const also = [kaskets && (kaskets === 1 ? 'Kasket' : `${kaskets} Kaskets`), maxed && `${maxed} maxed card${maxed === 1 ? '' : 's'}`].filter(Boolean);
-  return also.length ? `${text} and its ${also.join(' and ')}` : text;
+function withRemoved(text: string, kaskets: number, maxed = 0) {
+  const also = [kaskets && (kaskets === 1 ? 'its Kasket' : `its ${kaskets} Kaskets`), maxed && (maxed === 1 ? 'its maxed card' : `its ${maxed} maxed cards`)].filter(Boolean);
+  return also.length === 2 ? `${text}, ${also[0]} and ${also[1]}` : also.length ? `${text} and ${also[0]}` : text;
 }
 
 const KIND_LABEL: Record<RarityRule['kind'], string> = { character: 'Character', equipment: 'Equipment', kameo: 'Kameo' };
@@ -271,12 +271,12 @@ export default function SettingsView() {
                       </>
                     )}
                     <span className={`${grow} lg:hidden`} />
-                    <button
-                      className={btn.ghost}
-                      disabled={state.cards.some((c) => c.rarityId === r.id)}
-                      title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : withKaskets('Remove rarity', state.packs.filter((p) => p.kasket === r.id).length, (state.maxed ?? []).filter((m) => m.rarityId === r.id).length)}
-                      onClick={() => {
-                        // The Kaskets counted as the change removes them: a sync may have added or removed some since.
+                    {(() => {
+                      const used = state.cards.some((c) => c.rarityId === r.id);
+                      const maxedHere = (state.maxed ?? []).filter((m) => m.rarityId === r.id).length;
+                      const remove = () => {
+                        // The Kaskets and Maxed entries counted as the change removes them: a sync may have added or
+                        // removed some since.
                         let kaskets = 0;
                         let maxed = 0;
                         // Not if a sync already removed it, or brought in cards that use it.
@@ -287,12 +287,23 @@ export default function SettingsView() {
                             maxed = (d.maxed ?? []).filter((m) => m.rarityId === r.id).length;
                             removeRarity(d, r.id);
                           },
-                          () => withKaskets(`Removed ${r.label}`, kaskets, maxed),
+                          () => withRemoved(`Removed ${r.label}`, kaskets, maxed),
                         );
-                      }}
-                    >
-                      Remove
-                    </button>
+                      };
+                      // Its Maxed history goes with it, and the tooltip doesn't show on phones: two taps, with the count on
+                      // the button. Otherwise one tap, with Undo, as before.
+                      if (!used && maxedHere > 0) return <ConfirmButton label={`Remove (${maxedHere} maxed)`} className={btn.ghost} onConfirm={remove} />;
+                      return (
+                        <button
+                          className={btn.ghost}
+                          disabled={used}
+                          title={used ? 'Cards use this rarity' : withRemoved('Remove rarity', state.packs.filter((p) => p.kasket === r.id).length)}
+                          onClick={remove}
+                        >
+                          Remove
+                        </button>
+                      );
+                    })()}
                   </div>
                   {!kameo && r.fusionUpThreshold != null && (
                     <>

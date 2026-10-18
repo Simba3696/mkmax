@@ -5,6 +5,7 @@ import { defaultState } from '../defaults';
 import { StoreProvider } from '../store';
 import { PlanProvider } from '../planner';
 import CardsView from './CardsView';
+import { dayLabel } from '../ui';
 
 // Its own file, so catalog.ts starts with no card list downloaded: a test that loaded it would leave it cached.
 beforeEach(() => {
@@ -35,7 +36,7 @@ describe("Cards: the Maxed page when MK Mobile Base's list doesn't load", () => 
     );
     expect(await screen.findByText(/card list didn't load, so completion can't be worked out yet/)).not.toBeNull();
     expect([screen.queryByText(/Loading MK Mobile Base/), screen.queryByText(/of every card MK Mobile Base lists/)]).toEqual([null, null]);
-    expect([screen.getByText('Kori Blade') != null, screen.queryByText(/^maxed Oct 18/) != null]).toEqual([true, true]);
+    expect([screen.getByText('Kori Blade') != null, screen.queryByText(`maxed ${dayLabel('2026-10-18', new Date())}`) != null]).toEqual([true, true]);
     const items = [{ kind: 'equipment', name: 'Kori Blade', rarity: 'epic', slug: 'kori', image: 'kori.webp' }];
     vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ items }))));
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));

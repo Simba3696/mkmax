@@ -162,9 +162,10 @@ describe('the Maxed record', () => {
     expect([normalize(old).version, normalize(old).maxed]).toEqual([17, []]);
     const odd = normalize({ ...old, maxed: [{ name: 'Kori Blade', rarityId: 'epic' }, { name: 3 }, null, 'x'] } as unknown as AppState);
     expect(odd.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic' }]);
-    // A day that isn't text would break the page, and the same card twice would list twice: both dropped.
+    // A day that isn't text would break the page, and the same card twice would list twice: one entry, with the day a
+    // later copy has.
     const twice = normalize({ ...old, maxed: [{ name: 'Kori Blade', rarityId: 'epic', at: {}, extra: 1 }, { name: 'kori blade', rarityId: 'epic', at: '2026-10-01' }] } as unknown as AppState);
-    expect(twice.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic' }]);
+    expect(twice.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic', at: '2026-10-01' }]);
   });
 });
 

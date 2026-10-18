@@ -261,8 +261,14 @@ export function dayLabel(day: string, now: Date) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(y !== now.getFullYear() && { year: 'numeric' }) });
 }
 
-/** Why Add card won't add a card on the Maxed record as not owned (see onMaxedRecord in engine.ts). */
-export const ON_MAXED_NOTE = "That card is on your Maxed record. Give its level to add it back (a Gold card with a new Stage, say), or remove it from Maxed first.";
+/**
+ * Why Add card and the pack editor won't add a card on the Maxed record as not owned (see onMaxedRecord in engine.ts). A
+ * Kameo has no level to give (owning one is its top level), so the only way is to take it off the record.
+ */
+export const onMaxedNote = (rule: RarityRule | undefined) =>
+  rule?.kind === 'kameo'
+    ? 'That Kameo is on your Maxed record, so you own it already. Remove it from Maxed first to add it as not owned.'
+    : 'That card is on your Maxed record: pick the level you have it at to add it back, or remove it from Maxed first.';
 
 /**
  * A display choice remembered on this device (a list's sort order), not synced. Falls back to the first option

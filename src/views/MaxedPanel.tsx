@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { recordMaxed } from '../engine';
+import { maxedKeys, recordMaxed } from '../engine';
 import { completion, findInCatalog, loadCatalog, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
 import { CardThumb, ConfirmButton, RarityBadge, dayLabel } from '../ui';
@@ -44,27 +44,24 @@ export default function MaxedPanel() {
     };
   }, [attempt]);
 
-  const maxed = useSame(state.maxed ?? [], (state.maxed ?? []).map((m) => `${cardKey(m.rarityId, m.name)}|${m.name}|${m.at ?? ''}`).join('\n'));
+  const maxed = useSame(state.maxed ?? [], (state.maxed ?? []).map((m) => `${m.rarityId}|${m.name}|${m.at ?? ''}`).join('\n'));
   const rarities = useSame(state.rarities, JSON.stringify(state.rarities));
   const done = useMemo(() => (catalog ? completion(maxed, rarities, catalog) : null), [catalog, maxed, rarities]);
   const counted = done ? done.rarities.reduce((n, r) => n + r.maxed, 0) : 0;
   const total = done ? done.rarities.reduce((n, r) => n + r.total, 0) : 0;
-  const ruleOf = (m: MaxedCard) => rarities.find((r) => r.id === m.rarityId);
-  // Art from the catalog, as the record keeps only a name and rarity. Matched once per record, not on every redraw.
-  const images = useMemo(() => {
-    const out = new Map<string, string>();
-    for (const m of catalog ? maxed : []) {
-      const rule = rarities.find((r) => r.id === m.rarityId);
-      const hit = rule && findInCatalog({ id: '', name: m.name, rarityId: m.rarityId, fusion: 0, guest: false }, rule, catalog!);
-      if (hit) out.set(cardKey(m.rarityId, m.name), hit.image);
-    }
-    return out;
-  }, [catalog, maxed, rarities]);
+  // Each entry with its key, rule and art (from the catalog, as the record keeps only a name and rarity), by rarity then
+  // name: worked out once per record, not on every redraw.
   const sorted = useMemo(() => {
     const order = new Map(rarities.map((r, i) => [r.id, i]));
-    return [...maxed].sort((a, b) => (order.get(a.rarityId) ?? -1) - (order.get(b.rarityId) ?? -1) || a.name.localeCompare(b.name));
-  }, [maxed, rarities]);
-  const listed = q ? sorted.filter((m) => m.name.toLowerCase().includes(q.toLowerCase())) : sorted;
+    return maxed
+      .map((m) => {
+        const rule = rarities.find((r) => r.id === m.rarityId);
+        const image = catalog && rule ? findInCatalog({ id: '', name: m.name, rarityId: m.rarityId, fusion: 0, guest: false }, rule, catalog)?.image : undefined;
+        return { m, key: cardKey(m.rarityId, m.name), rule, image };
+      })
+      .sort((a, b) => (order.get(a.m.rarityId) ?? -1) - (order.get(b.m.rarityId) ?? -1) || a.m.name.localeCompare(b.m.name));
+  }, [catalog, maxed, rarities]);
+  const listed = useMemo(() => (q ? sorted.filter(({ m }) => m.name.toLowerCase().includes(q.toLowerCase())) : sorted), [sorted, q]);
 
   // Found by rarity and name rather than by its place in the list, so a tap after a sync changed the list removes the
   // card it was for, or nothing.
@@ -128,13 +125,13 @@ export default function MaxedPanel() {
         {maxed.length > 0 && <input className="w-full md:max-w-[360px] my-[0.6rem]" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />}
         {maxed.length === 0 && <p className="text-muted">No maxed cards yet.</p>}
         {maxed.length > 0 && listed.length === 0 && <p className="text-muted">No maxed cards match.</p>}
-        {listed.map((m) => (
-          <div key={cardKey(m.rarityId, m.name)} className={`${row} items-center`}>
-            <CardThumb card={{ id: '', name: m.name, rarityId: m.rarityId, fusion: 0, guest: false, imageUrl: images.get(cardKey(m.rarityId, m.name)) }} rule={ruleOf(m)} size={36} />
+        {listed.map(({ m, key, rule, image }) => (
+          <div key={key} className={`${row} items-center`}>
+            <CardThumb card={{ id: '', name: m.name, rarityId: m.rarityId, fusion: 0, guest: false, imageUrl: image }} rule={rule} size={36} />
             <div className={grow}>
               <div className={rowTitle}>{m.name}</div>
               <div className="text-small">
-                <RarityBadge rule={ruleOf(m)} />
+                <RarityBadge rule={rule} />
                 {m.at && <span className="text-muted">maxed {dayLabel(m.at, now)}</span>}
               </div>
             </div>
@@ -158,11 +155,6 @@ function PasteMaxed() {
   // The rarity shown is the one plain lines go under: the first one once a sync has removed the one picked.
   const rarityId = state.rarities.some((r) => r.id === picked) ? picked : (state.rarities[0]?.id ?? '');
   const parsed = useMemo(() => parseCardList(text, state.rarities, rarityId, state.cards), [text, state.rarities, rarityId, state.cards]);
-  const onRecord = new Set((state.maxed ?? []).map((m) => cardKey(m.rarityId, m.name)));
-  const inList = new Set(state.cards.map((c) => cardKey(c.rarityId, c.name)));
-  const fresh = parsed.cards.filter((c) => !onRecord.has(cardKey(c.rarityId, c.name)));
-  const already = parsed.cards.length - fresh.length;
-  const stillListed = parsed.updates.length + parsed.duplicates.filter((d) => inList.has(d.key)).length;
 
   if (!open) {
     return (
@@ -171,6 +163,13 @@ function PasteMaxed() {
       </div>
     );
   }
+
+  // Only while the box is open: the page redraws on every change, hidden or not.
+  const onRecord = maxedKeys(state);
+  const inList = new Set(state.cards.map((c) => cardKey(c.rarityId, c.name)));
+  const fresh = parsed.cards.filter((c) => !onRecord.has(cardKey(c.rarityId, c.name)));
+  const already = parsed.cards.length - fresh.length;
+  const stillListed = parsed.updates.length + parsed.duplicates.filter((d) => inList.has(d.key)).length;
 
   function add() {
     let added = 0;
@@ -195,9 +194,11 @@ function PasteMaxed() {
     }
   }
 
+  // As Paste a list words it: what's new, then what's skipped.
   const status = [
-    already > 0 && `${already === 1 ? '1 is' : `${already} are`} already on Maxed`,
-    stillListed > 0 && `skipping ${stillListed === 1 ? "1 card that's" : `${stillListed} cards that are`} still in your card list, so not maxed yet`,
+    fresh.length ? `New: ${fresh.length}` : 'Nothing to add yet.',
+    already > 0 && `skipping ${already} already on Maxed`,
+    stillListed > 0 && `skipping ${stillListed} still in your card list, so not maxed yet`,
   ].filter(Boolean);
   return (
     <div className={subpanel}>
@@ -214,8 +215,8 @@ function PasteMaxed() {
           ))}
         </select>
       </label>
-      <textarea className="w-full my-[0.4rem]" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic'} aria-label="Maxed cards" autoFocus />
-      {status.length > 0 && <div className="text-small text-muted">{status.join(' · ')}.</div>}
+      <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic'} aria-label="Maxed cards" autoFocus />
+      <div className="text-small text-muted">{status.join(' · ')}</div>
       {parsed.problems.length > 0 && (
         <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
           {/* Keyed by place too: the same line can be pasted twice. */}

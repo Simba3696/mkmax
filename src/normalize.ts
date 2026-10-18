@@ -1,8 +1,7 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
 import type { AppState, Card, MaxedCard, RarityRule } from './types';
-import { nameKey } from './catalog';
 import { ASCENSION_KARD_COST, ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
-import { REALM_KLASH_CURRENCY, kasketShape, pruneDone } from './engine';
+import { REALM_KLASH_CURRENCY, kasketShape, pruneDone, recordKey } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
 import { fixPackNames } from './events';
 import { kasketIn } from './kaskets';
@@ -80,19 +79,22 @@ const RENAMED: Record<string, string> = { 'Datusha, Bane of Moroi': 'Datusha, Ba
 
 /**
  * The Maxed record as a hand-edited file could hold it: only entries with a name and rarity, a day only if it's text (an
- * object there would break the page), and one entry per card, as the app records them.
+ * object there would break the page), and one entry per card, as the app records them (the first, with a day from a
+ * later copy if it has none).
  */
 function keptMaxed(input: unknown): MaxedCard[] {
-  const seen = new Set<string>();
-  const out: MaxedCard[] = [];
+  const seen = new Map<string, MaxedCard>();
   for (const m of Array.isArray(input) ? (input as Partial<MaxedCard>[]) : []) {
     if (!m || typeof m.name !== 'string' || typeof m.rarityId !== 'string') continue;
-    const key = `${m.rarityId}|${nameKey(m.name)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ name: m.name, rarityId: m.rarityId, ...(typeof m.at === 'string' && { at: m.at }) });
+    const at = typeof m.at === 'string' ? m.at : undefined;
+    const kept = seen.get(recordKey({ name: m.name, rarityId: m.rarityId }));
+    if (kept) {
+      if (!kept.at && at) kept.at = at;
+      continue;
+    }
+    seen.set(recordKey({ name: m.name, rarityId: m.rarityId }), { name: m.name, rarityId: m.rarityId, ...(at && { at }) });
   }
-  return out;
+  return [...seen.values()];
 }
 
 /** Fill in fields missing from older saves or hand-edited imports, then drop cards that are already done. */

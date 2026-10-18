@@ -78,7 +78,18 @@ export const isMaxed = (card: Card, rule: RarityRule) => card.fusion >= targetLe
 export const atTopLevel = (card: Card, rule: RarityRule) => card.fusion >= targetLevel({ ...card, goal: 'max' }, rule);
 
 /** A card's rarity and name key, whatever its case or word order: the same key as cardKey in cardList.ts, which imports this module. */
-const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityId}|${nameKey(c.name)}`;
+export const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityId}|${nameKey(c.name)}`;
+
+// Each change copies the whole save (store.tsx), so a record is checked against many times (every pasted line, every
+// keystroke in Add card) before it changes: its keys are worked out once per copy.
+const keysOf = new WeakMap<MaxedCard[], Set<string>>();
+/** The keys (recordKey) of the cards on the Maxed record. */
+export function maxedKeys(s: AppState): ReadonlySet<string> {
+  if (!s.maxed) return new Set();
+  let keys = keysOf.get(s.maxed);
+  if (!keys) keysOf.set(s.maxed, (keys = new Set(s.maxed.map(recordKey))));
+  return keys;
+}
 
 /** YYYY-MM-DD in local time, as the day a card was maxed is shown. */
 const dayOf = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1034,9 +1045,20 @@ export function unmarkMaxed(s: AppState, cards: Card[]) {
 
 /**
  * A card on the Maxed record being added as not owned, which would list a maxed card as one to start from nothing (typing
- * a pack's whole drop table, say). Add card and Paste a list refuse it; one with a level comes back as `unmarkMaxed` says.
+ * a pack's whole drop table, say). Add card, the pack editor and Paste a list refuse it; one with a level comes back as
+ * `unmarkMaxed` says.
  */
-export const onMaxedRecord = (s: AppState, card: Pick<Card, 'rarityId' | 'name' | 'fusion'>) => card.fusion <= 0 && (s.maxed ?? []).some((m) => recordKey(m) === recordKey(card));
+export const onMaxedRecord = (s: AppState, card: Pick<Card, 'rarityId' | 'name' | 'fusion'>) => card.fusion <= 0 && maxedKeys(s).has(recordKey(card));
+
+/**
+ * The Max of a Gold card on the Maxed record pasted back at one of its rarity's caps below the top (F10, or A5) with no
+ * Stage, which would otherwise get Max A10 and come off the record with copies it can't get. The record says it was
+ * maxed there, so it still is: its Max is that level. Undefined for anything else; a Stage part is how one comes back.
+ */
+export function recordedCap(s: AppState, card: Pick<Card, 'rarityId' | 'name' | 'fusion'>, rule: RarityRule) {
+  const caps = ascensionCaps(rule);
+  return caps.length > 1 && card.fusion < maxFusion(rule) && caps.includes(card.fusion) && maxedKeys(s).has(recordKey(card)) ? card.fusion : undefined;
+}
 
 /** Adds cards to the Maxed record by hand (ones maxed before it existed), leaving out any already on it. Mutates the state. */
 export function recordMaxed(s: AppState, cards: MaxedCard[]) {
