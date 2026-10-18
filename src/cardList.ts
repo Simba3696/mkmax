@@ -37,6 +37,16 @@ export interface ParsedList {
   problems: { line: string; reason: string }[];
 }
 
+/**
+ * A pasted line as the list reads it: spaces tidied and a leading bullet or number dropped (lists copied from notes
+ * often have them: "- Jade, Lizard", "2. Kori Blade"). Empty for a blank or underline row. Lines in ParsedList are these.
+ */
+export function listLine(raw: string) {
+  const trimmed = raw.trim().replace(/\s+/g, ' ');
+  if (!trimmed || /^[-=_*\s]+$/.test(trimmed)) return '';
+  return trimmed.replace(/^(?:[-–—*•·]|\d+[.)])\s+/, '');
+}
+
 /** One card in a list, whatever case, spacing or word order its name is typed in: its rarity and name key. */
 export const cardKey = (rarityId: string, name: string) => `${rarityId}|${nameKey(name)}`;
 
@@ -84,10 +94,8 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
   let headingRarityId = startRarityId;
   const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [] };
   for (const raw of text.split(/\r?\n/)) {
-    const trimmed = raw.trim().replace(/\s+/g, ' ');
-    if (!trimmed || /^[-=_*\s]+$/.test(trimmed)) continue;
-    // Lists copied from notes often have bullets or numbers ("- Jade, Lizard", "2. Kori Blade"), which aren't part of the name.
-    const line = trimmed.replace(/^(?:[-–—*•·]|\d+[.)])\s+/, '');
+    const line = listLine(raw);
+    if (!line) continue;
     const [name, ...parts] = line.split(/\s+[-–—]\s+/);
     if (parts.length === 0) {
       // A heading is a rarity's full name. Matched on the name alone, so a name the list was typed with still counts

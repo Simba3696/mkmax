@@ -3,7 +3,7 @@ import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { maxedKeys, recordMaxed } from '../engine';
 import { completion, findInCatalog, loadCatalog, type CatalogItem } from '../catalog';
-import { cardKey, parseCardList } from '../cardList';
+import { cardKey, listLine, parseCardList } from '../cardList';
 import { CardThumb, ConfirmButton, RarityBadge, dayLabel } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, subpanel } from '../classes';
 import type { MaxedCard } from '../types';
@@ -173,27 +173,30 @@ function PasteMaxed() {
 
   function add() {
     let added = 0;
+    let recorded: string[] = [];
     update(
       (d) => {
         // As the screen showed, checked against the save as it is now: not under a rarity a sync removed, nor a card a
         // sync has put back in the list.
         const have = new Set(d.cards.map((c) => cardKey(c.rarityId, c.name)));
+        const ok = fresh.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name)));
         const before = d.maxed?.length ?? 0;
-        recordMaxed(
-          d,
-          fresh.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name))).map((c) => ({ name: c.name, rarityId: c.rarityId })),
-        );
+        recordMaxed(d, ok.map((c) => ({ name: c.name, rarityId: c.rarityId })));
         added = (d.maxed?.length ?? 0) - before;
         if (!added) return noChange;
+        recorded = ok.map((c) => c.line);
       },
       () => `Added ${added} to Maxed`,
     );
-    // Lines skipped with a reason stay in the box, on their own, so they can be fixed and added; the rest are done.
-    if (added && parsed.problems.length) setText(parsed.problems.map((p) => p.line).join('\n'));
-    else if (added) {
+    if (!added) return;
+    // The lines now on the record are done; everything else stays as typed (headings, lines skipped with a reason, ones a
+    // sync made unusable just before the tap), so they can be fixed and added. With nothing left to fix, the box closes.
+    const done = new Set([...recorded, ...parsed.cards.filter((c) => onRecord.has(cardKey(c.rarityId, c.name))).map((c) => c.line)]);
+    const left = fresh.length - recorded.length + parsed.problems.length;
+    if (!left) {
       setText('');
       setOpen(false);
-    }
+    } else setText(text.split(/\r?\n/).filter((raw) => !done.has(listLine(raw))).join('\n'));
   }
 
   // As Paste a list words it: what's new, then what's skipped.
