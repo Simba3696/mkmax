@@ -75,12 +75,18 @@ export default function SettingsView() {
 
   // Rows are found by id when the change runs, not by their place on screen: a sync can reorder or remove rarities and
   // currencies while Settings is open, and a change by place would land on the wrong row. A row that's gone saves nothing.
+  // A rule change that leaves cards done (− Level, a kind made Kameo) removes them without putting them on the Maxed
+  // record: they weren't maxed in the game.
   const editRarity = (id: string, edit: (r: RarityRule) => void | typeof noChange, undoLabel?: string | (() => string)) =>
-    update((d) => {
-      const r = d.rarities.find((x) => x.id === id);
-      if (!r) return noChange;
-      return edit(r);
-    }, undoLabel);
+    update(
+      (d) => {
+        const r = d.rarities.find((x) => x.id === id);
+        if (!r) return noChange;
+        return edit(r);
+      },
+      undoLabel,
+      { ruleChange: true },
+    );
   const editCurrency = (id: string, edit: (c: AppState['currencies'][number]) => void) =>
     update((d) => {
       const c = d.currencies.find((x) => x.id === id);

@@ -507,6 +507,7 @@ One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gol
 - **Duplicates per step**, with **+ Level** and **− Level**. When the rarity has kards, the new step gets a kard cost straight away (usually 10, or 0 for Uncommon gear), which you can change under **Fusion Up Kards per step**. **− Level** removes cards that are now at or past the new top level, with a brief Undo.
 - **Fusion Up Kards per step:** 0 means kards can't do that step.
 - **Remove:** greyed out while any card uses the rarity. One tap, with Undo, unless the rarity has cards on the [Maxed](#maxed) record: then the button says how many ("Remove (12 maxed)") and takes two taps. It also deletes the Kaskets that draw from that rarity and its cards on the Maxed record (its tooltip and the Undo say how many), and Undo brings them back too.
+- **Rule changes and the Maxed record:** a change here that leaves cards done (**− Level** below cards already there, or making a rarity a Kameo) removes them with Undo, but doesn't put them on the [Maxed](#maxed) record, since you didn't max them in the game. Use **Paste maxed cards…** for any that are.
 
 **+ Rarity** adds a new one.
 

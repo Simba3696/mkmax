@@ -391,7 +391,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
             {newCard.rarityId && newCardRule && newCardRule.id !== newCard.rarityId && (
               <div className="text-small text-muted">The rarity picked here has since been removed, so this card goes in as {newCardRule.label}.</div>
             )}
-            {newCardDone && <div className="text-small text-muted">That level is already the card's goal, so it would be done at once: pick a lower level to add it.</div>}
+            {newCardDone && !newCardMaxed && <div className="text-small text-muted">That level is already the card's goal, so it would be done at once: pick a lower level to add it.</div>}
             {newCardMaxed && <div className="text-small text-muted">{onMaxedNote(newCardRule)}</div>}
           </div>
         </>

@@ -13,11 +13,12 @@ export type { SyncStatus };
  * Pass an undo label to offer "Undo <label>" for this change; it can be a function, called after the recipe, when it
  * depends on what the recipe changed. `auto` marks a change the app makes by itself that
  * every device works out the same way (catalog art, or the season end on a fresh install): it's saved but doesn't count as an edit for sync, so it can't
- * make two devices disagree. A recipe that finds nothing to change returns `noChange`: the draft is thrown away, so
+ * make two devices disagree. `ruleChange` marks a change to a rarity's rules: cards it leaves done are removed but not
+ * put on the Maxed record. A recipe that finds nothing to change returns `noChange`: the draft is thrown away, so
  * nothing is saved, stamped or synced and no Undo is offered, though anything the recipe did outside the draft (like a
  * flag its caller reads) still happened.
  */
-type Update = (recipe: (draft: AppState) => void | typeof noChange, undoLabel?: string | (() => string), opts?: { auto?: boolean }) => void;
+type Update = (recipe: (draft: AppState) => void | typeof noChange, undoLabel?: string | (() => string), opts?: { auto?: boolean; ruleChange?: boolean }) => void;
 
 /**
  * What an update recipe returns when there's nothing to change, like a tap on a screen a sync has made out of date. A
@@ -150,7 +151,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // No save, no stamp and no sync push, so a tap that does nothing can't make this device's copy look newest.
     if (recipe(draft) === noChange) return;
     const split = { maxed: [] as string[], done: [] as string[] };
-    pruneDone(draft, new Date(), split);
+    pruneDone(draft, new Date(), split, !opts?.ruleChange);
     if (!opts?.auto) draft.updatedAt = loop.nextStamp();
     stateRef.current = draft;
     setState(draft);

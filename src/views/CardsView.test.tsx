@@ -2036,6 +2036,9 @@ describe('Cards: the Maxed record', () => {
     fireEvent.change(form.getByLabelText('Current level'), { target: { value: '3' } });
     const add = form.getByRole('button', { name: 'Add' }) as HTMLButtonElement;
     expect([add.disabled, form.queryByText(/on your Maxed record. Remove it from Maxed first/) != null]).toEqual([true, true]);
+    // At its top level too, with only the Maxed note: picking a lower level wouldn't add it either.
+    fireEvent.change(form.getByLabelText('Current level'), { target: { value: '11' } });
+    expect([add.disabled, form.queryByText(/would be done at once/), form.queryByText(/on your Maxed record/) != null]).toEqual([true, null, true]);
     fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
     fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Jade, Lizard\nRaiden, Dark - Diamond - F4\nScorpion - Diamond - F2' } });
     expect(form.queryByText(/skipping 2 already maxed \(Jade, Lizard; Raiden, Dark\)/)).not.toBeNull();

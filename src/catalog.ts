@@ -48,7 +48,9 @@ const SITE_TYPOS: Record<string, string> = { warface: 'warfare' };
 export function nameKey(name: string) {
   const s = name.toLowerCase().replace(/’/g, "'").replace(/'s\b/g, '').replace(/\bmkii\b/g, 'mk2');
   const words = s.split(/[^a-z0-9]+/).filter((w) => w && w !== 'the' && w !== 'of').map((w) => SITE_TYPOS[w] ?? w);
-  return [...new Set(words)].sort().join(' ');
+  // The app says "Kold" where MK Mobile Base says "Kold War": one card, so one key (the list, the Maxed record and art).
+  const kold = words.includes('kold');
+  return [...new Set(words.filter((w) => !(kold && w === 'war')))].sort().join(' ');
 }
 
 // The catalog's items by kind and name key, in catalog order. Built once per catalog, so checking a few hundred cards

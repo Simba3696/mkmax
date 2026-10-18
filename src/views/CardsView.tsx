@@ -720,7 +720,8 @@ function CardList() {
         {draft.rarityId && draftRule && draftRule.id !== draft.rarityId && (
           <p className="text-muted text-small">The rarity picked here has since been removed, so this card goes in as {draftRule.label}.</p>
         )}
-        {draftRule && goalNote(shown as Card, draftRule) && <p className="text-muted text-small">{goalNote(shown as Card, draftRule)}</p>}
+        {/* A card on the Maxed record gets only its own note: a lower level wouldn't add it either. */}
+        {draftRule && !addsMaxed && goalNote(shown as Card, draftRule) && <p className="text-muted text-small">{goalNote(shown as Card, draftRule)}</p>}
         {addsMaxed && <p className="text-muted text-small">{onMaxedNote(draftRule)}</p>}
         <PasteList pick={picks} startRarityId={draftRule?.id ?? ''} />
       </section>
