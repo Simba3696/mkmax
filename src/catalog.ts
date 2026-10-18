@@ -1,7 +1,7 @@
 // Card catalog from MK Mobile Base (mkmobilebase.com): names, rarities and card art for every character, Kameo and
 // piece of equipment. scripts/fetch-catalog.mjs downloads it into public/catalog.json at deploy time, because
 // the site's API doesn't allow requests from other sites.
-import type { Card, RarityRule } from './types';
+import type { Card, MaxedCard, RarityRule } from './types';
 
 export interface CatalogItem {
   kind: 'character' | 'equipment' | 'kameo';
@@ -81,6 +81,39 @@ export function findInCatalog(card: Card, rule: RarityRule | undefined, items: C
   const base = card.name.split(',')[0].trim();
   if (base === card.name.trim()) return undefined;
   return named(base).find((i) => i.rarity === card.rarityId || `${i.kind}-${i.rarity}` === card.rarityId);
+}
+
+/** One rarity's completion: how many of the cards MK Mobile Base lists under it are on the Maxed record. */
+export interface RarityCompletion {
+  rarityId: string;
+  maxed: number;
+  total: number;
+}
+
+/**
+ * Completion for each rarity MK Mobile Base lists cards of, in the rarities' order: Maxed record entries it lists
+ * under that rarity, out of every card it lists there, matched by name as card art is. Entries it doesn't list there
+ * (a card it doesn't have yet, or one filed under another rarity) are returned as `unlisted` and not counted, so a
+ * figure never passes 100%.
+ */
+export function completion(maxed: MaxedCard[], rules: RarityRule[], items: CatalogItem[]) {
+  const counted = new Map<string, Set<CatalogItem>>(rules.map((r) => [r.id, new Set()]));
+  const unlisted: MaxedCard[] = [];
+  for (const m of maxed) {
+    const rule = rules.find((r) => r.id === m.rarityId);
+    const item = rule && findInCatalog({ id: '', name: m.name, rarityId: m.rarityId, fusion: 0, guest: false }, rule, items);
+    if (item && appRarityId(item, rules) === m.rarityId) counted.get(m.rarityId)!.add(item);
+    else unlisted.push(m);
+  }
+  const totals = new Map<string, number>();
+  for (const i of items) {
+    const id = appRarityId(i, rules);
+    if (id) totals.set(id, (totals.get(id) ?? 0) + 1);
+  }
+  const rarities: RarityCompletion[] = rules
+    .filter((r) => totals.has(r.id))
+    .map((r) => ({ rarityId: r.id, maxed: counted.get(r.id)!.size, total: totals.get(r.id)! }));
+  return { rarities, unlisted };
 }
 
 /** A card has no art yet, or art from an older wiki lookup that MK Mobile Base may have a proper card image for. */

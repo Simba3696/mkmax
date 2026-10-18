@@ -175,9 +175,9 @@ The Packs tab shows a red count of packs the plan says to buy that end within 24
 
 ## Cards tab
 
-### Cards and Tower gear
+### Cards, Tower gear and Maxed
 
-Two buttons at the top switch between your card list and the [Tower gear](#tower-gear) view. Tapping the **Cards** tab again while you're on it switches too, and starts the page at the top. Coming from another tab, it always opens on **Cards**, and a quick double tap just opens it rather than going straight on to Tower gear. Switching between the two keeps anything you'd typed on the card list (a card you were adding, a pasted list, a search).
+Three buttons at the top switch between your card list, the [Tower gear](#tower-gear) view and the [Maxed](#maxed) record. Tapping the **Cards** tab again while you're on it switches between the card list and Tower gear, and starts the page at the top; from Maxed it goes back to the card list. Coming from another tab, it always opens on **Cards**, and a quick double tap just opens it rather than going straight on to Tower gear. Switching between the two keeps anything you'd typed on the card list (a card you were adding, a pasted list, a search).
 
 ### Add card
 
@@ -224,7 +224,8 @@ If another device changes your rarities while the box is open, or while text you
 - **Search** matches the text as typed, in order. (The pack editor's card picker is looser and matches words in any order.) Search and filters reset each time you open Cards.
 - The rarity filter starts on **All rarities**. It also has **All characters** (Diamond and Gold), **All equipment** (Epic, Rare and Uncommon) and **All Kameos** (Diamond and Gold), as well as each single rarity.
 - The source filter starts on **Any source**. It also has **Packs/store** (cards with no source), **Krypt gear**, **Tower gear** and **Elder challenge**.
-- Each option in the rarity and source filters shows in parentheses how many cards it would list, given the search and the other filter.
+- The owned filter starts on **Owned or not**. It also has **Not owned** (cards you have no copy of yet) and **Owned**.
+- Each option in the rarity, source and owned filters shows in parentheses how many cards it would list, given the search and the other filters.
 - **Sort:** rarity (the default), fusion level highest or lowest first, or name. Rarity order is the order in Settings. Gold ascension counts as above F10, so A3 sorts before F9; not-owned cards and Kameos count as lowest. When sorted by fusion, a card moves as you tap + or −. The choice is remembered on each device and isn't synced.
 
 ### A card on the list
@@ -265,6 +266,16 @@ Cards → Tower gear lists every card tagged as tower gear, grouped by the tower
 - "N left" counts cards, not copies.
 - Epic and Rare gear count copies only to F3, unless their goal is Max or they're marked **No kards**.
 - There's no delete, goal or source control here; use the card on Cards.
+
+### Maxed
+
+Cards → Maxed keeps a record of the cards you've maxed, and how much of the game that is.
+
+- **What counts as maxed:** a card that leaves your list at its top level: F10 for Diamond and gear, a Gold card's own cap (F10, A5 or A10), and owning one for a Kameo. It's added when that happens, with the day. Gear the app stops tracking at F3 (**Track until** at the kard threshold) isn't maxed yet, so it isn't added; add it with **Paste maxed cards…** once you've finished it in the game, or set that rarity's **Track until** to Max so the app tracks it to F10. A card you **Delete** isn't added either.
+- **Completion** at the top compares the record with every card MK Mobile Base lists: overall, and for each rarity ("12 of 74", with the percentage rounded down, so 100% means every card). It matches names the way card art does. A maxed card MK Mobile Base doesn't list under that rarity yet isn't counted, and the page names it. Completion shows once MK Mobile Base's card list has loaded.
+- **Paste maxed cards…** adds cards you maxed before the record existed, in the same format as [Paste a list](#paste-a-list): plain names go under the rarity picked in the box, a line that's just a rarity's name switches it, or add the rarity after a name. Levels are ignored. Lines for cards still in your card list are skipped (they aren't maxed yet), and so are cards already on the record. **Add N** adds them, with Undo.
+- **Remove** takes a card off the record, with Undo.
+- **A card that comes back:** adding a card that's on the record again (with Add card, Paste a list or the pack editor, such as a Gold card pasted with a new stage) takes it off the record, since it has copies to go again. It goes back on when it's maxed.
 
 The view says tower gear "isn't part of the plan", because it's farmed. It's planned for only when a pack you've entered drops it.
 
@@ -549,7 +560,7 @@ The bottom of Settings shows which version you have and the date of that change,
 - **Kameos** (Diamond and Gold) fuse to F10 in the game, but here you only track the ones you don't own yet. Add them under **Diamond Kameo** or **Gold Kameo**. Cards offers to switch a wrong tier to MK Mobile Base's (see [Find images and rarity fixes](#find-images-and-rarity-fixes)). When you get one, tap **+** and it's done, so it leaves the list (with Undo). Kameos sold in the Realm Klash store, or Kameo packs, go in as store items or packs like anything else.
 - **Challenge Kameos:** the Gold Kameo of a challenge character (for example Kotal Kahn, Dark Lord) is earned by finishing that character's Elder challenge when it comes around as an event. These Kameos are tagged **Elder challenge**. The app has a list of the Gold challenge characters (from the MK Mobile wiki's Challenge Mode page), and any Gold Kameo you add that matches it is tagged automatically. Only the Gold Kameo rarity is tagged, and the name match ignores word order. You can change a card's source on the card itself, and removing the tag sticks. Challenges that no longer run are kept out of the list. When a challenge Kameo's challenge is on or coming up, its card shows the dates and the Plan lists it under **Elder challenges**.
 - **Krypt and tower gear, and challenge Kameos** are tagged with their source. They're tracked, but only planned for when a pack you've entered actually drops them.
-- **Done cards are removed:** when a card reaches its goal, the app deletes it. It's also removed from any pack drop lists, and a store item that only sold that card is deleted too. The goal is max for Diamond, the card's own ascension cap for Gold, F3 for Rare and Epic unless the card's **Goal** is Max, it's marked **No kards** or it's Realm Klash gear, F10 for Uncommon, and owning one for Kameos. Right after this happens you can use **Undo**. Any card that's already at its goal is removed when the app loads, when you import a backup, or when a sync brings one in.
+- **Done cards are removed:** when a card reaches its goal, the app takes it off your list; if that's its top level, it goes on the [Maxed](#maxed) record. It's also removed from any pack drop lists, and a store item that only sold that card is deleted too. The goal is max for Diamond, the card's own ascension cap for Gold, F3 for Rare and Epic unless the card's **Goal** is Max, it's marked **No kards** or it's Realm Klash gear, F10 for Uncommon, and owning one for Kameos. Right after this happens you can use **Undo**. Any card that's already at its goal is removed when the app loads, when you import a backup, or when a sync brings one in.
 
 **Not modelled on purpose:** Koins, duplicate refunds, tower and Krypt drops as pack sources, and guest-event dates. Urgency comes from the pack end dates you enter or the event schedule provides.
 

@@ -102,7 +102,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 16,
+    version: 17,
     rarities: s.rarities!.map((r) => ({
       ...r,
       // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
@@ -128,6 +128,8 @@ export function normalize(input: unknown): AppState {
     realmKlashSeasonEnd: s.realmKlashSeasonEnd ?? null,
     dismissedShopPacks: s.dismissedShopPacks ?? [],
     gearOrder: s.gearOrder ?? [],
+    // Only entries with a name and rarity: a hand-edited file could hold anything.
+    maxed: (Array.isArray(s.maxed) ? s.maxed : []).filter((m) => m && typeof m.name === 'string' && typeof m.rarityId === 'string'),
     updatedAt: s.updatedAt,
   };
   // Version 5 tags Gold Kameos of challenge characters (they come from Elder challenges). Done once, so a tag
@@ -184,6 +186,8 @@ export function normalize(input: unknown): AppState {
       return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
     });
   }
+  // Version 17 adds the Maxed record (`maxed`), which starts empty, so nothing in an older save changes either; the bump
+  // keeps a build from before it from pulling the record and dropping it.
   // Version 16 adds No kards on cards (`noKards`), so nothing in an older save changes. The bump is what matters: a build
   // from before it would ignore the flag, plan kards on those cards and delete a No kards piece at F3, so it mustn't
   // pull or import a save that uses it (see fromNewerApp in sync.ts; builds from 2026-10-07 on refuse it).

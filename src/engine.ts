@@ -1,6 +1,6 @@
 import { nameKey } from './catalog';
 import { isKasketExcluded } from './kaskets';
-import type { AppState, Card, DropEntry, Pack, RarityRule } from './types';
+import type { AppState, Card, DropEntry, MaxedCard, Pack, RarityRule } from './types';
 
 // ---------- Fusion math ----------
 // Levels are stored as "copy levels": 0 = not owned, 1 = first copy (F0), 2 = F1, … fusionMax + 1 = F10,
@@ -74,20 +74,34 @@ export function copiesToThreshold(card: Card, rule: RarityRule) {
 
 export const isMaxed = (card: Card, rule: RarityRule) => card.fusion >= targetLevel(card, rule);
 
+/** A card's rarity and name key, whatever its case or word order: the same key as cardKey in cardList.ts, which imports this module. */
+const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityId}|${nameKey(c.name)}`;
+
+/** YYYY-MM-DD in local time, as the day a card was maxed is shown. */
+const dayOf = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
 /**
  * Cards that reached their goal are done, so they leave the app: the card, its pack drops, and any store
- * item that only sold done cards. Mutates the state and returns the removed cards' names.
+ * item that only sold done cards. Mutates the state and returns the removed cards' names. One at its top level (its
+ * own max, or owned for a Kameo) also goes on the Maxed record, dated `now` when given; one done at its kard threshold
+ * isn't maxed yet, since kards finish it in the game.
  *
  * Realm Klash gear also gets a stored goal of max first. The name already makes it max here, but a copy of the app
  * from before the name list only reads the goal, so without it that copy would delete the gear at F3 and sync the
  * deletion back. It also keeps a piece from being removed mid-rename, when the half-typed name is off the list.
  */
-export function pruneDone(s: AppState): string[] {
+export function pruneDone(s: AppState, now?: Date): string[] {
   const rules = new Map(s.rarities.map((r) => [r.id, r]));
   for (const c of s.cards) if (c.goal !== 'max' && rules.get(c.rarityId)?.kind === 'equipment' && isRealmKlashName(c.name)) c.goal = 'max';
   const done = new Set(s.cards.filter((c) => rules.has(c.rarityId) && isMaxed(c, rules.get(c.rarityId)!)).map((c) => c.id));
   if (done.size === 0) return [];
   const names = s.cards.filter((c) => done.has(c.id)).map((c) => c.name);
+  const recorded = new Set((s.maxed ?? []).map(recordKey));
+  for (const c of s.cards) {
+    if (!done.has(c.id) || c.fusion < targetLevel({ ...c, goal: 'max' }, rules.get(c.rarityId)!) || recorded.has(recordKey(c))) continue;
+    recorded.add(recordKey(c));
+    (s.maxed ??= []).push({ name: c.name, rarityId: c.rarityId, ...(now && { at: dayOf(now) }) });
+  }
   s.cards = s.cards.filter((c) => !done.has(c.id));
   s.packs = s.packs.filter((p) => !(p.store && p.drops.length > 0 && p.drops.every((d) => done.has(d.cardId))));
   for (const p of s.packs) p.drops = p.drops.filter((d) => !done.has(d.cardId));
@@ -993,6 +1007,26 @@ export function savePack(d: AppState, pack: Pack, moveSeasonTo: string | null, n
   else d.packs.push(clean);
   if (moveSeasonTo) moveSeasonEnd(d, moveSeasonTo, now);
   return true;
+}
+
+/**
+ * Takes cards that are back in the list off the Maxed record: a Gold card pasted again for a new Stage, say, which
+ * has copies to go once more. Matched by rarity and name, as the list matches cards. Mutates the state.
+ */
+export function unmarkMaxed(s: AppState, cards: Pick<Card, 'rarityId' | 'name'>[]) {
+  if (!s.maxed?.length) return;
+  const back = new Set(cards.map(recordKey));
+  s.maxed = s.maxed.filter((m) => !back.has(recordKey(m)));
+}
+
+/** Adds cards to the Maxed record by hand (ones maxed before it existed), leaving out any already on it. Mutates the state. */
+export function recordMaxed(s: AppState, cards: MaxedCard[]) {
+  const recorded = new Set((s.maxed ?? []).map(recordKey));
+  for (const c of cards) {
+    if (recorded.has(recordKey(c))) continue;
+    recorded.add(recordKey(c));
+    (s.maxed ??= []).push({ name: c.name, rarityId: c.rarityId });
+  }
 }
 
 /** Each card's share of an even pool: its total ÷ every item in the pool, which is at least the cards picked. */

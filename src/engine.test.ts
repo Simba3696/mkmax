@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, buildCtx, cardGoal, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addPool, ascensionCaps, buildCtx, cardGoal, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -91,6 +91,52 @@ describe('goals and caps', () => {
     // A rarity tracked to Max, or one with no kards, keeps what it had.
     expect(entryGoal(card('d', F(5), { rarityId: 'diamond' }), rules().get('diamond')!)).toBeUndefined();
     expect(entryGoal(card('k', 1, { rarityId: 'kameo-gold' }), rules().get('kameo-gold')!)).toBeUndefined();
+  });
+});
+
+describe('the Maxed record', () => {
+  // Value: protects=a card leaving the list at its top level goes on the Maxed record, dated, once; gear done at its kard
+  // threshold and a Kameo's absence aren't recorded; fails_when=pruneDone records cards done at F3 (not maxed), skips an
+  // owned Kameo or a Gold card at its own cap, or records one twice; why_new=the Maxed record is new; seam=none
+  it('records cards that leave at their top level, and not gear done at F3', () => {
+    const s = setup([
+      card('d', F(10)),
+      card('g', A(5), { rarityId: 'gold', maxLevel: A(5) }),
+      card('k', 1, { rarityId: 'kameo-gold', name: 'Jade, Lizard' }),
+      card('e', F(3), { rarityId: 'epic', name: 'Kori Blade' }),
+      card('still', F(4)),
+    ]);
+    expect(pruneDone(s, new Date('2026-10-18T09:00:00'))).toEqual(['d', 'g', 'Jade, Lizard', 'Kori Blade']);
+    expect(s.maxed).toEqual([
+      { name: 'd', rarityId: 'diamond', at: '2026-10-18' },
+      { name: 'g', rarityId: 'gold', at: '2026-10-18' },
+      { name: 'Jade, Lizard', rarityId: 'kameo-gold', at: '2026-10-18' },
+    ]);
+    // Already on the record (same rarity, name in another order): not added again. Found done on a load: no date.
+    s.cards = [card('x', F(10), { name: 'D' }), card('y', F(10), { name: 'Raiden, Dark' })];
+    pruneDone(s);
+    expect(s.maxed!.map((m) => [m.name, m.at ?? null])).toEqual([['d', '2026-10-18'], ['g', '2026-10-18'], ['Jade, Lizard', '2026-10-18'], ['Raiden, Dark', null]]);
+  });
+
+  // Value: protects=a card back in the list (pasted again for a new Stage, say) comes off the record, and hand-added ones
+  // aren't doubled; fails_when=a card is both in the list and counted as maxed, or pasting twice doubles it; why_new=the
+  // Maxed record is new; seam=none
+  it('takes a card back in the list off the record, and adds pasted ones once', () => {
+    const s = setup([]);
+    recordMaxed(s, [{ name: 'Kenshi, Elder God', rarityId: 'gold' }, { name: 'Kori Blade', rarityId: 'epic' }, { name: 'elder god kenshi', rarityId: 'gold' }]);
+    expect(s.maxed).toEqual([{ name: 'Kenshi, Elder God', rarityId: 'gold' }, { name: 'Kori Blade', rarityId: 'epic' }]);
+    unmarkMaxed(s, [card('k', A(5), { rarityId: 'gold', name: 'Elder God Kenshi' }), card('o', 0, { rarityId: 'rare', name: 'Kori Blade' })]);
+    expect(s.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic' }]);
+  });
+
+  // Value: protects=version 17 loads older saves with an empty record and drops junk entries a hand-edited file could
+  // hold; fails_when=the record is missing (views crash) or a bad entry is kept; why_new=the record is new; seam=none
+  it('loads an older save with an empty record, and keeps only well-formed entries', () => {
+    const old = { ...defaultState(), version: 16 } as unknown as AppState;
+    delete (old as Partial<AppState>).maxed;
+    expect([normalize(old).version, normalize(old).maxed]).toEqual([17, []]);
+    const odd = normalize({ ...old, maxed: [{ name: 'Kori Blade', rarityId: 'epic' }, { name: 3 }, null, 'x'] } as unknown as AppState);
+    expect(odd.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic' }]);
   });
 });
 
@@ -449,7 +495,7 @@ describe('save migration', () => {
   it('moves saves to version 16 without changing them, and keeps No kards', () => {
     const v15 = { ...defaultState(), version: 15, cards: [card('a', F(2)), card('nk', F(5), { rarityId: 'epic', noKards: true })] } as unknown as AppState;
     const s = normalize(v15);
-    expect([s.version, s.cards.map((c) => [c.id, c.noKards ?? null, c.goal ?? null])]).toEqual([16, [['a', null, null], ['nk', true, null]]]);
+    expect([s.version, s.cards.map((c) => [c.id, c.noKards ?? null, c.goal ?? null])]).toEqual([defaultState().version, [['a', null, null], ['nk', true, null]]]);
     expect(normalize(s).cards).toEqual(s.cards);
     // Only an exact true counts: anything else from a hand-edited file is dropped rather than read as on.
     const odd = normalize({ ...v15, cards: [card('f', F(1), { noKards: false }), { ...card('s', F(1)), noKards: 'false' } as unknown as Card] });

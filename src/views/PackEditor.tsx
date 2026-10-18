@@ -3,7 +3,7 @@ import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { LevelOptions, Modal, NumInput, kasketLine } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
-import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, entryGoal, isMaxed, isSeasonal, kasketPool, maxFusion, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
+import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, entryGoal, isMaxed, isSeasonal, kasketPool, maxFusion, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave, unmarkMaxed } from '../engine';
 import { initialSource } from '../challenges';
 import { scheduledSeason, scheduledSeasonEnd, useEvents } from '../events';
 import { kasketFor } from '../kaskets';
@@ -119,6 +119,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       const source = initialSource(made, d.rarities);
       if (source) made.source = source;
       d.cards.push(made);
+      unmarkMaxed(d, [made]);
       card = made;
     });
     // The typed name stays for another try when nothing was added.

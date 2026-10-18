@@ -1,10 +1,11 @@
 import { Activity, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel } from '../engine';
+import { ascensionCaps, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel, unmarkMaxed } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
+import MaxedPanel from './MaxedPanel';
 import { findCardImages, wikiUrl } from '../wiki';
 import { catalogPageUrl, findInCatalog, loadCatalog, rarityMismatches, wantsCatalogImage, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
@@ -233,6 +234,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
           if (goal) f.goal = goal;
         }
         d.cards.push(...fresh);
+        // A card pasted back (a Gold card made ascendable again, say) has copies to go, so it's not maxed any more.
+        unmarkMaxed(d, fresh);
         for (const { c, patch } of saving) Object.assign(c, patch);
         added = cards.length;
         updated = saving.length;
@@ -338,23 +341,26 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   );
 }
 
-/** Which of the Cards tab's two pages is showing. App holds it, so tapping the Cards tab again can switch it. */
-export type CardsPage = 'cards' | 'towers';
+/** Which of the Cards tab's pages is showing. App holds it, so tapping the Cards tab again can switch it. */
+export type CardsPage = 'cards' | 'towers' | 'maxed';
 
 export default function CardsView({ sub, onSub }: { sub: CardsPage; onSub: (sub: CardsPage) => void }) {
   return (
     <>
-      {/* A short switch on wide screens: stretched across 1000px+ it reads as a banner, not two buttons. */}
-      <div className="flex mb-[0.8rem] border border-line rounded-panel overflow-hidden md:max-w-[360px]">
+      {/* A short switch on wide screens: stretched across 1000px+ it reads as a banner, not three buttons. */}
+      <div className="flex mb-[0.8rem] border border-line rounded-panel overflow-hidden md:max-w-[480px]">
         <button className={segment(sub === 'cards')} onClick={() => onSub('cards')} aria-pressed={sub === 'cards'}>
           Cards
         </button>
         <button className={segment(sub === 'towers')} onClick={() => onSub('towers')} aria-pressed={sub === 'towers'}>
           Tower gear
         </button>
+        <button className={segment(sub === 'maxed')} onClick={() => onSub('maxed')} aria-pressed={sub === 'maxed'}>
+          Maxed
+        </button>
       </div>
       {/*
-        Both keep their state, so switching pages keeps a half-typed card, a pasted list or a search on the card list.
+        Each keeps its state, so switching pages keeps a half-typed card, a pasted list or a search on the card list.
         Activity hides the other page: it still redraws, at low priority, but its effects (like the catalog download) wait
         until it's shown.
       */}
@@ -363,6 +369,9 @@ export default function CardsView({ sub, onSub }: { sub: CardsPage; onSub: (sub:
       </Activity>
       <Activity mode={sub === 'towers' ? 'visible' : 'hidden'}>
         <TowersPanel />
+      </Activity>
+      <Activity mode={sub === 'maxed' ? 'visible' : 'hidden'}>
+        <MaxedPanel />
       </Activity>
     </>
   );
@@ -380,6 +389,7 @@ function CardList() {
   const [rarity, setRarity] = useState<string>('all');
   const [q, setQ] = useState('');
   const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all');
+  const [ownedFilter, setOwnedFilter] = useState<'all' | 'owned' | 'unowned'>('all');
   const [sortBy, setSortBy] = useDeviceChoice('mkmax:cardSort', CARD_SORTS);
   /**
    * The card being renamed, its name before (which comes back if the name is cleared), what's in the box, and the name
@@ -611,6 +621,7 @@ function CardList() {
       const saved = { ...card, goal: formGoal(card, rule).goal };
       if (isMaxed(saved, rule)) return noChange;
       d.cards.push(saved);
+      unmarkMaxed(d, [saved]);
       added = true;
     });
     // The typed name stays for another try when nothing was added.
@@ -623,13 +634,15 @@ function CardList() {
   // "kind:equipment" etc. groups every rarity of that kind (Diamond + Gold characters, all gear, both Kameo tiers).
   const inRarity = (c: Card, value: string) => value === 'all' || c.rarityId === value || value === `kind:${state.rarities.find((r) => r.id === c.rarityId)?.kind}`;
   const inSource = (c: Card, value: Source | 'all') => value === 'all' || (c.source ?? '') === value;
+  const inOwned = (c: Card, value: typeof ownedFilter) => value === 'all' || (value === 'owned') === c.fusion > 0;
   // The card being renamed stays listed even if its new name no longer matches the search.
   const matchesSearch = (c: Card) => !q || c.id === renaming?.id || c.name.toLowerCase().includes(q.toLowerCase());
-  // Each filter option shows how many cards it would list, given the search and the other filter.
-  const rarityCount = (value: string) => state.cards.filter((c) => matchesSearch(c) && inSource(c, sourceFilter) && inRarity(c, value)).length;
-  const sourceCount = (value: Source | 'all') => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, value)).length;
+  // Each filter option shows how many cards it would list, given the search and the other filters.
+  const rarityCount = (value: string) => state.cards.filter((c) => matchesSearch(c) && inSource(c, sourceFilter) && inOwned(c, ownedFilter) && inRarity(c, value)).length;
+  const sourceCount = (value: Source | 'all') => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inOwned(c, ownedFilter) && inSource(c, value)).length;
+  const ownedCount = (value: typeof ownedFilter) => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && inOwned(c, value)).length;
   const cards = state.cards
-    .filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter))
+    .filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && inOwned(c, ownedFilter))
     // Rarity then name by default, so a card doesn't jump around while you edit it. By fusion, ties keep that order.
     .sort((a, b) => fusionOrder(a, b) || rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name));
 
@@ -721,6 +734,11 @@ function CardList() {
           <option value="krypt">{`Krypt gear (${sourceCount('krypt')})`}</option>
           <option value="tower">{`Tower gear (${sourceCount('tower')})`}</option>
           <option value="challenge">{`Elder challenge (${sourceCount('challenge')})`}</option>
+        </select>
+        <select value={ownedFilter} onChange={(e) => setOwnedFilter(e.target.value as typeof ownedFilter)} aria-label="Filter by owned">
+          <option value="all">{`Owned or not (${ownedCount('all')})`}</option>
+          <option value="unowned">{`Not owned (${ownedCount('unowned')})`}</option>
+          <option value="owned">{`Owned (${ownedCount('owned')})`}</option>
         </select>
         {missingImages.length > 0 && (
           <button className="xl:ml-auto" onClick={findImages} disabled={imgStatus?.busy} title="Look up card art on MK Mobile Base, then the MK Mobile wiki">

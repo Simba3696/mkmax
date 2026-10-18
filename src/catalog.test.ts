@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appRarityId, catalogImageUpdates, findInCatalog, nameKey, rarityMismatches, type CatalogItem } from './catalog';
+import { appRarityId, catalogImageUpdates, completion, findInCatalog, nameKey, rarityMismatches, type CatalogItem } from './catalog';
 import { defaultState } from './defaults';
 import type { Card } from './types';
 
@@ -71,6 +71,33 @@ describe('automatic catalog art', () => {
   });
 });
 
+
+describe('completion', () => {
+  // Value: protects=completion counts Maxed entries MK Mobile Base lists under their rarity, out of every card it lists
+  // there, and sets aside entries it doesn't list there; fails_when=an entry under the wrong rarity or missing from the
+  // catalog is counted (a figure past 100%), or a rarity's total is wrong; why_new=completion is new; seam=none
+  it('counts maxed cards the catalog lists under their rarity, out of all it lists there', () => {
+    const { rarities, unlisted } = completion(
+      [
+        { name: 'Scorpion, MKII Movie', rarityId: 'diamond' },
+        { name: 'Klassic Baraka', rarityId: 'kameo-diamond' },
+        { name: 'Man in the Sky', rarityId: 'epic' }, // the catalog has it as Rare
+        { name: 'Noob Saibot, MK1', rarityId: 'kameo-diamond' }, // not in the catalog yet
+      ],
+      defaultState().rarities,
+      ITEMS,
+    );
+    expect(rarities.map((r) => [r.rarityId, r.maxed, r.total])).toEqual([
+      ['diamond', 1, 3],
+      ['gold', 0, 1],
+      ['epic', 0, 1],
+      ['rare', 0, 1],
+      ['kameo-diamond', 1, 1],
+      ['kameo-gold', 0, 1],
+    ]);
+    expect(unlisted.map((m) => m.name)).toEqual(['Man in the Sky', 'Noob Saibot, MK1']);
+  });
+});
 
 describe('rarity check', () => {
   it("lists cards whose rarity the site gives differently, whether or not they have art", () => {

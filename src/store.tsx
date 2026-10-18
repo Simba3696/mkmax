@@ -149,7 +149,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const draft = structuredClone(prev);
     // No save, no stamp and no sync push, so a tap that does nothing can't make this device's copy look newest.
     if (recipe(draft) === noChange) return;
-    const removed = pruneDone(draft);
+    const removed = pruneDone(draft, new Date());
     if (!opts?.auto) draft.updatedAt = loop.nextStamp();
     stateRef.current = draft;
     setState(draft);

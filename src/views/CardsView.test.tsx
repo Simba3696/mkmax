@@ -1917,6 +1917,33 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
   });
 });
 
+describe('Cards: the Owned filter', () => {
+  // Value: protects=the Owned filter lists only cards not owned (or owned), with counts that follow the other filters;
+  // fails_when=it lists the wrong cards or its counts ignore the rarity filter; why_new=the filter is new; seam=none
+  it('lists cards not owned or owned, counted with the other filters', () => {
+    const s = defaultState();
+    s.cards = [
+      { id: 'a', name: 'Scorpion', rarityId: 'diamond', fusion: 3, guest: false },
+      { id: 'b', name: 'Sub-Zero', rarityId: 'diamond', fusion: 0, guest: false },
+      { id: 'c', name: 'Kori Blade', rarityId: 'epic', fusion: 0, guest: false },
+    ];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub="cards" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const names = () => screen.queryAllByTitle('Tap to rename').map((e) => e.textContent);
+    const owned = screen.getByLabelText('Filter by owned') as HTMLSelectElement;
+    fireEvent.change(owned, { target: { value: 'unowned' } });
+    expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero', 'Kori Blade'], ['Owned or not (3)', 'Not owned (2)', 'Owned (1)']]);
+    fireEvent.change(screen.getByDisplayValue(/^All rarities/), { target: { value: 'diamond' } });
+    expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero'], ['Owned or not (2)', 'Not owned (1)', 'Owned (1)']]);
+  });
+});
+
 describe('Cards: No kards', () => {
   let update!: ReturnType<typeof useStore>['update'];
   let lastUndo: ReturnType<typeof useStore>['lastUndo'] = null;

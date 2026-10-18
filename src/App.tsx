@@ -211,6 +211,7 @@ export default function App() {
     // A negative gap means the device clock went back since: not a double tap.
     const since = Date.now() - cardsOpenedAt.current;
     if (since >= 0 && since < DOUBLE_TAP_MS) return;
+    // Between the card list and Tower gear, as before; from Maxed it goes back to the card list.
     setCardsPage((p) => (p === 'cards' ? 'towers' : 'cards'));
     scrollRoot()?.scrollTo({ top: 0 });
   };
