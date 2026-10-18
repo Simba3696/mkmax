@@ -97,7 +97,8 @@ const dayOf = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).
 
 /**
  * Cards that reached their goal are done, so they leave the app: the card, its pack drops, and any store
- * item that only sold done cards. Mutates the state and returns the removed cards' names. One at its top level (its
+ * item that only sold done cards. Mutates the state and returns the removed cards' names (tests read them; the Undo
+ * reads `split`). One at its top level (its
  * own max, or owned for a Kameo) also goes on the Maxed record, dated `now` when given; one done at its kard threshold
  * isn't maxed yet, since kards finish it in the game. `split`, when given, gets the removed cards' names sorted into
  * maxed and only done at their kard threshold, card by card (two cards can share a name), for the Undo.
