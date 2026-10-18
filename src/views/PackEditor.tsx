@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { LevelOptions, Modal, NumInput, kasketLine } from '../ui';
+import { LevelOptions, Modal, NumInput, ON_MAXED_NOTE, kasketLine } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
-import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, entryGoal, isMaxed, isSeasonal, kasketPool, maxFusion, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave, unmarkMaxed } from '../engine';
+import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, entryGoal, isMaxed, isSeasonal, kasketPool, maxFusion, onMaxedRecord, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave, unmarkMaxed } from '../engine';
 import { initialSource } from '../challenges';
 import { scheduledSeason, scheduledSeasonEnd, useEvents } from '../events';
 import { kasketFor } from '../kaskets';
@@ -105,6 +105,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   // its name too, since Realm Klash gear is tracked to F10 whatever its rarity's Track until, and with the goal it's
   // saved with: one at or past its kard threshold goes on to its max.
   const newCardDone = !!newCardRule && isMaxed(entered({ id: '', name: newCard.name.trim(), rarityId: newCardRule.id, fusion: newCardFusion, guest: false }, newCardRule), newCardRule);
+  // A card on the Maxed record typed in as not owned (a pack's whole drop table, say) isn't one to start again.
+  const newCardMaxed = !!newCard.name.trim() && !!newCardRule && onMaxedRecord(state, { name: newCard.name.trim(), rarityId: newCardRule.id, fusion: newCardFusion });
   function addNewCard() {
     if (!newCard.name.trim() || !newCardRule) return;
     let card = undefined as Card | undefined;
@@ -115,7 +117,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       if (!rule) return noChange;
       const made = entered({ id: newId(), name: newCard.name.trim(), rarityId: rule.id, fusion: newCardFusion <= maxFusion(rule) ? newCardFusion : 0, guest: false }, rule);
       // A card already at its goal is done: the save would delete it at once and leave the pack a drop for nothing.
-      if (isMaxed(made, rule)) return noChange;
+      // Nor, as not owned, one on the Maxed record.
+      if (isMaxed(made, rule) || onMaxedRecord(d, made)) return noChange;
       const source = initialSource(made, d.rarities);
       if (source) made.source = source;
       d.cards.push(made);
@@ -382,7 +385,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
               <select className="flex-1" value={newCardFusion} onChange={(e) => setNewCard({ ...newCard, rarityId: newCardRule?.id ?? '', fusion: Number(e.target.value) })}>
                 <LevelOptions rule={newCardRule} />
               </select>
-              <button onClick={addNewCard} disabled={!newCard.name.trim() || newCardDone}>
+              <button onClick={addNewCard} disabled={!newCard.name.trim() || newCardDone || newCardMaxed}>
                 Add card
               </button>
             </div>
@@ -390,6 +393,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
               <div className="text-small text-muted">The rarity picked here has since been removed, so this card goes in as {newCardRule.label}.</div>
             )}
             {newCardDone && <div className="text-small text-muted">That level is already the card's goal, so it would be done at once: pick a lower level to add it.</div>}
+            {newCardMaxed && <div className="text-small text-muted">{ON_MAXED_NOTE}</div>}
           </div>
         </>
       )}

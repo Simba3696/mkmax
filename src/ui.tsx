@@ -253,6 +253,17 @@ export function daysFromNow(days: number, now: Date) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== now.getFullYear() && { year: 'numeric' }) });
 }
 
+/** A saved day (YYYY-MM-DD, local) shown as daysFromNow shows dates: "Oct 16", or "Feb 6, 2027" in another year. */
+export function dayLabel(day: string, now: Date) {
+  const [y, m, d] = day.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return day;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(y !== now.getFullYear() && { year: 'numeric' }) });
+}
+
+/** Why Add card won't add a card on the Maxed record as not owned (see onMaxedRecord in engine.ts). */
+export const ON_MAXED_NOTE = "That card is on your Maxed record. Give its level to add it back (a Gold card with a new Stage, say), or remove it from Maxed first.";
+
 /**
  * A display choice remembered on this device (a list's sort order), not synced. Falls back to the first option
  * when nothing valid is saved or storage is blocked.

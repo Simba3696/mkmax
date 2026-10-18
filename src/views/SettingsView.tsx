@@ -22,8 +22,11 @@ const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'limitedBoost', label: 'Limited-time pack urgency', help: 'The planner prefers limited-time packs by this factor over permanent packs, which you can buy later.' },
 ];
 
-/** Removing a rarity also removes its Kaskets (removeRarity), so the button and its Undo say so. */
-const withKaskets = (text: string, kaskets: number) => (kaskets === 0 ? text : `${text} and its ${kaskets === 1 ? 'Kasket' : `${kaskets} Kaskets`}`);
+/** Removing a rarity also removes its Kaskets and its Maxed record entries (removeRarity), so the button and its Undo say so. */
+function withKaskets(text: string, kaskets: number, maxed = 0) {
+  const also = [kaskets && (kaskets === 1 ? 'Kasket' : `${kaskets} Kaskets`), maxed && `${maxed} maxed card${maxed === 1 ? '' : 's'}`].filter(Boolean);
+  return also.length ? `${text} and its ${also.join(' and ')}` : text;
+}
 
 const KIND_LABEL: Record<RarityRule['kind'], string> = { character: 'Character', equipment: 'Equipment', kameo: 'Kameo' };
 
@@ -271,18 +274,20 @@ export default function SettingsView() {
                     <button
                       className={btn.ghost}
                       disabled={state.cards.some((c) => c.rarityId === r.id)}
-                      title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : withKaskets('Remove rarity', state.packs.filter((p) => p.kasket === r.id).length)}
+                      title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : withKaskets('Remove rarity', state.packs.filter((p) => p.kasket === r.id).length, (state.maxed ?? []).filter((m) => m.rarityId === r.id).length)}
                       onClick={() => {
                         // The Kaskets counted as the change removes them: a sync may have added or removed some since.
                         let kaskets = 0;
+                        let maxed = 0;
                         // Not if a sync already removed it, or brought in cards that use it.
                         update(
                           (d) => {
                             if (!d.rarities.some((x) => x.id === r.id) || d.cards.some((c) => c.rarityId === r.id)) return noChange;
                             kaskets = d.packs.filter((p) => p.kasket === r.id).length;
+                            maxed = (d.maxed ?? []).filter((m) => m.rarityId === r.id).length;
                             removeRarity(d, r.id);
                           },
-                          () => withKaskets(`Removed ${r.label}`, kaskets),
+                          () => withKaskets(`Removed ${r.label}`, kaskets, maxed),
                         );
                       }}
                     >

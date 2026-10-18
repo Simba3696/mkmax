@@ -1,14 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { noChange, useStore } from '../store';
+import { usePlan } from '../planner';
 import { recordMaxed } from '../engine';
 import { completion, findInCatalog, loadCatalog, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
-import { CardThumb, RarityBadge } from '../ui';
-import { actions, btn, card, grow, row, rowTitle } from '../classes';
+import { CardThumb, ConfirmButton, RarityBadge, dayLabel } from '../ui';
+import { actions, btn, card, field, grow, row, rowTitle, subpanel } from '../classes';
 import type { MaxedCard } from '../types';
 
 /** Whole percent, rounded down so a rarity reads 100% only once every card is maxed. */
 const percent = (n: number, of: number) => (of ? Math.floor((n / of) * 100) : 0);
+
+/**
+ * The same value while `key` is unchanged. Every change copies the whole save (store.tsx), so the record and rarities
+ * are new arrays after any tap; matching them against the catalog again is only needed when they actually change.
+ */
+function useSame<T>(value: T, key: string): T {
+  const ref = useRef({ key, value });
+  if (ref.current.key !== key) ref.current = { key, value };
+  return ref.current.value;
+}
 
 /**
  * The Maxed record: cards that reached their top level and left the card list, and how much of each rarity MK Mobile
@@ -16,8 +27,11 @@ const percent = (n: number, of: number) => (of ? Math.floor((n / of) * 100) : 0)
  */
 export default function MaxedPanel() {
   const { state, update } = useStore();
+  const { now } = usePlan();
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [catalogFailed, setCatalogFailed] = useState(false);
+  // Bumped by Try again: loadCatalog forgets a failed download, so loading again fetches it again.
+  const [attempt, setAttempt] = useState(0);
   const [q, setQ] = useState('');
   useEffect(() => {
     let cancelled = false;
@@ -28,22 +42,29 @@ export default function MaxedPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  const maxed = useMemo(() => state.maxed ?? [], [state.maxed]);
-  const done = useMemo(() => (catalog ? completion(maxed, state.rarities, catalog) : null), [catalog, maxed, state.rarities]);
+  const maxed = useSame(state.maxed ?? [], (state.maxed ?? []).map((m) => `${cardKey(m.rarityId, m.name)}|${m.name}|${m.at ?? ''}`).join('\n'));
+  const rarities = useSame(state.rarities, JSON.stringify(state.rarities));
+  const done = useMemo(() => (catalog ? completion(maxed, rarities, catalog) : null), [catalog, maxed, rarities]);
   const counted = done ? done.rarities.reduce((n, r) => n + r.maxed, 0) : 0;
   const total = done ? done.rarities.reduce((n, r) => n + r.total, 0) : 0;
-  const ruleOf = (m: MaxedCard) => state.rarities.find((r) => r.id === m.rarityId);
-  const order = (m: MaxedCard) => state.rarities.findIndex((r) => r.id === m.rarityId);
-  const listed = maxed
-    .filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()))
-    .sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name));
-  // Art from the catalog, as the record keeps only a name and rarity.
-  const imageOf = (m: MaxedCard) => {
-    const rule = ruleOf(m);
-    return catalog && rule ? findInCatalog({ id: '', name: m.name, rarityId: m.rarityId, fusion: 0, guest: false }, rule, catalog)?.image : undefined;
-  };
+  const ruleOf = (m: MaxedCard) => rarities.find((r) => r.id === m.rarityId);
+  // Art from the catalog, as the record keeps only a name and rarity. Matched once per record, not on every redraw.
+  const images = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const m of catalog ? maxed : []) {
+      const rule = rarities.find((r) => r.id === m.rarityId);
+      const hit = rule && findInCatalog({ id: '', name: m.name, rarityId: m.rarityId, fusion: 0, guest: false }, rule, catalog!);
+      if (hit) out.set(cardKey(m.rarityId, m.name), hit.image);
+    }
+    return out;
+  }, [catalog, maxed, rarities]);
+  const sorted = useMemo(() => {
+    const order = new Map(rarities.map((r, i) => [r.id, i]));
+    return [...maxed].sort((a, b) => (order.get(a.rarityId) ?? -1) - (order.get(b.rarityId) ?? -1) || a.name.localeCompare(b.name));
+  }, [maxed, rarities]);
+  const listed = q ? sorted.filter((m) => m.name.toLowerCase().includes(q.toLowerCase())) : sorted;
 
   // Found by rarity and name rather than by its place in the list, so a tap after a sync changed the list removes the
   // card it was for, or nothing.
@@ -61,34 +82,35 @@ export default function MaxedPanel() {
     <>
       <section className={card}>
         <h2>Completion</h2>
-        {!done && (
-          <p className="text-muted text-small">
-            {catalogFailed ? "MK Mobile Base's card list didn't load, so completion can't be worked out yet. Pull to refresh to try again." : "Loading MK Mobile Base's card list…"}
-          </p>
+        {!done && !catalogFailed && <p className="text-muted text-small">Loading MK Mobile Base's card list…</p>}
+        {!done && catalogFailed && (
+          <>
+            <p className="text-muted text-small">MK Mobile Base's card list didn't load, so completion can't be worked out yet.</p>
+            <div className={actions}>
+              <button onClick={() => (setCatalogFailed(false), setAttempt((n) => n + 1))}>Try again</button>
+            </div>
+          </>
         )}
         {done && (
           <>
             <p>
               <b>{percent(counted, total)}%</b> of every card MK Mobile Base lists: {counted} of {total} maxed.
             </p>
-            {done.rarities.map((r) => {
-              const rule = state.rarities.find((x) => x.id === r.rarityId);
-              return (
-                <div key={r.rarityId} className={`${row} items-center`}>
-                  <div className={grow}>
-                    <RarityBadge rule={rule} />
-                  </div>
-                  <span className="text-muted text-small">
-                    {r.maxed} of {r.total}
-                  </span>
-                  <b className="min-w-[3.5rem] text-right">{percent(r.maxed, r.total)}%</b>
+            {done.rarities.map((r) => (
+              <div key={r.rarityId} className={`${row} items-center`}>
+                <div className={grow}>
+                  <RarityBadge rule={rarities.find((x) => x.id === r.rarityId)} />
                 </div>
-              );
-            })}
+                <span className="text-muted text-small">
+                  {r.maxed} of {r.total}
+                </span>
+                <b className="min-w-[3.5rem] text-right">{percent(r.maxed, r.total)}%</b>
+              </div>
+            ))}
             {done.unlisted.length > 0 && (
               <p className="text-muted text-small">
-                {done.unlisted.length === 1 ? '1 maxed card isn’t' : `${done.unlisted.length} maxed cards aren’t`} on MK Mobile Base's list under that rarity yet, so{' '}
-                {done.unlisted.length === 1 ? 'it isn’t' : 'they aren’t'} counted: {done.unlisted.map((m) => m.name).join(', ')}.
+                {done.unlisted.length === 1 ? "1 maxed card isn't" : `${done.unlisted.length} maxed cards aren't`} on MK Mobile Base's list under that rarity yet, so{' '}
+                {done.unlisted.length === 1 ? "it isn't" : "they aren't"} counted: {done.unlisted.map((m) => m.name).join(', ')}.
               </p>
             )}
           </>
@@ -108,17 +130,15 @@ export default function MaxedPanel() {
         {maxed.length > 0 && listed.length === 0 && <p className="text-muted">No maxed cards match.</p>}
         {listed.map((m) => (
           <div key={cardKey(m.rarityId, m.name)} className={`${row} items-center`}>
-            <CardThumb card={{ id: '', name: m.name, rarityId: m.rarityId, fusion: 0, guest: false, imageUrl: imageOf(m) }} rule={ruleOf(m)} size={36} />
+            <CardThumb card={{ id: '', name: m.name, rarityId: m.rarityId, fusion: 0, guest: false, imageUrl: images.get(cardKey(m.rarityId, m.name)) }} rule={ruleOf(m)} size={36} />
             <div className={grow}>
               <div className={rowTitle}>{m.name}</div>
               <div className="text-small">
                 <RarityBadge rule={ruleOf(m)} />
-                {m.at && <span className="text-muted">maxed {m.at}</span>}
+                {m.at && <span className="text-muted">maxed {dayLabel(m.at, now)}</span>}
               </div>
             </div>
-            <button className={btn.ghost} onClick={() => remove(m)}>
-              Remove
-            </button>
+            <ConfirmButton label="Remove" className={btn.ghost} onConfirm={() => remove(m)} />
           </div>
         ))}
       </section>
@@ -175,26 +195,37 @@ function PasteMaxed() {
     }
   }
 
+  const status = [
+    already > 0 && `${already === 1 ? '1 is' : `${already} are`} already on Maxed`,
+    stillListed > 0 && `skipping ${stillListed === 1 ? "1 card that's" : `${stillListed} cards that are`} still in your card list, so not maxed yet`,
+  ].filter(Boolean);
   return (
-    <div className="my-[0.6rem]">
+    <div className={subpanel}>
       <p className="text-muted text-small md:max-w-[80ch]">
         One card per line, as in Paste a list: plain names go under the rarity picked here, a line that's just a rarity's name (like "Gold Kameo") switches it, or add a rarity after a name ("Kori Blade - Epic"). Levels are ignored.
       </p>
-      <select value={rarityId} onChange={(e) => setPicked(e.target.value)} aria-label="Rarity for plain names">
-        {state.rarities.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.label}
-          </option>
-        ))}
-      </select>
+      <label className={`${field} md:max-w-[240px]`}>
+        <span>Rarity for plain names</span>
+        <select value={rarityId} onChange={(e) => setPicked(e.target.value)}>
+          {state.rarities.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <textarea className="w-full my-[0.4rem]" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic'} aria-label="Maxed cards" autoFocus />
-      {already > 0 && <p className="text-muted text-small">{already === 1 ? '1 is' : `${already} are`} already on Maxed.</p>}
-      {stillListed > 0 && <p className="text-muted text-small">Skipped {stillListed === 1 ? '1 card that’s' : `${stillListed} cards that are`} still in your card list, so not maxed yet.</p>}
-      {parsed.problems.map((p) => (
-        <p key={p.line} className="text-error text-small">
-          Skipped "{p.line}": {p.reason}.
-        </p>
-      ))}
+      {status.length > 0 && <div className="text-small text-muted">{status.join(' · ')}.</div>}
+      {parsed.problems.length > 0 && (
+        <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
+          {/* Keyed by place too: the same line can be pasted twice. */}
+          {parsed.problems.map((p, i) => (
+            <li key={`${i}|${p.line}`}>
+              Skipped "{p.line}": {p.reason}.
+            </li>
+          ))}
+        </ul>
+      )}
       <div className={actions}>
         <button
           onClick={() => {
@@ -205,7 +236,7 @@ function PasteMaxed() {
           Cancel
         </button>
         <button className={btn.primary} onClick={add} disabled={fresh.length === 0}>
-          Add {fresh.length}
+          {fresh.length ? `Add ${fresh.length}` : 'Add maxed cards'}
         </button>
       </div>
     </div>

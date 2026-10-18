@@ -74,6 +74,9 @@ export function copiesToThreshold(card: Card, rule: RarityRule) {
 
 export const isMaxed = (card: Card, rule: RarityRule) => card.fusion >= targetLevel(card, rule);
 
+/** At its top level, whatever its goal: its own max (F10, or a Gold card's cap), or owned for a Kameo. That's maxed. */
+export const atTopLevel = (card: Card, rule: RarityRule) => card.fusion >= targetLevel({ ...card, goal: 'max' }, rule);
+
 /** A card's rarity and name key, whatever its case or word order: the same key as cardKey in cardList.ts, which imports this module. */
 const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityId}|${nameKey(c.name)}`;
 
@@ -84,13 +87,14 @@ const dayOf = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).
  * Cards that reached their goal are done, so they leave the app: the card, its pack drops, and any store
  * item that only sold done cards. Mutates the state and returns the removed cards' names. One at its top level (its
  * own max, or owned for a Kameo) also goes on the Maxed record, dated `now` when given; one done at its kard threshold
- * isn't maxed yet, since kards finish it in the game.
+ * isn't maxed yet, since kards finish it in the game. `maxedOut`, when given, gets the names of the removed cards that
+ * were maxed, so the Undo can tell them from ones only done at their kard threshold.
  *
  * Realm Klash gear also gets a stored goal of max first. The name already makes it max here, but a copy of the app
  * from before the name list only reads the goal, so without it that copy would delete the gear at F3 and sync the
  * deletion back. It also keeps a piece from being removed mid-rename, when the half-typed name is off the list.
  */
-export function pruneDone(s: AppState, now?: Date): string[] {
+export function pruneDone(s: AppState, now?: Date, maxedOut?: string[]): string[] {
   const rules = new Map(s.rarities.map((r) => [r.id, r]));
   for (const c of s.cards) if (c.goal !== 'max' && rules.get(c.rarityId)?.kind === 'equipment' && isRealmKlashName(c.name)) c.goal = 'max';
   const done = new Set(s.cards.filter((c) => rules.has(c.rarityId) && isMaxed(c, rules.get(c.rarityId)!)).map((c) => c.id));
@@ -98,7 +102,9 @@ export function pruneDone(s: AppState, now?: Date): string[] {
   const names = s.cards.filter((c) => done.has(c.id)).map((c) => c.name);
   const recorded = new Set((s.maxed ?? []).map(recordKey));
   for (const c of s.cards) {
-    if (!done.has(c.id) || c.fusion < targetLevel({ ...c, goal: 'max' }, rules.get(c.rarityId)!) || recorded.has(recordKey(c))) continue;
+    if (!done.has(c.id) || !atTopLevel(c, rules.get(c.rarityId)!)) continue;
+    maxedOut?.push(c.name);
+    if (recorded.has(recordKey(c))) continue;
     recorded.add(recordKey(c));
     (s.maxed ??= []).push({ name: c.name, rarityId: c.rarityId, ...(now && { at: dayOf(now) }) });
   }
@@ -461,10 +467,14 @@ export function kasketShape(pack: Pack): Pack {
   return out;
 }
 
-/** Remove a rarity and the Kaskets that draw from it, in one change so one Undo brings both back. Mutates the state. */
+/**
+ * Remove a rarity, the Kaskets that draw from it and its Maxed record entries (with no rarity they'd match nothing, even
+ * once it's added again under a new id), in one change so one Undo brings them all back. Mutates the state.
+ */
 export function removeRarity(d: AppState, id: string) {
   d.rarities = d.rarities.filter((r) => r.id !== id);
   d.packs = d.packs.filter((p) => p.kasket !== id);
+  if (d.maxed?.some((m) => m.rarityId === id)) d.maxed = d.maxed.filter((m) => m.rarityId !== id);
 }
 
 export function packEV(ctx: Ctx, pack: Pack, gained: Map<string, number> = new Map()): number {
@@ -1010,14 +1020,23 @@ export function savePack(d: AppState, pack: Pack, moveSeasonTo: string | null, n
 }
 
 /**
- * Takes cards that are back in the list off the Maxed record: a Gold card pasted again for a new Stage, say, which
- * has copies to go once more. Matched by rarity and name, as the list matches cards. Mutates the state.
+ * Takes cards that are back in the list with copies to go off the Maxed record: a Gold card added again at its old cap
+ * for a new Stage, say. Only owned cards below their top level: one added at its top level is maxed still (it keeps its
+ * entry and day), and one added as not owned is refused while it's on the record (see `onMaxedRecord`). Matched by
+ * rarity and name, as the list matches cards. Mutates the state.
  */
-export function unmarkMaxed(s: AppState, cards: Pick<Card, 'rarityId' | 'name'>[]) {
+export function unmarkMaxed(s: AppState, cards: Card[]) {
   if (!s.maxed?.length) return;
-  const back = new Set(cards.map(recordKey));
+  const rules = new Map(s.rarities.map((r) => [r.id, r]));
+  const back = new Set(cards.filter((c) => c.fusion > 0 && rules.has(c.rarityId) && !atTopLevel(c, rules.get(c.rarityId)!)).map(recordKey));
   s.maxed = s.maxed.filter((m) => !back.has(recordKey(m)));
 }
+
+/**
+ * A card on the Maxed record being added as not owned, which would list a maxed card as one to start from nothing (typing
+ * a pack's whole drop table, say). Add card and Paste a list refuse it; one with a level comes back as `unmarkMaxed` says.
+ */
+export const onMaxedRecord = (s: AppState, card: Pick<Card, 'rarityId' | 'name' | 'fusion'>) => card.fusion <= 0 && (s.maxed ?? []).some((m) => recordKey(m) === recordKey(card));
 
 /** Adds cards to the Maxed record by hand (ones maxed before it existed), leaving out any already on it. Mutates the state. */
 export function recordMaxed(s: AppState, cards: MaxedCard[]) {

@@ -1,8 +1,8 @@
 import { Activity, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel, unmarkMaxed } from '../engine';
-import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
+import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, unmarkMaxed } from '../engine';
+import { CardThumb, Chip, ConfirmButton, LevelOptions, ON_MAXED_NOTE, RarityBadge, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
 import MaxedPanel from './MaxedPanel';
@@ -166,9 +166,12 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const isOrphan = (u: (typeof parsed.updates)[number]) => state.cards.some((c) => c.id === u.cardId && !live(c.rarityId));
   const updates = parsed.updates.filter((u) => !isOrphan(u));
   const removedLines = [...parsed.cards.filter(isRemoved).map((c) => c.line), ...parsed.updates.filter(isOrphan).map((u) => u.line)];
+  // A card on the Maxed record pasted as not owned (a list of a pack's drops, say) isn't one to start again: skipped.
+  const isMaxedLine = (c: (typeof parsed.cards)[number]) => onMaxedRecord(state, { ...c, fusion: c.fusion ?? 0 });
+  const maxedLines = parsed.cards.filter((c) => live(c.rarityId) && isMaxedLine(c)).map((c) => c.name);
   // `gone` holds the lines as typed, so an edited line (a lower level, say) is offered again, and a line that reads
   // differently once its card is gone (a Stage line brings a maxed card back) still matches.
-  const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(c.line));
+  const newCards = parsed.cards.filter((c) => live(c.rarityId) && !gone.has(c.line) && !isMaxedLine(c));
   const counts = state.rarities
     .map((r) => ({ label: r.label, n: newCards.filter((c) => c.rarityId === r.id).length }))
     .filter((x) => x.n > 0);
@@ -204,7 +207,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // to delete them. Nor a card a sync has added meanwhile (the same list pasted on another device), which would
         // then be in twice. Nor updates to cards a sync removed.
         const have = new Set(d.cards.map((x) => cardKey(x.rarityId, x.name)));
-        const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name)));
+        // Nor, as not owned, one a sync has put on the Maxed record.
+        const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name)) && !onMaxedRecord(d, { ...c, fusion: c.fusion ?? 0 }));
         // Nor to a card left without its rarity (an older build or an imported file can leave one): it has no rules to
         // check its goal against. Nor one a sync has already updated that way (the same list pasted on another device).
         const changes = (c: Card, patch: (typeof updates)[number]['patch']) =>
@@ -234,7 +238,10 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
           if (goal) f.goal = goal;
         }
         d.cards.push(...fresh);
-        // A card pasted back (a Gold card made ascendable again, say) has copies to go, so it's not maxed any more.
+        const ruleOf = (c: Card) => d.rarities.find((r) => r.id === c.rarityId)!;
+        // One pasted already maxed goes on the record with no day (when it was maxed isn't known), or keeps the entry it
+        // has. One pasted back with copies to go (a Gold card made ascendable again, say) comes off it.
+        recordMaxed(d, fresh.filter((f) => atTopLevel(f, ruleOf(f))));
         unmarkMaxed(d, fresh);
         for (const { c, patch } of saving) Object.assign(c, patch);
         added = cards.length;
@@ -242,7 +249,6 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         const touched = [...fresh, ...saving.map(({ c }) => c)];
         saved = touched.map((c) => cardKey(c.rarityId, c.name));
         // At their goal now, so the save deletes them as done: their lines are left out from then on.
-        const ruleOf = (c: Card) => d.rarities.find((r) => r.id === c.rarityId)!;
         done = [
           ...cards.filter((_, i) => isMaxed(fresh[i], ruleOf(fresh[i]))).map((c) => c.line),
           ...saving.filter(({ c }) => isMaxed(c, ruleOf(c))).map(({ line }) => line),
@@ -305,6 +311,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
                 : 'Nothing to add yet.'}
         {updates.length > 0 && ` · updating ${updates.length} already listed (${updates.map((u) => u.name).join('; ')})`}
         {skipped.length > 0 && ` · skipping ${skipped.length} already listed (${skipped.join('; ')})`}
+        {maxedLines.length > 0 && ` · skipping ${maxedLines.length} on Maxed as not owned (${maxedLines.join('; ')}): give a level to add one back`}
       </div>
       {parsed.problems.length + removedLines.length > 0 && (
         <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
@@ -390,6 +397,10 @@ function CardList() {
   const [q, setQ] = useState('');
   const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all');
   const [ownedFilter, setOwnedFilter] = useState<'all' | 'owned' | 'unowned'>('all');
+  // Cards whose level was tapped while the Owned filter was on stay listed until it changes, so one tapped from not owned
+  // to owned (or back) doesn't vanish, with no Undo, before it can be tapped back. A new search starts afresh too.
+  const [tapped, setTapped] = useState<ReadonlySet<string>>(new Set());
+  const pickOwned = (v: typeof ownedFilter) => (setOwnedFilter(v), setTapped(new Set()));
   const [sortBy, setSortBy] = useDeviceChoice('mkmax:cardSort', CARD_SORTS);
   /**
    * The card being renamed, its name before (which comes back if the name is cleared), what's in the box, and the name
@@ -553,8 +564,10 @@ function CardList() {
     );
 
   // A level tap steps from the level it showed: saving that level ± 1 would undo a level a sync has added since.
-  const stepLevel = (c: Card, by: 1 | -1) =>
+  const stepLevel = (c: Card, by: 1 | -1) => {
+    if (ownedFilter !== 'all' && !tapped.has(c.id)) setTapped(new Set([...tapped, c.id]));
     update((d) => (d.cards.find((x) => x.id === c.id)?.fusion === c.fusion && stepCard(d, c.id, by) ? undefined : noChange));
+  };
 
   /** Fuse one level with Fusion Up Kards from the Wallet, as done in the game: the step the button showed, or none. */
   function fuse(c: Card, cost: number) {
@@ -619,7 +632,8 @@ function CardList() {
       // The goal the form showed for it (see formGoal), worked out with the rarity as it is now. A card already at it would
       // be done at once, so it isn't added (Add is greyed out for it; Enter in the name box comes here too).
       const saved = { ...card, goal: formGoal(card, rule).goal };
-      if (isMaxed(saved, rule)) return noChange;
+      // Nor, as not owned, a card on the Maxed record (Add is greyed out for that too).
+      if (isMaxed(saved, rule) || onMaxedRecord(d, saved)) return noChange;
       d.cards.push(saved);
       unmarkMaxed(d, [saved]);
       added = true;
@@ -641,8 +655,9 @@ function CardList() {
   const rarityCount = (value: string) => state.cards.filter((c) => matchesSearch(c) && inSource(c, sourceFilter) && inOwned(c, ownedFilter) && inRarity(c, value)).length;
   const sourceCount = (value: Source | 'all') => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inOwned(c, ownedFilter) && inSource(c, value)).length;
   const ownedCount = (value: typeof ownedFilter) => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && inOwned(c, value)).length;
+  const addsMaxed = !!shown.name.trim() && !!draftRule && onMaxedRecord(state, { ...shown, name: shown.name.trim(), rarityId: draftRule.id });
   const cards = state.cards
-    .filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && inOwned(c, ownedFilter))
+    .filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && (inOwned(c, ownedFilter) || tapped.has(c.id)))
     // Rarity then name by default, so a card doesn't jump around while you edit it. By fusion, ties keep that order.
     .sort((a, b) => fusionOrder(a, b) || rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name));
 
@@ -695,7 +710,7 @@ function CardList() {
               <input value={shown.sourceNote ?? ''} placeholder="e.g. Lin Kuei Tower" onChange={(e) => setDraft({ ...shown, sourceNote: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
             </label>
           )}
-          <button className={`${btn.primary} md:-col-end-1`} onClick={add} disabled={!shown.name.trim() || (!!draftRule && isMaxed({ ...(shown as Card), goal: formGoal(shown as Card, draftRule).goal }, draftRule))}>
+          <button className={`${btn.primary} md:-col-end-1`} onClick={add} disabled={!shown.name.trim() || (!!draftRule && isMaxed({ ...(shown as Card), goal: formGoal(shown as Card, draftRule).goal }, draftRule)) || addsMaxed}>
             Add
           </button>
         </div>
@@ -703,12 +718,13 @@ function CardList() {
           <p className="text-muted text-small">The rarity picked here has since been removed, so this card goes in as {draftRule.label}.</p>
         )}
         {draftRule && goalNote(shown as Card, draftRule) && <p className="text-muted text-small">{goalNote(shown as Card, draftRule)}</p>}
+        {addsMaxed && <p className="text-muted text-small">{ON_MAXED_NOTE}</p>}
         <PasteList pick={picks} startRarityId={draftRule?.id ?? ''} />
       </section>
 
       {/* Kept in view while scrolling a long list on wide screens, where it fits on one row; elsewhere it scrolls away as before. */}
       <div className="flex flex-wrap gap-2 mb-[0.8rem] items-center xl:sticky xl:top-0 xl:z-[2] xl:bg-bg xl:py-2">
-        <input className="flex-1 min-w-0 md:min-w-[200px] md:max-w-[360px]" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="flex-1 min-w-0 md:min-w-[200px] md:max-w-[360px]" placeholder="Search…" value={q} onChange={(e) => (setQ(e.target.value), setTapped(new Set()))} />
         <select value={rarity} onChange={(e) => setRarity(e.target.value)}>
           <option value="all">{`All rarities (${rarityCount('all')})`}</option>
           <option value="kind:character">{`All characters (${rarityCount('kind:character')})`}</option>
@@ -735,7 +751,7 @@ function CardList() {
           <option value="tower">{`Tower gear (${sourceCount('tower')})`}</option>
           <option value="challenge">{`Elder challenge (${sourceCount('challenge')})`}</option>
         </select>
-        <select value={ownedFilter} onChange={(e) => setOwnedFilter(e.target.value as typeof ownedFilter)} aria-label="Filter by owned">
+        <select value={ownedFilter} onChange={(e) => pickOwned(e.target.value as typeof ownedFilter)} aria-label="Filter by owned">
           <option value="all">{`Owned or not (${ownedCount('all')})`}</option>
           <option value="unowned">{`Not owned (${ownedCount('unowned')})`}</option>
           <option value="owned">{`Owned (${ownedCount('owned')})`}</option>

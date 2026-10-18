@@ -1,5 +1,6 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
-import type { AppState, Card, RarityRule } from './types';
+import type { AppState, Card, MaxedCard, RarityRule } from './types';
+import { nameKey } from './catalog';
 import { ASCENSION_KARD_COST, ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
 import { REALM_KLASH_CURRENCY, kasketShape, pruneDone } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
@@ -77,6 +78,23 @@ export function kardTable(r: RarityRule): number[] {
 /** Card (and same-named pack) names from older saves, mapped to the game's spelling. */
 const RENAMED: Record<string, string> = { 'Datusha, Bane of Moroi': 'Datusha, Bane of the Moroi' };
 
+/**
+ * The Maxed record as a hand-edited file could hold it: only entries with a name and rarity, a day only if it's text (an
+ * object there would break the page), and one entry per card, as the app records them.
+ */
+function keptMaxed(input: unknown): MaxedCard[] {
+  const seen = new Set<string>();
+  const out: MaxedCard[] = [];
+  for (const m of Array.isArray(input) ? (input as Partial<MaxedCard>[]) : []) {
+    if (!m || typeof m.name !== 'string' || typeof m.rarityId !== 'string') continue;
+    const key = `${m.rarityId}|${nameKey(m.name)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name: m.name, rarityId: m.rarityId, ...(typeof m.at === 'string' && { at: m.at }) });
+  }
+  return out;
+}
+
 /** Fill in fields missing from older saves or hand-edited imports, then drop cards that are already done. */
 export function normalize(input: unknown): AppState {
   let s = input as Partial<AppState>;
@@ -128,8 +146,7 @@ export function normalize(input: unknown): AppState {
     realmKlashSeasonEnd: s.realmKlashSeasonEnd ?? null,
     dismissedShopPacks: s.dismissedShopPacks ?? [],
     gearOrder: s.gearOrder ?? [],
-    // Only entries with a name and rarity: a hand-edited file could hold anything.
-    maxed: (Array.isArray(s.maxed) ? s.maxed : []).filter((m) => m && typeof m.name === 'string' && typeof m.rarityId === 'string'),
+    maxed: keptMaxed(s.maxed),
     updatedAt: s.updatedAt,
   };
   // Version 5 tags Gold Kameos of challenge characters (they come from Elder challenges). Done once, so a tag
