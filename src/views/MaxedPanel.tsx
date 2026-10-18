@@ -203,7 +203,7 @@ function PasteMaxed() {
   return (
     <div className={subpanel}>
       <p className="text-muted text-small md:max-w-[80ch]">
-        One card per line, as in Paste a list: plain names go under the rarity picked here, a line that's just a rarity's name (like "Gold Kameo") switches it, or add a rarity after a name ("Kori Blade - Epic"). Levels are ignored.
+        One card per line, as in Paste a list: plain names go under the rarity picked here, a line that's just a rarity's name (like "Gold Kameo") switches it, or add a rarity after a name ("Kori Blade - Epic"). No level is needed and none is saved, though a line with a level the rarity doesn't have is skipped.
       </p>
       <label className={`${field} md:max-w-[240px]`}>
         <span>Rarity for plain names</span>

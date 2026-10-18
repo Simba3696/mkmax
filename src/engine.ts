@@ -99,14 +99,14 @@ const dayOf = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).
  * Cards that reached their goal are done, so they leave the app: the card, its pack drops, and any store
  * item that only sold done cards. Mutates the state and returns the removed cards' names. One at its top level (its
  * own max, or owned for a Kameo) also goes on the Maxed record, dated `now` when given; one done at its kard threshold
- * isn't maxed yet, since kards finish it in the game. `maxedOut`, when given, gets the names of the removed cards that
- * were maxed, so the Undo can tell them from ones only done at their kard threshold.
+ * isn't maxed yet, since kards finish it in the game. `split`, when given, gets the removed cards' names sorted into
+ * maxed and only done at their kard threshold, card by card (two cards can share a name), for the Undo.
  *
  * Realm Klash gear also gets a stored goal of max first. The name already makes it max here, but a copy of the app
  * from before the name list only reads the goal, so without it that copy would delete the gear at F3 and sync the
  * deletion back. It also keeps a piece from being removed mid-rename, when the half-typed name is off the list.
  */
-export function pruneDone(s: AppState, now?: Date, maxedOut?: string[]): string[] {
+export function pruneDone(s: AppState, now?: Date, split?: { maxed: string[]; done: string[] }): string[] {
   const rules = new Map(s.rarities.map((r) => [r.id, r]));
   for (const c of s.cards) if (c.goal !== 'max' && rules.get(c.rarityId)?.kind === 'equipment' && isRealmKlashName(c.name)) c.goal = 'max';
   const done = new Set(s.cards.filter((c) => rules.has(c.rarityId) && isMaxed(c, rules.get(c.rarityId)!)).map((c) => c.id));
@@ -114,8 +114,12 @@ export function pruneDone(s: AppState, now?: Date, maxedOut?: string[]): string[
   const names = s.cards.filter((c) => done.has(c.id)).map((c) => c.name);
   const recorded = new Set((s.maxed ?? []).map(recordKey));
   for (const c of s.cards) {
-    if (!done.has(c.id) || !atTopLevel(c, rules.get(c.rarityId)!)) continue;
-    maxedOut?.push(c.name);
+    if (!done.has(c.id)) continue;
+    if (!atTopLevel(c, rules.get(c.rarityId)!)) {
+      split?.done.push(c.name);
+      continue;
+    }
+    split?.maxed.push(c.name);
     if (recorded.has(recordKey(c))) continue;
     recorded.add(recordKey(c));
     s.maxed = [...(s.maxed ?? []), { name: c.name, rarityId: c.rarityId, ...(now && { at: dayOf(now) }) }];

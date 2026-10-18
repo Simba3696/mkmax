@@ -148,8 +148,10 @@ describe('the Maxed record', () => {
   // maxed; why_new=the record test had only gear done at F3; seam=none; no_claim=the Undo wording (CardsView.test.tsx)
   it('records gear finished to F10, and says which removed cards were maxed', () => {
     const s = setup([card('g', F(10), { rarityId: 'epic', name: 'Kori Blade', goal: 'max' }), card('e', F(3), { rarityId: 'rare', name: 'Hook Swords' })]);
-    const maxed: string[] = [];
-    expect([pruneDone(s, new Date('2026-10-18T09:00:00'), maxed), maxed]).toEqual([['Kori Blade', 'Hook Swords'], ['Kori Blade']]);
+    // Card by card, not by name: a same-named Rare piece done at F3 is still only done.
+    s.cards.push(card('r', F(3), { rarityId: 'rare', name: 'Kori Blade' }));
+    const split = { maxed: [] as string[], done: [] as string[] };
+    expect([pruneDone(s, new Date('2026-10-18T09:00:00'), split), split]).toEqual([['Kori Blade', 'Hook Swords', 'Kori Blade'], { maxed: ['Kori Blade'], done: ['Hook Swords', 'Kori Blade'] }]);
     expect(s.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic', at: '2026-10-18' }]);
   });
 

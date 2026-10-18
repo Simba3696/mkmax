@@ -149,15 +149,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const draft = structuredClone(prev);
     // No save, no stamp and no sync push, so a tap that does nothing can't make this device's copy look newest.
     if (recipe(draft) === noChange) return;
-    const maxed: string[] = [];
-    const removed = pruneDone(draft, new Date(), maxed);
+    const split = { maxed: [] as string[], done: [] as string[] };
+    pruneDone(draft, new Date(), split);
     if (!opts?.auto) draft.updatedAt = loop.nextStamp();
     stateRef.current = draft;
     setState(draft);
     // Gear done at its kard threshold isn't maxed (it's not on the Maxed page), so it's only "done".
-    const done = removed.filter((n) => !maxed.includes(n));
     const gone = (names: string[], how: string) => names.length > 0 && `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} ${how} and removed`;
-    const label = [typeof undoLabel === 'function' ? undoLabel() : undoLabel, gone(maxed, 'maxed'), gone(done, 'done')].filter(Boolean).join(' · ');
+    const label = [typeof undoLabel === 'function' ? undoLabel() : undoLabel, gone(split.maxed, 'maxed'), gone(split.done, 'done')].filter(Boolean).join(' · ');
     if (label) setLastUndo({ label, prev, at: Date.now() });
     if (!opts?.auto) schedulePush();
   };
