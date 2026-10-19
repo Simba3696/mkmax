@@ -248,7 +248,7 @@ export default function App() {
         <div className="max-w-page md:max-w-[1400px] mx-auto p-4 md:px-6 md:py-6 lg:px-8" ref={pageRef}>
           {/* On every tab, since nothing a tap does is saved meanwhile. */}
           {newerSave && (
-            <p className={`${hint} mt-0 mb-4`} role="alert">
+            <p className={`${hint} mt-0 mb-4 md:max-w-[80ch]`} role="alert">
               {NEWER_SAVE_MESSAGE}
             </p>
           )}

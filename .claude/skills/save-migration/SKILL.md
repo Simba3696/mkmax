@@ -9,7 +9,8 @@ Saved data reaches the app from localStorage, backups and the gist, and all of i
 
 ## Do you need one?
 
-- New optional field with a safe default: no version bump. Default it in the `out` object in `normalize()` (like `gearOrder: s.gearOrder ?? []`). But if an older build that ignores the field would plan or delete cards wrongly, bump the version anyway, with no migration step, so sync and Import backup keep older builds off the new data (version 16, `noKards`; see `docs/development.md`).
+- New optional field on a card, pack or rarity with a safe default: no version bump. Older builds keep those objects as they are. But if an older build that ignores the field would plan or delete cards wrongly, bump the version anyway, with no migration step, so sync and Import backup keep older builds off the new data (version 16, `noKards`; see `docs/development.md`).
+- New top-level `AppState` field: always bump the version, with no migration step. `normalize()` builds `out` one field at a time, so an older build drops any top-level field it doesn't know and syncs that back (version 17, `maxed`). Default it in `out` (like `gearOrder: s.gearOrder ?? []`).
 - Anything that changes existing data (renames, new built-in rarities, changed meaning of a number, fixing bad data): yes.
 
 ## Steps
