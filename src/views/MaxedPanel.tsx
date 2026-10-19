@@ -105,7 +105,7 @@ export default function MaxedPanel() {
               </div>
             ))}
             {done.unlisted.length > 0 && (
-              <p className="text-muted text-small">
+              <p className="text-muted text-small md:max-w-[80ch]">
                 {done.unlisted.length === 1 ? "1 maxed card isn't" : `${done.unlisted.length} maxed cards aren't`} on MK Mobile Base's list under {done.unlisted.length === 1 ? 'its' : 'their'} rarity yet, so{' '}
                 {done.unlisted.length === 1 ? "it isn't" : "they aren't"} counted: {done.unlisted.map((m) => m.name).join(', ')}.
               </p>

@@ -406,8 +406,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       )}
       {gone && <p className="text-muted text-small">This pack has since been removed on another device, so saving it won't bring it back.</p>}
       {!gone && itemGone && <p className="text-muted text-small">The card this item sells has since been removed: choose another item to save it.</p>}
-      {/* The notice saying why is behind this pop-up, and the update waits for it to close. */}
-      {newerSave && <p className="text-muted text-small">Not saved: the data in this browser is now from a newer version of MK Max. Close this and MK Max updates.</p>}
+      {/* The notice saying why is behind this pop-up. */}
+      {newerSave && <p className="text-muted text-small">Not saved: the data in this browser is from a newer version of MK Max, so changes aren’t saved until MK Max updates.</p>}
       <div className={modalFoot}>
         <button onClick={onClose}>Cancel</button>
         <button className={btn.primary} onClick={save} disabled={errors.length > 0 || gone || itemGone || newerSave}>

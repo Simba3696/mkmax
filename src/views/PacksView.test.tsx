@@ -754,7 +754,7 @@ describe('Packs: the pack editor once another tab saves a newer version', () => 
       window.dispatchEvent(new StorageEvent('storage', { key: 'mkmax:v1', newValue: newer }));
     });
     expect([
-      screen.queryByText(/^Not saved: the data in this browser is now from a newer version of MK Max/) != null,
+      screen.queryByText(/^Not saved: the data in this browser is from a newer version of MK Max, so changes aren’t saved until MK Max updates/) != null,
       (screen.getByRole('button', { name: 'Save pack' }) as HTMLButtonElement).disabled,
       localStorage.getItem('mkmax:v1'),
     ]).toEqual([true, true, newer]);
