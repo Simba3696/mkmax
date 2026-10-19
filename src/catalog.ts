@@ -41,12 +41,15 @@ export function appRarityId(item: CatalogItem, rules: Iterable<RarityRule>): str
   return undefined;
 }
 
-/** Words MK Mobile Base misspells, mapped to the game's spelling ("Weather Warface" is the game's Weather Warfare). */
+/**
+ * Words MK Mobile Base misspells, mapped to the game's spelling ("Weather Warface" is the game's Weather Warfare). A
+ * word the site splits in two is joined in nameKey instead ("Sub-Zero, Grand Master" is the game's Grandmaster).
+ */
 const SITE_TYPOS: Record<string, string> = { warface: 'warfare' };
 
 /** Order-free word key: "Scorpion, MKII Movie" and "Scorpion MK2 Movie" match; "the"/"of" and possessive 's are ignored. */
 export function nameKey(name: string) {
-  const s = name.toLowerCase().replace(/’/g, "'").replace(/'s\b/g, '').replace(/\bmkii\b/g, 'mk2');
+  const s = name.toLowerCase().replace(/’/g, "'").replace(/'s\b/g, '').replace(/\bmkii\b/g, 'mk2').replace(/\bgrand[^a-z0-9]*master\b/g, 'grandmaster');
   const words = s.split(/[^a-z0-9]+/).filter((w) => w && w !== 'the' && w !== 'of').map((w) => SITE_TYPOS[w] ?? w);
   // The app says "Kold" where MK Mobile Base says "Kold War": one card, so one key (the list, the Maxed record and art).
   const kold = words.includes('kold');

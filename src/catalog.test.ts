@@ -22,6 +22,8 @@ describe('catalog matching', () => {
   it('ignores word order, commas, possessives and MKII vs MK2', () => {
     expect(nameKey('Scorpion, MKII Movie')).toBe(nameKey('Scorpion MK2 Movie'));
     expect(nameKey('Weather Warfare')).toBe(nameKey('Weather Warface')); // the site's spelling
+    // The site splits Grandmaster in two (added 2026-10-20).
+    expect([nameKey('Sub-Zero, Grandmaster'), nameKey('Grand-Master Sub-Zero')]).toEqual([nameKey('Sub-Zero - Grand Master'), nameKey('Sub-Zero - Grand Master')]);
     // The app says "Kold" where the site says "Kold War": one card, one key (the list, the Maxed record, card art).
     expect([nameKey('Kold Scorpion'), nameKey('Scorpion, Kold War')]).toEqual([nameKey('Kold War Scorpion'), nameKey('Kold War Scorpion')]);
     expect(find('Scorpion, MKII Movie', 'diamond')).toBe('Scorpion MK2 Movie');
