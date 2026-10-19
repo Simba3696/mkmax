@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { newId, noChange, normalize, useStore } from '../store';
 import { savedText } from '../storage';
 import { kardTable } from '../normalize';
@@ -93,8 +93,26 @@ export default function SettingsView() {
       { ruleChange: true },
     );
   // Past the neighbour shown on screen, so a tap after a sync reordered the rarities moves nothing rather than the wrong one.
-  const shiftRarity = (r: RarityRule, past: RarityRule, by: -1 | 1) =>
+  const shiftRarity = (r: RarityRule, past: RarityRule, by: -1 | 1) => {
+    setMoved({ id: r.id, by });
     update((d) => (moveRarity(d, r.id, past.id, by) ? undefined : noChange), `Moved ${r.label} ${by < 0 ? 'up' : 'down'}`);
+  };
+  // Each rarity's ↑ ↓ Remove group, by rarity id, and the last one moved.
+  const arrowGroups = useRef(new Map<string, HTMLElement>());
+  const [moved, setMoved] = useState<{ id: string; by: -1 | 1 } | null>(null);
+  // A rarity panel is tall, so a move takes it a whole panel away from the finger that tapped: bring its arrows back into
+  // view, so moving one several places is a few taps in a row. An arrow greyed out by the move (the rarity reached an end)
+  // can't keep keyboard focus, so focus goes to the other one instead of falling back to the top of the page.
+  useEffect(() => {
+    if (!moved) return;
+    setMoved(null);
+    const group = arrowGroups.current.get(moved.id);
+    if (!group) return;
+    const [up, down] = group.querySelectorAll('button');
+    const pressed = moved.by < 0 ? up : down;
+    if (pressed.disabled && (document.activeElement === pressed || document.activeElement === document.body)) (moved.by < 0 ? down : up).focus({ preventScroll: true });
+    group.scrollIntoView({ block: 'nearest' });
+  }, [moved, state.rarities]);
   const editCurrency = (id: string, edit: (c: AppState['currencies'][number]) => void) =>
     update((d) => {
       const c = d.currencies.find((x) => x.id === id);
@@ -287,7 +305,7 @@ export default function SettingsView() {
                     <span className={`${grow} lg:hidden`} />
                     {/* One group, right-aligned, so on a narrow phone the arrows and Remove wrap together instead of leaving
                         Remove alone at the left of a line of its own. */}
-                    <span className="flex gap-[0.4rem] ml-auto">
+                    <span className="flex gap-[0.4rem] ml-auto" ref={(el) => void (el ? arrowGroups.current.set(r.id, el) : arrowGroups.current.delete(r.id))}>
                       <button className={btn.ghost} onClick={() => shiftRarity(r, all[i - 1], -1)} disabled={i === 0} aria-label={`Move ${r.label} up`} title="Move up">
                         ↑
                       </button>

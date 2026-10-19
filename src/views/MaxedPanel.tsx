@@ -5,7 +5,7 @@ import { maxedKeys, recordMaxed } from '../engine';
 import { completion, findInCatalog, loadCatalog, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
 import { CardThumb, ConfirmButton, RarityBadge, dayLabel } from '../ui';
-import { actions, barFill, btn, card, field, grow, row, rowTitle, subpanel } from '../classes';
+import { actions, barFill, btn, card, field, grow, row, rowDivider, rowTitle, subpanel } from '../classes';
 import type { MaxedCard } from '../types';
 
 /** Whole percent, rounded down so a rarity reads 100% only once every card is maxed. */
@@ -113,7 +113,7 @@ export default function MaxedPanel() {
               {done.rarities.map((r) => {
                 const rule = rarities.find((x) => x.id === r.rarityId);
                 return (
-                  <div key={r.rarityId} className="py-[0.35rem] [&+&]:border-t [&+&]:border-line">
+                  <div key={r.rarityId} className={rowDivider}>
                     <div className="flex gap-[0.6rem] items-center">
                       <div className={grow}>
                         <RarityBadge rule={rule} />

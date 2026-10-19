@@ -21,8 +21,10 @@ export const hint = 'bg-hint border-l-[3px] border-gold py-[0.4rem] px-[0.6rem] 
 /** The red to gold fill of a progress bar: the Plan's pack efficiency and the Maxed page's overall completion. */
 export const barFill = 'bg-[linear-gradient(90deg,var(--color-red),var(--color-gold))]';
 
+/** A list row's padding and the divider between consecutive rows, for a row laid out some other way than `row`. */
+export const rowDivider = 'py-[0.35rem] [&+&]:border-t [&+&]:border-line';
 /** A list row; consecutive rows get a divider. Vertical alignment and wrapping are left to the caller. */
-export const row = 'flex gap-[0.6rem] py-[0.35rem] [&+&]:border-t [&+&]:border-line';
+export const row = `flex gap-[0.6rem] ${rowDivider}`;
 /** Takes the free space in a flex row and lets long text wrap or truncate. */
 export const grow = 'flex-1 min-w-0';
 export const rowTitle = 'font-semibold wrap-anywhere';
