@@ -76,7 +76,7 @@ export default function SyncPanel() {
             </div>
           )}
           <div className={actions}>
-            <button onClick={() => sync.syncNow()} disabled={status.kind === 'syncing' || status.kind === 'conflict'}>
+            <button onClick={() => sync.syncNow()} disabled={status.kind === 'syncing' || status.kind === 'conflict' || newerSave}>
               Sync now
             </button>
             <ConfirmButton label="Disconnect this device" className={btn.ghost} onConfirm={sync.disconnect} />

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { newId, noChange, normalize, useStore } from '../store';
+import { savedText } from '../storage';
 import { kardTable } from '../normalize';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
@@ -433,7 +434,7 @@ export default function SettingsView() {
         )}
         <p className={`${note} md:max-w-[75ch]`}>Your data is saved in this browser only. Export a backup now and then, or use one to move to another device.</p>
         <div className={actions}>
-          <button className={btn.primary} onClick={() => download(JSON.stringify(state, null, 2), 'mkmax-backup')}>
+          <button className={btn.primary} onClick={() => download((newerSave && savedText()) || JSON.stringify(state, null, 2), 'mkmax-backup')}>
             Export backup
           </button>
           <button onClick={() => fileRef.current?.click()}>Import backup</button>

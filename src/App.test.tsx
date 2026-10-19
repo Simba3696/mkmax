@@ -101,6 +101,15 @@ describe('a save from a newer version', () => {
       </StoreProvider>,
     );
     expect(notice()).toBeNull();
+    // Extended by /ship test coverage audit on 2026-10-19
+    // Value: protects=a tab already open shows the notice once another tab saves data from a newer version, still with no
+    // sync error while sync is off; fails_when=the storage listener's hold isn't shown, or it sets a sync error with sync
+    // off; why_new=the store test holds with sync on and reads the store only; seam=a StorageEvent dispatched by hand
+    // stands in for the other tab; no_claim=a real second tab
+    const newer = JSON.stringify({ ...defaultState(), version: 99 });
+    localStorage.setItem('mkmax:v1', newer);
+    act(() => void window.dispatchEvent(new StorageEvent('storage', { key: 'mkmax:v1', newValue: newer })));
+    expect([notice(), screen.queryAllByText(/Sync error/)]).toEqual([expect.stringMatching(/newer version of MK Max/), []]);
   });
 });
 

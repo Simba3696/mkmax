@@ -1,4 +1,5 @@
-// Reading the saved data at startup, and keeping a copy of it when it can't be read. Kept apart from store.tsx,
+// Reading the saved data at startup, keeping a copy of it when it can't be read, and holding one from a newer version
+// (shown, but never saved over). Kept apart from store.tsx,
 // which imports the service worker, so tests can run it against a stubbed localStorage.
 import type { AppState } from './types';
 import { defaultState } from './defaults';
@@ -18,16 +19,18 @@ export const UNREADABLE_KEY = 'mkmax:v1:unreadable';
 let heldForNewerApp = false;
 export const savedByNewerApp = () => heldForNewerApp;
 
-/** For another tab's save (a `storage` event): holds it if it's from a newer version, and says whether it did. */
+/**
+ * For another tab's save (a `storage` event): holds it if it's from a newer version, and says whether it did. Text that
+ * isn't JSON throws: every build saves whole JSON, so that's a broken save, not one to read past.
+ */
 export function holdIfNewer(key: string | null, raw: string | null) {
   if (key !== KEY || !raw) return false;
-  try {
-    if (fromNewerApp(JSON.parse(raw))) heldForNewerApp = true;
-  } catch {
-    /* half-written or not JSON: not a newer save this build can tell apart */
-  }
+  if (fromNewerApp(JSON.parse(raw))) heldForNewerApp = true;
   return heldForNewerApp;
 }
+
+/** The save exactly as stored, for a backup while it's held: this build's reading of it drops what it doesn't know. */
+export const savedText = () => localStorage.getItem(KEY);
 
 export function load(): AppState {
   let raw: string | null = null;

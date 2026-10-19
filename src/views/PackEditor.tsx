@@ -21,7 +21,7 @@ const dropRow = 'flex gap-[0.4rem] items-center my-[0.35rem]';
 const pctInput = 'w-[80px]';
 
 export default function PackEditor({ initial, onClose }: { initial: Pack | null; onClose: () => void }) {
-  const { state, update } = useStore();
+  const { state, update, newerSave } = useStore();
   // A store item left with no item (Delete on its card keeps it) opens with an empty item picker, so one is chosen
   // before it's saved.
   const [p, setP] = useState<Pack>(
@@ -406,9 +406,11 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       )}
       {gone && <p className="text-muted text-small">This pack has since been removed on another device, so saving it won't bring it back.</p>}
       {!gone && itemGone && <p className="text-muted text-small">The card this item sells has since been removed: choose another item to save it.</p>}
+      {/* The notice saying why is behind this pop-up, and the update waits for it to close. */}
+      {newerSave && <p className="text-muted text-small">Not saved: the data in this browser is now from a newer version of MK Max. Close this and MK Max updates.</p>}
       <div className={modalFoot}>
         <button onClick={onClose}>Cancel</button>
-        <button className={btn.primary} onClick={save} disabled={errors.length > 0 || gone || itemGone}>
+        <button className={btn.primary} onClick={save} disabled={errors.length > 0 || gone || itemGone || newerSave}>
           Save pack
         </button>
       </div>

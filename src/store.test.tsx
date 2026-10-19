@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
 import { noChange, StoreProvider, useStore } from './store';
 import { SyncLoop } from './syncLoop';
@@ -120,6 +120,12 @@ describe('update undo labels', () => {
   // reading over the newer data; why_new=review of the TODOS.md P2 fix; seam=a StorageEvent dispatched by hand stands in
   // for the other tab, SyncLoop.syncNow spied; no_claim=a real second tab
   it('holds once another tab saves data from a newer version', () => {
+    // Extended by /ship test coverage audit on 2026-10-19 (fake timers and the push check at the end)
+    // Value: protects=a push already scheduled by a tap before the other tab's newer save never runs; fails_when=the
+    // listener doesn't cancel the push timer, so 1.5 s later the older reading is sent to the gist; why_new=the test read
+    // the store before the push delay ran out; seam=none; no_claim=the push itself (SyncLoop.syncNow spied)
+    vi.useFakeTimers();
+    onTestFinished(() => void vi.useRealTimers());
     localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
     const pull = vi.spyOn(SyncLoop.prototype, 'syncNow').mockResolvedValue();
     let latest: Store | undefined;
@@ -137,6 +143,7 @@ describe('update undo labels', () => {
     act(() => api().update((d) => void (d.dismissedShopPacks = ['A', 'B']), 'Hid B'));
     act(() => api().undo());
     act(() => void document.dispatchEvent(new Event('visibilitychange')));
+    act(() => void vi.advanceTimersByTime(5000));
     expect([api().newerSave, api().lastUndo, api().state.dismissedShopPacks, localStorage.getItem('mkmax:v1'), pull.mock.calls.length]).toEqual([
       true,
       null,
