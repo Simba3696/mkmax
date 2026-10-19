@@ -42,8 +42,9 @@ export function appRarityId(item: CatalogItem, rules: Iterable<RarityRule>): str
 }
 
 /**
- * Words MK Mobile Base misspells, mapped to the game's spelling ("Weather Warface" is the game's Weather Warfare). A
- * word the site splits in two is joined in nameKey instead ("Sub-Zero, Grand Master" is the game's Grandmaster).
+ * Words MK Mobile Base misspells, mapped to the game's spelling ("Weather Warface" is the game's Weather Warfare; the
+ * site fixed it by October 2026, but the committed fallback catalog still has it). A word the site splits in two is
+ * joined in nameKey instead ("Sub-Zero, Grand Master" is the game's Grandmaster).
  */
 const SITE_TYPOS: Record<string, string> = { warface: 'warfare' };
 
