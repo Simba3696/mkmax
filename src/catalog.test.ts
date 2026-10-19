@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appRarityId, catalogImageUpdates, findInCatalog, nameKey, rarityMismatches, type CatalogItem } from './catalog';
+import { appRarityId, catalogImageUpdates, completion, findInCatalog, nameKey, rarityMismatches, type CatalogItem } from './catalog';
 import { defaultState } from './defaults';
 import type { Card } from './types';
 
@@ -22,6 +22,8 @@ describe('catalog matching', () => {
   it('ignores word order, commas, possessives and MKII vs MK2', () => {
     expect(nameKey('Scorpion, MKII Movie')).toBe(nameKey('Scorpion MK2 Movie'));
     expect(nameKey('Weather Warfare')).toBe(nameKey('Weather Warface')); // the site's spelling
+    // The app says "Kold" where the site says "Kold War": one card, one key (the list, the Maxed record, card art).
+    expect([nameKey('Kold Scorpion'), nameKey('Scorpion, Kold War')]).toEqual([nameKey('Kold War Scorpion'), nameKey('Kold War Scorpion')]);
     expect(find('Scorpion, MKII Movie', 'diamond')).toBe('Scorpion MK2 Movie');
     expect(find("Takahashi's Gauntlets", 'epic')).toBe("Takahashi's Gauntlets");
   });
@@ -71,6 +73,37 @@ describe('automatic catalog art', () => {
   });
 });
 
+
+describe('completion', () => {
+  // Value: protects=completion counts Maxed entries MK Mobile Base lists under their rarity, out of every card it lists
+  // there, and sets aside entries it doesn't list there; fails_when=an entry under the wrong rarity or missing from the
+  // catalog is counted (a figure past 100%), or a rarity's total is wrong; why_new=completion is new; seam=none
+  // Extended by /ship review fixes on 2026-10-19: two entries that both match one catalog card (a variant the site lists
+  // only under its base name) count once; fails_when=matches are counted, not catalog cards, so a figure can pass 100%.
+  it('counts maxed cards the catalog lists under their rarity, out of all it lists there', () => {
+    const { rarities, unlisted } = completion(
+      [
+        { name: 'Scorpion, MKII Movie', rarityId: 'diamond' },
+        { name: 'Jason Voorhees', rarityId: 'diamond' },
+        { name: 'Jason Voorhees, Nightmare', rarityId: 'diamond' }, // falls back to the site's "Jason Voorhees" too
+        { name: 'Klassic Baraka', rarityId: 'kameo-diamond' },
+        { name: 'Man in the Sky', rarityId: 'epic' }, // the catalog has it as Rare
+        { name: 'Noob Saibot, MK1', rarityId: 'kameo-diamond' }, // not in the catalog yet
+      ],
+      defaultState().rarities,
+      ITEMS,
+    );
+    expect(rarities.map((r) => [r.rarityId, r.maxed, r.total])).toEqual([
+      ['diamond', 2, 3],
+      ['gold', 0, 1],
+      ['epic', 0, 1],
+      ['rare', 0, 1],
+      ['kameo-diamond', 1, 1],
+      ['kameo-gold', 0, 1],
+    ]);
+    expect(unlisted.map((m) => m.name)).toEqual(['Man in the Sky', 'Noob Saibot, MK1']);
+  });
+});
 
 describe('rarity check', () => {
   it("lists cards whose rarity the site gives differently, whether or not they have art", () => {

@@ -1,6 +1,6 @@
 // Parses a pasted list of cards for bulk adding. Plain TS so it can be tested.
 import { nameKey } from './catalog';
-import { ascensionCaps, fLevel, levelLabel, maxFusion } from './engine';
+import { ascensionCaps, fLevel, levelLabel, maxFusion, recordKey } from './engine';
 import type { Card, RarityRule } from './types';
 
 interface ListedCard {
@@ -8,6 +8,8 @@ interface ListedCard {
   rarityId: string;
   /** The line it came from (bullets and extra spaces dropped), for messages that quote it. */
   line: string;
+  /** Where that line is in the text (0 for the first, blank lines counted), so a caller can take out the lines it used. */
+  row: number;
   /** Stored level from the line (e.g. "F2" → 3, "Unowned" → 0); unset means not owned. */
   fusion?: number;
   source?: Card['source'];
@@ -19,8 +21,9 @@ interface ListedCard {
 interface CardUpdate {
   cardId: string;
   name: string;
-  /** The line it came from, as in ListedCard. */
+  /** The line it came from and where, as in ListedCard. */
   line: string;
+  row: number;
   patch: Partial<Pick<Card, 'fusion' | 'source' | 'sourceNote' | 'maxLevel'>>;
 }
 
@@ -30,15 +33,25 @@ export interface ParsedList {
   updates: CardUpdate[];
   /**
    * Cards skipped because they're already in the app (with nothing to update) or earlier in the list, with their
-   * cardKey to tell same-named cards of different rarities apart.
+   * cardKey to tell same-named cards of different rarities apart, and where its line is, as in ListedCard.
    */
-  duplicates: { name: string; key: string }[];
+  duplicates: { name: string; key: string; row: number }[];
   /** Lines that couldn't be used, with why. */
   problems: { line: string; reason: string }[];
 }
 
+/**
+ * A pasted line as the list reads it: spaces tidied and a leading bullet or number dropped (lists copied from notes
+ * often have them: "- Jade, Lizard", "2. Kori Blade"). Empty for a blank or underline row. Lines in ParsedList are these.
+ */
+function listLine(raw: string) {
+  const trimmed = raw.trim().replace(/\s+/g, ' ');
+  if (!trimmed || /^[-=_*\s]+$/.test(trimmed)) return '';
+  return trimmed.replace(/^(?:[-–—*•·]|\d+[.)])\s+/, '');
+}
+
 /** One card in a list, whatever case, spacing or word order its name is typed in: its rarity and name key. */
-export const cardKey = (rarityId: string, name: string) => `${rarityId}|${nameKey(name)}`;
+export const cardKey = (rarityId: string, name: string) => recordKey({ rarityId, name });
 
 /** Grades the game has that aren't tracked as cards here. */
 const UNTRACKED_GRADES: Record<string, string> = {
@@ -83,11 +96,9 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
   const seen = new Set<string>();
   let headingRarityId = startRarityId;
   const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [] };
-  for (const raw of text.split(/\r?\n/)) {
-    const trimmed = raw.trim().replace(/\s+/g, ' ');
-    if (!trimmed || /^[-=_*\s]+$/.test(trimmed)) continue;
-    // Lists copied from notes often have bullets or numbers ("- Jade, Lizard", "2. Kori Blade"), which aren't part of the name.
-    const line = trimmed.replace(/^(?:[-–—*•·]|\d+[.)])\s+/, '');
+  for (const [row, raw] of text.split(/\r?\n/).entries()) {
+    const line = listLine(raw);
+    if (!line) continue;
     const [name, ...parts] = line.split(/\s+[-–—]\s+/);
     if (parts.length === 0) {
       // A heading is a rarity's full name. Matched on the name alone, so a name the list was typed with still counts
@@ -140,7 +151,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
 
     const key = cardKey(rarityId, name);
     if (seen.has(key)) {
-      out.duplicates.push({ name, key });
+      out.duplicates.push({ name, key, row });
       continue;
     }
     seen.add(key);
@@ -155,8 +166,8 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       if (fusion != null && fusion !== card.fusion) patch.fusion = fusion;
       if (source && (source !== card.source || sourceNote !== card.sourceNote)) Object.assign(patch, { source, sourceNote });
       if (maxLevel !== undefined && maxLevel !== (card.maxLevel ?? null)) patch.maxLevel = maxLevel;
-      if (Object.keys(patch).length) out.updates.push({ cardId: card.id, name: card.name, line, patch });
-      else out.duplicates.push({ name, key });
+      if (Object.keys(patch).length) out.updates.push({ cardId: card.id, name: card.name, line, row, patch });
+      else out.duplicates.push({ name, key, row });
       continue;
     }
     // Every card still being maxed is in the app, so a Gold card made ascendable that isn't was maxed and removed:
@@ -172,6 +183,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       name,
       rarityId,
       line,
+      row,
       ...(start != null && { fusion: start }),
       ...(source && { source }),
       ...(sourceNote && { sourceNote }),

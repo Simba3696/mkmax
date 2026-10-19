@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { newId, noChange, normalize, useStore } from '../store';
+import { savedText } from '../storage';
 import { kardTable } from '../normalize';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
@@ -22,8 +23,11 @@ const WEIGHT_HELP: { key: keyof Weights; label: string; help: string }[] = [
   { key: 'limitedBoost', label: 'Limited-time pack urgency', help: 'The planner prefers limited-time packs by this factor over permanent packs, which you can buy later.' },
 ];
 
-/** Removing a rarity also removes its Kaskets (removeRarity), so the button and its Undo say so. */
-const withKaskets = (text: string, kaskets: number) => (kaskets === 0 ? text : `${text} and its ${kaskets === 1 ? 'Kasket' : `${kaskets} Kaskets`}`);
+/** Removing a rarity also removes its Kaskets and its Maxed record entries (removeRarity), so the button and its Undo say so. */
+function withRemoved(text: string, kaskets: number, maxed = 0) {
+  const also = [kaskets && (kaskets === 1 ? 'its Kasket' : `its ${kaskets} Kaskets`), maxed && (maxed === 1 ? 'its maxed card' : `its ${maxed} maxed cards`)].filter(Boolean);
+  return also.length === 2 ? `${text}, ${also[0]} and ${also[1]}` : also.length ? `${text} and ${also[0]}` : text;
+}
 
 const KIND_LABEL: Record<RarityRule['kind'], string> = { character: 'Character', equipment: 'Equipment', kameo: 'Kameo' };
 
@@ -39,7 +43,12 @@ const levels = 'grid grid-cols-[repeat(auto-fill,minmax(70px,1fr))] gap-[0.4rem]
 const level = 'flex flex-col gap-[2px] [&_input]:w-full';
 
 export default function SettingsView() {
-  const { state, update, replace, unreadable, discardUnreadable } = useStore();
+  const { state, update, replace, unreadable, discardUnreadable, newerSave } = useStore();
+  // replace() changes nothing while the save is from a newer version, so say that rather than that it worked.
+  const replaced = (next: AppState, done: string) => {
+    replace(next);
+    setMsg(newerSave ? 'Nothing changed: the data saved in this browser is from a newer version of MK Max (see the notice at the top).' : done);
+  };
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -63,8 +72,7 @@ export default function SettingsView() {
         void checkForAppUpdate();
         return;
       }
-      replace(normalize(data));
-      setMsg('Backup imported.');
+      replaced(normalize(data), 'Backup imported.');
     } catch (e) {
       setMsg(`Import failed: ${(e as Error).message}`);
     }
@@ -72,12 +80,18 @@ export default function SettingsView() {
 
   // Rows are found by id when the change runs, not by their place on screen: a sync can reorder or remove rarities and
   // currencies while Settings is open, and a change by place would land on the wrong row. A row that's gone saves nothing.
+  // A rule change that leaves cards done (− Level, a kind made Kameo) removes them without putting them on the Maxed
+  // record: they weren't maxed in the game.
   const editRarity = (id: string, edit: (r: RarityRule) => void | typeof noChange, undoLabel?: string | (() => string)) =>
-    update((d) => {
-      const r = d.rarities.find((x) => x.id === id);
-      if (!r) return noChange;
-      return edit(r);
-    }, undoLabel);
+    update(
+      (d) => {
+        const r = d.rarities.find((x) => x.id === id);
+        if (!r) return noChange;
+        return edit(r);
+      },
+      undoLabel,
+      { ruleChange: true },
+    );
   const editCurrency = (id: string, edit: (c: AppState['currencies'][number]) => void) =>
     update((d) => {
       const c = d.currencies.find((x) => x.id === id);
@@ -268,26 +282,42 @@ export default function SettingsView() {
                       </>
                     )}
                     <span className={`${grow} lg:hidden`} />
-                    <button
-                      className={btn.ghost}
-                      disabled={state.cards.some((c) => c.rarityId === r.id)}
-                      title={state.cards.some((c) => c.rarityId === r.id) ? 'Cards use this rarity' : withKaskets('Remove rarity', state.packs.filter((p) => p.kasket === r.id).length)}
-                      onClick={() => {
-                        // The Kaskets counted as the change removes them: a sync may have added or removed some since.
+                    {(() => {
+                      const used = state.cards.some((c) => c.rarityId === r.id);
+                      const maxedHere = (state.maxed ?? []).filter((m) => m.rarityId === r.id).length;
+                      const remove = (confirmed: boolean) => {
+                        // The Kaskets and Maxed entries counted as the change removes them: a sync may have added or
+                        // removed some since.
                         let kaskets = 0;
-                        // Not if a sync already removed it, or brought in cards that use it.
+                        let maxed = 0;
+                        // Not if a sync already removed it, or brought in cards that use it. Nor on one tap if a sync
+                        // has given it Maxed entries since the screen showed none: the button then asks for two taps.
                         update(
                           (d) => {
                             if (!d.rarities.some((x) => x.id === r.id) || d.cards.some((c) => c.rarityId === r.id)) return noChange;
+                            if (!confirmed && d.maxed?.some((m) => m.rarityId === r.id)) return noChange;
                             kaskets = d.packs.filter((p) => p.kasket === r.id).length;
+                            maxed = (d.maxed ?? []).filter((m) => m.rarityId === r.id).length;
                             removeRarity(d, r.id);
                           },
-                          () => withKaskets(`Removed ${r.label}`, kaskets),
+                          () => withRemoved(`Removed ${r.label}`, kaskets, maxed),
                         );
-                      }}
-                    >
-                      Remove
-                    </button>
+                      };
+                      // Its Maxed history goes with it, and the tooltip doesn't show on phones: two taps, with the count on
+                      // the button. Otherwise one tap, with Undo, as before.
+                      const kaskets = state.packs.filter((p) => p.kasket === r.id).length;
+                      if (!used && maxedHere > 0) return <ConfirmButton label={`Remove (${maxedHere} maxed)`} className={btn.ghost} onConfirm={() => remove(true)} title={withRemoved('Remove rarity', kaskets, maxedHere)} />;
+                      return (
+                        <button
+                          className={btn.ghost}
+                          disabled={used}
+                          title={used ? 'Cards use this rarity' : withRemoved('Remove rarity', kaskets)}
+                          onClick={() => remove(false)}
+                        >
+                          Remove
+                        </button>
+                      );
+                    })()}
                   </div>
                   {!kameo && r.fusionUpThreshold != null && (
                     <>
@@ -404,7 +434,7 @@ export default function SettingsView() {
         )}
         <p className={`${note} md:max-w-[75ch]`}>Your data is saved in this browser only. Export a backup now and then, or use one to move to another device.</p>
         <div className={actions}>
-          <button className={btn.primary} onClick={() => download(JSON.stringify(state, null, 2), 'mkmax-backup')}>
+          <button className={btn.primary} onClick={() => download((newerSave && savedText()) || JSON.stringify(state, null, 2), 'mkmax-backup')}>
             Export backup
           </button>
           <button onClick={() => fileRef.current?.click()}>Import backup</button>
@@ -420,8 +450,8 @@ export default function SettingsView() {
               if (file) void importData(file);
             }}
           />
-          <ConfirmButton label="Load sample data" onConfirm={() => (replace(sampleState()), setMsg('Sample data loaded.'))} />
-          <ConfirmButton label="Erase everything" onConfirm={() => (replace(defaultState()), setMsg('All data erased.'))} />
+          <ConfirmButton label="Load sample data" onConfirm={() => replaced(sampleState(), 'Sample data loaded.')} />
+          <ConfirmButton label="Erase everything" onConfirm={() => replaced(defaultState(), 'All data erased.')} />
         </div>
         {msg && <p className="text-small">{msg}</p>}
       </FoldCard>

@@ -1,7 +1,7 @@
 // Card catalog from MK Mobile Base (mkmobilebase.com): names, rarities and card art for every character, Kameo and
 // piece of equipment. scripts/fetch-catalog.mjs downloads it into public/catalog.json at deploy time, because
 // the site's API doesn't allow requests from other sites.
-import type { Card, RarityRule } from './types';
+import type { Card, MaxedCard, RarityRule } from './types';
 
 export interface CatalogItem {
   kind: 'character' | 'equipment' | 'kameo';
@@ -48,7 +48,9 @@ const SITE_TYPOS: Record<string, string> = { warface: 'warfare' };
 export function nameKey(name: string) {
   const s = name.toLowerCase().replace(/’/g, "'").replace(/'s\b/g, '').replace(/\bmkii\b/g, 'mk2');
   const words = s.split(/[^a-z0-9]+/).filter((w) => w && w !== 'the' && w !== 'of').map((w) => SITE_TYPOS[w] ?? w);
-  return [...new Set(words)].sort().join(' ');
+  // The app says "Kold" where MK Mobile Base says "Kold War": one card, so one key (the list, the Maxed record and art).
+  const kold = words.includes('kold');
+  return [...new Set(words.filter((w) => !(kold && w === 'war')))].sort().join(' ');
 }
 
 // The catalog's items by kind and name key, in catalog order. Built once per catalog, so checking a few hundred cards
@@ -68,7 +70,7 @@ function catalogIndex(items: CatalogItem[]) {
 }
 
 /**
- * The catalog entry for a card: same kind and name words. The app says "Kold" where the site says "Kold War",
+ * The catalog entry for a card: same kind and name words (nameKey reads "Kold" and the site's "Kold War" as one),
  * and the site lists some original variants without a variant name (the Diamond "Jason Voorhees" is the wiki's
  * "Jason Voorhees/Nightmare"), so a no-variant entry of the card's own rarity is accepted as a last resort.
  */
@@ -76,11 +78,44 @@ export function findInCatalog(card: Card, rule: RarityRule | undefined, items: C
   const kind = rule?.kind ?? 'character';
   const index = catalogIndex(items);
   const named = (name: string) => index.get(`${kind}|${nameKey(name)}`) ?? [];
-  const exact = named(card.name)[0] ?? named(card.name.replace(/\bKold\b/i, 'Kold War'))[0];
+  const exact = named(card.name)[0];
   if (exact) return exact;
   const base = card.name.split(',')[0].trim();
   if (base === card.name.trim()) return undefined;
   return named(base).find((i) => i.rarity === card.rarityId || `${i.kind}-${i.rarity}` === card.rarityId);
+}
+
+/** One rarity's completion: how many of the cards MK Mobile Base lists under it are on the Maxed record. */
+interface RarityCompletion {
+  rarityId: string;
+  maxed: number;
+  total: number;
+}
+
+/**
+ * Completion for each rarity MK Mobile Base lists cards of, in the rarities' order: Maxed record entries it lists
+ * under that rarity, out of every card it lists there, matched by name as card art is. Entries it doesn't list there
+ * (a card it doesn't have yet, or one filed under another rarity) are returned as `unlisted` and not counted, so a
+ * figure never passes 100%.
+ */
+export function completion(maxed: MaxedCard[], rules: RarityRule[], items: CatalogItem[]) {
+  const counted = new Map<string, Set<CatalogItem>>(rules.map((r) => [r.id, new Set()]));
+  const unlisted: MaxedCard[] = [];
+  for (const m of maxed) {
+    const rule = rules.find((r) => r.id === m.rarityId);
+    const item = rule && findInCatalog({ id: '', name: m.name, rarityId: m.rarityId, fusion: 0, guest: false }, rule, items);
+    if (item && appRarityId(item, rules) === m.rarityId) counted.get(m.rarityId)!.add(item);
+    else unlisted.push(m);
+  }
+  const totals = new Map<string, number>();
+  for (const i of items) {
+    const id = appRarityId(i, rules);
+    if (id) totals.set(id, (totals.get(id) ?? 0) + 1);
+  }
+  const rarities: RarityCompletion[] = rules
+    .filter((r) => totals.has(r.id))
+    .map((r) => ({ rarityId: r.id, maxed: counted.get(r.id)!.size, total: totals.get(r.id)! }));
+  return { rarities, unlisted };
 }
 
 /** A card has no art yet, or art from an older wiki lookup that MK Mobile Base may have a proper card image for. */

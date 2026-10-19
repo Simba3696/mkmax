@@ -123,9 +123,20 @@ export interface Weights {
   limitedBoost: number;
 }
 
+/**
+ * A card that reached its top level (its own max, or owned for a Kameo) and so left the card list. A card done at its
+ * kard threshold isn't maxed yet (kards finish it in the game), so it isn't one.
+ */
+export interface MaxedCard {
+  name: string;
+  rarityId: string;
+  /** The day it was maxed (YYYY-MM-DD); unset for one a load, import or sync found already maxed, or one pasted in. */
+  at?: string;
+}
+
 export interface AppState {
-  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. 8–9 = renamed packs and cards to the game's spelling. 10 = fixed "Kollector’S" pack names and gave Blood Rubies a daily income. 11 = removed Time Krystals (console-only) when unused. 12 = gave Epic and Rare gear their own kard costs and Kameos guests. 13 = gave Gold ascension the game's kard costs. 14 = switched rarities with no kards from the kard threshold to max. 15 = turned hand-made Kaskets into Kaskets. 16 = added No kards on cards, which older builds would ignore. */
-  version: 16;
+  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. 8–9 = renamed packs and cards to the game's spelling. 10 = fixed "Kollector’S" pack names and gave Blood Rubies a daily income. 11 = removed Time Krystals (console-only) when unused. 12 = gave Epic and Rare gear their own kard costs and Kameos guests. 13 = gave Gold ascension the game's kard costs. 14 = switched rarities with no kards from the kard threshold to max. 15 = turned hand-made Kaskets into Kaskets. 16 = added No kards on cards, which older builds would ignore. 17 = added the Maxed record, which older builds would drop. */
+  version: 17;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];
@@ -137,6 +148,8 @@ export interface AppState {
   dismissedShopPacks?: string[];
   /** Realm Klash gear card ids in the order Blood Rubies max them, one at a time, before any other purchase. */
   gearOrder?: string[];
+  /** Cards that reached their top level and left the list, for the Maxed page and completion figures. */
+  maxed?: MaxedCard[];
   /** When this data was last changed (ms since epoch); drives cross-device sync. */
   updatedAt?: number;
 }

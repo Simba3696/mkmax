@@ -38,6 +38,6 @@ These aren't obvious from general game knowledge. Don't change them unless asked
 - Kaskets give one random card of their rarity you don't own, minus the newest cards from the latest update; once you own them all, one you haven't maxed (below its own cap, so ascending Gold counts). Guests and tower or Krypt gear are in the pool.
 - Kameos only need owning. Elder challenge Kameos are weighted down because the challenge guarantees one.
 - Every card is wanted. Don't add priority tiers ("Must-have", "Skip"); the only reasons a copy is worth more are game mechanics.
-- Cards that reach their goal are deleted, not archived.
+- Cards that reach their goal leave the card list. One that leaves at its top level (F10, a Gold card's own cap, or owned for a Kameo) goes on the Maxed record for completion; gear done at F3 isn't maxed, so it doesn't.
 - Don't model duplicate refunds, tower or Krypt drops as pack sources, Koins, or guest-event dates. Urgency comes from the pack end dates the user enters or the event schedule provides.
 - MK Mobile Base has no CORS. Fetch from it only in `scripts/`, never from the app (hotlinked images are fine).

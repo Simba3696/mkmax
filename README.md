@@ -21,6 +21,7 @@
 - **Blood Ruby gear order.** Maxes the Realm Klash gear one piece at a time, in an order you choose, before any other Blood Ruby buy, and forecasts the date each piece and the whole set will be maxed.
 - **Ending-soon badge.** The Packs tab, and the home-screen icon where the phone supports it, counts planned packs that end within a day.
 - **Live shop schedule.** Packs on sale or coming up, Elder challenge dates and Realm Klash season ends come from [MK Mobile Base](https://mkmobilebase.com/) and are refreshed daily.
+- **Completion.** Maxed cards go on a record, with how much of each rarity MK Mobile Base lists you've maxed. Paste in cards you maxed earlier.
 - **Card art and rarities.** Looked up automatically from MK Mobile Base and the [MK Mobile wiki](https://mortalkombat-mobile.fandom.com/).
 - **Quick entry.** Paste a whole card list, split even-pool odds across cards in one go, and log a purchase with one tap. Undo works on all of these. Sort packs by end time or currency and cards by rarity, fusion level or name, and fold away Plan and Settings cards you don't need.
 - **Works on tablets and desktops too.** The tabs move to a side rail, and wider screens get extra columns.

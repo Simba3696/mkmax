@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Card, RarityRule } from './types';
-import { levelLabel, targetLevel, type KardPlan, type KasketPool } from './engine';
+import { ascensionCaps, levelLabel, targetLevel, type KardPlan, type KasketPool } from './engine';
 import { btn, card, chipTone, type ChipTone } from './classes';
 
 export function fmt(n: number) {
@@ -253,6 +253,27 @@ export function daysFromNow(days: number, now: Date) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== now.getFullYear() && { year: 'numeric' }) });
 }
 
+// Made once: a long Maxed list redraws every row's day.
+const thisYearDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+const otherYearDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+/** A saved day (YYYY-MM-DD, local) shown as daysFromNow shows dates: "Oct 16", or "Feb 6, 2027" in another year. */
+export function dayLabel(day: string, now: Date) {
+  const [y, m, d] = day.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return day;
+  return (y === now.getFullYear() ? thisYearDay : otherYearDay).format(date);
+}
+
+/**
+ * Why Add card and the pack editor won't add a card on the Maxed record (see onMaxedRecord in engine.ts). A card of a
+ * rarity that ascends comes back by pasting it with its Stage; a Kameo only needs owning, so it never comes back.
+ */
+export function onMaxedNote(rule: RarityRule | undefined) {
+  if (rule?.kind === 'kameo') return 'That Kameo is on your Maxed record, so you own it already. Remove it from Maxed first to add it again.';
+  const stage = rule && ascensionCaps(rule).length > 1 ? ' If an update made it ascendable, paste it in Cards → Paste a list with its Stage instead.' : '';
+  return `That card is on your Maxed record. Remove it from Maxed first to add it again.${stage}`;
+}
+
 /**
  * A display choice remembered on this device (a list's sort order), not synced. Falls back to the first option
  * when nothing valid is saved or storage is blocked.
@@ -317,7 +338,7 @@ export function FoldCard({ id, title, children }: { id: string; title: string; c
 
 const CONFIRM_MS = 3000;
 
-export function ConfirmButton({ label, onConfirm, className }: { label: string; onConfirm: () => void; className?: string }) {
+export function ConfirmButton({ label, onConfirm, className, title }: { label: string; onConfirm: () => void; className?: string; title?: string }) {
   // When it was armed, not just whether: a page hidden mid-countdown (Activity) stops the timer, so the time itself
   // decides. Shown again later, it disarms; a tap after the 3 seconds arms again.
   const [armedAt, setArmedAt] = useState<number | null>(null);
@@ -341,7 +362,7 @@ export function ConfirmButton({ label, onConfirm, className }: { label: string; 
   };
   // Ghost buttons (btn.ghost, alone or with extra classes after it) stay ghost when armed, as before; only the text changes.
   return (
-    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={tap}>
+    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={tap} title={title}>
       {armed ? 'Tap again to confirm' : label}
     </button>
   );

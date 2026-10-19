@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { LevelOptions, Modal, NumInput, kasketLine } from '../ui';
+import { LevelOptions, Modal, NumInput, kasketLine, onMaxedNote } from '../ui';
 import { actions, btn, check, field, form, modalFoot, subpanel } from '../classes';
-import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, entryGoal, isMaxed, isSeasonal, kasketPool, maxFusion, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
+import { REALM_KLASH_CURRENCY, addPool as withPool, editedPack, editorSeasonEnd, fromEndedSeason, entryGoal, isMaxed, isSeasonal, kasketPool, maxFusion, onMaxedRecord, packEndOnSave, poolShare, savePack, seasonEnd, seasonMoveOnSave } from '../engine';
 import { initialSource } from '../challenges';
 import { scheduledSeason, scheduledSeasonEnd, useEvents } from '../events';
 import { kasketFor } from '../kaskets';
@@ -21,7 +21,7 @@ const dropRow = 'flex gap-[0.4rem] items-center my-[0.35rem]';
 const pctInput = 'w-[80px]';
 
 export default function PackEditor({ initial, onClose }: { initial: Pack | null; onClose: () => void }) {
-  const { state, update } = useStore();
+  const { state, update, newerSave } = useStore();
   // A store item left with no item (Delete on its card keeps it) opens with an empty item picker, so one is chosen
   // before it's saved.
   const [p, setP] = useState<Pack>(
@@ -105,6 +105,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
   // its name too, since Realm Klash gear is tracked to F10 whatever its rarity's Track until, and with the goal it's
   // saved with: one at or past its kard threshold goes on to its max.
   const newCardDone = !!newCardRule && isMaxed(entered({ id: '', name: newCard.name.trim(), rarityId: newCardRule.id, fusion: newCardFusion, guest: false }, newCardRule), newCardRule);
+  // A card on the Maxed record (typing a pack's whole drop table, say) isn't one to start again.
+  const newCardMaxed = !!newCard.name.trim() && !!newCardRule && onMaxedRecord(state, { name: newCard.name.trim(), rarityId: newCardRule.id });
   function addNewCard() {
     if (!newCard.name.trim() || !newCardRule) return;
     let card = undefined as Card | undefined;
@@ -115,7 +117,8 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       if (!rule) return noChange;
       const made = entered({ id: newId(), name: newCard.name.trim(), rarityId: rule.id, fusion: newCardFusion <= maxFusion(rule) ? newCardFusion : 0, guest: false }, rule);
       // A card already at its goal is done: the save would delete it at once and leave the pack a drop for nothing.
-      if (isMaxed(made, rule)) return noChange;
+      // Nor one on the Maxed record.
+      if (isMaxed(made, rule) || onMaxedRecord(d, made)) return noChange;
       const source = initialSource(made, d.rarities);
       if (source) made.source = source;
       d.cards.push(made);
@@ -381,14 +384,15 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
               <select className="flex-1" value={newCardFusion} onChange={(e) => setNewCard({ ...newCard, rarityId: newCardRule?.id ?? '', fusion: Number(e.target.value) })}>
                 <LevelOptions rule={newCardRule} />
               </select>
-              <button onClick={addNewCard} disabled={!newCard.name.trim() || newCardDone}>
+              <button onClick={addNewCard} disabled={!newCard.name.trim() || newCardDone || newCardMaxed}>
                 Add card
               </button>
             </div>
             {newCard.rarityId && newCardRule && newCardRule.id !== newCard.rarityId && (
               <div className="text-small text-muted">The rarity picked here has since been removed, so this card goes in as {newCardRule.label}.</div>
             )}
-            {newCardDone && <div className="text-small text-muted">That level is already the card's goal, so it would be done at once: pick a lower level to add it.</div>}
+            {newCardDone && !newCardMaxed && <div className="text-small text-muted">That level is already the card's goal, so it would be done at once: pick a lower level to add it.</div>}
+            {newCardMaxed && <div className="text-small text-muted lg:max-w-[75ch]">{onMaxedNote(newCardRule)}</div>}
           </div>
         </>
       )}
@@ -402,9 +406,11 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
       )}
       {gone && <p className="text-muted text-small">This pack has since been removed on another device, so saving it won't bring it back.</p>}
       {!gone && itemGone && <p className="text-muted text-small">The card this item sells has since been removed: choose another item to save it.</p>}
+      {/* The notice saying why is behind this pop-up. */}
+      {newerSave && <p className="text-muted text-small lg:max-w-[75ch]">Not saved: the data in this browser is from a newer version of MK Max, so changes aren’t saved until MK Max updates.</p>}
       <div className={modalFoot}>
         <button onClick={onClose}>Cancel</button>
-        <button className={btn.primary} onClick={save} disabled={errors.length > 0 || gone || itemGone}>
+        <button className={btn.primary} onClick={save} disabled={errors.length > 0 || gone || itemGone || newerSave}>
           Save pack
         </button>
       </div>

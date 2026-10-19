@@ -1,6 +1,6 @@
 import { nameKey } from './catalog';
 import { isKasketExcluded } from './kaskets';
-import type { AppState, Card, DropEntry, Pack, RarityRule } from './types';
+import type { AppState, Card, DropEntry, MaxedCard, Pack, RarityRule } from './types';
 
 // ---------- Fusion math ----------
 // Levels are stored as "copy levels": 0 = not owned, 1 = first copy (F0), 2 = F1, … fusionMax + 1 = F10,
@@ -74,20 +74,58 @@ export function copiesToThreshold(card: Card, rule: RarityRule) {
 
 export const isMaxed = (card: Card, rule: RarityRule) => card.fusion >= targetLevel(card, rule);
 
+/** At its top level, whatever its goal: its own max (F10, or a Gold card's cap), or owned for a Kameo. That's maxed. */
+export const atTopLevel = (card: Card, rule: RarityRule) => card.fusion >= targetLevel({ ...card, goal: 'max' }, rule);
+
+/** A card's rarity and name key, whatever its case or word order. cardKey in cardList.ts is this key too. */
+export const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityId}|${nameKey(c.name)}`;
+
+// Each change copies the whole save (store.tsx), so a record is checked against many times (every pasted line, every
+// keystroke in Add card) before it changes: its keys are worked out once per array. That holds because the record is
+// never changed in place: every change to it puts a new array in `maxed`.
+const keysOf = new WeakMap<MaxedCard[], Set<string>>();
+/** The keys (recordKey) of the cards on the Maxed record. */
+export function maxedKeys(s: AppState): ReadonlySet<string> {
+  if (!s.maxed) return new Set();
+  let keys = keysOf.get(s.maxed);
+  if (!keys) keysOf.set(s.maxed, (keys = new Set(s.maxed.map(recordKey))));
+  return keys;
+}
+
+/** YYYY-MM-DD in local time, as the day a card was maxed is shown. */
+const dayOf = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
 /**
  * Cards that reached their goal are done, so they leave the app: the card, its pack drops, and any store
- * item that only sold done cards. Mutates the state and returns the removed cards' names.
+ * item that only sold done cards. Mutates the state and returns the removed cards' names (tests read them; the Undo
+ * reads `split`). One at its top level (its own max, or owned for a Kameo) also goes on the Maxed record, dated `now`
+ * when given; one done at its kard threshold isn't maxed yet, since kards finish it in the game. `split`, when given,
+ * gets the removed cards' names sorted into maxed and only done (at their kard threshold, or removed by a rule
+ * change), card by card (two cards can share a name), for the Undo. With `record` false (a Settings rule change),
+ * nothing goes on the record: the rules changed, not what was done in the game.
  *
  * Realm Klash gear also gets a stored goal of max first. The name already makes it max here, but a copy of the app
  * from before the name list only reads the goal, so without it that copy would delete the gear at F3 and sync the
  * deletion back. It also keeps a piece from being removed mid-rename, when the half-typed name is off the list.
  */
-export function pruneDone(s: AppState): string[] {
+export function pruneDone(s: AppState, now?: Date, split?: { maxed: string[]; done: string[] }, record = true): string[] {
   const rules = new Map(s.rarities.map((r) => [r.id, r]));
   for (const c of s.cards) if (c.goal !== 'max' && rules.get(c.rarityId)?.kind === 'equipment' && isRealmKlashName(c.name)) c.goal = 'max';
   const done = new Set(s.cards.filter((c) => rules.has(c.rarityId) && isMaxed(c, rules.get(c.rarityId)!)).map((c) => c.id));
   if (done.size === 0) return [];
   const names = s.cards.filter((c) => done.has(c.id)).map((c) => c.name);
+  const recorded = new Set((s.maxed ?? []).map(recordKey));
+  for (const c of s.cards) {
+    if (!done.has(c.id)) continue;
+    if (!record || !atTopLevel(c, rules.get(c.rarityId)!)) {
+      split?.done.push(c.name);
+      continue;
+    }
+    split?.maxed.push(c.name);
+    if (recorded.has(recordKey(c))) continue;
+    recorded.add(recordKey(c));
+    s.maxed = [...(s.maxed ?? []), { name: c.name, rarityId: c.rarityId, ...(now && { at: dayOf(now) }) }];
+  }
   s.cards = s.cards.filter((c) => !done.has(c.id));
   s.packs = s.packs.filter((p) => !(p.store && p.drops.length > 0 && p.drops.every((d) => done.has(d.cardId))));
   for (const p of s.packs) p.drops = p.drops.filter((d) => !done.has(d.cardId));
@@ -447,10 +485,14 @@ export function kasketShape(pack: Pack): Pack {
   return out;
 }
 
-/** Remove a rarity and the Kaskets that draw from it, in one change so one Undo brings both back. Mutates the state. */
+/**
+ * Remove a rarity, the Kaskets that draw from it and its Maxed record entries (with no rarity they'd match nothing, even
+ * once it's added again under a new id), in one change so one Undo brings them all back. Mutates the state.
+ */
 export function removeRarity(d: AppState, id: string) {
   d.rarities = d.rarities.filter((r) => r.id !== id);
   d.packs = d.packs.filter((p) => p.kasket !== id);
+  if (d.maxed?.some((m) => m.rarityId === id)) d.maxed = d.maxed.filter((m) => m.rarityId !== id);
 }
 
 export function packEV(ctx: Ctx, pack: Pack, gained: Map<string, number> = new Map()): number {
@@ -993,6 +1035,34 @@ export function savePack(d: AppState, pack: Pack, moveSeasonTo: string | null, n
   else d.packs.push(clean);
   if (moveSeasonTo) moveSeasonEnd(d, moveSeasonTo, now);
   return true;
+}
+
+/**
+ * Takes cards off the Maxed record, matched by rarity and name as the list matches cards: ones pasted back with a Stage
+ * (a Gold card an update made ascendable), the only way a maxed card comes back with copies to go. Mutates the state.
+ */
+export function unmarkMaxed(s: AppState, cards: Pick<Card, 'rarityId' | 'name'>[]) {
+  if (!s.maxed?.length || !cards.length) return;
+  const back = new Set(cards.map(recordKey));
+  s.maxed = s.maxed.filter((m) => !back.has(recordKey(m)));
+}
+
+/**
+ * A card on the Maxed record, at any level: Add card and the pack editor won't add it, and Paste a list skips it unless
+ * its line has a Stage (see `unmarkMaxed`). Removing it from the Maxed page is the other way back.
+ */
+export const onMaxedRecord = (s: AppState, card: Pick<Card, 'rarityId' | 'name'>) => maxedKeys(s).has(recordKey(card));
+
+/** Adds cards to the Maxed record by hand (ones maxed before it existed), leaving out any already on it. Mutates the state. */
+export function recordMaxed(s: AppState, cards: MaxedCard[]) {
+  const recorded = new Set((s.maxed ?? []).map(recordKey));
+  const added: MaxedCard[] = [];
+  for (const c of cards) {
+    if (recorded.has(recordKey(c))) continue;
+    recorded.add(recordKey(c));
+    added.push({ name: c.name, rarityId: c.rarityId });
+  }
+  if (added.length) s.maxed = [...(s.maxed ?? []), ...added];
 }
 
 /** Each card's share of an even pool: its total ÷ every item in the pool, which is at least the cards picked. */

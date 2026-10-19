@@ -1,7 +1,7 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
-import type { AppState, Card, RarityRule } from './types';
+import type { AppState, Card, MaxedCard, RarityRule } from './types';
 import { ASCENSION_KARD_COST, ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
-import { REALM_KLASH_CURRENCY, kasketShape, pruneDone } from './engine';
+import { REALM_KLASH_CURRENCY, kasketShape, pruneDone, recordKey } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
 import { fixPackNames } from './events';
 import { kasketIn } from './kaskets';
@@ -77,6 +77,26 @@ export function kardTable(r: RarityRule): number[] {
 /** Card (and same-named pack) names from older saves, mapped to the game's spelling. */
 const RENAMED: Record<string, string> = { 'Datusha, Bane of Moroi': 'Datusha, Bane of the Moroi' };
 
+/**
+ * The Maxed record as a hand-edited file could hold it: only entries with a name and rarity, a day only if it's text (an
+ * object there would break the page), and one entry per card, as the app records them (the first, with a day from a
+ * later copy if it has none).
+ */
+function keptMaxed(input: unknown): MaxedCard[] {
+  const seen = new Map<string, MaxedCard>();
+  for (const m of Array.isArray(input) ? (input as Partial<MaxedCard>[]) : []) {
+    if (!m || typeof m.name !== 'string' || typeof m.rarityId !== 'string') continue;
+    const at = typeof m.at === 'string' ? m.at : undefined;
+    const kept = seen.get(recordKey({ name: m.name, rarityId: m.rarityId }));
+    if (kept) {
+      if (!kept.at && at) kept.at = at;
+      continue;
+    }
+    seen.set(recordKey({ name: m.name, rarityId: m.rarityId }), { name: m.name, rarityId: m.rarityId, ...(at && { at }) });
+  }
+  return [...seen.values()];
+}
+
 /** Fill in fields missing from older saves or hand-edited imports, then drop cards that are already done. */
 export function normalize(input: unknown): AppState {
   let s = input as Partial<AppState>;
@@ -102,7 +122,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 16,
+    version: 17,
     rarities: s.rarities!.map((r) => ({
       ...r,
       // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
@@ -128,6 +148,7 @@ export function normalize(input: unknown): AppState {
     realmKlashSeasonEnd: s.realmKlashSeasonEnd ?? null,
     dismissedShopPacks: s.dismissedShopPacks ?? [],
     gearOrder: s.gearOrder ?? [],
+    maxed: keptMaxed(s.maxed),
     updatedAt: s.updatedAt,
   };
   // Version 5 tags Gold Kameos of challenge characters (they come from Elder challenges). Done once, so a tag
@@ -184,6 +205,8 @@ export function normalize(input: unknown): AppState {
       return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
     });
   }
+  // Version 17 adds the Maxed record (`maxed`), which starts empty, so nothing in an older save changes either; the bump
+  // keeps a build from before it from pulling the record and dropping it.
   // Version 16 adds No kards on cards (`noKards`), so nothing in an older save changes. The bump is what matters: a build
   // from before it would ignore the flag, plan kards on those cards and delete a No kards piece at F3, so it mustn't
   // pull or import a save that uses it (see fromNewerApp in sync.ts; builds from 2026-10-07 on refuse it).

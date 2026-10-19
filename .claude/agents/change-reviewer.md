@@ -11,7 +11,7 @@ Start by reading `AGENTS.md` and `docs/architecture.md`, then the diff (`git dif
 Check, in this order:
 
 1. **Correctness.** Bugs in the change itself: off-by-one levels (stored level 1 = F0), wrong currency, ignoring purchase limits or expired packs, `now` handling, undo restoring the wrong state.
-2. **Game rules.** Anything that breaks a rule listed in `AGENTS.md`, such as kards on Realm Klash gear, priority tiers, archiving finished cards, or modelling refunds.
+2. **Game rules.** Anything that breaks a rule listed in `AGENTS.md`, such as kards on Realm Klash gear, priority tiers, keeping finished cards in the card list, or modelling refunds.
 3. **Layering.** `engine.ts` stays free of React, I/O, the clock and storage. State changes go through `update()`. MK Mobile Base is fetched only from `scripts/`.
 4. **Saved data.** A change to the shape or meaning of `AppState` without a version bump and a once-only step in `normalize()`, or a migration that will re-run on every load.
 5. **Tests.** New engine or migration logic without a test.
