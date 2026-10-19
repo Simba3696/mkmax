@@ -23,8 +23,8 @@ describe('pasted card lists', () => {
       { name: 'Kano, Commando', rarityId: 'gold', line: 'Kano, Commando', row: 4 },
     ]);
     expect(r.duplicates).toEqual([
-      { name: 'Scorpion, MKII Movie', key: cardKey('kameo-diamond', 'Scorpion, MKII Movie'), line: 'Scorpion, MKII Movie', row: 0 },
-      { name: 'sub-zero, mk1', key: cardKey('kameo-diamond', 'sub-zero, mk1'), line: 'sub-zero, mk1', row: 2 },
+      { name: 'Scorpion, MKII Movie', key: cardKey('kameo-diamond', 'Scorpion, MKII Movie'), row: 0 },
+      { name: 'sub-zero, mk1', key: cardKey('kameo-diamond', 'sub-zero, mk1'), row: 2 },
     ]);
   });
 
@@ -127,7 +127,7 @@ describe('pasted card lists', () => {
     const r = parseCardList(text, rarities, 'gold', existing);
     expect(r.cards).toEqual([]);
     expect(r.updates).toEqual([{ cardId: 'g', name: 'Goro, Tigrar Fury', line: 'Goro, Tigrar Fury - Gold - Stage I', row: 2, patch: { maxLevel: 16 } }]);
-    expect(r.duplicates).toEqual([{ name: 'Goro, Tigrar Fury', key: cardKey('gold', 'Goro, Tigrar Fury'), line: 'Goro, Tigrar Fury - Gold - Stage II', row: 3 }]);
+    expect(r.duplicates).toEqual([{ name: 'Goro, Tigrar Fury', key: cardKey('gold', 'Goro, Tigrar Fury'), row: 3 }]);
     expect(r.problems.map((p) => p.reason)).toEqual([
       'Listed as Diamond: change its rarity on the card first',
       'A7 is past Stage I’s A5',

@@ -1992,8 +1992,9 @@ describe('Cards: the Owned filter', () => {
     // it too, so "Not owned" matches the rows shown, while "Owned" already counts it as owned.
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
     expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero'], ['Owned or not (2)', 'Not owned (1)', 'Owned (2)']]);
-    // The rarity options count the kept card too (Sub-Zero, and Kori Blade, still not owned).
-    expect([...document.querySelectorAll('option')].find((o) => o.textContent!.startsWith('All rarities'))!.textContent).toBe('All rarities (2)');
+    // The rarity and source options count the kept card too: Sub-Zero, and for rarities Kori Blade, still not owned.
+    const first = (start: string) => [...document.querySelectorAll('option')].find((o) => o.textContent!.startsWith(start))!.textContent;
+    expect([first('All rarities'), first('Any source')]).toEqual(['All rarities (2)', 'Any source (1)']);
     fireEvent.change(owned, { target: { value: 'owned' } });
     fireEvent.change(owned, { target: { value: 'unowned' } });
     expect(names()).toEqual([]);

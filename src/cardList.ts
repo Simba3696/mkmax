@@ -33,9 +33,9 @@ export interface ParsedList {
   updates: CardUpdate[];
   /**
    * Cards skipped because they're already in the app (with nothing to update) or earlier in the list, with their
-   * cardKey to tell same-named cards of different rarities apart, and the line and where it is, as in ListedCard.
+   * cardKey to tell same-named cards of different rarities apart, and where its line is, as in ListedCard.
    */
-  duplicates: { name: string; key: string; line: string; row: number }[];
+  duplicates: { name: string; key: string; row: number }[];
   /** Lines that couldn't be used, with why. */
   problems: { line: string; reason: string }[];
 }
@@ -151,7 +151,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
 
     const key = cardKey(rarityId, name);
     if (seen.has(key)) {
-      out.duplicates.push({ name, key, line, row });
+      out.duplicates.push({ name, key, row });
       continue;
     }
     seen.add(key);
@@ -167,7 +167,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       if (source && (source !== card.source || sourceNote !== card.sourceNote)) Object.assign(patch, { source, sourceNote });
       if (maxLevel !== undefined && maxLevel !== (card.maxLevel ?? null)) patch.maxLevel = maxLevel;
       if (Object.keys(patch).length) out.updates.push({ cardId: card.id, name: card.name, line, row, patch });
-      else out.duplicates.push({ name, key, line, row });
+      else out.duplicates.push({ name, key, row });
       continue;
     }
     // Every card still being maxed is in the app, so a Gold card made ascendable that isn't was maxed and removed:
