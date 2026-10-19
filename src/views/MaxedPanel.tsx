@@ -12,6 +12,19 @@ import type { MaxedCard } from '../types';
 const percent = (n: number, of: number) => (of ? Math.floor((n / of) * 100) : 0);
 
 /**
+ * A completion bar in the rarity's color, or the Plan bars' red to gold overall. It fills to the exact share, not the
+ * rounded-down figure beside it: most rarities sit at a few percent, which would round to an empty bar. The exact share
+ * still only fills the bar once every card is maxed, and any maxed card shows at least a dot.
+ */
+function Bar({ n, of, color, label }: { n: number; of: number; color?: string; label: string }) {
+  return (
+    <div role="progressbar" aria-label={label} aria-valuenow={percent(n, of)} aria-valuemin={0} aria-valuemax={100} className="h-[8px] mt-[0.35rem] bg-line rounded-[4px] overflow-hidden">
+      <div className={`h-full rounded-[4px] ${n > 0 ? 'min-w-[8px]' : ''} ${color ? '' : 'bg-[linear-gradient(90deg,var(--color-red),var(--color-gold))]'}`} style={{ width: `${of ? (n / of) * 100 : 0}%`, background: color }} />
+    </div>
+  );
+}
+
+/**
  * The same value while `key` is unchanged. Every change copies the whole save (store.tsx), so the record and rarities
  * are new arrays after any tap; matching them against the catalog again is only needed when they actually change.
  */
@@ -93,17 +106,26 @@ export default function MaxedPanel() {
             <p>
               <b>{percent(counted, total)}%</b> of every card MK Mobile Base lists: {counted} of {total} maxed.
             </p>
-            {done.rarities.map((r) => (
-              <div key={r.rarityId} className={`${row} items-center`}>
-                <div className={grow}>
-                  <RarityBadge rule={rarities.find((x) => x.id === r.rarityId)} />
-                </div>
-                <span className="text-muted text-small">
-                  {r.maxed} of {r.total}
-                </span>
-                <b className="min-w-[3.5rem] text-right">{percent(r.maxed, r.total)}%</b>
-              </div>
-            ))}
+            <Bar n={counted} of={total} label="All cards maxed" />
+            <div className="mt-[0.6rem]">
+              {done.rarities.map((r) => {
+                const rule = rarities.find((x) => x.id === r.rarityId);
+                return (
+                  <div key={r.rarityId} className="py-[0.35rem] [&+&]:border-t [&+&]:border-line">
+                    <div className="flex gap-[0.6rem] items-center">
+                      <div className={grow}>
+                        <RarityBadge rule={rule} />
+                      </div>
+                      <span className="text-muted text-small">
+                        {r.maxed} of {r.total}
+                      </span>
+                      <b className="min-w-[3.5rem] text-right">{percent(r.maxed, r.total)}%</b>
+                    </div>
+                    <Bar n={r.maxed} of={r.total} color={rule?.color} label={`${rule?.label ?? 'Rarity'} maxed`} />
+                  </div>
+                );
+              })}
+            </div>
             {done.unlisted.length > 0 && (
               <p className="text-muted text-small md:max-w-[80ch]">
                 {done.unlisted.length === 1 ? "1 maxed card isn't" : `${done.unlisted.length} maxed cards aren't`} on MK Mobile Base's list under {done.unlisted.length === 1 ? 'its' : 'their'} rarity yet, so{' '}
