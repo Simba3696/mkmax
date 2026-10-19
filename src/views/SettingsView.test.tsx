@@ -253,6 +253,10 @@ describe('Settings rows on a screen a sync has changed', () => {
   // reordered the rarities moves nothing; fails_when=the buttons move the rarity at the tapped place after a sync, or
   // save without an Undo; why_new=rarities couldn't be reordered before; seam=a grabbed update stands in for the sync;
   // no_claim=the move rule itself (engine.test.ts moveRarity)
+  // Extended by /ship test coverage audit on 2026-10-20 with a ↓ move that lands
+  // Value: protects=↓ moves a rarity one place down with a "Moved X down" Undo; fails_when=the ↓ button passes the
+  // neighbour above (or -1), so it moves nothing or throws, or its Undo says "up"; why_new=the only ↓ tap above is the
+  // stale one, which moves nothing either way; seam=none; no_claim=Undo putting the order back (store tests)
   it('moves a rarity up or down with Undo, and moves nothing once a sync reordered them', () => {
     localStorage.setItem('mkmax:v1', JSON.stringify(defaultState()));
     renderSettings();
@@ -261,13 +265,19 @@ describe('Settings rows on a screen a sync has changed', () => {
     expect([button('Move Diamond up').disabled, button('Move Gold Kameo down').disabled, button('Move Gold up').disabled]).toEqual([true, true, false]);
     act(() => button('Move Gold Kameo up').click());
     expect([ids().slice(-2), lastUndo?.label]).toEqual([['kameo-gold', 'kameo-diamond'], 'Moved Gold Kameo up']);
-    // Drawn with Diamond above Gold; a sync swaps them before the tap lands.
+    // Drawn with Diamond above Gold; a sync swaps them before the tap lands. It saves nothing and adds no Undo
+    // (strengthened on 2026-10-20 after /ship review: the order alone can't tell a no-op save from no save).
     const down = button('Move Diamond down');
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
     act(() => {
       update((d) => void (d.rarities = [d.rarities[1], d.rarities[0], ...d.rarities.slice(2)]));
       down.click();
     });
-    expect(ids().slice(0, 2)).toEqual(['gold', 'diamond']);
+    expect([ids().slice(0, 2), lastUndo?.label]).toEqual([['gold', 'diamond'], 'Moved Gold Kameo up']);
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+    // Drawn again with Gold first: its ↓ now lands.
+    act(() => button('Move Gold down').click());
+    expect([ids().slice(0, 3), lastUndo?.label]).toEqual([['diamond', 'gold', 'epic'], 'Moved Gold down']);
   });
 });
 
