@@ -1979,12 +1979,21 @@ describe('Cards: the Owned filter', () => {
     const owned = screen.getByLabelText('Filter by owned') as HTMLSelectElement;
     fireEvent.change(owned, { target: { value: 'unowned' } });
     expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero', 'Kori Blade'], ['Owned or not (3)', 'Not owned (2)', 'Owned (1)']]);
+    // Extended by /ship test coverage audit on 2026-10-19
+    // Value: protects=the rarity and source options count only the cards the Owned filter lists; fails_when=rarityCount or
+    // sourceCount drops the Owned filter, so "All rarities" reads 3 while 2 are listed; why_new=the test read the Owned
+    // options only; seam=none; no_claim=the counts' other filters (earlier tests)
+    const options = (label: RegExp) => [...(screen.getByDisplayValue(label) as HTMLSelectElement).options].slice(0, 1).map((o) => o.textContent);
+    expect([options(/^All rarities/), options(/^Any source/)]).toEqual([['All rarities (2)'], ['Any source (2)']]);
     fireEvent.change(screen.getByDisplayValue(/^All rarities/), { target: { value: 'diamond' } });
     expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero'], ['Owned or not (2)', 'Not owned (1)', 'Owned (1)']]);
     // Changed by /ship review fixes on 2026-10-18: a card tapped to owned stays listed (so it can be tapped back) until
-    // the filter changes, though the counts already move.
+    // the filter changes. Changed by /ship review fixes on 2026-10-19 (user decision D2, run 5): the option picked counts
+    // it too, so "Not owned" matches the rows shown, while "Owned" already counts it as owned.
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
-    expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero'], ['Owned or not (2)', 'Not owned (0)', 'Owned (2)']]);
+    expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero'], ['Owned or not (2)', 'Not owned (1)', 'Owned (2)']]);
+    // The rarity options count the kept card too (Sub-Zero, and Kori Blade, still not owned).
+    expect([...document.querySelectorAll('option')].find((o) => o.textContent!.startsWith('All rarities'))!.textContent).toBe('All rarities (2)');
     fireEvent.change(owned, { target: { value: 'owned' } });
     fireEvent.change(owned, { target: { value: 'unowned' } });
     expect(names()).toEqual([]);

@@ -656,13 +656,17 @@ function CardList() {
   const inOwned = (c: Card, value: typeof ownedFilter) => value === 'all' || (value === 'owned') === c.fusion > 0;
   // The card being renamed stays listed even if its new name no longer matches the search.
   const matchesSearch = (c: Card) => !q || c.id === renaming?.id || c.name.toLowerCase().includes(q.toLowerCase());
-  // Each filter option shows how many cards it would list, given the search and the other filters.
-  const rarityCount = (value: string) => state.cards.filter((c) => matchesSearch(c) && inSource(c, sourceFilter) && inOwned(c, ownedFilter) && inRarity(c, value)).length;
-  const sourceCount = (value: Source | 'all') => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inOwned(c, ownedFilter) && inSource(c, value)).length;
-  const ownedCount = (value: typeof ownedFilter) => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && inOwned(c, value)).length;
+  // Listed under the Owned filter picked: a card tapped while it's on stays listed (see `tapped`).
+  const shownOwned = (c: Card) => inOwned(c, ownedFilter) || tapped.has(c.id);
+  // Each filter option shows how many cards it would list, given the search and the other filters, tapped cards kept
+  // listed included, so the Owned option picked counts the rows on screen.
+  const rarityCount = (value: string) => state.cards.filter((c) => matchesSearch(c) && inSource(c, sourceFilter) && shownOwned(c) && inRarity(c, value)).length;
+  const sourceCount = (value: Source | 'all') => state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && shownOwned(c) && inSource(c, value)).length;
+  const ownedCount = (value: typeof ownedFilter) =>
+    state.cards.filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && (value === ownedFilter ? shownOwned(c) : inOwned(c, value))).length;
   const addsMaxed = !!shown.name.trim() && !!draftRule && onMaxedRecord(state, { name: shown.name.trim(), rarityId: draftRule.id });
   const cards = state.cards
-    .filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && (inOwned(c, ownedFilter) || tapped.has(c.id)))
+    .filter((c) => matchesSearch(c) && inRarity(c, rarity) && inSource(c, sourceFilter) && shownOwned(c))
     // Rarity then name by default, so a card doesn't jump around while you edit it. By fusion, ties keep that order.
     .sort((a, b) => fusionOrder(a, b) || rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name));
 

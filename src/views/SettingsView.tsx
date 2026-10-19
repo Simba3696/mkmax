@@ -280,15 +280,17 @@ export default function SettingsView() {
                     {(() => {
                       const used = state.cards.some((c) => c.rarityId === r.id);
                       const maxedHere = (state.maxed ?? []).filter((m) => m.rarityId === r.id).length;
-                      const remove = () => {
+                      const remove = (confirmed: boolean) => {
                         // The Kaskets and Maxed entries counted as the change removes them: a sync may have added or
                         // removed some since.
                         let kaskets = 0;
                         let maxed = 0;
-                        // Not if a sync already removed it, or brought in cards that use it.
+                        // Not if a sync already removed it, or brought in cards that use it. Nor on one tap if a sync
+                        // has given it Maxed entries since the screen showed none: the button then asks for two taps.
                         update(
                           (d) => {
                             if (!d.rarities.some((x) => x.id === r.id) || d.cards.some((c) => c.rarityId === r.id)) return noChange;
+                            if (!confirmed && d.maxed?.some((m) => m.rarityId === r.id)) return noChange;
                             kaskets = d.packs.filter((p) => p.kasket === r.id).length;
                             maxed = (d.maxed ?? []).filter((m) => m.rarityId === r.id).length;
                             removeRarity(d, r.id);
@@ -299,13 +301,13 @@ export default function SettingsView() {
                       // Its Maxed history goes with it, and the tooltip doesn't show on phones: two taps, with the count on
                       // the button. Otherwise one tap, with Undo, as before.
                       const kaskets = state.packs.filter((p) => p.kasket === r.id).length;
-                      if (!used && maxedHere > 0) return <ConfirmButton label={`Remove (${maxedHere} maxed)`} className={btn.ghost} onConfirm={remove} title={withRemoved('Remove rarity', kaskets, maxedHere)} />;
+                      if (!used && maxedHere > 0) return <ConfirmButton label={`Remove (${maxedHere} maxed)`} className={btn.ghost} onConfirm={() => remove(true)} title={withRemoved('Remove rarity', kaskets, maxedHere)} />;
                       return (
                         <button
                           className={btn.ghost}
                           disabled={used}
                           title={used ? 'Cards use this rarity' : withRemoved('Remove rarity', kaskets)}
-                          onClick={remove}
+                          onClick={() => remove(false)}
                         >
                           Remove
                         </button>

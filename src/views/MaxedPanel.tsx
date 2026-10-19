@@ -3,7 +3,7 @@ import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { maxedKeys, recordMaxed } from '../engine';
 import { completion, findInCatalog, loadCatalog, type CatalogItem } from '../catalog';
-import { cardKey, listLine, parseCardList } from '../cardList';
+import { cardKey, parseCardList } from '../cardList';
 import { CardThumb, ConfirmButton, RarityBadge, dayLabel } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, subpanel } from '../classes';
 import type { MaxedCard } from '../types';
@@ -168,13 +168,16 @@ function PasteMaxed() {
   // Only while the box is open: the page redraws on every change, hidden or not.
   const onRecord = maxedKeys(state);
   const inList = new Set(state.cards.map((c) => cardKey(c.rarityId, c.name)));
-  const fresh = parsed.cards.filter((c) => !onRecord.has(cardKey(c.rarityId, c.name)));
-  const already = parsed.cards.filter((c) => onRecord.has(cardKey(c.rarityId, c.name))).map((c) => c.name);
+  // With every rarity removed, plain names have no rarity to go under, so they can't be added until there's one.
+  const live = (c: { rarityId: string }) => state.rarities.some((r) => r.id === c.rarityId);
+  const noRarity = parsed.cards.filter((c) => !live(c));
+  const fresh = parsed.cards.filter((c) => live(c) && !onRecord.has(cardKey(c.rarityId, c.name)));
+  const already = parsed.cards.filter((c) => live(c) && onRecord.has(cardKey(c.rarityId, c.name)));
   const stillListed = [...parsed.updates, ...parsed.duplicates.filter((d) => inList.has(d.key))];
 
   const add = () => {
     let added = 0;
-    let recorded: string[] = [];
+    let recorded: { key: string; row: number }[] = [];
     update(
       (d) => {
         // As the screen showed, checked against the save as it is now: not under a rarity a sync removed, nor a card a
@@ -185,26 +188,30 @@ function PasteMaxed() {
         recordMaxed(d, ok.map((c) => ({ name: c.name, rarityId: c.rarityId })));
         added = (d.maxed?.length ?? 0) - before;
         if (!added) return noChange;
-        recorded = ok.map((c) => c.line);
+        recorded = ok.map((c) => ({ key: cardKey(c.rarityId, c.name), row: c.row }));
       },
       () => `Added ${added} to Maxed`,
     );
     if (!added) return;
-    // Lines now on the record, and ones for cards already on it or still in the list, have nothing to fix, so they go;
-    // everything else stays as typed (headings, lines skipped with a reason, ones a sync made unusable just before the
-    // tap), so they can be fixed and added. With nothing left to fix, the box closes.
-    const done = new Set([...recorded, ...parsed.cards.filter((c) => onRecord.has(cardKey(c.rarityId, c.name))).map((c) => c.line), ...stillListed.map((x) => x.line)]);
+    // Lines now on the record, and ones for cards already on it or still in the list (a line pasted twice too), have
+    // nothing to fix, so they go; everything else stays as typed (headings, lines skipped with a reason, ones a sync made
+    // unusable just before the tap), so they can be fixed and added. Found by their place in the text, not their
+    // wording: the same line under another heading is another card. With nothing left to fix, the box closes.
+    const recordedKeys = new Set(recorded.map((r) => r.key));
+    const twice = parsed.duplicates.filter((d) => onRecord.has(d.key) || recordedKeys.has(d.key));
+    const done = new Set([...recorded, ...already, ...stillListed, ...twice].map((x) => x.row));
     const left = fresh.length - recorded.length + parsed.problems.length;
     if (!left) {
       setText('');
       setOpen(false);
-    } else setText(text.split(/\r?\n/).filter((raw) => !done.has(listLine(raw))).join('\n'));
+    } else setText(text.split(/\r?\n/).filter((_, row) => !done.has(row)).join('\n'));
   };
 
   // As Paste a list words it: what's new, then what's skipped.
   const status = [
     fresh.length ? `New: ${fresh.length}` : 'Nothing to add yet.',
-    already.length > 0 && `skipping ${already.length} already on Maxed (${already.join('; ')})`,
+    already.length > 0 && `skipping ${already.length} already on Maxed (${already.map((c) => c.name).join('; ')})`,
+    noRarity.length > 0 && `skipping ${noRarity.length} with no rarity to go under: add one in Settings first`,
     stillListed.length > 0 && `skipping ${stillListed.length} still in your card list, so not maxed yet (${stillListed.map((x) => x.name).join('; ')})`,
   ].filter(Boolean);
   return (

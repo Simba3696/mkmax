@@ -10,8 +10,8 @@ describe('pasted card lists', () => {
   it('switches rarity at heading lines and skips underlines and blanks', () => {
     const text = 'Gold Kameo\n----------------------\nJade, Lizard\n\nDiamond Kameo\n-------------------------\nGeras, MK1\n';
     expect(parseCardList(text, rarities, 'diamond', []).cards).toEqual([
-      { name: 'Jade, Lizard', rarityId: 'kameo-gold', line: 'Jade, Lizard' },
-      { name: 'Geras, MK1', rarityId: 'kameo-diamond', line: 'Geras, MK1' },
+      { name: 'Jade, Lizard', rarityId: 'kameo-gold', line: 'Jade, Lizard', row: 2 },
+      { name: 'Geras, MK1', rarityId: 'kameo-diamond', line: 'Geras, MK1', row: 6 },
     ]);
   });
 
@@ -19,12 +19,12 @@ describe('pasted card lists', () => {
     const existing: Card[] = [{ id: 'x', name: 'Scorpion MK2 Movie', rarityId: 'kameo-diamond', fusion: 0, guest: false }];
     const r = parseCardList('Scorpion, MKII Movie\nSub-Zero, MK1\nsub-zero, mk1\nGold:\nKano, Commando', rarities, 'kameo-diamond', existing);
     expect(r.cards).toEqual([
-      { name: 'Sub-Zero, MK1', rarityId: 'kameo-diamond', line: 'Sub-Zero, MK1' },
-      { name: 'Kano, Commando', rarityId: 'gold', line: 'Kano, Commando' },
+      { name: 'Sub-Zero, MK1', rarityId: 'kameo-diamond', line: 'Sub-Zero, MK1', row: 1 },
+      { name: 'Kano, Commando', rarityId: 'gold', line: 'Kano, Commando', row: 4 },
     ]);
     expect(r.duplicates).toEqual([
-      { name: 'Scorpion, MKII Movie', key: cardKey('kameo-diamond', 'Scorpion, MKII Movie'), line: 'Scorpion, MKII Movie' },
-      { name: 'sub-zero, mk1', key: cardKey('kameo-diamond', 'sub-zero, mk1'), line: 'sub-zero, mk1' },
+      { name: 'Scorpion, MKII Movie', key: cardKey('kameo-diamond', 'Scorpion, MKII Movie'), line: 'Scorpion, MKII Movie', row: 0 },
+      { name: 'sub-zero, mk1', key: cardKey('kameo-diamond', 'sub-zero, mk1'), line: 'sub-zero, mk1', row: 2 },
     ]);
   });
 
@@ -36,10 +36,10 @@ describe('pasted card lists', () => {
       'Carnival Swirl - Uncommon - Twisted Tower - F6',
     ].join('\n');
     expect(parseCardList(text, rarities, 'diamond', []).cards).toEqual([
-      { name: 'Kori Blade', rarityId: 'epic', line: 'Kori Blade - Epic - Lin Kuei Tower - F2', fusion: 3, source: 'tower', sourceNote: 'Lin Kuei Tower' },
-      { name: 'Man in Control', rarityId: 'epic', line: 'Man in Control - Krypt Gear - Epic - Unowned', fusion: 0, source: 'krypt' },
-      { name: 'Frost Axe', rarityId: 'rare', line: 'Frost Axe - Rare - F0', fusion: 1 },
-      { name: 'Carnival Swirl', rarityId: 'uncommon', line: 'Carnival Swirl - Uncommon - Twisted Tower - F6', fusion: 7, source: 'tower', sourceNote: 'Twisted Tower' },
+      { name: 'Kori Blade', rarityId: 'epic', line: 'Kori Blade - Epic - Lin Kuei Tower - F2', row: 0, fusion: 3, source: 'tower', sourceNote: 'Lin Kuei Tower' },
+      { name: 'Man in Control', rarityId: 'epic', line: 'Man in Control - Krypt Gear - Epic - Unowned', row: 1, fusion: 0, source: 'krypt' },
+      { name: 'Frost Axe', rarityId: 'rare', line: 'Frost Axe - Rare - F0', row: 2, fusion: 1 },
+      { name: 'Carnival Swirl', rarityId: 'uncommon', line: 'Carnival Swirl - Uncommon - Twisted Tower - F6', row: 3, fusion: 7, source: 'tower', sourceNote: 'Twisted Tower' },
     ]);
   });
 
@@ -55,7 +55,7 @@ describe('pasted card lists', () => {
     const r = parseCardList(text, rarities, 'epic', existing);
     expect(r.cards).toEqual([]);
     expect(r.updates).toEqual([
-      { cardId: 'k', name: 'Kori Blade', line: 'Kori Blade - Epic - Lin Kuei Tower - F2', patch: { fusion: 3, source: 'tower', sourceNote: 'Lin Kuei Tower' } },
+      { cardId: 'k', name: 'Kori Blade', line: 'Kori Blade - Epic - Lin Kuei Tower - F2', row: 0, patch: { fusion: 3, source: 'tower', sourceNote: 'Lin Kuei Tower' } },
     ]);
     expect(r.problems.map((p) => p.reason)).toEqual([
       'Common gear isn’t tracked',
@@ -68,18 +68,18 @@ describe('pasted card lists', () => {
   it('drops bullets and numbers from the start of a line', () => {
     const text = 'Gold Kameo\n- Jade, Lizard\n• Baraka, Klassic\n* Smoke, Klassic\n2. Kitana, Mournful\n3) Geras, MK1\n– Kori Blade - Epic - F2';
     expect(parseCardList(text, rarities, 'diamond', []).cards).toEqual([
-      { name: 'Jade, Lizard', rarityId: 'kameo-gold', line: 'Jade, Lizard' },
-      { name: 'Baraka, Klassic', rarityId: 'kameo-gold', line: 'Baraka, Klassic' },
-      { name: 'Smoke, Klassic', rarityId: 'kameo-gold', line: 'Smoke, Klassic' },
-      { name: 'Kitana, Mournful', rarityId: 'kameo-gold', line: 'Kitana, Mournful' },
-      { name: 'Geras, MK1', rarityId: 'kameo-gold', line: 'Geras, MK1' },
-      { name: 'Kori Blade', rarityId: 'epic', line: 'Kori Blade - Epic - F2', fusion: 3 },
+      { name: 'Jade, Lizard', rarityId: 'kameo-gold', line: 'Jade, Lizard', row: 1 },
+      { name: 'Baraka, Klassic', rarityId: 'kameo-gold', line: 'Baraka, Klassic', row: 2 },
+      { name: 'Smoke, Klassic', rarityId: 'kameo-gold', line: 'Smoke, Klassic', row: 3 },
+      { name: 'Kitana, Mournful', rarityId: 'kameo-gold', line: 'Kitana, Mournful', row: 4 },
+      { name: 'Geras, MK1', rarityId: 'kameo-gold', line: 'Geras, MK1', row: 5 },
+      { name: 'Kori Blade', rarityId: 'epic', line: 'Kori Blade - Epic - F2', row: 6, fusion: 3 },
     ]);
   });
 
   it('tags only gear as Krypt or tower gear', () => {
     const r = parseCardList('Scorpion, Klassic - Gold - Krypt\nJade, Lizard - Gold Kameo - Tower\nKori Blade - Epic - Krypt', rarities, 'diamond', []);
-    expect(r.cards).toEqual([{ name: 'Kori Blade', rarityId: 'epic', line: 'Kori Blade - Epic - Krypt', source: 'krypt' }]);
+    expect(r.cards).toEqual([{ name: 'Kori Blade', rarityId: 'epic', line: 'Kori Blade - Epic - Krypt', row: 2, source: 'krypt' }]);
     expect(r.problems.map((p) => p.reason)).toEqual(['Only gear comes from the Krypt or a tower', 'Only gear comes from the Krypt or a tower']);
   });
 
@@ -100,13 +100,13 @@ describe('pasted card lists', () => {
     ].join('\n');
     const r = parseCardList(text, rarities, 'diamond', existing);
     expect(r.updates).toEqual([
-      { cardId: 'k', name: 'Kenshi, Elder God', line: 'Kenshi, Elder God - Gold - Stage I', patch: { maxLevel: 16 } },
-      { cardId: 's', name: 'Scorpion, Hanzo Hasashi', line: 'Scorpion, Hanzo Hasashi - Gold - Stage II', patch: { maxLevel: null } },
+      { cardId: 'k', name: 'Kenshi, Elder God', line: 'Kenshi, Elder God - Gold - Stage I', row: 0, patch: { maxLevel: 16 } },
+      { cardId: 's', name: 'Scorpion, Hanzo Hasashi', line: 'Scorpion, Hanzo Hasashi - Gold - Stage II', row: 1, patch: { maxLevel: null } },
     ]);
     expect(r.cards).toEqual([
-      { name: 'Goro, Tigrar Fury', rarityId: 'gold', line: 'Goro, Tigrar Fury - Gold - Stage I', fusion: 11, maxLevel: 16 },
-      { name: 'Sub-Zero, Klassic', rarityId: 'gold', line: 'Sub-Zero, Klassic - Gold - Stage II', fusion: 16, maxLevel: null },
-      { name: 'Kitana, Edenian Blood', rarityId: 'gold', line: 'Kitana, Edenian Blood - Gold - Stage I - Unowned', fusion: 0, maxLevel: 16 },
+      { name: 'Goro, Tigrar Fury', rarityId: 'gold', line: 'Goro, Tigrar Fury - Gold - Stage I', row: 2, fusion: 11, maxLevel: 16 },
+      { name: 'Sub-Zero, Klassic', rarityId: 'gold', line: 'Sub-Zero, Klassic - Gold - Stage II', row: 3, fusion: 16, maxLevel: null },
+      { name: 'Kitana, Edenian Blood', rarityId: 'gold', line: 'Kitana, Edenian Blood - Gold - Stage I - Unowned', row: 4, fusion: 0, maxLevel: 16 },
     ]);
     expect(r.problems.map((p) => p.reason)).toEqual(['Already A7, past Stage I’s A5', 'Diamond cards don’t have Stage I ascension']);
   });
@@ -126,8 +126,8 @@ describe('pasted card lists', () => {
     ].join('\n');
     const r = parseCardList(text, rarities, 'gold', existing);
     expect(r.cards).toEqual([]);
-    expect(r.updates).toEqual([{ cardId: 'g', name: 'Goro, Tigrar Fury', line: 'Goro, Tigrar Fury - Gold - Stage I', patch: { maxLevel: 16 } }]);
-    expect(r.duplicates).toEqual([{ name: 'Goro, Tigrar Fury', key: cardKey('gold', 'Goro, Tigrar Fury'), line: 'Goro, Tigrar Fury - Gold - Stage II' }]);
+    expect(r.updates).toEqual([{ cardId: 'g', name: 'Goro, Tigrar Fury', line: 'Goro, Tigrar Fury - Gold - Stage I', row: 2, patch: { maxLevel: 16 } }]);
+    expect(r.duplicates).toEqual([{ name: 'Goro, Tigrar Fury', key: cardKey('gold', 'Goro, Tigrar Fury'), line: 'Goro, Tigrar Fury - Gold - Stage II', row: 3 }]);
     expect(r.problems.map((p) => p.reason)).toEqual([
       'Listed as Diamond: change its rarity on the card first',
       'A7 is past Stage I’s A5',
@@ -163,8 +163,8 @@ describe('pasted card lists typed before a rarity was renamed', () => {
     const r = parseCardList(text, [...current, old], 'diamond', []);
     expect(r.problems).toEqual([{ line: 'Kori Blade - Epic Equip - F5', reason: 'F5 is past this rarity’s max' }]);
     expect(r.cards).toEqual([
-      { name: 'Shadow Sash', rarityId: 'epic', line: 'Shadow Sash - Epic Equip - F2', fusion: 3 },
-      { name: 'Frost Axe', rarityId: 'epic', line: 'Frost Axe' },
+      { name: 'Shadow Sash', rarityId: 'epic', line: 'Shadow Sash - Epic Equip - F2', row: 1, fusion: 3 },
+      { name: 'Frost Axe', rarityId: 'epic', line: 'Frost Axe', row: 3 },
     ]);
   });
 });
