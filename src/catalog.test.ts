@@ -78,10 +78,14 @@ describe('completion', () => {
   // Value: protects=completion counts Maxed entries MK Mobile Base lists under their rarity, out of every card it lists
   // there, and sets aside entries it doesn't list there; fails_when=an entry under the wrong rarity or missing from the
   // catalog is counted (a figure past 100%), or a rarity's total is wrong; why_new=completion is new; seam=none
+  // Extended by /ship review fixes on 2026-10-19: two entries that both match one catalog card (a variant the site lists
+  // only under its base name) count once; fails_when=matches are counted, not catalog cards, so a figure can pass 100%.
   it('counts maxed cards the catalog lists under their rarity, out of all it lists there', () => {
     const { rarities, unlisted } = completion(
       [
         { name: 'Scorpion, MKII Movie', rarityId: 'diamond' },
+        { name: 'Jason Voorhees', rarityId: 'diamond' },
+        { name: 'Jason Voorhees, Nightmare', rarityId: 'diamond' }, // falls back to the site's "Jason Voorhees" too
         { name: 'Klassic Baraka', rarityId: 'kameo-diamond' },
         { name: 'Man in the Sky', rarityId: 'epic' }, // the catalog has it as Rare
         { name: 'Noob Saibot, MK1', rarityId: 'kameo-diamond' }, // not in the catalog yet
@@ -90,7 +94,7 @@ describe('completion', () => {
       ITEMS,
     );
     expect(rarities.map((r) => [r.rarityId, r.maxed, r.total])).toEqual([
-      ['diamond', 1, 3],
+      ['diamond', 2, 3],
       ['gold', 0, 1],
       ['epic', 0, 1],
       ['rare', 0, 1],

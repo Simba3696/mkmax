@@ -170,7 +170,7 @@ function PasteMaxed() {
   const inList = new Set(state.cards.map((c) => cardKey(c.rarityId, c.name)));
   const fresh = parsed.cards.filter((c) => !onRecord.has(cardKey(c.rarityId, c.name)));
   const already = parsed.cards.filter((c) => onRecord.has(cardKey(c.rarityId, c.name))).map((c) => c.name);
-  const stillListed = [...parsed.updates.map((u) => u.name), ...parsed.duplicates.filter((d) => inList.has(d.key)).map((d) => d.name)];
+  const stillListed = [...parsed.updates, ...parsed.duplicates.filter((d) => inList.has(d.key))];
 
   const add = () => {
     let added = 0;
@@ -190,9 +190,10 @@ function PasteMaxed() {
       () => `Added ${added} to Maxed`,
     );
     if (!added) return;
-    // The lines now on the record are done; everything else stays as typed (headings, lines skipped with a reason, ones a
-    // sync made unusable just before the tap), so they can be fixed and added. With nothing left to fix, the box closes.
-    const done = new Set([...recorded, ...parsed.cards.filter((c) => onRecord.has(cardKey(c.rarityId, c.name))).map((c) => c.line)]);
+    // Lines now on the record, and ones for cards already on it or still in the list, have nothing to fix, so they go;
+    // everything else stays as typed (headings, lines skipped with a reason, ones a sync made unusable just before the
+    // tap), so they can be fixed and added. With nothing left to fix, the box closes.
+    const done = new Set([...recorded, ...parsed.cards.filter((c) => onRecord.has(cardKey(c.rarityId, c.name))).map((c) => c.line), ...stillListed.map((x) => x.line)]);
     const left = fresh.length - recorded.length + parsed.problems.length;
     if (!left) {
       setText('');
@@ -204,7 +205,7 @@ function PasteMaxed() {
   const status = [
     fresh.length ? `New: ${fresh.length}` : 'Nothing to add yet.',
     already.length > 0 && `skipping ${already.length} already on Maxed (${already.join('; ')})`,
-    stillListed.length > 0 && `skipping ${stillListed.length} still in your card list, so not maxed yet (${stillListed.join('; ')})`,
+    stillListed.length > 0 && `skipping ${stillListed.length} still in your card list, so not maxed yet (${stillListed.map((x) => x.name).join('; ')})`,
   ].filter(Boolean);
   return (
     <div className={subpanel}>
@@ -221,7 +222,7 @@ function PasteMaxed() {
           ))}
         </select>
       </label>
-      <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic'} aria-label="Maxed cards" autoFocus />
+      <textarea className="mt-[0.6rem]" value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic'} aria-label="Maxed cards" autoFocus />
       <div className="text-small text-muted">{status.join(' · ')}</div>
       {parsed.problems.length > 0 && (
         <ul className="list-disc pl-[40px] my-[1em] text-error text-small">

@@ -1,6 +1,6 @@
 // Parses a pasted list of cards for bulk adding. Plain TS so it can be tested.
 import { nameKey } from './catalog';
-import { ascensionCaps, fLevel, levelLabel, maxFusion } from './engine';
+import { ascensionCaps, fLevel, levelLabel, maxFusion, recordKey } from './engine';
 import type { Card, RarityRule } from './types';
 
 interface ListedCard {
@@ -30,9 +30,9 @@ export interface ParsedList {
   updates: CardUpdate[];
   /**
    * Cards skipped because they're already in the app (with nothing to update) or earlier in the list, with their
-   * cardKey to tell same-named cards of different rarities apart.
+   * cardKey to tell same-named cards of different rarities apart, and the line, as in ListedCard.
    */
-  duplicates: { name: string; key: string }[];
+  duplicates: { name: string; key: string; line: string }[];
   /** Lines that couldn't be used, with why. */
   problems: { line: string; reason: string }[];
 }
@@ -48,7 +48,7 @@ export function listLine(raw: string) {
 }
 
 /** One card in a list, whatever case, spacing or word order its name is typed in: its rarity and name key. */
-export const cardKey = (rarityId: string, name: string) => `${rarityId}|${nameKey(name)}`;
+export const cardKey = (rarityId: string, name: string) => recordKey({ rarityId, name });
 
 /** Grades the game has that aren't tracked as cards here. */
 const UNTRACKED_GRADES: Record<string, string> = {
@@ -148,7 +148,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
 
     const key = cardKey(rarityId, name);
     if (seen.has(key)) {
-      out.duplicates.push({ name, key });
+      out.duplicates.push({ name, key, line });
       continue;
     }
     seen.add(key);
@@ -164,7 +164,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       if (source && (source !== card.source || sourceNote !== card.sourceNote)) Object.assign(patch, { source, sourceNote });
       if (maxLevel !== undefined && maxLevel !== (card.maxLevel ?? null)) patch.maxLevel = maxLevel;
       if (Object.keys(patch).length) out.updates.push({ cardId: card.id, name: card.name, line, patch });
-      else out.duplicates.push({ name, key });
+      else out.duplicates.push({ name, key, line });
       continue;
     }
     // Every card still being maxed is in the app, so a Gold card made ascendable that isn't was maxed and removed:

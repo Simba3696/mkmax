@@ -77,7 +77,7 @@ export const isMaxed = (card: Card, rule: RarityRule) => card.fusion >= targetLe
 /** At its top level, whatever its goal: its own max (F10, or a Gold card's cap), or owned for a Kameo. That's maxed. */
 export const atTopLevel = (card: Card, rule: RarityRule) => card.fusion >= targetLevel({ ...card, goal: 'max' }, rule);
 
-/** A card's rarity and name key, whatever its case or word order: the same key as cardKey in cardList.ts, which imports this module. */
+/** A card's rarity and name key, whatever its case or word order. cardKey in cardList.ts is this key too. */
 export const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityId}|${nameKey(c.name)}`;
 
 // Each change copies the whole save (store.tsx), so a record is checked against many times (every pasted line, every
