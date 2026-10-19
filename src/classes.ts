@@ -18,6 +18,9 @@ export const subpanel = 'bg-panel-2 border border-line rounded-panel p-[0.7rem] 
 /** Gold-edged tip or warning. */
 export const hint = 'bg-hint border-l-[3px] border-gold py-[0.4rem] px-[0.6rem] rounded-chip text-[0.85rem]';
 
+/** The red to gold fill of a progress bar: the Plan's pack efficiency and the Maxed page's overall completion. */
+export const barFill = 'bg-[linear-gradient(90deg,var(--color-red),var(--color-gold))]';
+
 /** A list row; consecutive rows get a divider. Vertical alignment and wrapping are left to the caller. */
 export const row = 'flex gap-[0.6rem] py-[0.35rem] [&+&]:border-t [&+&]:border-line';
 /** Takes the free space in a flex row and lets long text wrap or truncate. */

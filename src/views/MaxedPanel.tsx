@@ -5,7 +5,7 @@ import { maxedKeys, recordMaxed } from '../engine';
 import { completion, findInCatalog, loadCatalog, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
 import { CardThumb, ConfirmButton, RarityBadge, dayLabel } from '../ui';
-import { actions, btn, card, field, grow, row, rowTitle, subpanel } from '../classes';
+import { actions, barFill, btn, card, field, grow, row, rowTitle, subpanel } from '../classes';
 import type { MaxedCard } from '../types';
 
 /** Whole percent, rounded down so a rarity reads 100% only once every card is maxed. */
@@ -18,8 +18,9 @@ const percent = (n: number, of: number) => (of ? Math.floor((n / of) * 100) : 0)
  */
 function Bar({ n, of, color, label }: { n: number; of: number; color?: string; label: string }) {
   return (
-    <div role="progressbar" aria-label={label} aria-valuenow={percent(n, of)} aria-valuemin={0} aria-valuemax={100} className="h-[8px] mt-[0.35rem] bg-line rounded-[4px] overflow-hidden">
-      <div className={`h-full rounded-[4px] ${n > 0 ? 'min-w-[8px]' : ''} ${color ? '' : 'bg-[linear-gradient(90deg,var(--color-red),var(--color-gold))]'}`} style={{ width: `${of ? (n / of) * 100 : 0}%`, background: color }} />
+    <div role="progressbar" aria-label={label} aria-valuenow={percent(n, of)} aria-valuemin={0} aria-valuemax={100} className="h-[8px] mt-[0.35rem] bg-line rounded-chip overflow-hidden">
+      {/* backgroundColor, not background: a rarity's color comes from synced data, and only a plain color belongs here. */}
+      <div className={`h-full rounded-chip ${n > 0 ? 'min-w-[8px]' : ''} ${color ? '' : barFill}`} style={{ width: `${of ? (n / of) * 100 : 0}%`, backgroundColor: color }} />
     </div>
   );
 }
@@ -103,7 +104,8 @@ export default function MaxedPanel() {
         )}
         {done && (
           <>
-            <p>
+            {/* No bottom margin: the bar under it belongs to this figure, so it sits as close as the rarity bars do. */}
+            <p className="mb-0">
               <b>{percent(counted, total)}%</b> of every card MK Mobile Base lists: {counted} of {total} maxed.
             </p>
             <Bar n={counted} of={total} label="All cards maxed" />
