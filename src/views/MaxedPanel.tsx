@@ -154,9 +154,10 @@ function PasteMaxed() {
   const [picked, setPicked] = useState(state.rarities[0]?.id ?? '');
   // The rarity shown is the one plain lines go under: the first one once a sync has removed the one picked.
   const rarityId = state.rarities.some((r) => r.id === picked) ? picked : (state.rarities[0]?.id ?? '');
-  const parsed = useMemo(() => parseCardList(text, state.rarities, rarityId, state.cards), [text, state.rarities, rarityId, state.cards]);
+  // Read only while the box is open: every change elsewhere in the app gives the list a new state.cards.
+  const parsed = useMemo(() => (open ? parseCardList(text, state.rarities, rarityId, state.cards) : null), [open, text, state.rarities, rarityId, state.cards]);
 
-  if (!open) {
+  if (!parsed) {
     return (
       <div className={actions}>
         <button onClick={() => setOpen(true)}>Paste maxed cards…</button>
@@ -171,7 +172,7 @@ function PasteMaxed() {
   const already = parsed.cards.filter((c) => onRecord.has(cardKey(c.rarityId, c.name))).map((c) => c.name);
   const stillListed = [...parsed.updates.map((u) => u.name), ...parsed.duplicates.filter((d) => inList.has(d.key)).map((d) => d.name)];
 
-  function add() {
+  const add = () => {
     let added = 0;
     let recorded: string[] = [];
     update(
@@ -197,7 +198,7 @@ function PasteMaxed() {
       setText('');
       setOpen(false);
     } else setText(text.split(/\r?\n/).filter((raw) => !done.has(listLine(raw))).join('\n'));
-  }
+  };
 
   // As Paste a list words it: what's new, then what's skipped.
   const status = [

@@ -98,12 +98,11 @@ const dayOf = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).
 /**
  * Cards that reached their goal are done, so they leave the app: the card, its pack drops, and any store
  * item that only sold done cards. Mutates the state and returns the removed cards' names (tests read them; the Undo
- * reads `split`). One at its top level (its
- * own max, or owned for a Kameo) also goes on the Maxed record, dated `now` when given; one done at its kard threshold
- * isn't maxed yet, since kards finish it in the game. `split`, when given, gets the removed cards' names sorted into
- * maxed and only done (at their kard threshold, or removed by a rule change), card by card (two cards can share a
- * name), for the Undo. With `record`
- * false (a Settings rule change), nothing goes on the record: the rules changed, not what was done in the game.
+ * reads `split`). One at its top level (its own max, or owned for a Kameo) also goes on the Maxed record, dated `now`
+ * when given; one done at its kard threshold isn't maxed yet, since kards finish it in the game. `split`, when given,
+ * gets the removed cards' names sorted into maxed and only done (at their kard threshold, or removed by a rule
+ * change), card by card (two cards can share a name), for the Undo. With `record` false (a Settings rule change),
+ * nothing goes on the record: the rules changed, not what was done in the game.
  *
  * Realm Klash gear also gets a stored goal of max first. The name already makes it max here, but a copy of the app
  * from before the name list only reads the goal, so without it that copy would delete the gear at F3 and sync the
