@@ -40,11 +40,11 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/syncLoop.ts` | When to pull, push or ask, around requests that can overlap edits and disconnects |
 | `src/catalog.ts`, `src/wiki.ts` | Card art and rarity lookups (MK Mobile Base, MK Mobile wiki) |
 | `src/events.ts` | Event schedule: shop packs, Elder challenges, Realm Klash seasons |
-| `src/cardList.ts` | The **Paste a list…** parser |
+| `src/cardList.ts` | The parser for **Paste a list…** and **Paste maxed cards…** |
 | `src/styles.css` | Tailwind theme tokens (`@theme`: colors, radii, text sizes) and the base styles for buttons, inputs and headings |
 | `src/classes.ts` | Shared Tailwind class sets (`card`, `row`, `btn`, `form` and so on) |
 | `src/ui.tsx` | Shared components: `Modal` (with a `wide` option), `Chip`, `CardThumb`, `RarityBadge`, `NumInput`, `ConfirmButton`, `FoldCard`, `useDeviceChoice` (per-device settings like sort order), `kasketLine` (a Kasket's pool in words), and `kardNotes` and `kardFooter` (the Fusion Up Kard plan's notes in words) |
-| `src/views/` | One component per tab, plus the pack editor, the card search (`CardPicker`, shared by the editor and a Kasket's pull step) and sync panel |
+| `src/views/` | One component per tab, plus the pack editor, the Tower gear and Maxed pages, the card search (`CardPicker`, shared by the editor and a Kasket's pull step) and sync panel |
 | `scripts/` | Build-time fetchers for the catalog and the event schedule; `schedule.mjs` turns the schedule into `events.json` and is tested |
 | `public/` | Icons, and the bundled catalog and schedule |
 
