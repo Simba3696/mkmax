@@ -177,7 +177,7 @@ The Packs tab shows a red count of packs the plan says to buy that end within 24
 
 ### Cards, Tower gear and Maxed
 
-Three buttons at the top switch between your card list, the [Tower gear](#tower-gear) view and the [Maxed](#maxed) record. Tapping the **Cards** tab again while you're on it switches between the card list and Tower gear, and starts the page at the top; from Maxed it goes back to the card list. Coming from another tab, it always opens on **Cards**, and a quick double tap just opens it rather than going straight on to Tower gear. Switching between them keeps anything you'd typed on the card list (a card you were adding, a pasted list, a search).
+Three buttons across the top, each with its own icon, switch between your card list, the [Tower gear](#tower-gear) view and the [Maxed](#maxed) record. Tapping the **Cards** tab again while you're on it switches between the card list and Tower gear, and starts the page at the top; from Maxed it goes back to the card list. Coming from another tab, it always opens on **Cards**, and a quick double tap just opens it rather than going straight on to Tower gear. Switching between them keeps anything you'd typed on the card list (a card you were adding, a pasted list, a search).
 
 ### Add card
 
