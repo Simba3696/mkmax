@@ -230,7 +230,7 @@ function PasteMaxed() {
         </select>
       </label>
       <textarea className="mt-[0.6rem]" value={text} onChange={(e) => setText(e.target.value)} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic'} aria-label="Maxed cards" autoFocus />
-      <div className="text-small text-muted">{status.join(' · ')}</div>
+      <div className="text-small text-muted md:max-w-[80ch]">{status.join(' · ')}</div>
       {parsed.problems.length > 0 && (
         <ul className="list-disc pl-[40px] my-[1em] text-error text-small">
           {/* Keyed by place too: the same line can be pasted twice. */}
