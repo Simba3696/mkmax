@@ -135,7 +135,7 @@ export default function MaxedPanel() {
                 {m.at && <span className="text-muted">{' '}maxed {dayLabel(m.at, now)}</span>}
               </div>
             </div>
-            <ConfirmButton label="Remove" className={btn.ghost} onConfirm={() => remove(m)} />
+            <ConfirmButton label="✕" className={btn.ghost} onConfirm={() => remove(m)} title={`Remove ${m.name} from Maxed`} ariaLabel={`Remove ${m.name} from Maxed`} />
           </div>
         ))}
       </section>

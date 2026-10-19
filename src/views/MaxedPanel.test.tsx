@@ -99,8 +99,11 @@ describe('Cards: the Maxed page', () => {
   it('removes a card with Undo, by name after a sync, and saves nothing for one already removed', () => {
     const stamps = renderMaxed((s) => (s.maxed = [{ name: 'Kori Blade', rarityId: 'epic' }, { name: 'Sub-Zero, MK1', rarityId: 'diamond' }]));
     const handler = (b: HTMLElement) => (b as unknown as Record<string, { onClick: () => void }>)[Object.keys(b).find((k) => k.startsWith('__reactProps$'))!].onClick;
-    // Listed by rarity: Sub-Zero (Diamond) first, then Kori Blade (Epic). The first tap arms it.
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[1]);
+    // Listed by rarity: Sub-Zero (Diamond) first, then Kori Blade (Epic). The button shows ✕ and is named for its card
+    // (changed on 2026-10-20 from a "Remove" label). The first tap arms it.
+    const removeKori = screen.getByRole('button', { name: 'Remove Kori Blade from Maxed' });
+    expect([removeKori.textContent, screen.getAllByRole('button', { name: /^Remove .* from Maxed$/ }).map((b) => b.textContent)]).toEqual(['✕', ['✕', '✕']]);
+    fireEvent.click(removeKori);
     const onClick = handler(screen.getByRole('button', { name: ARMED }));
     // A sync puts a card ahead of Kori Blade: the tap still removes Kori Blade, not the card now in its place.
     act(() => update((d) => void d.maxed!.unshift({ name: 'Jade, Lizard', rarityId: 'diamond' })));
