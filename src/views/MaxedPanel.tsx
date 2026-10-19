@@ -119,7 +119,7 @@ export default function MaxedPanel() {
           Maxed cards <span className="text-muted text-small">{maxed.length}</span>
         </h2>
         <p className="text-muted text-small md:max-w-[80ch]">
-          A card goes here when it reaches its top level (F10, or a Gold card's own cap) or, for a Kameo, when you own it. Gear the app stops tracking at F3 isn't maxed yet, so add it here once you've finished it in the game.
+          A card goes here when it reaches its top level (F10, or a Gold card's own cap) or, for a Kameo, when you own it. A card the app stops tracking at F3 (gear, by default) isn't maxed yet, so add it here once you've finished it in the game.
         </p>
         <PasteMaxed />
         {maxed.length > 0 && <input className="w-full md:max-w-[360px] my-[0.6rem]" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />}

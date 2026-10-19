@@ -86,7 +86,7 @@ export function findInCatalog(card: Card, rule: RarityRule | undefined, items: C
 }
 
 /** One rarity's completion: how many of the cards MK Mobile Base lists under it are on the Maxed record. */
-export interface RarityCompletion {
+interface RarityCompletion {
   rarityId: string;
   maxed: number;
   total: number;
