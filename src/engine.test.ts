@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addPool, ascensionCaps, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -1977,5 +1977,25 @@ describe('saving a pack from the editor', () => {
       { cardId: 'x', chance: 2 },
       { cardId: 'b', chance: 1.5 },
     ]);
+  });
+});
+
+describe('moveRarity', () => {
+  // Generated on 2026-10-20 (rarity order in Settings)
+  // Value: protects=a rarity moves one place past the neighbour the screen showed, in a new array, and a stale move (the
+  // neighbour isn't next to it that way round any more, or either is gone) changes nothing; fails_when=moves go by index
+  // alone, so a tap after a sync shifts the wrong rarity; why_new=rarities couldn't be reordered before; seam=none;
+  // no_claim=the Settings buttons (SettingsView.test.tsx)
+  it('moves a rarity past its shown neighbour, and refuses a move a sync made stale', () => {
+    const s = defaultState();
+    const ids = () => s.rarities.map((r) => r.id);
+    const before = s.rarities;
+    expect(moveRarity(s, 'kameo-diamond', 'uncommon', -1)).toBe(true);
+    expect([ids(), s.rarities === before]).toEqual([['diamond', 'gold', 'epic', 'rare', 'kameo-diamond', 'uncommon', 'kameo-gold'], false]);
+    expect(moveRarity(s, 'diamond', 'gold', 1)).toBe(true);
+    expect(ids().slice(0, 2)).toEqual(['gold', 'diamond']);
+    // Stale: gold is no longer below diamond, the first can't go up, and a gone rarity can't move.
+    const after = ids();
+    expect([moveRarity(s, 'diamond', 'gold', 1), moveRarity(s, 'gold', 'diamond', -1), moveRarity(s, 'nope', 'gold', 1), ids()]).toEqual([false, false, false, after]);
   });
 });

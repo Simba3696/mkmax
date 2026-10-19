@@ -5,7 +5,7 @@ import { kardTable } from '../normalize';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
 import { actions, btn, check, field, form, grow, hint, subpanel } from '../classes';
-import { copiesTotal, fLevel, levelLabel, maxFusion, removeRarity } from '../engine';
+import { copiesTotal, fLevel, levelLabel, maxFusion, moveRarity, removeRarity } from '../engine';
 import { fromNewerApp } from '../sync';
 import { checkForAppUpdate } from '../appUpdate';
 import SyncPanel from './SyncPanel';
@@ -92,6 +92,9 @@ export default function SettingsView() {
       undoLabel,
       { ruleChange: true },
     );
+  // Past the neighbour shown on screen, so a tap after a sync reordered the rarities moves nothing rather than the wrong one.
+  const shiftRarity = (r: RarityRule, past: RarityRule, by: -1 | 1) =>
+    update((d) => (moveRarity(d, r.id, past.id, by) ? undefined : noChange), `Moved ${r.label} ${by < 0 ? 'up' : 'down'}`);
   const editCurrency = (id: string, edit: (c: AppState['currencies'][number]) => void) =>
     update((d) => {
       const c = d.currencies.find((x) => x.id === id);
@@ -140,7 +143,7 @@ export default function SettingsView() {
             which left the two column tops out of line.
           */}
           <div className="lg:columns-2 lg:gap-3 lg:[&>div]:break-inside-avoid lg:[&>div]:mt-0 lg:[&>div]:mb-3">
-            {state.rarities.map((r) => {
+            {state.rarities.map((r, i, all) => {
               const kameo = r.kind === 'kameo';
               return (
                 <div key={r.id} className={subpanel}>
@@ -282,6 +285,12 @@ export default function SettingsView() {
                       </>
                     )}
                     <span className={`${grow} lg:hidden`} />
+                    <button className={btn.ghost} onClick={() => shiftRarity(r, all[i - 1], -1)} disabled={i === 0} aria-label={`Move ${r.label} up`} title="Move up">
+                      ↑
+                    </button>
+                    <button className={btn.ghost} onClick={() => shiftRarity(r, all[i + 1], 1)} disabled={i === all.length - 1} aria-label={`Move ${r.label} down`} title="Move down">
+                      ↓
+                    </button>
                     {(() => {
                       const used = state.cards.some((c) => c.rarityId === r.id);
                       const maxedHere = (state.maxed ?? []).filter((m) => m.rarityId === r.id).length;

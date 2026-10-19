@@ -247,6 +247,28 @@ describe('Settings rows on a screen a sync has changed', () => {
     act(() => within(panelOf('Uncommon Equip')).getByRole('button', { name: 'Tap again to confirm' }).click());
     expect([saved().maxed, saved().packs, lastUndo?.label]).toEqual([[], [], 'Removed Uncommon Equip, its Kasket and its 2 maxed cards']);
   });
+
+  // Generated on 2026-10-20 (rarity order in Settings)
+  // Value: protects=↑ and ↓ on a rarity move it one place with an Undo, the ends are greyed out, and a tap after a sync
+  // reordered the rarities moves nothing; fails_when=the buttons move the rarity at the tapped place after a sync, or
+  // save without an Undo; why_new=rarities couldn't be reordered before; seam=a grabbed update stands in for the sync;
+  // no_claim=the move rule itself (engine.test.ts moveRarity)
+  it('moves a rarity up or down with Undo, and moves nothing once a sync reordered them', () => {
+    localStorage.setItem('mkmax:v1', JSON.stringify(defaultState()));
+    renderSettings();
+    const ids = () => saved().rarities.map((r: { id: string }) => r.id);
+    const button = (name: string) => screen.getByRole('button', { name }) as HTMLButtonElement;
+    expect([button('Move Diamond up').disabled, button('Move Gold Kameo down').disabled, button('Move Gold up').disabled]).toEqual([true, true, false]);
+    act(() => button('Move Gold Kameo up').click());
+    expect([ids().slice(-2), lastUndo?.label]).toEqual([['kameo-gold', 'kameo-diamond'], 'Moved Gold Kameo up']);
+    // Drawn with Diamond above Gold; a sync swaps them before the tap lands.
+    const down = button('Move Diamond down');
+    act(() => {
+      update((d) => void (d.rarities = [d.rarities[1], d.rarities[0], ...d.rarities.slice(2)]));
+      down.click();
+    });
+    expect(ids().slice(0, 2)).toEqual(['gold', 'diamond']);
+  });
 });
 
 // Regression: /ship review of stale-screens-and-schedule — Kind saved, with an Undo, when a sync had already set it
