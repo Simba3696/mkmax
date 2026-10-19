@@ -42,7 +42,12 @@ const levels = 'grid grid-cols-[repeat(auto-fill,minmax(70px,1fr))] gap-[0.4rem]
 const level = 'flex flex-col gap-[2px] [&_input]:w-full';
 
 export default function SettingsView() {
-  const { state, update, replace, unreadable, discardUnreadable } = useStore();
+  const { state, update, replace, unreadable, discardUnreadable, newerSave } = useStore();
+  // replace() changes nothing while the save is from a newer version, so say that rather than that it worked.
+  const replaced = (next: AppState, done: string) => {
+    replace(next);
+    setMsg(newerSave ? 'Nothing changed: the data saved in this browser is from a newer version of MK Max (see the notice at the top).' : done);
+  };
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -66,8 +71,7 @@ export default function SettingsView() {
         void checkForAppUpdate();
         return;
       }
-      replace(normalize(data));
-      setMsg('Backup imported.');
+      replaced(normalize(data), 'Backup imported.');
     } catch (e) {
       setMsg(`Import failed: ${(e as Error).message}`);
     }
@@ -445,8 +449,8 @@ export default function SettingsView() {
               if (file) void importData(file);
             }}
           />
-          <ConfirmButton label="Load sample data" onConfirm={() => (replace(sampleState()), setMsg('Sample data loaded.'))} />
-          <ConfirmButton label="Erase everything" onConfirm={() => (replace(defaultState()), setMsg('All data erased.'))} />
+          <ConfirmButton label="Load sample data" onConfirm={() => replaced(sampleState(), 'Sample data loaded.')} />
+          <ConfirmButton label="Erase everything" onConfirm={() => replaced(defaultState(), 'All data erased.')} />
         </div>
         {msg && <p className="text-small">{msg}</p>}
       </FoldCard>

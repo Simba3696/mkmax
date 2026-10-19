@@ -22,7 +22,7 @@ export function syncLabel(status: ReturnType<typeof useStore>['sync']['status'])
 }
 
 export default function SyncPanel() {
-  const { state, sync } = useStore();
+  const { state, sync, newerSave } = useStore();
   const [token, setToken] = useState('');
   const { status } = sync;
 
@@ -45,7 +45,7 @@ export default function SyncPanel() {
           </ol>
           <div className="flex flex-wrap gap-[0.4rem] items-center my-[0.35rem] md:max-w-[32rem]">
             <input className="flex-1 min-w-0" type="password" autoComplete="off" placeholder="ghp_…" value={token} onChange={(e) => setToken(e.target.value)} />
-            <button className={btn.primary} disabled={!token.trim() || status.kind === 'syncing'} onClick={() => sync.connect(token).then(() => setToken(''), () => {})}>
+            <button className={btn.primary} disabled={!token.trim() || status.kind === 'syncing' || newerSave} onClick={() => sync.connect(token).then(() => setToken(''), () => {})}>
               {status.kind === 'syncing' ? 'Connecting…' : 'Connect'}
             </button>
           </div>

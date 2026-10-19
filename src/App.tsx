@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { noChange, useStore, type SyncStatus, type UndoEntry } from './store';
-import { btn } from './classes';
+import { btn, hint } from './classes';
+import { NEWER_SAVE_MESSAGE } from './sync';
 import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
@@ -65,7 +66,7 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: () 
 const DOUBLE_TAP_MS = 500;
 
 export default function App() {
-  const { state, update, sync, lastUndo, undo, dismissUndo } = useStore();
+  const { state, update, sync, lastUndo, undo, dismissUndo, newerSave } = useStore();
   // A mistyped or pasted link (#Packs, a docs anchor) opens Plan rather than a blank page with no tab selected.
   const [tab, setTab] = useState<TabId>(() => TABS.find((t) => t.id === location.hash.slice(1))?.id ?? 'plan');
 
@@ -245,6 +246,12 @@ export default function App() {
       </header>
       <main data-scroll-root className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch]">
         <div className="max-w-page md:max-w-[1400px] mx-auto p-4 md:px-6 md:py-6 lg:px-8" ref={pageRef}>
+          {/* On every tab, since nothing a tap does is saved meanwhile. */}
+          {newerSave && (
+            <p className={`${hint} mt-0 mb-4`} role="alert">
+              {NEWER_SAVE_MESSAGE}
+            </p>
+          )}
           {tab === 'plan' && <PlanView goto={go} openPack={openPack} />}
           {tab === 'packs' && <PacksView focus={focusPack} onFocused={() => setFocusPack(null)} />}
           {tab === 'cards' && <CardsView sub={cardsPage} onSub={setCardsPage} />}

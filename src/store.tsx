@@ -2,9 +2,9 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import type { AppState } from './types';
 import { normalize } from './normalize';
 import { pruneDone } from './engine';
-import { findOrCreateGist, loadSyncConfig, readRemote, saveSyncConfig, writeRemote } from './sync';
+import { NEWER_SAVE_MESSAGE, findOrCreateGist, loadSyncConfig, readRemote, saveSyncConfig, writeRemote } from './sync';
 import { SyncLoop, type SyncStatus } from './syncLoop';
-import { discardUnreadable as removeUnreadable, load, loadUnreadable, save } from './storage';
+import { discardUnreadable as removeUnreadable, holdIfNewer, load, loadUnreadable, save, savedByNewerApp } from './storage';
 
 export { normalize };
 export type { SyncStatus };
@@ -56,6 +56,8 @@ interface StoreApi {
   /** The saved data as it was when it couldn't be read, until the user discards it. */
   unreadable: string | null;
   discardUnreadable: () => void;
+  /** This browser's save is from a newer version of MK Max: it's shown but nothing changes, saves or syncs until a reload. */
+  newerSave: boolean;
 }
 
 const Ctx = createContext<StoreApi | null>(null);
@@ -69,6 +71,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
   // Read after load(), which keeps the copy.
   const [unreadable, setUnreadable] = useState(loadUnreadable);
+  // Also set by load(). Changes are refused rather than kept in memory, where the next reload would lose them without
+  // a word, and sync stays off: pulling would replace the newer save and pushing would send this copy's older reading.
+  // Checked through savedByNewerApp() where it matters, since the sync loop keeps the first render's callbacks.
+  const [newerSave, setNewerSave] = useState(savedByNewerApp);
 
   const [lastUndo, setLastUndo] = useState<UndoEntry | null>(null);
 
@@ -117,17 +123,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ),
   );
   const [connected, setConnected] = useState(() => !!loop.config);
-  const [status, setStatus] = useState<SyncStatus>(() => (loop.config ? { kind: 'idle', at: null } : { kind: 'off' }));
-  const [settled, setSettled] = useState(() => !loop.config);
+  // With sync off there's nothing paused, so no sync error; the notice on every tab says why taps do nothing.
+  const [status, setStatus] = useState<SyncStatus>(() =>
+    !loop.config ? { kind: 'off' } : newerSave ? { kind: 'error', message: NEWER_SAVE_MESSAGE } : { kind: 'idle', at: null },
+  );
+  const [settled, setSettled] = useState(() => newerSave || !loop.config);
 
   function schedulePush() {
-    if (!loop.config) return;
+    if (!loop.config || savedByNewerApp()) return;
     clearTimeout(pushTimer.current);
     pushTimer.current = setTimeout(() => void loop.syncNow(), PUSH_DELAY_MS);
   }
 
   // Pull when the app opens, comes back to the foreground, reconnects, and every couple of minutes.
   useEffect(() => {
+    if (newerSave) return;
     const pull = () => document.visibilityState === 'visible' && void loop.syncNow();
     // Some browsers restore a page from the back-forward cache with only pageshow, no visibility change.
     const onPageShow = (e: PageTransitionEvent) => e.persisted && pull();
@@ -142,9 +152,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('online', pull);
       clearInterval(t);
     };
+  }, [loop, newerSave]);
+
+  // A tab left open on the older build when another tab, on the newer one, saves: hold from then on, as at startup
+  // (the update itself reloads this tab, but not while a pop-up or the Undo bar is up).
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (!holdIfNewer(e.key, e.newValue)) return;
+      clearTimeout(pushTimer.current);
+      setNewerSave(true);
+      setLastUndo(null);
+      if (loop.config) setStatus({ kind: 'error', message: NEWER_SAVE_MESSAGE });
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [loop]);
 
   const update: Update = (recipe, undoLabel, opts) => {
+    if (savedByNewerApp()) return;
     // Built from the ref rather than a setState updater so the undo label can include what got pruned.
     const prev = stateRef.current;
     const draft = structuredClone(prev);
@@ -164,6 +189,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const replace = (s: AppState) => {
+    if (savedByNewerApp()) return;
     const next = { ...structuredClone(s), updatedAt: loop.nextStamp() };
     pruneDone(next);
     stateRef.current = next;
@@ -173,20 +199,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const undo = () => {
-    if (!lastUndo) return;
+    if (!lastUndo || savedByNewerApp()) return;
     // A fresh stamp so sync treats the restored copy as this device's newest change.
     setLocal({ ...lastUndo.prev, updatedAt: loop.nextStamp() });
     setLastUndo(null);
     schedulePush();
   };
 
+  const paused = () => Promise.resolve();
   const sync: SyncApi = {
     status,
     connected,
-    connect: (token) => loop.connect(token.trim()),
+    connect: newerSave ? paused : (token) => loop.connect(token.trim()),
     disconnect: () => loop.disconnect(),
-    syncNow: () => loop.syncNow(),
-    resolve: (keep) => loop.resolve(keep),
+    syncNow: newerSave ? paused : () => loop.syncNow(),
+    resolve: newerSave ? paused : (keep) => loop.resolve(keep),
     settled,
   };
 
@@ -196,7 +223,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: () => setLastUndo(null), unreadable, discardUnreadable }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: () => setLastUndo(null), unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
   );
 }
 

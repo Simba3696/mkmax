@@ -35,7 +35,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/normalize.ts` | Save-file migrations (`AppState.version`) |
 | `src/store.tsx` | App state, undo, and localStorage persistence |
 | `src/planner.tsx` | `PlanProvider` and `usePlan()`: the planner context and plan, worked out once and shared by every view |
-| `src/storage.ts` | Reading the save at startup, and keeping a copy of one that can't be read |
+| `src/storage.ts` | Reading the save at startup, keeping a copy of one that can't be read, and holding one from a newer version |
 | `src/sync.ts` | GitHub Gist sync: the API calls and which copy wins |
 | `src/syncLoop.ts` | When to pull, push or ask, around requests that can overlap edits and disconnects |
 | `src/catalog.ts`, `src/wiki.ts` | Card art and rarity lookups (MK Mobile Base, MK Mobile wiki) |
