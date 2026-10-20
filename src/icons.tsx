@@ -43,9 +43,10 @@ export const SettingsIcon = () => (
 
 export const TowerIcon = ({ size }: { size?: number }) => (
   <Icon size={size}>
-    <path d="M6 21V9h12v12" />
+    {/* Separate merlons, 4 units apart: notches cut into one outline close up under a 2-unit stroke at 18px. */}
+    <path d="M6 21V6h12v15" />
+    <path d="M6 6V3M10 6V3M14 6V3M18 6V3" />
     <path d="M4 21h16" />
-    <path d="M6 9V4h2.5v2h2V4h3v2h2V4H18v5" />
     <path d="M10 21v-4a2 2 0 0 1 4 0v4" />
   </Icon>
 );
