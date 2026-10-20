@@ -24,8 +24,6 @@ const isColor = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
  * still only fills the bar once every card is maxed, and any maxed card shows at least a dot.
  */
 function Bar({ n, of, color, label }: { n: number; of: number; color?: string; label: string }) {
-  // A rarity's color comes from synced or imported data: one the browser doesn't accept as a color would leave the fill
-  // invisible, so the bar falls back to the red to gold fill instead.
   const fill = color && isColor(color) ? color : undefined;
   return (
     <div role="progressbar" aria-label={label} aria-valuenow={percent(n, of)} aria-valuemin={0} aria-valuemax={100} className="h-[8px] mt-[0.35rem] bg-line rounded-chip overflow-hidden">
