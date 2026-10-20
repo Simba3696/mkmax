@@ -11,16 +11,26 @@ import type { MaxedCard } from '../types';
 /** Whole percent, rounded down so a rarity reads 100% only once every card is maxed. */
 const percent = (n: number, of: number) => (of ? Math.floor((n / of) * 100) : 0);
 
+/** Whether the browser takes `value` as a background color: it drops anything else when the style is set. */
+function isColor(value: string) {
+  const style = document.createElement('div').style;
+  style.backgroundColor = value;
+  return style.backgroundColor !== '';
+}
+
 /**
  * A completion bar in the rarity's color, or the Plan bars' red to gold overall. It fills to the exact share, not the
  * rounded-down figure beside it: most rarities sit at a few percent, which would round to an empty bar. The exact share
  * still only fills the bar once every card is maxed, and any maxed card shows at least a dot.
  */
 function Bar({ n, of, color, label }: { n: number; of: number; color?: string; label: string }) {
+  // A rarity's color comes from synced or imported data: one the browser doesn't accept as a color would leave the fill
+  // invisible, so the bar falls back to the red to gold fill instead.
+  const fill = color && isColor(color) ? color : undefined;
   return (
     <div role="progressbar" aria-label={label} aria-valuenow={percent(n, of)} aria-valuemin={0} aria-valuemax={100} className="h-[8px] mt-[0.35rem] bg-line rounded-chip overflow-hidden">
       {/* backgroundColor, not background: a rarity's color comes from synced data, and only a plain color belongs here. */}
-      <div className={`h-full rounded-chip ${n > 0 ? 'min-w-[8px]' : ''} ${color ? '' : barFill}`} style={{ width: `${of ? (n / of) * 100 : 0}%`, backgroundColor: color }} />
+      <div className={`h-full rounded-chip ${n > 0 ? 'min-w-[8px]' : ''} ${fill ? '' : barFill}`} style={{ width: `${of ? (n / of) * 100 : 0}%`, backgroundColor: fill }} />
     </div>
   );
 }
