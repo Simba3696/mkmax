@@ -9,9 +9,10 @@ export const btn = {
   ghost: 'bg-transparent border-transparent md:hover:bg-panel-2',
 };
 /**
- * A ghost button that also gets the base buttons' muted hover border on wider screens (enabled buttons only), for one
- * that sits on a subpanel (Settings), where ghost's hover tint matches the background and would be invisible. Starts
- * with btn.ghost, which is how ConfirmButton knows to stay ghost when armed.
+ * A ghost button that also gets the base buttons' muted hover border on wider screens (enabled buttons only). Settings'
+ * buttons sit on a subpanel, where ghost's hover tint matches the background and would be invisible; glyphBtn builds on
+ * it too, so ↑ ↓ and the Maxed ✕ (on a card, where the tint does show) hover the same way. Starts with btn.ghost, which
+ * is how ConfirmButton knows to stay ghost when armed.
  */
 export const ghostBordered = `${btn.ghost} md:enabled:hover:border-muted`;
 /**

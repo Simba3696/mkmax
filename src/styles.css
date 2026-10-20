@@ -139,7 +139,8 @@
   }
   /* Pointer feedback on tablets and desktops. Utilities beat this base rule, so buttons with their own border color
      (primary, ghost, danger, chips) keep it; ghost buttons get a background tint in classes.ts instead.
-     ghostBordered (classes.ts) copies this muted border for ghost buttons on a subpanel: keep the two in step. */
+     ghostBordered (classes.ts) copies this muted border for Settings' ghost buttons and the ↑ ↓ ✕ glyph buttons: keep
+     the two in step. */
   @media (min-width: 768px) and (hover: hover) {
     button:not(:disabled):hover {
       border-color: var(--color-muted);
