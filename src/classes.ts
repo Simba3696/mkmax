@@ -14,6 +14,12 @@ export const btn = {
  * how ConfirmButton knows to stay ghost when armed.
  */
 export const glyphBtn = `${btn.ghost} min-w-[38px]`;
+/**
+ * Bottom scroll margin for a control that scrolls itself into view after a change that opens the Undo bar (App.tsx's
+ * UndoToast), so the bar doesn't cover it. The bar's top sits about 57px above the bottom of the page area on phones and
+ * 74px on wider screens; 6rem leaves room to spare. Raise it if the bar gets taller or moves up.
+ */
+export const clearOfUndoBar = 'scroll-mb-[6rem]';
 
 /** A panel on the page background (Plan and Settings sections, card and pack rows). No padding or margin. */
 export const surface = 'bg-panel border border-line rounded-card';

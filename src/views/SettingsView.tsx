@@ -4,7 +4,7 @@ import { savedText } from '../storage';
 import { kardTable } from '../normalize';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
-import { actions, btn, check, field, form, glyphBtn, grow, hint, subpanel } from '../classes';
+import { actions, btn, check, clearOfUndoBar, field, form, glyphBtn, grow, hint, subpanel } from '../classes';
 import { copiesTotal, fLevel, levelLabel, maxFusion, moveRarity, removeRarity } from '../engine';
 import { fromNewerApp } from '../sync';
 import { checkForAppUpdate } from '../appUpdate';
@@ -307,9 +307,9 @@ export default function SettingsView() {
                     <span className={`${grow} lg:hidden`} />
                     {/* One group, right-aligned, so on a narrow phone the arrows and Remove wrap together instead of leaving
                         Remove alone at the left of a line of its own. */}
-                    {/* The bottom scroll margin keeps the arrows clear of the Undo toast a move opens when a ↓ scrolls them
-                        to the bottom edge; without it the next tap lands on Undo. */}
-                    <span className="flex gap-[0.4rem] ml-auto scroll-mb-[5rem]" ref={(el) => void (el ? arrowGroups.current.set(r.id, el) : arrowGroups.current.delete(r.id))}>
+                    {/* clearOfUndoBar keeps the arrows above the Undo bar a move opens when a ↓ scrolls them to the bottom
+                        edge; without it the next tap lands on Undo. */}
+                    <span className={`flex gap-[0.4rem] ml-auto ${clearOfUndoBar}`} ref={(el) => void (el ? arrowGroups.current.set(r.id, el) : arrowGroups.current.delete(r.id))}>
                       <button className={glyphBtn} data-arrow="up" onClick={() => shiftRarity(r, all[i - 1], -1)} disabled={i === 0} aria-label={`Move ${r.label} up`} title="Move up">
                         ↑
                       </button>
