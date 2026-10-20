@@ -11,13 +11,25 @@ import type { MaxedCard } from '../types';
 /** Whole percent, rounded down so a rarity reads 100% only once every card is maxed. */
 const percent = (n: number, of: number) => (of ? Math.floor((n / of) * 100) : 0);
 
-/** Whether the browser takes `value` as a background color: it drops anything else when the style is set. */
+const NOT_COLORS = new Set(['transparent', 'inherit', 'initial', 'unset', 'revert', 'currentcolor']);
+
+/**
+ * Whether `value` is a plain, visible color: hex, a color function like rgb() or hsl() with plain values, or a color
+ * name, that the browser takes and that isn't fully see-through. The style parser alone also takes keywords, var(),
+ * env() and colors with zero alpha, any of which would leave a bar empty instead of falling back to red to gold.
+ */
 function isColor(value: string) {
-  // The style parser also takes keywords and var(), which would leave the bar see-through or track-colored rather than
-  // falling back to red to gold.
-  if (/^\s*(transparent|inherit|initial|unset|revert|revert-layer|currentcolor)\s*$/i.test(value) || /var\(/i.test(value)) return false;
+  const v = value.trim().toLowerCase();
+  const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(v);
+  const fn = /^(rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(([^()]*)\)$/.exec(v);
+  const visible = hex
+    ? !/^(...0|......00)$/.test(hex[1])
+    : fn
+      ? parseFloat(fn[2].includes('/') ? fn[2].split('/')[1] : (fn[2].split(',')[3] ?? '1')) !== 0
+      : /^[a-z]+$/.test(v) && !NOT_COLORS.has(v);
+  if (!visible) return false;
   const style = document.createElement('div').style;
-  style.backgroundColor = value;
+  style.backgroundColor = v;
   return style.backgroundColor !== '';
 }
 
