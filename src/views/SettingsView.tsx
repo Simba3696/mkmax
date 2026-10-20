@@ -92,7 +92,7 @@ export default function SettingsView() {
       undoLabel,
       { ruleChange: true },
     );
-  // Past the neighbour shown on screen, so a tap after a sync reordered the rarities moves nothing rather than the wrong one.
+  // Past the neighbour shown on screen, so a tap after a sync moved either of the two moves nothing rather than the wrong one.
   const shiftRarity = (r: RarityRule, past: RarityRule, by: -1 | 1) => {
     setMoved({ id: r.id, by });
     update((d) => (moveRarity(d, r.id, past.id, by) ? undefined : noChange), `Moved ${r.label} ${by < 0 ? 'up' : 'down'}`);
