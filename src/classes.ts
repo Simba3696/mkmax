@@ -8,6 +8,12 @@ export const btn = {
   danger: 'bg-red-dim border-red',
   ghost: 'bg-transparent border-transparent md:hover:bg-panel-2',
 };
+/**
+ * A ghost button whose label is one symbol (↑, ↓, ✕): at least as wide as the stepper's 38px buttons, so it's a fair
+ * tap target, and free to grow (a two-tap ✕ reads "Tap again to confirm" once armed). Starts with btn.ghost, which is
+ * how ConfirmButton knows to stay ghost when armed.
+ */
+export const glyphBtn = `${btn.ghost} min-w-[38px]`;
 
 /** A panel on the page background (Plan and Settings sections, card and pack rows). No padding or margin. */
 export const surface = 'bg-panel border border-line rounded-card';

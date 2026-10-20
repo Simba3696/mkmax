@@ -5,7 +5,7 @@ import { maxedKeys, recordMaxed } from '../engine';
 import { completion, findInCatalog, loadCatalog, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
 import { CardThumb, ConfirmButton, RarityBadge, dayLabel } from '../ui';
-import { actions, barFill, btn, card, field, grow, row, rowDivider, rowTitle, subpanel } from '../classes';
+import { actions, barFill, btn, card, field, glyphBtn, grow, row, rowDivider, rowTitle, subpanel } from '../classes';
 import type { MaxedCard } from '../types';
 
 /** Whole percent, rounded down so a rarity reads 100% only once every card is maxed. */
@@ -159,7 +159,7 @@ export default function MaxedPanel() {
                 {m.at && <span className="text-muted">{' '}maxed {dayLabel(m.at, now)}</span>}
               </div>
             </div>
-            <ConfirmButton label="✕" className={btn.ghost} onConfirm={() => remove(m)} title={`Remove ${m.name} from Maxed`} ariaLabel={`Remove ${m.name} from Maxed`} />
+            <ConfirmButton label="✕" className={glyphBtn} onConfirm={() => remove(m)} title={`Remove ${m.name} from Maxed`} ariaLabel={`Remove ${m.name} from Maxed`} />
           </div>
         ))}
       </section>
