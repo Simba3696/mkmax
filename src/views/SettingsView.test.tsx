@@ -263,10 +263,6 @@ describe('Settings rows on a screen a sync has changed', () => {
   // moved that rarity or its shown neighbour moves nothing; fails_when=the buttons move the rarity at the tapped place after a sync, or
   // save without an Undo; why_new=rarities couldn't be reordered before; seam=a grabbed update stands in for the sync;
   // no_claim=the move rule itself (engine.test.ts moveRarity)
-  // Extended by /ship test coverage audit on 2026-10-20 with a ↓ move that lands
-  // Value: protects=↓ moves a rarity one place down with a "Moved X down" Undo; fails_when=the ↓ button passes the
-  // neighbour above (or -1), so it moves nothing or throws, or its Undo says "up"; why_new=the only ↓ tap above is the
-  // stale one, which moves nothing either way; seam=none; no_claim=Undo putting the order back (store tests)
   it('moves a rarity up or down with Undo, and moves nothing once a sync moved it or its neighbour', () => {
     localStorage.setItem('mkmax:v1', JSON.stringify(defaultState()));
     renderSettings();
@@ -285,6 +281,10 @@ describe('Settings rows on a screen a sync has changed', () => {
     });
     expect([ids().slice(0, 2), lastUndo?.label]).toEqual([['gold', 'diamond'], 'Moved Gold Kameo up']);
     expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+    // Extended by /ship test coverage audit on 2026-10-20 with a ↓ move that lands
+    // Value: protects=↓ moves a rarity one place down with a "Moved X down" Undo; fails_when=the ↓ button passes the
+    // neighbour above (or -1), so it moves nothing or throws, or its Undo says "up"; why_new=the only ↓ tap above is the
+    // stale one, which moves nothing either way; seam=none; no_claim=Undo putting the order back (store tests)
     // Drawn again with Gold first: its ↓ now lands.
     act(() => button('Move Gold down').click());
     expect([ids().slice(0, 3), lastUndo?.label]).toEqual([['diamond', 'gold', 'epic'], 'Moved Gold down']);
