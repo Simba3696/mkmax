@@ -93,17 +93,19 @@ export default function SettingsView() {
       { ruleChange: true },
     );
   // Past the neighbour shown on screen, so a tap after a sync moved either of the two moves nothing rather than the wrong one.
-  const shiftRarity = (r: RarityRule, past: RarityRule, by: -1 | 1) => {
-    setMoved({ id: r.id, by });
+  const shiftRarity = (r: RarityRule, past: RarityRule, by: -1 | 1, keyboard: boolean) => {
+    setMoved({ id: r.id, by, keyboard });
     update((d) => (moveRarity(d, r.id, past.id, by) ? undefined : noChange), `Moved ${r.label} ${by < 0 ? 'up' : 'down'}`);
   };
   // Each rarity's ↑ ↓ Remove group, by rarity id, and the last one moved.
   const arrowGroups = useRef(new Map<string, HTMLElement>());
-  const [moved, setMoved] = useState<{ id: string; by: -1 | 1 } | null>(null);
+  const [moved, setMoved] = useState<{ id: string; by: -1 | 1; keyboard: boolean } | null>(null);
   // A rarity panel is tall, so a move takes it a whole panel away from the finger that tapped: bring its arrows back into
-  // view, so moving one several places is a few taps in a row. Keyboard focus that was on the tapped arrow, or that the
-  // browser dropped to the page (some do when a focused element's panel is moved), goes back to the tapped arrow, or to
-  // the other one when the move greyed it out (the rarity reached an end). Focus somewhere else, like a field, stays put.
+  // view, so moving one several places is a few taps in a row. After a keyboard press (a click with detail 0, as Enter,
+  // Space and assistive tech send), focus that was on the tapped arrow, or that the browser dropped to the page (some do
+  // when a focused element's panel is moved), goes back to the tapped arrow, or to the other one when the move greyed it
+  // out (the rarity reached an end). A tap leaves focus alone: Safari never focuses a tapped button, so focusing it then
+  // would draw the focus ring after every tap. Focus somewhere else, like a field, stays put.
   useEffect(() => {
     if (!moved) return;
     setMoved(null);
@@ -114,7 +116,7 @@ export default function SettingsView() {
     if (!up || !down) return;
     const [pressed, other] = moved.by < 0 ? [up, down] : [down, up];
     const target = pressed.disabled ? other : pressed;
-    if (document.activeElement !== target && (document.activeElement === pressed || document.activeElement === document.body)) target.focus({ preventScroll: true });
+    if (moved.keyboard && document.activeElement !== target && (document.activeElement === pressed || document.activeElement === document.body)) target.focus({ preventScroll: true });
     group.scrollIntoView({ block: 'nearest' });
   }, [moved, state.rarities]);
   const editCurrency = (id: string, edit: (c: AppState['currencies'][number]) => void) =>
@@ -312,10 +314,10 @@ export default function SettingsView() {
                     {/* clearOfUndoBar keeps the arrows above the Undo bar a move opens when a ↓ scrolls them to the bottom
                         edge; without it the next tap lands on Undo. */}
                     <span className={`flex gap-[0.4rem] ml-auto ${clearOfUndoBar}`} ref={(el) => void (el ? arrowGroups.current.set(r.id, el) : arrowGroups.current.delete(r.id))}>
-                      <button className={glyphBtn} data-arrow="up" onClick={() => shiftRarity(r, all[i - 1], -1)} disabled={i === 0} aria-label={`Move ${r.label} up`} title="Move up">
+                      <button className={glyphBtn} data-arrow="up" onClick={(e) => shiftRarity(r, all[i - 1], -1, e.detail === 0)} disabled={i === 0} aria-label={`Move ${r.label} up`} title="Move up">
                         ↑
                       </button>
-                      <button className={glyphBtn} data-arrow="down" onClick={() => shiftRarity(r, all[i + 1], 1)} disabled={i === all.length - 1} aria-label={`Move ${r.label} down`} title="Move down">
+                      <button className={glyphBtn} data-arrow="down" onClick={(e) => shiftRarity(r, all[i + 1], 1, e.detail === 0)} disabled={i === all.length - 1} aria-label={`Move ${r.label} down`} title="Move down">
                         ↓
                       </button>
                       {(() => {
