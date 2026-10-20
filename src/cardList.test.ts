@@ -157,6 +157,23 @@ describe('pasted card lists', () => {
     ]);
   });
 
+  // Regression: /ship review (Red Team, Testing) of maxed-remove-x, 2026-10-20 — a Stage line that gave a level skipped
+  // the filed-wrong check and added a second copy of a character listed under another rarity
+  // Value: protects=a Stage line, with or without a level, is refused for a character filed under another character
+  // rarity, even when a Kameo of the same name is also listed; fails_when=the check only runs without a level, or stops
+  // at the Kameo; why_new=the other filed-wrong tests have no level and no Kameo beside the misfiled card; seam=none;
+  // no_claim=the stage maths (the stage tests)
+  it('refuses a stage line, with or without a level, for a character filed elsewhere even beside a same-name Kameo', () => {
+    const existing: Card[] = [
+      { id: 'kk', name: 'Scorpion, Klassic', rarityId: 'kameo-gold', fusion: 0, guest: false },
+      { id: 'd', name: 'Klassic Scorpion', rarityId: 'diamond', fusion: 4, guest: false },
+    ];
+    for (const line of ['Klassic Scorpion - Gold - Stage I', 'Klassic Scorpion - Gold - Stage I - F10']) {
+      const r = parseCardList(line, rarities, 'gold', existing);
+      expect([line, r.cards, r.problems.map((p) => p.reason)]).toEqual([line, [], ['Listed as Diamond: change its rarity on the card first']]);
+    }
+  });
+
   it('a stage paste keeps a card still being fused, and one exactly at the new Max is maxed', () => {
     const s = defaultState();
     s.cards = [
