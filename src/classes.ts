@@ -13,7 +13,8 @@ export const btn = {
  * tap target, and free to grow (a two-tap ✕ reads "Tap again to confirm" once armed). Starts with btn.ghost, which is
  * how ConfirmButton knows to stay ghost when armed.
  */
-export const glyphBtn = `${btn.ghost} min-w-[38px]`;
+// The hover border shows on any background: ghost's hover tint matches a subpanel (Settings), so it's invisible there.
+export const glyphBtn = `${btn.ghost} min-w-[38px] md:hover:border-line`;
 /**
  * Bottom scroll margin for a control that scrolls itself into view after a change that opens the Undo bar (App.tsx's
  * UndoToast), so the bar doesn't cover it. The bar's top sits about 57px above the bottom of the page area on phones and

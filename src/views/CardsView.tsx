@@ -391,7 +391,7 @@ export default function CardsView({ sub, onSub }: { sub: CardsPage; onSub: (sub:
   );
 }
 
-const segment = (active: boolean) => `flex-1 inline-flex flex-col items-center justify-center gap-[0.15rem] md:flex-row md:gap-[0.4rem] whitespace-nowrap border-0 rounded-none focus-visible:-outline-offset-2 ${active ? 'bg-red-dim text-fg' : 'bg-panel text-muted hover:text-fg'}`;
+const segment = (active: boolean) => `flex-1 inline-flex flex-col items-center justify-center gap-[0.15rem] md:flex-row md:gap-[0.4rem] min-w-0 text-center md:whitespace-nowrap border-0 rounded-none focus-visible:-outline-offset-2 ${active ? 'bg-red-dim text-fg' : 'bg-panel text-muted hover:text-fg'}`;
 
 const CARD_SORTS = ['rarity', 'fusion-high', 'fusion-low', 'name'] as const;
 type CardSort = (typeof CARD_SORTS)[number];

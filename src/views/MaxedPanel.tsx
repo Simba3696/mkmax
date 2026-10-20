@@ -108,7 +108,7 @@ export default function MaxedPanel() {
             <p className="mb-0">
               <b>{percent(counted, total)}%</b> of every card MK Mobile Base lists: {counted} of {total} maxed.
             </p>
-            <Bar n={counted} of={total} label="All cards maxed" />
+            <Bar n={counted} of={total} label="Overall completion" />
             <div className="mt-[0.6rem]">
               {done.rarities.map((r) => {
                 const rule = rarities.find((x) => x.id === r.rarityId);
