@@ -181,7 +181,8 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     // the Scorpion, Klassic Kameo), so it doesn't count.
     const elsewhere = stage && fusion == null ? existing.find((c) => c.rarityId !== rarityId && rarityById.get(c.rarityId)?.kind === rule!.kind && nameKey(c.name) === nameKey(name)) : undefined;
     if (elsewhere) {
-      out.problems.push({ line, reason: `Listed as ${rarityById.get(elsewhere.rarityId)?.label ?? elsewhere.rarityId}: change its rarity on the card first` });
+      // The find only matches a card whose rarity is in rarityById, so its label is always there.
+      out.problems.push({ line, reason: `Listed as ${rarityById.get(elsewhere.rarityId)!.label}: change its rarity on the card first` });
       continue;
     }
     const start = fusion ?? (stage ? fLevel(rule!.fusionMax) + (stage - 1) * 5 : undefined);
