@@ -6,6 +6,7 @@ import { StoreProvider, useStore } from '../store';
 import { PlanProvider } from '../planner';
 import { SyncLoop } from '../syncLoop';
 import type { Pack } from '../types';
+import { ghostBordered } from '../classes';
 import SettingsView from './SettingsView';
 
 // The service worker module imports vite-plugin-pwa's virtual module, which only exists in a build; it isn't what's tested.
@@ -185,7 +186,14 @@ describe('Settings rows on a screen a sync has changed', () => {
     const remove = within(panelOf('Uncommon Equip')).getByRole('button', { name: 'Remove (1 maxed)' });
     act(() => remove.click());
     expect(saved().maxed).toHaveLength(2);
-    act(() => within(panelOf('Uncommon Equip')).getByRole('button', { name: 'Tap again to confirm' }).click());
+    // Extended by /ship test coverage audit on 2026-10-20
+    // Value: protects=both Remove buttons on a rarity's subpanel get ghostBordered's hover border, and the two-tap one
+    // stays ghost once armed rather than turning red; fails_when=Remove goes back to btn.ghost, or ghostBordered stops
+    // starting with btn.ghost so ConfirmButton swaps in btn.danger; why_new=styles.test.ts checks the class strings, not
+    // which buttons use them or how an armed one looks; seam=none; no_claim=how the border looks (a real browser)
+    const armed = within(panelOf('Uncommon Equip')).getByRole('button', { name: 'Tap again to confirm' });
+    expect([used.className, armed.className]).toEqual([ghostBordered, ghostBordered]);
+    act(() => armed.click());
     expect([saved().maxed, lastUndo?.label]).toEqual([[{ name: 'Kori Blade', rarityId: 'epic' }], 'Removed Uncommon Equip and its maxed card']);
   });
 
