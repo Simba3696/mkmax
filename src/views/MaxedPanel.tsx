@@ -11,27 +11,12 @@ import type { MaxedCard } from '../types';
 /** Whole percent, rounded down so a rarity reads 100% only once every card is maxed. */
 const percent = (n: number, of: number) => (of ? Math.floor((n / of) * 100) : 0);
 
-const NOT_COLORS = new Set(['transparent', 'inherit', 'initial', 'unset', 'revert', 'currentcolor']);
-
 /**
- * Whether `value` is a plain, visible color: hex, a color function like rgb() or hsl() with plain values, or a color
- * name, that the browser takes and that isn't fully see-through. The style parser alone also takes keywords, var(),
- * env() and colors with zero alpha, any of which would leave a bar empty instead of falling back to red to gold.
+ * Whether `value` is a six-digit hex color, the only kind the app saves (the defaults and Settings' color picker). A
+ * rarity's color can come from synced or imported data, and CSS takes many values that draw nothing (keywords, var(),
+ * see-through colors, lookalike letters), so anything else falls back to red to gold rather than an empty bar.
  */
-function isColor(value: string) {
-  const v = value.trim().toLowerCase();
-  const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(v);
-  const fn = /^(rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(([^()]*)\)$/.exec(v);
-  const visible = hex
-    ? !/^(...0|......00)$/.test(hex[1])
-    : fn
-      ? parseFloat(fn[2].includes('/') ? fn[2].split('/')[1] : (fn[2].split(',')[3] ?? '1')) !== 0
-      : /^[a-z]+$/.test(v) && !NOT_COLORS.has(v);
-  if (!visible) return false;
-  const style = document.createElement('div').style;
-  style.backgroundColor = v;
-  return style.backgroundColor !== '';
-}
+const isColor = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
 
 /**
  * A completion bar in the rarity's color, or the Plan bars' red to gold overall. It fills to the exact share, not the
