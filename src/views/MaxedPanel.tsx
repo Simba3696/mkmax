@@ -13,6 +13,9 @@ const percent = (n: number, of: number) => (of ? Math.floor((n / of) * 100) : 0)
 
 /** Whether the browser takes `value` as a background color: it drops anything else when the style is set. */
 function isColor(value: string) {
+  // The style parser also takes keywords and var(), which would leave the bar see-through or track-colored rather than
+  // falling back to red to gold.
+  if (/^\s*(transparent|inherit|initial|unset|revert|revert-layer|currentcolor)\s*$/i.test(value) || /var\(/i.test(value)) return false;
   const style = document.createElement('div').style;
   style.backgroundColor = value;
   return style.backgroundColor !== '';

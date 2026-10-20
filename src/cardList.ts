@@ -178,11 +178,11 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     // same name under another rarity of the same kind means the card is still here, just filed wrong, so that's a
     // problem instead. A line that gives a level (Unowned for a character new in that update) is added anyway, as the
     // user guide says. A Kameo is another card that can share a character's name (the Klassic Scorpion character and
-    // the Scorpion, Klassic Kameo), so it doesn't count.
-    const elsewhere = stage && fusion == null ? existing.find((c) => c.rarityId !== rarityId && rarityById.get(c.rarityId)?.kind === rule!.kind && nameKey(c.name) === nameKey(name)) : undefined;
+    // the Scorpion, Klassic Kameo), so it doesn't count. A card whose rarity is gone (another device removed it) has no
+    // kind to tell, so it counts: adding the line would leave the same card twice once its rarity is back.
+    const elsewhere = stage && fusion == null ? existing.find((c) => c.rarityId !== rarityId && (rarityById.get(c.rarityId)?.kind ?? rule!.kind) === rule!.kind && nameKey(c.name) === nameKey(name)) : undefined;
     if (elsewhere) {
-      // The find only matches a card whose rarity is in rarityById, so its label is always there.
-      out.problems.push({ line, reason: `Listed as ${rarityById.get(elsewhere.rarityId)!.label}: change its rarity on the card first` });
+      out.problems.push({ line, reason: `Listed as ${rarityById.get(elsewhere.rarityId)?.label ?? 'a rarity that was removed'}: change its rarity on the card first` });
       continue;
     }
     const start = fusion ?? (stage ? fLevel(rule!.fusionMax) + (stage - 1) * 5 : undefined);
