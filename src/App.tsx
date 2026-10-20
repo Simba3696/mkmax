@@ -45,7 +45,8 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: () 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry.at]);
   return (
-    // Above the tab bar on phones; on wider screens, centred over the content beside the rail.
+    // Above the tab bar on phones; on wider screens, centred over the content beside the rail. Settings' rarity arrows
+    // scroll to sit just above it (clearOfUndoBar in classes.ts): raise that margin if this gets taller or moves up.
     <div
       className="fixed left-1/2 -translate-x-1/2 z-[8] bottom-[calc(70px+env(safe-area-inset-bottom))] md:bottom-6 md:left-[calc(50%+44px)] lg:left-[calc(50%+110px)] w-[calc(100%-2rem)] max-w-[480px] flex items-center gap-[0.3rem] bg-panel-2 border border-line rounded-card py-[0.3rem] pr-[0.3rem] pl-[0.9rem] shadow-[0_4px_16px_rgba(0,0,0,0.6)] text-[0.9rem]"
       role="status"

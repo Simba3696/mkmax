@@ -6,6 +6,7 @@ import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote,
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
 import MaxedPanel from './MaxedPanel';
+import { CardsIcon, TowerIcon, TrophyIcon } from '../icons';
 import { findCardImages, wikiUrl } from '../wiki';
 import { catalogPageUrl, findInCatalog, loadCatalog, rarityMismatches, wantsCatalogImage, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
@@ -358,15 +359,17 @@ export type CardsPage = 'cards' | 'towers' | 'maxed';
 export default function CardsView({ sub, onSub }: { sub: CardsPage; onSub: (sub: CardsPage) => void }) {
   return (
     <>
-      {/* A short switch on wide screens: stretched across 1000px+ it reads as a banner, not three buttons. */}
-      <div className="flex mb-[0.8rem] border border-line rounded-panel overflow-hidden md:max-w-[480px]">
+      <div className="flex mb-[0.8rem] border border-line rounded-panel overflow-hidden">
         <button className={segment(sub === 'cards')} onClick={() => onSub('cards')} aria-pressed={sub === 'cards'}>
+          <CardsIcon size={18} />
           Cards
         </button>
         <button className={segment(sub === 'towers')} onClick={() => onSub('towers')} aria-pressed={sub === 'towers'}>
+          <TowerIcon size={18} />
           Tower gear
         </button>
         <button className={segment(sub === 'maxed')} onClick={() => onSub('maxed')} aria-pressed={sub === 'maxed'}>
+          <TrophyIcon size={18} />
           Maxed
         </button>
       </div>
@@ -388,7 +391,9 @@ export default function CardsView({ sub, onSub }: { sub: CardsPage; onSub: (sub:
   );
 }
 
-const segment = (active: boolean) => `flex-1 border-0 rounded-none focus-visible:-outline-offset-2 ${active ? 'bg-red-dim text-fg' : 'bg-panel text-muted hover:text-fg'}`;
+// No min-w-0: each segment stays at least as wide as its longest word, so with large text the labels wrap under their
+// icons instead of spilling into each other. Phones stack the icon over the label; wider screens put it beside.
+const segment = (active: boolean) => `flex-1 inline-flex flex-col items-center justify-center gap-[0.15rem] md:flex-row md:gap-[0.4rem] text-center md:whitespace-nowrap border-0 rounded-none focus-visible:-outline-offset-2 ${active ? 'bg-red-dim text-fg' : 'bg-panel text-muted hover:text-fg'}`;
 
 const CARD_SORTS = ['rarity', 'fusion-high', 'fusion-low', 'name'] as const;
 type CardSort = (typeof CARD_SORTS)[number];

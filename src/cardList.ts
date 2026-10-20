@@ -93,6 +93,9 @@ function parseLevel(word: string, rule: RarityRule | undefined): number | null {
  */
 export function parseCardList(text: string, rarities: RarityRule[], startRarityId: string, existing: Card[]): ParsedList {
   const byKey = new Map(existing.map((c) => [cardKey(c.rarityId, c.name), c]));
+  // A rarity's rules come from its first entry; an older name for it can follow.
+  const rarityById = new Map<string, RarityRule>();
+  for (const r of rarities) if (!rarityById.has(r.id)) rarityById.set(r.id, r);
   const seen = new Set<string>();
   let headingRarityId = startRarityId;
   const out: ParsedList = { cards: [], updates: [], duplicates: [], problems: [] };
@@ -130,7 +133,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     // Lines with details but no rarity are ambiguous (the heading rarity is for plain name lists).
     if (!problem && parts.length > 0 && !rarityId) problem = 'No rarity (e.g. Epic, Rare)';
     rarityId ??= headingRarityId;
-    const rule = rarities.find((r) => r.id === rarityId);
+    const rule = rarityById.get(rarityId);
     const fusion = levelWord == null ? undefined : parseLevel(levelWord, rule)!;
     if (!problem && rule && fusion != null && fusion > maxFusion(rule)) problem = `${levelWord} is past this rarity’s max`;
     // Only gear is tracked as Krypt or tower gear. A character or Kameo tagged that way would drop out of the plan.
@@ -172,10 +175,14 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     }
     // Every card still being maxed is in the app, so a Gold card made ascendable that isn't was maxed and removed:
     // it comes back at the cap below its new stage (F10 for Stage I, A5 for Stage II), with 5 copies to go. The
-    // same name under another rarity means the card is still here, just filed wrong, so that's a problem instead.
-    const elsewhere = stage && fusion == null ? existing.find((c) => c.rarityId !== rarityId && nameKey(c.name) === nameKey(name)) : undefined;
+    // same name under another rarity of the same kind means the card is still here, just filed wrong, so that's a
+    // problem instead. A line that gives a level (Unowned for a character new in that update) is added anyway, as the
+    // user guide says. A Kameo is another card that can share a character's name (the Klassic Scorpion character and
+    // the Scorpion, Klassic Kameo), so it doesn't count. A card whose rarity is gone (another device removed it) has no
+    // kind to tell, so it counts: adding the line would leave the same card twice once its rarity is back.
+    const elsewhere = stage && fusion == null ? existing.find((c) => c.rarityId !== rarityId && (rarityById.get(c.rarityId)?.kind ?? rule!.kind) === rule!.kind && nameKey(c.name) === nameKey(name)) : undefined;
     if (elsewhere) {
-      out.problems.push({ line, reason: `Listed as ${rarities.find((r) => r.id === elsewhere.rarityId)?.label ?? elsewhere.rarityId}: change its rarity on the card first` });
+      out.problems.push({ line, reason: `Listed as ${rarityById.get(elsewhere.rarityId)?.label ?? 'a rarity that was removed'}: change its rarity on the card first` });
       continue;
     }
     const start = fusion ?? (stage ? fLevel(rule!.fusionMax) + (stage - 1) * 5 : undefined);

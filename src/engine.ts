@@ -495,6 +495,21 @@ export function removeRarity(d: AppState, id: string) {
   if (d.maxed?.some((m) => m.rarityId === id)) d.maxed = d.maxed.filter((m) => m.rarityId !== id);
 }
 
+/**
+ * Move a rarity one place past `past`, the neighbour the screen showed on that side. Every list of rarities follows
+ * this order (the card list, filters, Settings, Completion), and the first is the default rarity for new cards. Returns
+ * false and changes nothing when the two are no longer side by side that way round (a sync moved one since): moving by
+ * where they sit now would shift a rarity the user didn't tap. Mutates the state.
+ */
+export function moveRarity(d: AppState, id: string, past: string, by: -1 | 1) {
+  const from = d.rarities.findIndex((r) => r.id === id);
+  if (from < 0 || d.rarities[from + by]?.id !== past) return false;
+  const next = [...d.rarities];
+  [next[from], next[from + by]] = [next[from + by], next[from]];
+  d.rarities = next;
+  return true;
+}
+
 export function packEV(ctx: Ctx, pack: Pack, gained: Map<string, number> = new Map()): number {
   let v = 0;
   for (const d of packDrops(ctx, pack, gained)) {

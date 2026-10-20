@@ -6,6 +6,7 @@ import { StoreProvider, useStore } from '../store';
 import { PlanProvider } from '../planner';
 import { SyncLoop } from '../syncLoop';
 import type { Pack } from '../types';
+import { ghostBordered } from '../classes';
 import SettingsView from './SettingsView';
 
 // The service worker module imports vite-plugin-pwa's virtual module, which only exists in a build; it isn't what's tested.
@@ -20,6 +21,8 @@ function Grab({ onRender }: { onRender: (store: ReturnType<typeof useStore>) => 
 beforeEach(() => {
   // The event schedule and the catalog aren't needed here; keep the test off the network.
   vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));
+  // jsdom doesn't scroll; a rarity move scrolls its arrows into view.
+  Element.prototype.scrollIntoView = () => {};
   localStorage.setItem('mkmax:v1', JSON.stringify(defaultState()));
 });
 afterEach(() => {
@@ -183,7 +186,14 @@ describe('Settings rows on a screen a sync has changed', () => {
     const remove = within(panelOf('Uncommon Equip')).getByRole('button', { name: 'Remove (1 maxed)' });
     act(() => remove.click());
     expect(saved().maxed).toHaveLength(2);
-    act(() => within(panelOf('Uncommon Equip')).getByRole('button', { name: 'Tap again to confirm' }).click());
+    // Extended by /ship test coverage audit on 2026-10-20
+    // Value: protects=both Remove buttons on a rarity's subpanel get ghostBordered's hover border, and the two-tap one
+    // stays ghost once armed rather than turning red; fails_when=Remove goes back to btn.ghost, or ghostBordered stops
+    // starting with btn.ghost so ConfirmButton swaps in btn.danger; why_new=styles.test.ts checks the class strings, not
+    // which buttons use them or how an armed one looks; seam=none; no_claim=how the border looks (a real browser)
+    const armed = within(panelOf('Uncommon Equip')).getByRole('button', { name: 'Tap again to confirm' });
+    expect([used.className, armed.className]).toEqual([ghostBordered, ghostBordered]);
+    act(() => armed.click());
     expect([saved().maxed, lastUndo?.label]).toEqual([[{ name: 'Kori Blade', rarityId: 'epic' }], 'Removed Uncommon Equip and its maxed card']);
   });
 
@@ -246,6 +256,168 @@ describe('Settings rows on a screen a sync has changed', () => {
     act(() => remove.click());
     act(() => within(panelOf('Uncommon Equip')).getByRole('button', { name: 'Tap again to confirm' }).click());
     expect([saved().maxed, saved().packs, lastUndo?.label]).toEqual([[], [], 'Removed Uncommon Equip, its Kasket and its 2 maxed cards']);
+  });
+
+  // Generated on 2026-10-20 (rarity order in Settings)
+  // Value: protects=↑ and ↓ on a rarity move it one place with an Undo, the ends are greyed out, and a tap after a sync
+  // moved that rarity or its shown neighbour moves nothing; fails_when=the buttons move the rarity at the tapped place after a sync, or
+  // save without an Undo; why_new=rarities couldn't be reordered before; seam=a grabbed update stands in for the sync;
+  // no_claim=the move rule itself (engine.test.ts moveRarity)
+  it('moves a rarity up or down with Undo, and moves nothing once a sync moved it or its neighbour', () => {
+    localStorage.setItem('mkmax:v1', JSON.stringify(defaultState()));
+    renderSettings();
+    const ids = () => saved().rarities.map((r: { id: string }) => r.id);
+    const button = (name: string) => screen.getByRole('button', { name }) as HTMLButtonElement;
+    expect([button('Move Diamond up').disabled, button('Move Gold Kameo down').disabled, button('Move Gold up').disabled]).toEqual([true, true, false]);
+    act(() => button('Move Gold Kameo up').click());
+    expect([ids().slice(-2), lastUndo?.label]).toEqual([['kameo-gold', 'kameo-diamond'], 'Moved Gold Kameo up']);
+    // Drawn with Diamond above Gold; a sync swaps them before the tap lands. It saves nothing and adds no Undo
+    // (strengthened on 2026-10-20 after /ship review: the order alone can't tell a no-op save from no save).
+    const down = button('Move Diamond down');
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    act(() => {
+      update((d) => void (d.rarities = [d.rarities[1], d.rarities[0], ...d.rarities.slice(2)]));
+      down.click();
+    });
+    expect([ids().slice(0, 2), lastUndo?.label]).toEqual([['gold', 'diamond'], 'Moved Gold Kameo up']);
+    expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
+    // Extended by /ship test coverage audit on 2026-10-20 with a ↓ move that lands
+    // Value: protects=↓ moves a rarity one place down with a "Moved X down" Undo; fails_when=the ↓ button passes the
+    // neighbour above (or -1), so it moves nothing or throws, or its Undo says "up"; why_new=the only ↓ tap above is the
+    // stale one, which moves nothing either way; seam=none; no_claim=Undo putting the order back (store tests)
+    // Drawn again with Gold first: its ↓ now lands.
+    act(() => button('Move Gold down').click());
+    expect([ids().slice(0, 3), lastUndo?.label]).toEqual([['diamond', 'gold', 'epic'], 'Moved Gold down']);
+  });
+
+  // Generated by /ship review fixes on 2026-10-20
+  // Value: protects=after a move the rarity's arrows are scrolled back into view, and a keyboard user whose arrow just
+  // greyed out (the rarity reached the top) keeps focus on the other arrow; fails_when=the scroll goes to another rarity
+  // or none, or focus is left on the greyed-out arrow or drops to the page; why_new=review (design); seam=scrollIntoView
+  // stubbed (jsdom doesn't scroll); no_claim=how far a real browser scrolls
+  it("keeps a moved rarity's arrows in view, and keyboard focus on an arrow that still works", () => {
+    renderSettings();
+    const button = (name: string) => screen.getByRole('button', { name }) as HTMLButtonElement;
+    const scrolled = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const up = button('Move Gold up');
+    up.focus();
+    act(() => up.click());
+    expect([saved().rarities[0].id, up.disabled, document.activeElement, scrolled.mock.contexts]).toEqual(['gold', true, button('Move Gold down'), [up.parentElement]]);
+    // Extended by /ship test coverage audit on 2026-10-20 with the bottom end
+    // Value: protects=a rarity moved to the bottom hands keyboard focus from its greyed-out ↓ to its ↑; fails_when=the
+    // effect always focuses ↓ (or ↑ only for upward moves), so focus stays on a disabled arrow or drops to the page;
+    // why_new=the lines above reach the top end only; seam=none; no_claim=focus rings in a real browser
+    const down = button('Move Diamond Kameo down');
+    down.focus();
+    act(() => down.click());
+    expect([saved().rarities.at(-1).id, down.disabled, document.activeElement]).toEqual(['kameo-diamond', true, button('Move Diamond Kameo up')]);
+  });
+
+  // Generated by /ship test coverage audit on 2026-10-20
+  // Value: protects=a keyboard user moving a rarity down mid-list keeps focus on that rarity's ↓ rather than having it
+  // pushed to ↑, so pressing again moves it again; fails_when=the effect hands focus to the other arrow whenever a move
+  // lands, not only when the pressed one greyed out; why_new=the focus test covers the ends only; seam=none;
+  // no_claim=a browser that drops focus when the panel moves (jsdom keeps it; the 'puts focus back' test covers that)
+  it('keeps keyboard focus on ↓ when a rarity moves down mid-list', () => {
+    renderSettings();
+    const down = screen.getByRole('button', { name: 'Move Gold down' }) as HTMLButtonElement;
+    down.focus();
+    act(() => down.click());
+    expect([saved().rarities.slice(0, 3).map((r: { id: string }) => r.id), document.activeElement === screen.getByRole('button', { name: 'Move Gold down' })]).toEqual([['diamond', 'epic', 'gold'], true]);
+  });
+
+  // Generated by /ship test coverage audit on 2026-10-20
+  // Value: protects=an arrow tapped on a rarity a sync has just removed saves nothing and leaves Settings on screen;
+  // fails_when=the scroll-and-focus effect reads the removed rarity's arrows without checking they're there, and the
+  // error takes the page down; why_new=the stale-tap test reorders, never removes; seam=a grabbed update stands in for
+  // the sync, SyncLoop.nextStamp spied to count saves; no_claim=a real sync
+  it('saves nothing and keeps Settings up when the moved rarity was just removed by a sync', () => {
+    renderSettings();
+    const down = screen.getByRole('button', { name: 'Move Epic Equip down' });
+    const stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    act(() => {
+      update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'epic')));
+      down.click();
+    });
+    expect([saved().rarities.map((r: { id: string }) => r.id).includes('epic'), stamps.mock.calls.length, screen.queryByRole('button', { name: 'Move Gold down' }) != null]).toEqual([false, 1, true]);
+  });
+
+  // Generated by /ship test coverage audit on 2026-10-20
+  // Value: protects=a move that greys out the tapped arrow leaves focus alone when it was somewhere else (a field being
+  // typed in); fails_when=the effect focuses the other arrow whenever the tapped one is disabled; why_new=the focus test
+  // always focuses the tapped arrow first; seam=none; no_claim=how a real browser focuses on a mouse tap
+  it('leaves focus on another field when a moved rarity reaches an end', () => {
+    renderSettings();
+    const field = screen.getByDisplayValue('Dragon Krystals') as HTMLInputElement;
+    field.focus();
+    act(() => (screen.getByRole('button', { name: 'Move Gold up' }) as HTMLButtonElement).click());
+    expect([saved().rarities[0].id, document.activeElement === field]).toEqual(['gold', true]);
+  });
+
+  // Generated by /ship adversarial review fixes on 2026-10-20
+  // Value: protects=a mid-list move whose panel move made the browser drop focus to the page puts focus back on the tapped
+  // arrow, so the next key press moves the rarity again; fails_when=focus is only handed over when the tapped arrow greys
+  // out; why_new=jsdom keeps focus on a moved element, so the mid-list test above can't see a browser that drops it;
+  // seam=none; no_claim=which browsers drop focus (Chromium was checked by hand and keeps it)
+  it('puts focus back on the tapped arrow after a mid-list move if it fell to the page', () => {
+    renderSettings();
+    (document.activeElement as HTMLElement | null)?.blur();
+    act(() => (screen.getByRole('button', { name: 'Move Gold down' }) as HTMLButtonElement).click());
+    expect([saved().rarities.slice(0, 3).map((r: { id: string }) => r.id), document.activeElement === screen.getByRole('button', { name: 'Move Gold down' })]).toEqual([['diamond', 'epic', 'gold'], true]);
+  });
+
+  // Generated by /ship review fixes on 2026-10-20 (Safari never focuses a tapped button)
+  // Value: protects=a pointer tap (click detail 1) leaves focus where it was, even when it's on the page, so Safari and
+  // iPhone don't draw the focus ring on the arrow after every tap; fails_when=the effect focuses an arrow after any click
+  // whose focus is on the page; why_new=every other arrow test clicks with detail 0, which counts as a keyboard press;
+  // seam=none; no_claim=how each browser draws focus rings
+  // Extended by /ship review fixes on 2026-10-20 with the scroll
+  // Value: protects=a tap still scrolls the moved rarity's arrows back into view, the reason the scroll exists (the panel
+  // jumps away from the finger); fails_when=the scroll is moved into the keyboard-only branch; why_new=the scroll test
+  // above clicks with detail 0; seam=none; no_claim=where the arrows land on a real screen
+  it('leaves focus alone after a pointer tap, even at an end', () => {
+    renderSettings();
+    const scrolled = vi.spyOn(Element.prototype, 'scrollIntoView');
+    (document.activeElement as HTMLElement | null)?.blur();
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Move Gold up' }), { detail: 1 }));
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Move Epic Equip down' }), { detail: 1 }));
+    const arrows = (name: string) => screen.getByRole('button', { name }).parentElement;
+    expect([saved().rarities.slice(0, 4).map((r: { id: string }) => r.id), document.activeElement === document.body, scrolled.mock.contexts]).toEqual([['gold', 'diamond', 'rare', 'epic'], true, [arrows('Move Gold up'), arrows('Move Epic Equip up')]]);
+  });
+
+  // Generated by /ship review fixes on 2026-10-20
+  // Value: protects=when the browser has already dropped focus from the greyed-out arrow to the page (Chrome and Safari
+  // do), focus still goes to the other arrow; fails_when=the hand-off only looks for focus on the tapped arrow, which
+  // jsdom keeps but real browsers don't; why_new=review (testing): every other focus test starts with the arrow focused;
+  // seam=none; no_claim=a real browser's focus fixup (checked by hand in Chromium, run 9)
+  it('hands focus to the other arrow when the greyed-out one has already lost it', () => {
+    renderSettings();
+    (document.activeElement as HTMLElement | null)?.blur();
+    act(() => (screen.getByRole('button', { name: 'Move Gold up' }) as HTMLButtonElement).click());
+    expect([saved().rarities[0].id, document.activeElement === screen.getByRole('button', { name: 'Move Gold down' })]).toEqual(['gold', true]);
+  });
+
+  // Generated by /ship review fixes on 2026-10-20 (a held Enter bounced a rarity between the ends)
+  // Value: protects=a held Enter's repeats only act on the arrow the key went down on, so once the rarity reaches an end
+  // and focus moves to the other arrow, the repeats don't carry it back; a fresh press still works there;
+  // fails_when=repeated keydowns on the arrow focus moved to aren't cancelled, or a fresh press or a repeat on the same
+  // arrow is; why_new=every other arrow test sends single presses; seam=none; no_claim=that a real browser's held Enter
+  // fires a click per repeat (jsdom fires no clicks from keys; the cancelled keydown is what stops them)
+  it('ignores a held Enter on the arrow focus moved to, but not a fresh press', () => {
+    renderSettings();
+    const button = (name: string) => screen.getByRole('button', { name }) as HTMLButtonElement;
+    const up = button('Move Gold up');
+    up.focus();
+    // fireEvent returns false when the keydown was cancelled.
+    const first = fireEvent.keyDown(up, { key: 'Enter' });
+    act(() => up.click());
+    const down = button('Move Gold down');
+    const held = [fireEvent.keyDown(down, { key: 'Enter', repeat: true }), fireEvent.keyDown(down, { key: 'Enter', repeat: true })];
+    const fresh = fireEvent.keyDown(down, { key: 'Enter' });
+    const heldHere = fireEvent.keyDown(down, { key: 'Enter', repeat: true });
+    // Extended by /ship review fixes on 2026-10-20: a held Tab arriving on an arrow passes on.
+    const heldTab = fireEvent.keyDown(button('Move Diamond down'), { key: 'Tab', repeat: true });
+    expect([saved().rarities[0].id, document.activeElement === down, first, held, fresh, heldHere, heldTab]).toEqual(['gold', true, true, [false, false], true, true, true]);
   });
 });
 

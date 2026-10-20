@@ -338,7 +338,11 @@ export function FoldCard({ id, title, children }: { id: string; title: string; c
 
 const CONFIRM_MS = 3000;
 
-export function ConfirmButton({ label, onConfirm, className, title }: { label: string; onConfirm: () => void; className?: string; title?: string }) {
+/**
+ * `ariaLabel` names a button whose label is only a symbol (✕). Once armed, its text says what the next tap does, and its
+ * name keeps the ariaLabel ahead of that, so a screen reader still says which card the next tap removes.
+ */
+export function ConfirmButton({ label, onConfirm, className, title, ariaLabel }: { label: string; onConfirm: () => void; className?: string; title?: string; ariaLabel?: string }) {
   // When it was armed, not just whether: a page hidden mid-countdown (Activity) stops the timer, so the time itself
   // decides. Shown again later, it disarms; a tap after the 3 seconds arms again.
   const [armedAt, setArmedAt] = useState<number | null>(null);
@@ -362,7 +366,7 @@ export function ConfirmButton({ label, onConfirm, className, title }: { label: s
   };
   // Ghost buttons (btn.ghost, alone or with extra classes after it) stay ghost when armed, as before; only the text changes.
   return (
-    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={tap} title={title}>
+    <button className={armed && !className?.startsWith(btn.ghost) ? btn.danger : className} onClick={tap} title={title} aria-label={armed && ariaLabel ? `${ariaLabel}: tap again to confirm` : ariaLabel}>
       {armed ? 'Tap again to confirm' : label}
     </button>
   );

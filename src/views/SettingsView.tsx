@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { newId, noChange, normalize, useStore } from '../store';
 import { savedText } from '../storage';
 import { kardTable } from '../normalize';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
-import { actions, btn, check, field, form, grow, hint, subpanel } from '../classes';
-import { copiesTotal, fLevel, levelLabel, maxFusion, removeRarity } from '../engine';
+import { actions, btn, check, clearOfUndoBar, field, form, ghostBordered, glyphBtn, grow, hint, subpanel } from '../classes';
+import { copiesTotal, fLevel, levelLabel, maxFusion, moveRarity, removeRarity } from '../engine';
 import { fromNewerApp } from '../sync';
 import { checkForAppUpdate } from '../appUpdate';
 import SyncPanel from './SyncPanel';
@@ -92,6 +92,43 @@ export default function SettingsView() {
       undoLabel,
       { ruleChange: true },
     );
+  // Past the neighbour shown on screen, so a tap after a sync moved either of the two moves nothing rather than the wrong one.
+  const shiftRarity = (r: RarityRule, past: RarityRule, by: -1 | 1, keyboard: boolean) => {
+    setMoved({ id: r.id, by, keyboard });
+    update((d) => (moveRarity(d, r.id, past.id, by) ? undefined : noChange), `Moved ${r.label} ${by < 0 ? 'up' : 'down'}`);
+  };
+  // Each rarity's ↑ ↓ Remove group, by rarity id, and the last one moved.
+  const arrowGroups = useRef(new Map<string, HTMLElement>());
+  const [moved, setMoved] = useState<{ id: string; by: -1 | 1; keyboard: boolean } | null>(null);
+  // A rarity panel is tall, so a move takes it a whole panel away from the finger that tapped: bring its arrows back into
+  // view, so moving one several places is a few taps in a row. After a keyboard press (a click with detail 0, as Enter,
+  // Space and assistive tech send), focus that was on the tapped arrow, or that the browser dropped to the page (some do
+  // when a focused element's panel is moved), goes back to the tapped arrow, or to the other one when the move greyed it
+  // out (the rarity reached an end). A tap leaves focus alone: Safari never focuses a tapped button, so focusing it then
+  // would draw the focus ring after every tap. Focus somewhere else, like a field, stays put.
+  useEffect(() => {
+    if (!moved) return;
+    setMoved(null);
+    const group = arrowGroups.current.get(moved.id);
+    if (!group) return;
+    const up = group.querySelector<HTMLButtonElement>('[data-arrow=up]');
+    const down = group.querySelector<HTMLButtonElement>('[data-arrow=down]');
+    if (!up || !down) return;
+    const [pressed, other] = moved.by < 0 ? [up, down] : [down, up];
+    const target = pressed.disabled ? other : pressed;
+    if (moved.keyboard && document.activeElement !== target && (document.activeElement === pressed || document.activeElement === document.body)) target.focus({ preventScroll: true });
+    group.scrollIntoView({ block: 'nearest' });
+  }, [moved, state.rarities]);
+  // A held Enter repeats its click. Once a move hands focus to the other arrow (the rarity reached an end), those repeats
+  // would move the rarity straight back, so only the arrow the key went down on takes them: holding Enter carries a
+  // rarity to the end and stops. A fresh press works on either arrow.
+  const keyDownOn = useRef<EventTarget | null>(null);
+  // Enter only: a held Tab must still move focus on through the arrows.
+  const arrowKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== 'Enter') return;
+    if (!e.repeat) keyDownOn.current = e.currentTarget;
+    else if (keyDownOn.current !== e.currentTarget) e.preventDefault();
+  };
   const editCurrency = (id: string, edit: (c: AppState['currencies'][number]) => void) =>
     update((d) => {
       const c = d.currencies.find((x) => x.id === id);
@@ -140,7 +177,7 @@ export default function SettingsView() {
             which left the two column tops out of line.
           */}
           <div className="lg:columns-2 lg:gap-3 lg:[&>div]:break-inside-avoid lg:[&>div]:mt-0 lg:[&>div]:mb-3">
-            {state.rarities.map((r) => {
+            {state.rarities.map((r, i, all) => {
               const kameo = r.kind === 'kameo';
               return (
                 <div key={r.id} className={subpanel}>
@@ -282,42 +319,54 @@ export default function SettingsView() {
                       </>
                     )}
                     <span className={`${grow} lg:hidden`} />
-                    {(() => {
-                      const used = state.cards.some((c) => c.rarityId === r.id);
-                      const maxedHere = (state.maxed ?? []).filter((m) => m.rarityId === r.id).length;
-                      const remove = (confirmed: boolean) => {
-                        // The Kaskets and Maxed entries counted as the change removes them: a sync may have added or
-                        // removed some since.
-                        let kaskets = 0;
-                        let maxed = 0;
-                        // Not if a sync already removed it, or brought in cards that use it. Nor on one tap if a sync
-                        // has given it Maxed entries since the screen showed none: the button then asks for two taps.
-                        update(
-                          (d) => {
-                            if (!d.rarities.some((x) => x.id === r.id) || d.cards.some((c) => c.rarityId === r.id)) return noChange;
-                            if (!confirmed && d.maxed?.some((m) => m.rarityId === r.id)) return noChange;
-                            kaskets = d.packs.filter((p) => p.kasket === r.id).length;
-                            maxed = (d.maxed ?? []).filter((m) => m.rarityId === r.id).length;
-                            removeRarity(d, r.id);
-                          },
-                          () => withRemoved(`Removed ${r.label}`, kaskets, maxed),
+                    {/* One group, right-aligned, so on a narrow phone the arrows and Remove wrap together instead of leaving
+                        Remove alone at the left of a line of its own. */}
+                    {/* clearOfUndoBar keeps the arrows above the Undo bar a move opens when a ↓ scrolls them to the bottom
+                        edge; without it the next tap lands on Undo. */}
+                    <span className={`flex gap-[0.4rem] ml-auto ${clearOfUndoBar}`} ref={(el) => void (el ? arrowGroups.current.set(r.id, el) : arrowGroups.current.delete(r.id))}>
+                      <button className={glyphBtn} data-arrow="up" onClick={(e) => shiftRarity(r, all[i - 1], -1, e.detail === 0)} onKeyDown={arrowKey} disabled={i === 0} aria-label={`Move ${r.label} up`} title="Move up">
+                        ↑
+                      </button>
+                      <button className={glyphBtn} data-arrow="down" onClick={(e) => shiftRarity(r, all[i + 1], 1, e.detail === 0)} onKeyDown={arrowKey} disabled={i === all.length - 1} aria-label={`Move ${r.label} down`} title="Move down">
+                        ↓
+                      </button>
+                      {(() => {
+                        const used = state.cards.some((c) => c.rarityId === r.id);
+                        const maxedHere = (state.maxed ?? []).filter((m) => m.rarityId === r.id).length;
+                        const remove = (confirmed: boolean) => {
+                          // The Kaskets and Maxed entries counted as the change removes them: a sync may have added or
+                          // removed some since.
+                          let kaskets = 0;
+                          let maxed = 0;
+                          // Not if a sync already removed it, or brought in cards that use it. Nor on one tap if a sync
+                          // has given it Maxed entries since the screen showed none: the button then asks for two taps.
+                          update(
+                            (d) => {
+                              if (!d.rarities.some((x) => x.id === r.id) || d.cards.some((c) => c.rarityId === r.id)) return noChange;
+                              if (!confirmed && d.maxed?.some((m) => m.rarityId === r.id)) return noChange;
+                              kaskets = d.packs.filter((p) => p.kasket === r.id).length;
+                              maxed = (d.maxed ?? []).filter((m) => m.rarityId === r.id).length;
+                              removeRarity(d, r.id);
+                            },
+                            () => withRemoved(`Removed ${r.label}`, kaskets, maxed),
+                          );
+                        };
+                        // Its Maxed history goes with it, and the tooltip doesn't show on phones: two taps, with the count on
+                        // the button. Otherwise one tap, with Undo, as before.
+                        const kaskets = state.packs.filter((p) => p.kasket === r.id).length;
+                        if (!used && maxedHere > 0) return <ConfirmButton label={`Remove (${maxedHere} maxed)`} className={ghostBordered} onConfirm={() => remove(true)} title={withRemoved('Remove rarity', kaskets, maxedHere)} />;
+                        return (
+                          <button
+                            className={ghostBordered}
+                            disabled={used}
+                            title={used ? 'Cards use this rarity' : withRemoved('Remove rarity', kaskets)}
+                            onClick={() => remove(false)}
+                          >
+                            Remove
+                          </button>
                         );
-                      };
-                      // Its Maxed history goes with it, and the tooltip doesn't show on phones: two taps, with the count on
-                      // the button. Otherwise one tap, with Undo, as before.
-                      const kaskets = state.packs.filter((p) => p.kasket === r.id).length;
-                      if (!used && maxedHere > 0) return <ConfirmButton label={`Remove (${maxedHere} maxed)`} className={btn.ghost} onConfirm={() => remove(true)} title={withRemoved('Remove rarity', kaskets, maxedHere)} />;
-                      return (
-                        <button
-                          className={btn.ghost}
-                          disabled={used}
-                          title={used ? 'Cards use this rarity' : withRemoved('Remove rarity', kaskets)}
-                          onClick={() => remove(false)}
-                        >
-                          Remove
-                        </button>
-                      );
-                    })()}
+                      })()}
+                    </span>
                   </div>
                   {!kameo && r.fusionUpThreshold != null && (
                     <>

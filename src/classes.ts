@@ -8,6 +8,24 @@ export const btn = {
   danger: 'bg-red-dim border-red',
   ghost: 'bg-transparent border-transparent md:hover:bg-panel-2',
 };
+/**
+ * A ghost button that also gets the base buttons' muted hover border on wider screens (enabled buttons only). Settings'
+ * rarity buttons sit on a subpanel, where ghost's hover tint matches the background and would be invisible; glyphBtn
+ * builds on it too, so the rarity arrows and the Maxed ✕ (on a card, where the tint does show) hover the same way.
+ * Starts with btn.ghost, which is how ConfirmButton knows to stay ghost when armed.
+ */
+export const ghostBordered = `${btn.ghost} md:enabled:hover:border-muted`;
+/**
+ * A ghost button whose label is one symbol (↑, ↓, ✕): at least as wide as the stepper's 38px buttons, so it's a fair
+ * tap target, and free to grow (a two-tap ✕ reads "Tap again to confirm" once armed).
+ */
+export const glyphBtn = `${ghostBordered} min-w-[38px]`;
+/**
+ * Bottom scroll margin for a control that scrolls itself into view after a change that opens the Undo bar (App.tsx's
+ * UndoToast), so the bar doesn't cover it. The bar's top sits about 57px above the bottom of the page area on phones and
+ * 74px on wider screens; 6rem leaves room to spare. Raise it if the bar gets taller or moves up.
+ */
+export const clearOfUndoBar = 'scroll-mb-[6rem]';
 
 /** A panel on the page background (Plan and Settings sections, card and pack rows). No padding or margin. */
 export const surface = 'bg-panel border border-line rounded-card';
@@ -18,8 +36,13 @@ export const subpanel = 'bg-panel-2 border border-line rounded-panel p-[0.7rem] 
 /** Gold-edged tip or warning. */
 export const hint = 'bg-hint border-l-[3px] border-gold py-[0.4rem] px-[0.6rem] rounded-chip text-[0.85rem]';
 
+/** The red to gold fill of a progress bar: the Plan's pack efficiency and the Maxed page's overall completion. */
+export const barFill = 'bg-[linear-gradient(90deg,var(--color-red),var(--color-gold))]';
+
+/** A list row's padding and the divider between consecutive rows, for a row laid out some other way than `row`. */
+export const rowDivider = 'py-[0.35rem] [&+&]:border-t [&+&]:border-line';
 /** A list row; consecutive rows get a divider. Vertical alignment and wrapping are left to the caller. */
-export const row = 'flex gap-[0.6rem] py-[0.35rem] [&+&]:border-t [&+&]:border-line';
+export const row = `flex gap-[0.6rem] ${rowDivider}`;
 /** Takes the free space in a flex row and lets long text wrap or truncate. */
 export const grow = 'flex-1 min-w-0';
 export const rowTitle = 'font-semibold wrap-anywhere';

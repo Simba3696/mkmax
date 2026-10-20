@@ -82,4 +82,4 @@ Only the content area scrolls; the header and tab bar are fixed rows around it, 
 
 The icon is a gold-ringed red medallion with a double up-chevron. `public/icon.svg` is the source. The PNGs next to it are rendered from it: `icon-192.png` and `icon-512.png` for the manifest, `icon-maskable-512.png` (the mark padded for Android's crop), and `apple-touch-icon.png` (180px). `public/logo-mark.svg` is the medallion without its background tile, used in the header and the side rail. If you change the design, re-render all four PNGs. Phones cache home-screen icons, so remove the app and add it again to see a new one.
 
-The tab icons are inline SVGs in `src/icons.tsx`. They use the current text color, so the active tab's icon turns red.
+The tab icons, and the ones on the Cards, Tower gear and Maxed buttons, are inline SVGs in `src/icons.tsx`. They use the current text color, so the active tab's icon turns red.

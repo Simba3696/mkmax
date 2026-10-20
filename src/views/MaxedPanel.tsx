@@ -5,11 +5,33 @@ import { maxedKeys, recordMaxed } from '../engine';
 import { completion, findInCatalog, loadCatalog, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
 import { CardThumb, ConfirmButton, RarityBadge, dayLabel } from '../ui';
-import { actions, btn, card, field, grow, row, rowTitle, subpanel } from '../classes';
+import { actions, barFill, btn, card, field, glyphBtn, grow, row, rowDivider, rowTitle, subpanel } from '../classes';
 import type { MaxedCard } from '../types';
 
 /** Whole percent, rounded down so a rarity reads 100% only once every card is maxed. */
 const percent = (n: number, of: number) => (of ? Math.floor((n / of) * 100) : 0);
+
+/**
+ * Whether `value` is a six-digit hex color, the only kind the app saves (the defaults and Settings' color picker). A
+ * rarity's color can come from synced or imported data, and CSS takes many values that draw nothing (keywords, var(),
+ * see-through colors, lookalike letters), so anything else falls back to red to gold rather than an empty bar.
+ */
+const isColor = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
+
+/**
+ * A completion bar in the rarity's color, or the Plan bars' red to gold overall. It fills to the exact share, not the
+ * rounded-down figure beside it: most rarities sit at a few percent, which would round to an empty bar. The exact share
+ * still only fills the bar once every card is maxed, and any maxed card shows at least a dot.
+ */
+function Bar({ n, of, color, label }: { n: number; of: number; color?: string; label: string }) {
+  const fill = color && isColor(color) ? color : undefined;
+  return (
+    <div role="progressbar" aria-label={label} aria-valuenow={percent(n, of)} aria-valuemin={0} aria-valuemax={100} className="h-[8px] mt-[0.35rem] bg-line rounded-chip overflow-hidden">
+      {/* backgroundColor, not background: a rarity's color comes from synced data, and only a plain color belongs here. */}
+      <div className={`h-full rounded-chip ${n > 0 ? 'min-w-[8px]' : ''} ${fill ? '' : barFill}`} style={{ width: `${of ? (n / of) * 100 : 0}%`, backgroundColor: fill }} />
+    </div>
+  );
+}
 
 /**
  * The same value while `key` is unchanged. Every change copies the whole save (store.tsx), so the record and rarities
@@ -90,20 +112,30 @@ export default function MaxedPanel() {
         )}
         {done && (
           <>
-            <p>
+            {/* No bottom margin: the bar under it belongs to this figure, so it sits as close as the rarity bars do. */}
+            <p className="mb-0">
               <b>{percent(counted, total)}%</b> of every card MK Mobile Base lists: {counted} of {total} maxed.
             </p>
-            {done.rarities.map((r) => (
-              <div key={r.rarityId} className={`${row} items-center`}>
-                <div className={grow}>
-                  <RarityBadge rule={rarities.find((x) => x.id === r.rarityId)} />
-                </div>
-                <span className="text-muted text-small">
-                  {r.maxed} of {r.total}
-                </span>
-                <b className="min-w-[3.5rem] text-right">{percent(r.maxed, r.total)}%</b>
-              </div>
-            ))}
+            <Bar n={counted} of={total} label="Overall completion" />
+            <div className="mt-[0.6rem]">
+              {done.rarities.map((r) => {
+                const rule = rarities.find((x) => x.id === r.rarityId);
+                return (
+                  <div key={r.rarityId} className={rowDivider}>
+                    <div className="flex gap-[0.6rem] items-center">
+                      <div className={grow}>
+                        <RarityBadge rule={rule} />
+                      </div>
+                      <span className="text-muted text-small">
+                        {r.maxed} of {r.total}
+                      </span>
+                      <b className="min-w-[3.5rem] text-right">{percent(r.maxed, r.total)}%</b>
+                    </div>
+                    <Bar n={r.maxed} of={r.total} color={rule?.color} label={`${rule?.label ?? 'Rarity'} maxed`} />
+                  </div>
+                );
+              })}
+            </div>
             {done.unlisted.length > 0 && (
               <p className="text-muted text-small md:max-w-[80ch]">
                 {done.unlisted.length === 1 ? "1 maxed card isn't" : `${done.unlisted.length} maxed cards aren't`} on MK Mobile Base's list under {done.unlisted.length === 1 ? 'its' : 'their'} rarity yet, so{' '}
@@ -135,7 +167,7 @@ export default function MaxedPanel() {
                 {m.at && <span className="text-muted">{' '}maxed {dayLabel(m.at, now)}</span>}
               </div>
             </div>
-            <ConfirmButton label="Remove" className={btn.ghost} onConfirm={() => remove(m)} />
+            <ConfirmButton label="✕" className={glyphBtn} onConfirm={() => remove(m)} title={`Remove ${m.name} from Maxed`} ariaLabel={`Remove ${m.name} from Maxed`} />
           </div>
         ))}
       </section>

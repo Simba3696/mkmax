@@ -6,7 +6,7 @@ import { CardThumb, Chip, daysFromNow, FoldCard, fmt, FusionLabel, kardFooter, k
 import { challengeFor, challengeWhen, useEvents } from '../events';
 import type { Pack } from '../types';
 import { GearSummary } from './GearOrder';
-import { btn, card, field, grow, hint, row, rowTitle, type ChipTone } from '../classes';
+import { barFill, btn, card, field, grow, hint, row, rowTitle, type ChipTone } from '../classes';
 
 const PHASE_LABEL: Record<Phase, string> = {
   unlock: 'Unlock',
@@ -343,7 +343,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                             {fmt(r.pack.cost)} {cur.name} · value {fmt(r.ev)} per buy
                           </span>
                           <span className="h-[4px] bg-panel-2 rounded-[2px] mt-[5px] overflow-hidden" title={`${Math.round(eff * 100)}% efficiency`}>
-                            <span className="block h-full bg-[linear-gradient(90deg,var(--color-red),var(--color-gold))]" style={{ width: `${eff * 100}%` }} />
+                            <span className={`block h-full ${barFill}`} style={{ width: `${eff * 100}%` }} />
                           </span>
                         </button>
                         <div className="flex flex-col items-end gap-[4px]">
