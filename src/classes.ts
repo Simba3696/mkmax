@@ -11,9 +11,8 @@ export const btn = {
 /**
  * A ghost button that also gets the base buttons' muted hover border on wider screens (enabled buttons only). Settings'
  * rarity buttons sit on a subpanel, where ghost's hover tint matches the background and would be invisible; glyphBtn
- * builds on it too, so the rarity arrows and the Maxed ✕ (on a card, where the tint does show) hover the same way. Other
- * ✕ and arrow buttons still use plain btn.ghost. Starts with btn.ghost, which is how ConfirmButton knows to stay ghost
- * when armed.
+ * builds on it too, so the rarity arrows and the Maxed ✕ (on a card, where the tint does show) hover the same way.
+ * Starts with btn.ghost, which is how ConfirmButton knows to stay ghost when armed.
  */
 export const ghostBordered = `${btn.ghost} md:enabled:hover:border-muted`;
 /**
