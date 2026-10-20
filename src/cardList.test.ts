@@ -136,6 +136,27 @@ describe('pasted card lists', () => {
     ]);
   });
 
+  // Regression: /ship review (Red Team) of maxed-remove-x, 2026-10-20 — a Kameo with a character's name blocked the
+  // character's Stage line ("Listed as Gold Kameo"); the Grand Master join made Sub-Zero, Grandmaster one more such pair
+  // Value: protects=a Stage line brings back a maxed Gold character while a Kameo of the same name is listed; fails_when=
+  // the filed-wrong check compares across kinds, so the line is refused; why_new=the existing filed-wrong test uses two
+  // character rarities only; seam=none; no_claim=which cards a stage leaves maxed (the stage tests above)
+  it('takes a stage line for a character when only a Kameo of the same name is listed', () => {
+    const existing: Card[] = [
+      { id: 'kk', name: 'Scorpion, Klassic', rarityId: 'kameo-gold', fusion: 0, guest: false },
+      { id: 'gm', name: 'Sub-Zero, Grand Master', rarityId: 'kameo-gold', fusion: 0, guest: false },
+    ];
+    const text = ['Klassic Scorpion - Gold - Stage I', 'Sub-Zero Grandmaster - Gold - Stage I'].join('\n');
+    const r = parseCardList(text, rarities, 'gold', existing);
+    expect([r.cards.map((c) => [c.name, c.rarityId]), r.problems]).toEqual([
+      [
+        ['Klassic Scorpion', 'gold'],
+        ['Sub-Zero Grandmaster', 'gold'],
+      ],
+      [],
+    ]);
+  });
+
   it('a stage paste keeps a card still being fused, and one exactly at the new Max is maxed', () => {
     const s = defaultState();
     s.cards = [

@@ -172,8 +172,11 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     }
     // Every card still being maxed is in the app, so a Gold card made ascendable that isn't was maxed and removed:
     // it comes back at the cap below its new stage (F10 for Stage I, A5 for Stage II), with 5 copies to go. The
-    // same name under another rarity means the card is still here, just filed wrong, so that's a problem instead.
-    const elsewhere = stage && fusion == null ? existing.find((c) => c.rarityId !== rarityId && nameKey(c.name) === nameKey(name)) : undefined;
+    // same name under another rarity of the same kind means the card is still here, just filed wrong, so that's a
+    // problem instead. A Kameo is another card that can share a character's name (the Klassic Scorpion character and
+    // the Scorpion, Klassic Kameo), so it doesn't count.
+    const kindOf = (id: string) => rarities.find((r) => r.id === id)?.kind;
+    const elsewhere = stage && fusion == null ? existing.find((c) => c.rarityId !== rarityId && kindOf(c.rarityId) === rule!.kind && nameKey(c.name) === nameKey(name)) : undefined;
     if (elsewhere) {
       out.problems.push({ line, reason: `Listed as ${rarities.find((r) => r.id === elsewhere.rarityId)?.label ?? elsewhere.rarityId}: change its rarity on the card first` });
       continue;
