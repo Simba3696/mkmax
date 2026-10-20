@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { newId, noChange, normalize, useStore } from '../store';
 import { savedText } from '../storage';
 import { kardTable } from '../normalize';
@@ -119,6 +119,14 @@ export default function SettingsView() {
     if (moved.keyboard && document.activeElement !== target && (document.activeElement === pressed || document.activeElement === document.body)) target.focus({ preventScroll: true });
     group.scrollIntoView({ block: 'nearest' });
   }, [moved, state.rarities]);
+  // A held Enter repeats its click. Once a move hands focus to the other arrow (the rarity reached an end), those repeats
+  // would move the rarity straight back, so only the arrow the key went down on takes them: holding Enter carries a
+  // rarity to the end and stops. A fresh press works on either arrow.
+  const keyDownOn = useRef<EventTarget | null>(null);
+  const arrowKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (!e.repeat) keyDownOn.current = e.currentTarget;
+    else if (keyDownOn.current !== e.currentTarget) e.preventDefault();
+  };
   const editCurrency = (id: string, edit: (c: AppState['currencies'][number]) => void) =>
     update((d) => {
       const c = d.currencies.find((x) => x.id === id);
@@ -314,10 +322,10 @@ export default function SettingsView() {
                     {/* clearOfUndoBar keeps the arrows above the Undo bar a move opens when a ↓ scrolls them to the bottom
                         edge; without it the next tap lands on Undo. */}
                     <span className={`flex gap-[0.4rem] ml-auto ${clearOfUndoBar}`} ref={(el) => void (el ? arrowGroups.current.set(r.id, el) : arrowGroups.current.delete(r.id))}>
-                      <button className={glyphBtn} data-arrow="up" onClick={(e) => shiftRarity(r, all[i - 1], -1, e.detail === 0)} disabled={i === 0} aria-label={`Move ${r.label} up`} title="Move up">
+                      <button className={glyphBtn} data-arrow="up" onClick={(e) => shiftRarity(r, all[i - 1], -1, e.detail === 0)} onKeyDown={arrowKey} disabled={i === 0} aria-label={`Move ${r.label} up`} title="Move up">
                         ↑
                       </button>
-                      <button className={glyphBtn} data-arrow="down" onClick={(e) => shiftRarity(r, all[i + 1], 1, e.detail === 0)} disabled={i === all.length - 1} aria-label={`Move ${r.label} down`} title="Move down">
+                      <button className={glyphBtn} data-arrow="down" onClick={(e) => shiftRarity(r, all[i + 1], 1, e.detail === 0)} onKeyDown={arrowKey} disabled={i === all.length - 1} aria-label={`Move ${r.label} down`} title="Move down">
                         ↓
                       </button>
                       {(() => {
