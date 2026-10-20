@@ -101,8 +101,9 @@ export default function SettingsView() {
   const arrowGroups = useRef(new Map<string, HTMLElement>());
   const [moved, setMoved] = useState<{ id: string; by: -1 | 1 } | null>(null);
   // A rarity panel is tall, so a move takes it a whole panel away from the finger that tapped: bring its arrows back into
-  // view, so moving one several places is a few taps in a row. An arrow greyed out by the move (the rarity reached an end)
-  // can't keep keyboard focus, so focus goes to the other one instead of falling back to the top of the page.
+  // view, so moving one several places is a few taps in a row. Keyboard focus that was on the tapped arrow, or that the
+  // browser dropped to the page (some do when a focused element's panel is moved), goes back to the tapped arrow, or to
+  // the other one when the move greyed it out (the rarity reached an end). Focus somewhere else, like a field, stays put.
   useEffect(() => {
     if (!moved) return;
     setMoved(null);
@@ -111,8 +112,9 @@ export default function SettingsView() {
     const up = group.querySelector<HTMLButtonElement>('[data-arrow=up]');
     const down = group.querySelector<HTMLButtonElement>('[data-arrow=down]');
     if (!up || !down) return;
-    const pressed = moved.by < 0 ? up : down;
-    if (pressed.disabled && (document.activeElement === pressed || document.activeElement === document.body)) (moved.by < 0 ? down : up).focus({ preventScroll: true });
+    const [pressed, other] = moved.by < 0 ? [up, down] : [down, up];
+    const target = pressed.disabled ? other : pressed;
+    if (document.activeElement !== target && (document.activeElement === pressed || document.activeElement === document.body)) target.focus({ preventScroll: true });
     group.scrollIntoView({ block: 'nearest' });
   }, [moved, state.rarities]);
   const editCurrency = (id: string, edit: (c: AppState['currencies'][number]) => void) =>
