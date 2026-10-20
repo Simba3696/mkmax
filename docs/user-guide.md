@@ -158,7 +158,7 @@ Pop-ups (like the pack editor) sit above the rest of the app and scroll on their
 After a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
 
 - The bar has **Undo** and ✕ (to close it).
-- It also appears for saving a pack ("Saved …"), hiding a shop pack ("Hid …"), pasting a list ("Added N cards, updated M"), pasting maxed cards ("Added N to Maxed") or removing one from the Maxed record, switching cards to MK Mobile Base's rarity ("rarity change for N cards"), ending a Realm Klash season early, removing a rarity or currency, **Reset weights**, and turning a rarity's kards off while it tracks to the kard threshold.
+- It also appears for saving a pack ("Saved …"), hiding a shop pack ("Hid …"), pasting a list ("Added N cards, updated M"), pasting maxed cards ("Added N to Maxed") or removing one from the Maxed record, switching cards to MK Mobile Base's rarity ("rarity change for N cards"), ending a Realm Klash season early, moving a rarity up or down ("Moved …"), removing a rarity or currency, **Reset weights**, and turning a rarity's kards off while it tracks to the kard threshold.
 - Only the latest change can be undone.
 - Undo puts back the whole app as it was, so anything else you changed while the bar was up (like a balance) is undone too.
 - **Import backup**, **Load sample data**, **Erase everything** and a sync download clear the bar and can't be undone.
@@ -496,7 +496,7 @@ Sync keeps your devices on the same data through a secret gist on your GitHub ac
 
 ### Fusion rules
 
-One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gold Kameo, show only **Name**, **Kind**, **Has guest cards**, **Color** and **Remove**, since a Kameo has no fusion steps. The others have:
+One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gold Kameo, show only **Name**, **Kind**, **Has guest cards**, **Color**, the **↑** and **↓** arrows and **Remove**, since a Kameo has no fusion steps. The others have:
 
 - **Name:** renaming changes the label. **Paste a list…** uses the new name for headings and details.
 - **Fusion Up Kards usable from:** the level where kards start. **No kards for this rarity** hides the kard costs. With no kards there's no threshold to stop at, so a rarity set to track until the kard threshold switches to **Max**, with Undo. Picking a level again leaves it on Max. An older save that still tracks to the kard threshold with no kards switches to Max once, when it loads. Uncommon gear has no kards unless you pick a level here and fill in its **Fusion Up Kards per step**, which start at 0.
