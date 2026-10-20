@@ -260,14 +260,14 @@ describe('Settings rows on a screen a sync has changed', () => {
 
   // Generated on 2026-10-20 (rarity order in Settings)
   // Value: protects=↑ and ↓ on a rarity move it one place with an Undo, the ends are greyed out, and a tap after a sync
-  // reordered the rarities moves nothing; fails_when=the buttons move the rarity at the tapped place after a sync, or
+  // moved that rarity or its shown neighbour moves nothing; fails_when=the buttons move the rarity at the tapped place after a sync, or
   // save without an Undo; why_new=rarities couldn't be reordered before; seam=a grabbed update stands in for the sync;
   // no_claim=the move rule itself (engine.test.ts moveRarity)
   // Extended by /ship test coverage audit on 2026-10-20 with a ↓ move that lands
   // Value: protects=↓ moves a rarity one place down with a "Moved X down" Undo; fails_when=the ↓ button passes the
   // neighbour above (or -1), so it moves nothing or throws, or its Undo says "up"; why_new=the only ↓ tap above is the
   // stale one, which moves nothing either way; seam=none; no_claim=Undo putting the order back (store tests)
-  it('moves a rarity up or down with Undo, and moves nothing once a sync reordered them', () => {
+  it('moves a rarity up or down with Undo, and moves nothing once a sync moved it or its neighbour', () => {
     localStorage.setItem('mkmax:v1', JSON.stringify(defaultState()));
     renderSettings();
     const ids = () => saved().rarities.map((r: { id: string }) => r.id);
