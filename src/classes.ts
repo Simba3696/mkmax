@@ -11,10 +11,10 @@ export const btn = {
 /**
  * A ghost button whose label is one symbol (↑, ↓, ✕): at least as wide as the stepper's 38px buttons, so it's a fair
  * tap target, and free to grow (a two-tap ✕ reads "Tap again to confirm" once armed). Starts with btn.ghost, which is
- * how ConfirmButton knows to stay ghost when armed.
+ * how ConfirmButton knows to stay ghost when armed. On wider screens it also gets the base buttons' muted hover border,
+ * on enabled buttons only, since ghost's hover tint matches a subpanel (Settings) and would be invisible there.
  */
-// The hover border shows on any background: ghost's hover tint matches a subpanel (Settings), so it's invisible there.
-export const glyphBtn = `${btn.ghost} min-w-[38px] md:hover:border-line`;
+export const glyphBtn = `${btn.ghost} min-w-[38px] md:enabled:hover:border-muted`;
 /**
  * Bottom scroll margin for a control that scrolls itself into view after a change that opens the Undo bar (App.tsx's
  * UndoToast), so the bar doesn't cover it. The bar's top sits about 57px above the bottom of the page area on phones and
