@@ -4,7 +4,7 @@ import { savedText } from '../storage';
 import { kardTable } from '../normalize';
 import { DIAMOND_KARD_COSTS, defaultState, defaultWeights, sampleState } from '../defaults';
 import { ConfirmButton, FoldCard, NumInput } from '../ui';
-import { actions, btn, check, clearOfUndoBar, field, form, glyphBtn, grow, hint, subpanel } from '../classes';
+import { actions, btn, check, clearOfUndoBar, field, form, ghostBordered, glyphBtn, grow, hint, subpanel } from '../classes';
 import { copiesTotal, fLevel, levelLabel, maxFusion, moveRarity, removeRarity } from '../engine';
 import { fromNewerApp } from '../sync';
 import { checkForAppUpdate } from '../appUpdate';
@@ -340,10 +340,10 @@ export default function SettingsView() {
                         // Its Maxed history goes with it, and the tooltip doesn't show on phones: two taps, with the count on
                         // the button. Otherwise one tap, with Undo, as before.
                         const kaskets = state.packs.filter((p) => p.kasket === r.id).length;
-                        if (!used && maxedHere > 0) return <ConfirmButton label={`Remove (${maxedHere} maxed)`} className={btn.ghost} onConfirm={() => remove(true)} title={withRemoved('Remove rarity', kaskets, maxedHere)} />;
+                        if (!used && maxedHere > 0) return <ConfirmButton label={`Remove (${maxedHere} maxed)`} className={ghostBordered} onConfirm={() => remove(true)} title={withRemoved('Remove rarity', kaskets, maxedHere)} />;
                         return (
                           <button
-                            className={btn.ghost}
+                            className={ghostBordered}
                             disabled={used}
                             title={used ? 'Cards use this rarity' : withRemoved('Remove rarity', kaskets)}
                             onClick={() => remove(false)}

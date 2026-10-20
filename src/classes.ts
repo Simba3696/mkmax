@@ -9,12 +9,16 @@ export const btn = {
   ghost: 'bg-transparent border-transparent md:hover:bg-panel-2',
 };
 /**
- * A ghost button whose label is one symbol (↑, ↓, ✕): at least as wide as the stepper's 38px buttons, so it's a fair
- * tap target, and free to grow (a two-tap ✕ reads "Tap again to confirm" once armed). Starts with btn.ghost, which is
- * how ConfirmButton knows to stay ghost when armed. On wider screens it also gets the base buttons' muted hover border,
- * on enabled buttons only, since ghost's hover tint matches a subpanel (Settings) and would be invisible there.
+ * A ghost button that also gets the base buttons' muted hover border on wider screens (enabled buttons only), for one
+ * that sits on a subpanel (Settings), where ghost's hover tint matches the background and would be invisible. Starts
+ * with btn.ghost, which is how ConfirmButton knows to stay ghost when armed.
  */
-export const glyphBtn = `${btn.ghost} min-w-[38px] md:enabled:hover:border-muted`;
+export const ghostBordered = `${btn.ghost} md:enabled:hover:border-muted`;
+/**
+ * A ghost button whose label is one symbol (↑, ↓, ✕): at least as wide as the stepper's 38px buttons, so it's a fair
+ * tap target, and free to grow (a two-tap ✕ reads "Tap again to confirm" once armed).
+ */
+export const glyphBtn = `${ghostBordered} min-w-[38px]`;
 /**
  * Bottom scroll margin for a control that scrolls itself into view after a change that opens the Undo bar (App.tsx's
  * UndoToast), so the bar doesn't cover it. The bar's top sits about 57px above the bottom of the page area on phones and

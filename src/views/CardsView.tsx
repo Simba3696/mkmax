@@ -391,6 +391,8 @@ export default function CardsView({ sub, onSub }: { sub: CardsPage; onSub: (sub:
   );
 }
 
+// No min-w-0: each segment stays at least as wide as its longest word, so with large text the labels wrap under their
+// icons instead of spilling into each other. Phones stack the icon over the label; wider screens put it beside.
 const segment = (active: boolean) => `flex-1 inline-flex flex-col items-center justify-center gap-[0.15rem] md:flex-row md:gap-[0.4rem] text-center md:whitespace-nowrap border-0 rounded-none focus-visible:-outline-offset-2 ${active ? 'bg-red-dim text-fg' : 'bg-panel text-muted hover:text-fg'}`;
 
 const CARD_SORTS = ['rarity', 'fusion-high', 'fusion-low', 'name'] as const;
