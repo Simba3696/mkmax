@@ -104,7 +104,10 @@ describe('Cards: the Maxed page', () => {
     const removeKori = screen.getByRole('button', { name: 'Remove Kori Blade from Maxed' });
     expect([removeKori.textContent, screen.getAllByRole('button', { name: /^Remove .* from Maxed$/ }).map((b) => b.textContent)]).toEqual(['✕', ['✕', '✕']]);
     fireEvent.click(removeKori);
-    const onClick = handler(screen.getByRole('button', { name: ARMED }));
+    // Armed, it shows the usual prompt, and its name still says which card (2026-10-20, /ship adversarial review).
+    const armed = screen.getByRole('button', { name: `Remove Kori Blade from Maxed: ${ARMED.toLowerCase()}` });
+    expect(armed.textContent).toBe(ARMED);
+    const onClick = handler(armed);
     // A sync puts a card ahead of Kori Blade: the tap still removes Kori Blade, not the card now in its place.
     act(() => update((d) => void d.maxed!.unshift({ name: 'Jade, Lizard', rarityId: 'diamond' })));
     act(() => onClick());
