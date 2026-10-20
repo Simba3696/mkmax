@@ -415,7 +415,9 @@ describe('Settings rows on a screen a sync has changed', () => {
     const held = [fireEvent.keyDown(down, { key: 'Enter', repeat: true }), fireEvent.keyDown(down, { key: 'Enter', repeat: true })];
     const fresh = fireEvent.keyDown(down, { key: 'Enter' });
     const heldHere = fireEvent.keyDown(down, { key: 'Enter', repeat: true });
-    expect([saved().rarities[0].id, document.activeElement === down, first, held, fresh, heldHere]).toEqual(['gold', true, true, [false, false], true, true]);
+    // Extended by /ship review fixes on 2026-10-20: a held Tab arriving on an arrow passes on.
+    const heldTab = fireEvent.keyDown(button('Move Diamond down'), { key: 'Tab', repeat: true });
+    expect([saved().rarities[0].id, document.activeElement === down, first, held, fresh, heldHere, heldTab]).toEqual(['gold', true, true, [false, false], true, true, true]);
   });
 });
 

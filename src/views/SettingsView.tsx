@@ -123,7 +123,9 @@ export default function SettingsView() {
   // would move the rarity straight back, so only the arrow the key went down on takes them: holding Enter carries a
   // rarity to the end and stops. A fresh press works on either arrow.
   const keyDownOn = useRef<EventTarget | null>(null);
+  // Enter only: a held Tab must still move focus on through the arrows.
   const arrowKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== 'Enter') return;
     if (!e.repeat) keyDownOn.current = e.currentTarget;
     else if (keyDownOn.current !== e.currentTarget) e.preventDefault();
   };
