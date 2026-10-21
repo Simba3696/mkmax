@@ -2345,3 +2345,52 @@ describe('Cards: No kards', () => {
     expect(stamps).toHaveBeenCalledTimes(1); // the sync stand-in only
   });
 });
+
+describe('Tower gear: the kard threshold filter', () => {
+  // Generated on 2026-10-22 (Tower gear filter)
+  // Value: protects=Below kard threshold lists only tower gear that still needs copies before Fusion Up Kards work, with
+  // counts on both options and per tower, and a piece raised to the threshold stays listed until the filter changes;
+  // fails_when=the filter reads the level instead of copiesToThreshold (so No kards gear or a rarity with no kards slips
+  // in), a raised piece vanishes mid-tap, or the counts go stale; why_new=Tower gear had no filter; seam=none;
+  // no_claim=how the plan values those copies (engine tests)
+  it('lists only gear below the kard threshold, and keeps a piece raised to it until the filter changes', () => {
+    const s = defaultState();
+    // Epic tracked to Max, so a piece raised to F3 stays on the list (tracked to F3 it would be done and removed there).
+    s.rarities.find((r) => r.id === 'epic')!.goal = 'max';
+    const tower = (id: string, name: string, rarityId: string, fusion: number, extra: object = {}) => ({ id, name, rarityId, fusion, guest: false, source: 'tower' as const, sourceNote: 'Lin Kuei Tower', ...extra });
+    s.cards = [
+      tower('kori', 'Kori Blade', 'epic', 3), // F2
+      tower('fan', 'Kitana Fan', 'epic', 4), // at F3: kards can finish it
+      tower('gloves', 'Kombat Gloves', 'uncommon', 1), // Uncommon has no kards, so no threshold
+      tower('mask', 'Noob Mask', 'epic', 1, { noKards: true }), // No kards: the threshold means nothing to it
+    ];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub="towers" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const filter = screen.getByLabelText('Filter by kard threshold') as HTMLSelectElement;
+    const options = () => [...filter.options].map((o) => o.textContent);
+    // Names on the tower's card only: the Cards page stays in the document, hidden, and lists the same cards.
+    const names = () => {
+      const section = screen.queryByRole('heading', { name: /^Lin Kuei Tower/ })?.closest('section');
+      return section ? [...new Set(within(section as HTMLElement).queryAllByText(/^(Kori Blade|Kitana Fan|Kombat Gloves|Noob Mask)$/).map((n) => n.textContent))] : [];
+    };
+    expect([options(), names().length]).toEqual([['All tower gear (4)', 'Below kard threshold (1)'], 4]);
+
+    fireEvent.change(filter, { target: { value: 'belowThreshold' } });
+    expect([names(), screen.queryByText('1 below threshold') != null]).toEqual([['Kori Blade'], true]);
+
+    // F2 → F3: it reaches the threshold but stays listed, so it can be tapped back.
+    act(() => screen.getByRole('button', { name: 'Raise level' }).click());
+    const saved = JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
+    expect([saved.find((c) => c.id === 'kori')?.fusion, names(), options()[1]]).toEqual([4, ['Kori Blade'], 'Below kard threshold (1)']);
+    // A fresh pick of the filter drops it: at F3 kards can finish it.
+    fireEvent.change(filter, { target: { value: 'all' } });
+    fireEvent.change(filter, { target: { value: 'belowThreshold' } });
+    expect([names(), options()[1], screen.queryByText('None of your tower gear is below the kard threshold.') != null]).toEqual([[], 'Below kard threshold (0)', true]);
+  });
+});

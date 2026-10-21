@@ -265,6 +265,7 @@ Cards → Tower gear lists every card tagged as tower gear, grouped by the tower
 - Tower names are grouped ignoring capitals, so "Lin kuei tower" goes under "Lin Kuei Tower".
 - "N left" counts cards, not copies.
 - Epic and Rare gear count copies only to F3, unless their goal is Max or they're marked **No kards**.
+- The filter at the top starts on **All tower gear**. **Below kard threshold** lists only gear that still needs copies before Fusion Up Kards can take over (below F3), which is what's worth farming towers for; each tower then says how many of its pieces are below the threshold. Gear marked **No kards**, and a rarity with no kards (Uncommon, by default), has no threshold, so it isn't listed there. A piece you raise to the threshold stays listed until you change the filter, so you can tap it back.
 - There's no delete, goal or source control here; use the card on Cards.
 
 ### Maxed
