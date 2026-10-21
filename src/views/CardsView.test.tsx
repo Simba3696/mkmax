@@ -2384,13 +2384,51 @@ describe('Tower gear: the kard threshold filter', () => {
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
     expect([names(), screen.queryByText('1 below threshold') != null]).toEqual([['Kori Blade'], true]);
 
-    // F2 → F3: it reaches the threshold but stays listed, so it can be tapped back.
+    // F2 → F3: it reaches the threshold but stays listed, so it can be tapped back, and both counts still count it.
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
     const saved = JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
-    expect([saved.find((c) => c.id === 'kori')?.fusion, names(), options()[1]]).toEqual([4, ['Kori Blade'], 'Below kard threshold (1)']);
+    expect([saved.find((c) => c.id === 'kori')?.fusion, names(), options()[1], screen.queryByText('1 below threshold') != null]).toEqual([4, ['Kori Blade'], 'Below kard threshold (1)', true]);
     // A fresh pick of the filter drops it: at F3 kards can finish it.
     fireEvent.change(filter, { target: { value: 'all' } });
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
     expect([names(), options()[1], screen.queryByText('None of your tower gear is below the kard threshold.') != null]).toEqual([[], 'Below kard threshold (0)', true]);
+  });
+
+  // Generated on 2026-10-22 (/ship test coverage audit, Tower gear filter)
+  // Value: protects=with Below kard threshold on, a tower with no gear below the threshold isn't listed at all, and towers
+  // sort by the pieces they list; fails_when=the filter is applied inside each tower after grouping, leaving an empty
+  // "0 below threshold" tower, or the order still counts every piece; why_new=the first test has one tower only;
+  // seam=none; no_claim=the columns layout on wide screens (jsdom has no layout)
+  it('drops a tower with nothing below the threshold, and orders towers by what they list', () => {
+    const s = defaultState();
+    s.rarities.find((r) => r.id === 'epic')!.goal = 'max';
+    const tower = (id: string, name: string, fusion: number, sourceNote: string) => ({ id, name, rarityId: 'epic', fusion, guest: false, source: 'tower' as const, sourceNote });
+    s.cards = [
+      // Shirai Ryu has the most gear, but all of it is past F3.
+      tower('a', 'Ryu Kunai', 4, 'Shirai Ryu Tower'),
+      tower('b', 'Ryu Mask', 5, 'Shirai Ryu Tower'),
+      tower('c', 'Ryu Chain', 6, 'Shirai Ryu Tower'),
+      tower('d', 'Ryu Sword', 7, 'Shirai Ryu Tower'),
+      // Lin Kuei has more gear than Thunder, but less of it below the threshold.
+      tower('e', 'Kori Blade', 3, 'Lin Kuei Tower'),
+      tower('f', 'Kori Gloves', 4, 'Lin Kuei Tower'),
+      tower('g', 'Kori Mask', 5, 'Lin Kuei Tower'),
+      tower('h', 'Wrath Hammer', 1, 'Thunder Tower'),
+      tower('i', 'Thunder Staff', 2, 'Thunder Tower'),
+    ];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub="towers" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    // Tower headings only: the Cards page stays in the document, hidden, with headings of its own.
+    const headings = () => screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((t) => /Tower/.test(t ?? ''));
+    expect(headings()).toEqual(['Shirai Ryu Tower 4 left', 'Lin Kuei Tower 3 left', 'Thunder Tower 2 left']);
+
+    fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
+    expect(headings()).toEqual(['Thunder Tower 2 below threshold', 'Lin Kuei Tower 1 below threshold']);
   });
 });
