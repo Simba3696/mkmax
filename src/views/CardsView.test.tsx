@@ -2358,6 +2358,9 @@ describe('Tower gear: the kard threshold filter', () => {
   // no_claim=how the plan values those copies (engine tests)
   // Extended on 2026-10-22 (/ship review): under the filter a piece tracked past F3 leads with its copies to F3;
   // fails_when=the line shows only copies to the goal, or the F3 part shows with the filter off.
+  // Extended on 2026-10-22 (/ship test coverage audit): Value: protects=with the filter off a piece's line is only its copies
+  // to its goal; fails_when=the filter check is dropped from the copies-to-F3 lead; why_new=the old text match still found the
+  // goal's count inside the lead, so it passed with the lead shown; seam=none; no_claim=the wrap on phones (jsdom has no layout)
   it('lists only gear below the kard threshold, and keeps a piece raised to it until the filter changes', () => {
     const s = defaultState();
     // Epic tracked to Max, so a piece raised to F3 stays on the list (tracked to F3 it would be done and removed there).
@@ -2385,7 +2388,8 @@ describe('Tower gear: the kard threshold filter', () => {
       const section = screen.queryByRole('heading', { name: /^Lin Kuei Tower/ })?.closest('section');
       return section ? [...new Set(within(section as HTMLElement).queryAllByText(/^(Kori Blade|Kitana Fan|Kombat Gloves|Noob Mask|Shadow Sash)$/).map((n) => n.textContent))] : [];
     };
-    expect([options(), names().length, screen.queryByText('8 copies to F10') != null]).toEqual([['All tower gear (5)', 'Below kard threshold (1)'], 5, true]);
+    // The whole line, so a copies-to-F3 lead shown with the filter off fails it (the goal's count alone would still match).
+    expect([options(), names().length, copiesLine('8 copies to F10') != null]).toEqual([['All tower gear (5)', 'Below kard threshold (1)'], 5, true]);
 
     // Under the filter, Kori Blade (tracked to F10) leads with its copies to the kard threshold.
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
