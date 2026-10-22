@@ -96,6 +96,23 @@ export function towerSpellings(cards: Card[]) {
   return byKey;
 }
 
+/**
+ * A tower typed in a spelling other than the one shown for it (by towerSpellings) becomes its spelling on every tower
+ * gear card naming it, so fixing a spelling on one card shows everywhere. Returns how many cards it changed.
+ */
+export function respellTower(cards: Card[], tower: string) {
+  const key = towerKey(tower);
+  const shown = towerSpellings(cards).get(key);
+  if (!shown || shown === tower) return 0;
+  let changed = 0;
+  for (const c of cards) {
+    if (c.source !== 'tower' || c.sourceNote === tower || !c.sourceNote?.trim() || towerKey(c.sourceNote) !== key) continue;
+    c.sourceNote = tower;
+    changed++;
+  }
+  return changed;
+}
+
 // Each change copies the whole save (store.tsx), so a record is checked against many times (every pasted line, every
 // keystroke in Add card) before it changes: its keys are worked out once per array. That holds because the record is
 // never changed in place: every change to it puts a new array in `maxed`.

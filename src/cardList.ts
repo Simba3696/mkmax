@@ -1,6 +1,6 @@
 // Parses a pasted list of cards for bulk adding. Plain TS so it can be tested.
 import { nameKey } from './catalog';
-import { ascensionCaps, fLevel, levelLabel, maxFusion, recordKey } from './engine';
+import { ascensionCaps, fLevel, levelLabel, maxFusion, recordKey, towerKey } from './engine';
 import type { Card, RarityRule } from './types';
 
 interface ListedCard {
@@ -167,7 +167,8 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       }
       const patch: CardUpdate['patch'] = {};
       if (fusion != null && fusion !== card.fusion) patch.fusion = fusion;
-      if (source && (source !== card.source || sourceNote !== card.sourceNote)) Object.assign(patch, { source, sourceNote });
+      // One tower however it's typed (towerKey), as on Cards and Tower gear: other capitals alone aren't an update.
+      if (source && (source !== card.source || towerKey(sourceNote ?? '') !== towerKey(card.sourceNote ?? ''))) Object.assign(patch, { source, sourceNote });
       if (maxLevel !== undefined && maxLevel !== (card.maxLevel ?? null)) patch.maxLevel = maxLevel;
       if (Object.keys(patch).length) out.updates.push({ cardId: card.id, name: card.name, line, row, patch });
       else out.duplicates.push({ name, key, row });

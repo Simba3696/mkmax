@@ -41,7 +41,7 @@ export default function TowersPanel() {
 
   // Grouped by towerKey: "Lin kuei tower" files with "Lin Kuei Tower". Each tower is spelled as the Tower list on Cards
   // spells it, whatever the filter shows.
-  const spelling = towerSpellings(state.cards);
+  const spelling = towerSpellings(gear);
   const byTower = new Map<string, { tower: string; cards: Card[] }>();
   for (const c of gear) {
     if (!shown(c)) continue;

@@ -220,3 +220,17 @@ describe('pasted card lists typed before a rarity was renamed', () => {
     ]);
   });
 });
+
+describe('pasted tower names', () => {
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=a pasted line whose tower differs only in capitals or end spaces from the card's is listed as already
+  // there, not as an update, while a different tower still updates; fails_when=Paste a list compares tower names exactly
+  // again, so the preview counts an update that changes nothing on screen; why_new=review (Red Team); seam=none;
+  // no_claim=none beyond protects
+  it('treats a tower in other capitals as the same tower', () => {
+    const existing: Card[] = [{ id: 'k', name: 'Kori Blade', rarityId: 'epic', fusion: 3, guest: false, source: 'tower', sourceNote: 'Lin Kuei Tower' }];
+    const same = parseCardList('Kori Blade - Epic - lin kuei tower - F2', rarities, 'epic', existing);
+    const moved = parseCardList('Kori Blade - Epic - Shirai Ryu Tower - F2', rarities, 'epic', existing);
+    expect([same.updates.length, same.duplicates.length, moved.updates.map((u) => u.patch)]).toEqual([0, 1, [{ source: 'tower', sourceNote: 'Shirai Ryu Tower' }]]);
+  });
+});

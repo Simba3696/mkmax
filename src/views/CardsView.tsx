@@ -1,7 +1,7 @@
 import { Activity, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, towerKey, towerSpellings, unmarkMaxed } from '../engine';
+import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerSpellings, unmarkMaxed } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -49,13 +49,19 @@ function towerNames(cards: Card[]) {
 /** The Tower list's "Add a new tower…" choice; not a name anyone types. */
 const NEW_TOWER = '\u0000new';
 
-/** Saves a Tower box's name. With `over`, only over the tower the box last saved, so one a sync brought in since stands. */
-type TowerWrite = (v: string | undefined, over?: { saved: string | undefined }) => void;
-// As a rename: the tower before the box opened, and the one it last saved.
+/**
+ * Saves a Tower box's name. With `over`, only over the tower the box last saved, so one a sync brought in since stands;
+ * `respell` marks a finished typed name, which fixes the tower's spelling on other cards too (respellTower).
+ */
+type TowerWrite = (v: string | undefined, over?: { saved: string | undefined; respell?: boolean }) => void;
+// As a rename: what an emptied box goes back to (`was`, none in the plain box) and the tower the box last saved.
 type TowerEdit = { text: string; was: string | undefined; saved: string | undefined };
 
 /** Leaving a Tower box saves the name trimmed, or the tower it had if it's empty, over the tower the box last saved. */
-const finishTower = (e: TowerEdit, write: TowerWrite) => write(e.text.trim() || e.was, { saved: e.saved });
+const finishTower = (e: TowerEdit, write: TowerWrite) => {
+  const typed = e.text.trim();
+  write(typed || e.was, { saved: e.saved, respell: !!typed });
+};
 
 /**
  * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
@@ -497,7 +503,8 @@ type CardSort = (typeof CARD_SORTS)[number];
 function CardList() {
   const { state, update } = useStore();
   const { now, ctx } = usePlan();
-  const towers = useMemo(() => towerNames(state.cards), [state.cards]);
+  // Cards under a rarity a sync removed are hidden everywhere, so they don't name or spell a tower either.
+  const towers = useMemo(() => towerNames(state.cards.filter((c) => state.rarities.some((r) => r.id === c.rarityId))), [state.cards, state.rarities]);
   // A card's chip names its tower as the Tower list spells it, so one row doesn't show it two ways.
   const towerLabel = (note: string) => towers.find((t) => towerKey(t) === towerKey(note)) ?? note.trim();
   const events = useEvents();
@@ -654,12 +661,21 @@ function CardList() {
     });
 
   // With `over`, only over that tower: a Tower box left empty doesn't put its old tower back over one a sync brought in.
-  const setTower = (id: string, tower: string | undefined, over?: { saved: string | undefined }, undoLabel?: string) =>
-    update((d) => {
-      const c = d.cards.find((x) => x.id === id);
-      if (!c || (over && c.sourceNote !== over.saved) || c.sourceNote === tower) return noChange;
-      c.sourceNote = tower;
-    }, undoLabel);
+  // A finished typed name in a new spelling also re-spells the tower on the other cards naming it; that changes cards the
+  // user didn't touch, so it has Undo even though typing doesn't.
+  const setTower = (id: string, tower: string | undefined, over?: { saved: string | undefined; respell?: boolean }, undoLabel?: string) => {
+    let respelled = 0;
+    update(
+      (d) => {
+        const c = d.cards.find((x) => x.id === id);
+        if (!c || (over && c.sourceNote !== over.saved)) return noChange;
+        respelled = over?.respell && tower ? respellTower(d.cards.filter((x) => x !== c && d.rarities.some((r) => r.id === x.rarityId)), tower) : 0;
+        if (c.sourceNote === tower && !respelled) return noChange;
+        c.sourceNote = tower;
+      },
+      () => (respelled ? `${tower} spelled that way on ${respelled} other card${respelled === 1 ? '' : 's'}` : (undoLabel ?? '')),
+    );
+  };
 
   // Saved on the card as it is now. Unticking keeps a card at or past F3 on Max, as when one is entered there (see
   // entryGoal); otherwise a piece tracked only to F3 would be removed as done the moment kards were allowed again.
@@ -730,7 +746,9 @@ function CardList() {
   function add() {
     if (!shown.name.trim()) return;
     let added = false;
-    update((d) => {
+    let respelled = 0;
+    update(
+      (d) => {
       // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
       // delete it. Its kind and steps come from the rarity as it is now.
       const rule = d.rarities.find((r) => r.id === shown.rarityId);
@@ -752,9 +770,13 @@ function CardList() {
       const saved = { ...card, goal: formGoal(card, rule).goal };
       // Nor a card on the Maxed record (Add is greyed out for that too).
       if (isMaxed(saved, rule) || onMaxedRecord(d, saved)) return noChange;
+      // A tower typed in a new spelling fixes it on the cards already naming it; that's the only part of Add with Undo.
+      respelled = tower ? respellTower(d.cards.filter((x) => d.rarities.some((r) => r.id === x.rarityId)), tower) : 0;
       d.cards.push(saved);
       added = true;
-    });
+      },
+      () => (respelled ? `Added ${shown.name.trim()}, with ${shown.sourceNote?.trim()} spelled that way on ${respelled} other card${respelled === 1 ? '' : 's'}` : ''),
+    );
     // The typed name stays for another try when nothing was added.
     if (added) setDraft({ ...shown, name: '', fusion: 0, guest: false });
   }
