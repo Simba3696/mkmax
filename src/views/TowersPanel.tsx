@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { copiesToMax, copiesToThreshold, isRealmKlashGear, levelLabel, maxFusion, stepCard, targetLevel } from '../engine';
+import { copiesToMax, copiesToThreshold, isRealmKlashGear, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel } from '../engine';
 import { CardThumb, RarityBadge } from '../ui';
 import { card, grow, row, rowTitle, stepper, stepperVal } from '../classes';
 import type { Card } from '../types';
@@ -81,6 +81,11 @@ export default function TowersPanel() {
               const rule = ctx.rules.get(c.rarityId)!;
               const max = maxFusion(rule);
               const toGo = copiesToMax(c, rule);
+              const target = targetLevel(c, rule);
+              // The filter is for farming toward the kard threshold, so its distance leads; gear whose goal is the threshold
+              // already shows it as copies to its goal.
+              const thr = thresholdLevel(rule);
+              const toThr = filter === 'belowThreshold' && thr != null && thr !== target && belowThreshold(c) ? copiesToThreshold(c, rule) : 0;
               return (
                 <div key={c.id} className={`${row} items-center`}>
                   <CardThumb card={c} rule={rule} size={36} />
@@ -90,7 +95,8 @@ export default function TowersPanel() {
                       <RarityBadge rule={rule} />
                       <span className="text-muted">
                         {' '}
-                        {toGo} {toGo === 1 ? 'copy' : 'copies'} to {levelLabel(rule, targetLevel(c, rule))}
+                        {toThr > 0 && `${toThr} ${toThr === 1 ? 'copy' : 'copies'} to ${levelLabel(rule, thr!)} · `}
+                        {toGo} {toGo === 1 ? 'copy' : 'copies'} to {levelLabel(rule, target)}
                       </span>
                     </div>
                   </div>

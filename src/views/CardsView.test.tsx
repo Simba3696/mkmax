@@ -2353,6 +2353,8 @@ describe('Tower gear: the kard threshold filter', () => {
   // fails_when=the filter reads the level instead of copiesToThreshold (so No kards gear, Realm Klash gear or a rarity
   // with no kards slips in), a raised piece vanishes mid-tap, or the counts go stale; why_new=Tower gear had no filter; seam=none;
   // no_claim=how the plan values those copies (engine tests)
+  // Extended on 2026-10-22 (/ship review): under the filter a piece tracked past F3 leads with its copies to F3;
+  // fails_when=the line shows only copies to the goal, or the F3 part shows with the filter off.
   it('lists only gear below the kard threshold, and keeps a piece raised to it until the filter changes', () => {
     const s = defaultState();
     // Epic tracked to Max, so a piece raised to F3 stays on the list (tracked to F3 it would be done and removed there).
@@ -2380,10 +2382,11 @@ describe('Tower gear: the kard threshold filter', () => {
       const section = screen.queryByRole('heading', { name: /^Lin Kuei Tower/ })?.closest('section');
       return section ? [...new Set(within(section as HTMLElement).queryAllByText(/^(Kori Blade|Kitana Fan|Kombat Gloves|Noob Mask|Shadow Sash)$/).map((n) => n.textContent))] : [];
     };
-    expect([options(), names().length]).toEqual([['All tower gear (5)', 'Below kard threshold (1)'], 5]);
+    expect([options(), names().length, screen.queryByText('8 copies to F10') != null]).toEqual([['All tower gear (5)', 'Below kard threshold (1)'], 5, true]);
 
+    // Under the filter, Kori Blade (tracked to F10) leads with its copies to the kard threshold.
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
-    expect([names(), screen.queryByText('1 below threshold') != null]).toEqual([['Kori Blade'], true]);
+    expect([names(), screen.queryByText('1 below threshold') != null, screen.queryByText('1 copy to F3 · 8 copies to F10') != null]).toEqual([['Kori Blade'], true, true]);
 
     // F2 → F3: it reaches the threshold but stays listed, so it can be tapped back, and both counts still count it.
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
@@ -2442,6 +2445,10 @@ describe('Tower gear: the kard threshold filter', () => {
   // Value: protects=with the filter on, gear tracked only to F3 that's raised to F3 is done and leaves the list with an
   // Undo that brings it back; fails_when=the filter keeps a done piece on screen, or the step loses its done Undo;
   // why_new=the other filter tests track Epic to Max; seam=none; no_claim=done handling on Cards (store tests)
+  // Extended on 2026-10-22 (/ship test coverage audit, Tower gear filter)
+  // Value: protects=with no tower gear left, only "No tower gear left." shows: no filter and no "none below the
+  // threshold" line beside it; fails_when=the total > 0 guard is dropped from the filter or the empty-filter message;
+  // why_new=no test rendered Tower gear with no gear left; seam=none; no_claim=none beyond protects
   it('leaves gear tracked to F3 that reaches F3 under the filter, with an Undo', () => {
     let lastUndo = null as ReturnType<typeof useStore>['lastUndo'];
     let undo!: ReturnType<typeof useStore>['undo'];
@@ -2460,6 +2467,8 @@ describe('Tower gear: the kard threshold filter', () => {
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
     const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string }[];
     expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }), saved().some((c) => c.id === 'kori'), lastUndo?.label]).toEqual([null, false, expect.stringMatching(/done/)]);
+    // That was the only tower gear, so the page says so and nothing else: a filter over nothing would only confuse.
+    expect([screen.queryByLabelText('Filter by kard threshold'), screen.queryByText(/^No tower gear left\./) != null, screen.queryByText('None of your tower gear is below the kard threshold.')]).toEqual([null, true, null]);
 
     act(() => undo());
     expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ })?.textContent, saved().some((c) => c.id === 'kori')]).toEqual(['Lin Kuei Tower 1 below threshold', true]);
