@@ -57,8 +57,9 @@ interface StoreApi {
   replace: (s: AppState) => void;
   sync: SyncApi;
   lastUndo: UndoEntry | null;
-  undo: () => void;
-  dismissUndo: () => void;
+  /** Given the change the Undo bar showed, only while that's still the one to undo (see UndoToast). */
+  undo: (shown?: UndoEntry) => void;
+  dismissUndo: (shown?: UndoEntry) => void;
   /** The saved data as it was when it couldn't be read, until the user discards it. */
   unreadable: string | null;
   discardUnreadable: () => void;
@@ -208,8 +209,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     schedulePush();
   };
 
-  const undo = () => {
-    if (!lastUndo || savedByNewerApp()) return;
+  const undo = (shown?: UndoEntry) => {
+    if (!lastUndo || (shown && shown !== lastUndo) || savedByNewerApp()) return;
     // A fresh stamp so sync treats the restored copy as this device's newest change.
     setLocal({ ...lastUndo.prev, updatedAt: loop.nextStamp() });
     setLastUndo(null);
@@ -233,7 +234,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: () => setLastUndo(null), unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: (shown) => setLastUndo((cur) => (shown && cur !== shown ? cur : null)), unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
   );
 }
 

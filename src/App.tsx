@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { noChange, useStore, type SyncStatus, type UndoEntry } from './store';
 import { btn, hint } from './classes';
 import { NEWER_SAVE_MESSAGE } from './sync';
@@ -37,13 +37,29 @@ const SYNC_PILL: Record<SyncStatus['kind'], string> = {
   conflict: 'border-red text-error',
 };
 
-function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: () => void; onDismiss: () => void }) {
+function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: (shown: UndoEntry) => void; onDismiss: (shown: UndoEntry) => void }) {
+  // The time only counts while the app is showing: a phone runs an overdue timer the moment it comes back, so a change
+  // made just before (or as) the app went away would lose its Undo unseen. Coming back shows it for the full time.
   useEffect(() => {
-    const t = setTimeout(onDismiss, UNDO_SHOW_MS);
-    return () => clearTimeout(t);
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const start = () => {
+      clearTimeout(t);
+      t = document.visibilityState === 'hidden' ? undefined : setTimeout(() => onDismiss(entry), UNDO_SHOW_MS);
+    };
+    start();
+    document.addEventListener('visibilitychange', start);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('visibilitychange', start);
+    };
     // Restart the timer for each new change, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry.at]);
+  // Undo and ✕ act on the change the bar showed when pressed. Pressing them can finish a box being typed in (a Tower
+  // name), which may put a new change in the bar before the tap lands; that one is shown, not undone or dropped unseen.
+  // A key press (a click with no pointer, detail 0) acts on the change showing then.
+  const pressed = useRef<UndoEntry | null>(null);
+  const shown = (e: MouseEvent) => (e.detail > 0 && pressed.current) || entry;
   return (
     // Above the tab bar on phones; on wider screens, centred over the content beside the rail. Settings' rarity arrows
     // scroll to sit just above it (clearOfUndoBar in classes.ts): raise that margin if this gets taller or moves up.
@@ -53,10 +69,10 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: () 
       data-undo
     >
       <span className="flex-1 min-w-0 truncate">{entry.label}</span>
-      <button className={`${btn.ghost} text-gold font-bold`} onClick={onUndo}>
+      <button className={`${btn.ghost} text-gold font-bold`} onPointerDown={() => void (pressed.current = entry)} onClick={(e) => onUndo(shown(e))}>
         Undo
       </button>
-      <button className={btn.ghost} onClick={onDismiss} aria-label="Dismiss">
+      <button className={btn.ghost} onPointerDown={() => void (pressed.current = entry)} onClick={(e) => onDismiss(shown(e))} aria-label="Dismiss">
         ✕
       </button>
     </div>

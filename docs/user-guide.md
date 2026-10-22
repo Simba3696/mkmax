@@ -157,7 +157,8 @@ Pop-ups (like the pack editor) sit above the rest of the app and scroll on their
 
 After a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
 
-- The bar has **Undo** and ✕ (to close it).
+- The bar has **Undo** and ✕ (to close it). They act on the change the bar showed when you pressed them: if pressing one finishes something you were typing (a new tower name) and that puts a new change in the bar, the new one shows instead, for you to undo or close.
+- The 8 seconds only count while MK Max is showing. Switch to another app and back, and the bar shows for the full 8 seconds again.
 - It also appears for saving a pack ("Saved …"), hiding a shop pack ("Hid …"), pasting a list ("Added N cards, updated M"), pasting maxed cards ("Added N to Maxed") or removing one from the Maxed record, switching cards to MK Mobile Base's rarity ("rarity change for N cards"), ending a Realm Klash season early, moving a rarity up or down ("Moved …"), removing a rarity or currency, **Reset weights**, and turning a rarity's kards off while it tracks to the kard threshold.
 - Only the latest change can be undone.
 - Undo puts back the whole app as it was, so anything else you changed while the bar was up (like a balance) is undone too.
@@ -593,7 +594,7 @@ The bottom of Settings shows which version you have and the date of that change,
 ### Updates
 
 - An app left open only looks for a new version when you pull to refresh or import a backup from a newer version (or when it's fully closed and reopened). If one is out, the app reloads into it by itself.
-- If a pop-up such as the pack editor is open when a new version is found, the app waits and reloads once you close it, so nothing you've typed is lost. It also waits while the Undo bar is showing (up to 8 seconds), so you can still undo a save that closed the pop-up.
+- If a pop-up such as the pack editor is open when a new version is found, the app waits and reloads once you close it, so nothing you've typed is lost. It also waits while the Undo bar is showing (8 seconds while MK Max is showing), so you can still undo a save that closed the pop-up.
 - The daily event schedule refresh isn't a new version, so it doesn't reload the app.
 - Updates never change your data, apart from the one-time upgrade of older saves.
 - Settings shows which [version](#version) you have.

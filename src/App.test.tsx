@@ -423,3 +423,66 @@ describe('the Realm Klash season from the schedule', () => {
     expect([saved.realmKlashSeasonEnd, saved.updatedAt, saved.packs[0].endsAt]).toEqual([local('2026-01-10T11:00:00Z'), undefined, local('2026-01-31T11:00:00Z')]);
   });
 });
+
+describe('the Undo bar', () => {
+  let update!: ReturnType<typeof useStore>['update'];
+  const renderApp = () =>
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+  const add = (id: string, label: string) => act(() => update((d) => void d.cards.push({ id, name: id, rarityId: 'epic', fusion: 1, guest: false }), label));
+  const ids = () => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string }[]).map((c) => c.id);
+  /** Sets what the page reports for document.visibilityState, then sends the event the app listens for. */
+  const appShows = (state: 'visible' | 'hidden') => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state);
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=the Undo bar's 8 seconds only count while the app is showing, and it gets them in full on coming
+  // back, so a change made as the app went away (a Tower name finished on hiding) keeps its Undo; fails_when=the bar's
+  // timer runs while the app is away and a phone fires it on return; why_new=review (Red Team); seam=fake timers,
+  // document.visibilityState mocked; no_claim=how long a real phone keeps the app
+  it('keeps its time while the app is away, and shows for the full time on return', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    renderApp();
+    add('a', 'Added a');
+    appShows('hidden');
+    act(() => void vi.advanceTimersByTime(20_000));
+    expect(screen.queryByText('Added a')).toBeTruthy();
+    appShows('visible');
+    act(() => void vi.advanceTimersByTime(7_000));
+    expect(screen.queryByText('Added a')).toBeTruthy();
+    act(() => void vi.advanceTimersByTime(1_500));
+    expect(screen.queryByText('Added a')).toBeNull();
+  });
+
+  // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=Undo and ✕ act only on the change the bar showed when pressed: a change made between the press and
+  // the click (a Tower box the press finished) is shown, not undone or dropped unseen; Undo from the keyboard acts on the
+  // change showing; fails_when=the click undoes or dismisses whatever came in after the press; why_new=review (Red Team);
+  // seam=the in-between change made with the store's update, a pointer click sent with detail 1; no_claim=a real tap's
+  // event order
+  it('undoes or dismisses only the change it showed when pressed', () => {
+    renderApp();
+    add('a', 'Added a');
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Undo' }));
+    add('b', 'Added b');
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }), { detail: 1 });
+    expect([ids(), screen.queryByText('Added b') !== null]).toEqual([['a', 'b'], true]);
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Dismiss' }));
+    add('c', 'Added c');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }), { detail: 1 });
+    expect(screen.queryByText('Added c')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect([ids(), screen.queryByText('Added c')]).toEqual([['a', 'b'], null]);
+  });
+});

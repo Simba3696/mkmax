@@ -44,9 +44,10 @@ const NEW_TOWER = '\u0000new';
 /**
  * Saves a Tower box's name. With `over`, only over the tower the box last saved, so one a sync brought in since stands;
  * `respell` marks a finished typed name, which fixes the tower's spelling on other cards too (respellTower), and `was`
- * is the tower the box opened on, which that fix's Undo puts back.
+ * is the tower the box opened on, which that fix's Undo puts back. A card's box and Add card's take the same `over`.
  */
-type TowerWrite = (v: string | undefined, over?: { saved: string | undefined; respell?: boolean; was?: string }) => void;
+type TowerWrite = (v: string | undefined, over?: TowerOver) => void;
+type TowerOver = { saved: string | undefined; respell?: boolean; was?: string };
 // As a rename: what an emptied box goes back to (`was`, none in the plain box) and the tower the box last saved.
 type TowerEdit = { text: string; was: string | undefined; saved: string | undefined };
 
@@ -729,7 +730,7 @@ function CardList() {
   // A finished typed name in a new spelling also re-spells the tower on the other cards naming it; that changes cards the
   // user didn't touch, so it has Undo even though typing doesn't. The box saved this card as it was typed, so Undo also
   // puts this card back to the tower the box opened on.
-  const setTower = (id: string, tower: string | undefined, over?: { saved: string | undefined; respell?: boolean; was?: string }, undoLabel?: string) => {
+  const setTower = (id: string, tower: string | undefined, over?: TowerOver, undoLabel?: string) => {
     let respelled = 0;
     update(
       (d) => {
