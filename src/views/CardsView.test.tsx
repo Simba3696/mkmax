@@ -2388,6 +2388,11 @@ describe('Tower gear: the kard threshold filter', () => {
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
     const saved = JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
     expect([saved.find((c) => c.id === 'kori')?.fusion, names(), options()[1], screen.queryByText('1 below threshold') != null]).toEqual([4, ['Kori Blade'], 'Below kard threshold (1)', true]);
+    // Tapped back to F2, it's still listed and counted once.
+    act(() => screen.getByRole('button', { name: 'Lower level' }).click());
+    const back = JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
+    expect([back.find((c) => c.id === 'kori')?.fusion, names(), options()[1], screen.queryByText('1 below threshold') != null]).toEqual([3, ['Kori Blade'], 'Below kard threshold (1)', true]);
+    act(() => screen.getByRole('button', { name: 'Raise level' }).click());
     // A fresh pick of the filter drops it: at F3 kards can finish it.
     fireEvent.change(filter, { target: { value: 'all' } });
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
@@ -2430,5 +2435,32 @@ describe('Tower gear: the kard threshold filter', () => {
 
     fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
     expect(headings()).toEqual(['Thunder Tower 2 below threshold', 'Lin Kuei Tower 1 below threshold']);
+  });
+
+  // Generated on 2026-10-22 (/ship review, Tower gear filter)
+  // Value: protects=with the filter on, gear tracked only to F3 that's raised to F3 is done and leaves the list with an
+  // Undo that brings it back; fails_when=the filter keeps a done piece on screen, or the step loses its done Undo;
+  // why_new=the other filter tests track Epic to Max; seam=none; no_claim=done handling on Cards (store tests)
+  it('leaves gear tracked to F3 that reaches F3 under the filter, with an Undo', () => {
+    let lastUndo: ReturnType<typeof useStore>['lastUndo'] = null;
+    let undo!: ReturnType<typeof useStore>['undo'];
+    const s = defaultState(); // Epic gear keeps its default goal, F3
+    s.cards = [{ id: 'kori', name: 'Kori Blade', rarityId: 'epic', fusion: 3, guest: false, source: 'tower', sourceNote: 'Lin Kuei Tower' }];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => ((lastUndo = store.lastUndo), (undo = store.undo))} />
+          <CardsView sub="towers" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
+    act(() => screen.getByRole('button', { name: 'Raise level' }).click());
+    const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string }[];
+    expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }), saved().some((c) => c.id === 'kori'), lastUndo?.label]).toEqual([null, false, expect.stringMatching(/done/)]);
+
+    act(() => undo());
+    expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ })?.textContent, saved().some((c) => c.id === 'kori')]).toEqual(['Lin Kuei Tower 1 below threshold', true]);
   });
 });
