@@ -9,8 +9,9 @@ const cardLabel = (c: Card, rule: RarityRule | undefined) => `${c.name} ${c.fusi
 
 /**
  * Type-to-search card chooser. Every word typed has to appear in the name, in any order ("man sky" finds Man in
- * the Sky). Cards in `exclude` are left out: ones already in the pack being edited, or other rarities than a
- * Kasket's. Cards in `first` are listed before the rest: the ones a Kasket can give right now.
+ * the Sky). Results are in name order, whatever their rarity, so a card is quick to spot. Cards in `exclude` are left
+ * out: ones already in the pack being edited, or other rarities than a Kasket's. Cards in `first` are listed before
+ * the rest: the ones a Kasket can give right now.
  */
 export default function CardPicker({ value, exclude, first, onChange }: { value: string; exclude: Set<string>; first?: Set<string>; onChange: (id: string) => void }) {
   const { state } = useStore();
@@ -18,7 +19,6 @@ export default function CardPicker({ value, exclude, first, onChange }: { value:
   const [hi, setHi] = useState(0);
   const listId = useId();
   const rules = new Map(state.rarities.map((r) => [r.id, r]));
-  const rarityOrder = (c: Card) => state.rarities.findIndex((r) => r.id === c.rarityId);
   const later = (c: Card) => (first && !first.has(c.id) ? 1 : 0);
   const chosen = state.cards.find((c) => c.id === value);
   const words = (q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
@@ -27,7 +27,7 @@ export default function CardPicker({ value, exclude, first, onChange }: { value:
       ? []
       : state.cards
           .filter((c) => c.id !== value && !exclude.has(c.id) && words.every((w) => c.name.toLowerCase().includes(w)))
-          .sort((a, b) => later(a) - later(b) || rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name))
+          .sort((a, b) => later(a) - later(b) || a.name.localeCompare(b.name))
           .slice(0, 40);
 
   function pick(c: Card) {
