@@ -3666,4 +3666,20 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     appShows('hidden');
     expect([stamp(), towerOf('Kori Blade'), lastUndo]).toEqual([before, 'Lin Kuei Tower', null]);
   });
+
+  // Generated on 2026-10-22 (/ship review, state machines, Tower dropdown)
+  // Value: protects=a card whose tower is only spaces (an older build's) shows no tower, and its new-tower box goes back to
+  // none when emptied, also after the app was hidden and shown again; fails_when=the box treats the spaces as a tower it
+  // opened on, so after a hide emptying it keeps the typed name; why_new=review (state machines); seam=document.
+  // visibilityState mocked; no_claim=a phone closing the app
+  it('empties a box opened on a tower of only spaces back to no tower, also after hiding the app', () => {
+    renderPage([tower('kori', 'Kori Blade', '  '), tower('kunai', 'Ryu Kunai', 'Lin Kuei Tower')]);
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Wind Tower' } });
+    appShows('hidden');
+    appShows('visible');
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: '' } });
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect(towerOf('Kori Blade')).toBeUndefined();
+  });
 });

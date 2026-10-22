@@ -2025,8 +2025,12 @@ describe('towerSpellings', () => {
   // copies; seam=none; no_claim=none beyond protects
   it('spells each tower once, as the first tower gear card naming it has it', () => {
     const card = (name: string, sourceNote: string, source: Card['source'] = 'tower'): Card => ({ id: name, name, rarityId: 'epic', fusion: 1, guest: false, source, sourceNote });
-    const cards = [card('Kori Blade', ' Lin Kuei Tower'), card('Frost Fan', 'lin kuei tower '), card('Ryu Kunai', 'Shirai Ryu Tower'), card('Krypt Axe', 'Krypt', 'krypt'), card('Blank', '  ')];
-    expect([...towerSpellings(cards)]).toEqual([
+    // Extended on 2026-10-22 (/ship review, maintainability): a card under a rarity a sync removed is hidden, so it doesn't
+    // spell a tower even when it comes first; fails_when=a caller's copy of that rule is missed and a hidden card decides
+    // the spelling the Tower list, Add card and Paste a list save.
+    const hidden: Card = { ...card('Ghost Blade', 'LIN KUEI TOWER'), rarityId: 'gone' };
+    const cards = [hidden, card('Kori Blade', ' Lin Kuei Tower'), card('Frost Fan', 'lin kuei tower '), card('Ryu Kunai', 'Shirai Ryu Tower'), card('Krypt Axe', 'Krypt', 'krypt'), card('Blank', '  ')];
+    expect([...towerSpellings({ cards, rarities: defaultState().rarities })]).toEqual([
       ['lin kuei tower', 'Lin Kuei Tower'],
       ['shirai ryu tower', 'Shirai Ryu Tower'],
     ]);
@@ -2043,14 +2047,23 @@ describe('respellTower', () => {
   it('spells a tower as typed on every card naming it another way', () => {
     const card = (name: string, sourceNote: string, source: Card['source'] = 'tower'): Card => ({ id: name, name, rarityId: 'epic', fusion: 1, guest: false, source, sourceNote });
     const cards = () => [card('Kori Blade', 'lin kuei tower'), card('Frost Fan', 'LIN KUEI TOWER '), card('Ryu Kunai', 'Shirai Ryu Tower'), card('Krypt Axe', 'lin kuei tower', 'krypt'), card('Fire Fan', 'Lin Kuei Tower'), card('Wind Fan', 'Lin Kuei Tower ')];
+    const rarities = defaultState().rarities;
     const fixed = cards();
     const shown = cards();
     const unknown = cards();
-    expect([respellTower(fixed, 'Lin Kuei Tower'), respellTower(shown, 'lin kuei tower'), respellTower(unknown, 'Wind Tower')]).toEqual([2, 3, 0]);
+    expect([respellTower({ cards: fixed, rarities }, 'Lin Kuei Tower'), respellTower({ cards: shown, rarities }, 'lin kuei tower'), respellTower({ cards: unknown, rarities }, 'Wind Tower')]).toEqual([2, 3, 0]);
     expect([fixed.map((c) => c.sourceNote), shown.map((c) => c.sourceNote), unknown]).toEqual([
       ['Lin Kuei Tower', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'lin kuei tower', 'Lin Kuei Tower', 'Lin Kuei Tower '],
       ['lin kuei tower', 'lin kuei tower', 'Shirai Ryu Tower', 'lin kuei tower', 'lin kuei tower', 'lin kuei tower'],
       cards(),
     ]);
+
+    // Extended on 2026-10-22 (/ship review, maintainability): the card the name was typed on (skip) and a card under a
+    // rarity a sync removed are left as they are; fails_when=the hidden-card rule or the typed card's skip is lost when a
+    // caller stops filtering for itself.
+    const typedOn = card('Kori Blade', 'LIN KUEI TOWER');
+    const hidden: Card = { ...card('Ghost Blade', 'lin kuei tower'), rarityId: 'gone' };
+    const mixed = [typedOn, hidden, card('Frost Fan', 'lin kuei tower')];
+    expect([respellTower({ cards: mixed, rarities }, 'Lin Kuei Tower', typedOn), mixed.map((c) => c.sourceNote)]).toEqual([1, ['LIN KUEI TOWER', 'lin kuei tower', 'Lin Kuei Tower']]);
   });
 });

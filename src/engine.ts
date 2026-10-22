@@ -86,10 +86,14 @@ export const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityI
  */
 export const towerKey = (name: string) => name.trim().toLowerCase();
 
+// Cards under a rarity a sync removed are hidden everywhere, so they don't spell a tower or get re-spelled: the Tower
+// list, chips, Add card, Paste a list and Tower gear all go by the cards that show.
+const shownCards = (s: Pick<AppState, 'cards' | 'rarities'>) => s.cards.filter((c) => s.rarities.some((r) => r.id === c.rarityId));
+
 /** Each tower your tower gear names, by towerKey, spelled as the first card naming it has it. */
-export function towerSpellings(cards: Card[]) {
+export function towerSpellings(s: Pick<AppState, 'cards' | 'rarities'>) {
   const byKey = new Map<string, string>();
-  for (const c of cards) {
+  for (const c of shownCards(s)) {
     const t = c.source === 'tower' ? c.sourceNote?.trim() : undefined;
     if (t && !byKey.has(towerKey(t))) byKey.set(towerKey(t), t);
   }
@@ -98,12 +102,14 @@ export function towerSpellings(cards: Card[]) {
 
 /**
  * A tower name typed on a card becomes its spelling on every tower gear card naming it some other way, so fixing a
- * spelling on one card shows everywhere, however mixed it was. Returns how many cards it changed.
+ * spelling on one card shows everywhere, however mixed it was. `skip` is the card it was typed on. Returns how many cards
+ * it changed.
  */
-export function respellTower(cards: Card[], tower: string) {
+export function respellTower(s: Pick<AppState, 'cards' | 'rarities'>, tower: string, skip?: Card) {
   const key = towerKey(tower);
   let changed = 0;
-  for (const c of cards) {
+  for (const c of shownCards(s)) {
+    if (c === skip) continue;
     // Already spelled that way, give or take spaces at the ends (as an older build could save it): nothing to fix.
     if (c.source !== 'tower' || c.sourceNote?.trim() === tower || !c.sourceNote?.trim() || towerKey(c.sourceNote) !== key) continue;
     c.sourceNote = tower;

@@ -92,7 +92,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   const settle = (v: string, enter: boolean) => {
     setHeld(null);
     if (v === NEW_TOWER) {
-      if (enter) setEdit({ text: '', was: value, saved: value });
+      if (enter) setEdit({ text: '', was: value?.trim() ? value : undefined, saved: value });
     } else if (v !== current) pick(v || undefined);
   };
 
@@ -399,7 +399,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // A pasted tower is saved as the Tower list spells it (one tower however it's typed), so a pasted line can't bring
         // a second spelling back; a tower no card names yet takes the spelling of the first new card naming it, or failing
         // that the first updated one.
-        const spellings = towerSpellings(d.cards.filter((c) => d.rarities.some((r) => r.id === c.rarityId)));
+        const spellings = towerSpellings(d);
         const listSpelling = (note: string) => {
           if (!spellings.has(towerKey(note))) spellings.set(towerKey(note), note.trim());
           return spellings.get(towerKey(note))!;
@@ -582,7 +582,7 @@ function CardList() {
   const { now, ctx } = usePlan();
   // Each tower your gear names, spelled as the first card naming it has it (towerSpellings), so "lin kuei tower" isn't
   // offered beside "Lin Kuei Tower". Cards under a rarity a sync removed are hidden everywhere, so they don't count.
-  const spellings = useMemo(() => towerSpellings(state.cards.filter((c) => state.rarities.some((r) => r.id === c.rarityId))), [state.cards, state.rarities]);
+  const spellings = useMemo(() => towerSpellings(state), [state.cards, state.rarities]);
   // The Tower list, A to Z.
   const towers = useMemo(() => [...spellings.values()].sort((a, b) => a.localeCompare(b)), [spellings]);
   // A card's chip names its tower as the Tower list spells it, so one row doesn't show it two ways.
@@ -752,7 +752,7 @@ function CardList() {
       (d) => {
         const c = d.cards.find((x) => x.id === id);
         if (!c || (over && c.sourceNote !== over.saved)) return noChange;
-        respelled = over?.respell && tower ? respellTower(d.cards.filter((x) => x !== c && d.rarities.some((r) => r.id === x.rarityId)), tower) : 0;
+        respelled = over?.respell && tower ? respellTower(d, tower, c) : 0;
         if (c.sourceNote === tower && !respelled) return noChange;
         c.sourceNote = tower;
       },
@@ -774,7 +774,7 @@ function CardList() {
     let respelled = 0;
     update(
       (d) => {
-        respelled = respellTower(d.cards.filter((x) => d.rarities.some((r) => r.id === x.rarityId)), tower);
+        respelled = respellTower(d, tower);
         return respelled ? undefined : noChange;
       },
       () => respelledLabel(tower, respelled),
@@ -857,10 +857,9 @@ function CardList() {
       if (!rule) return noChange;
       const isEquip = rule.kind === 'equipment';
       const typed = isEquip && shown.source === 'tower' ? shown.sourceNote?.trim() : undefined;
-      const visible = d.cards.filter((x) => d.rarities.some((r) => r.id === x.rarityId));
       // As the list spells it now (a spelling typed in the box was fixed on the other cards when the box was finished),
       // so an Add never puts an old spelling back, even one kept from the last card after a fix or a sync.
-      const tower = typed && (towerSpellings(visible).get(towerKey(typed)) ?? typed);
+      const tower = typed && (towerSpellings(d).get(towerKey(typed)) ?? typed);
       const card: Card = {
         id: newId(),
         ...shown,
