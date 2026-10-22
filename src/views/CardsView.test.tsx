@@ -3022,7 +3022,9 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     // Add keeps the tower for the next card.
     expect((form.getByLabelText('Tower') as HTMLSelectElement).value).toBe('Lin Kuei Tower');
     act(() => undo());
-    expect([towerOf('Frost Fan'), towerOf('Kori Blade')]).toEqual([undefined, 'lin kuei tower']);
+    // The card itself is gone, not only its tower.
+    const names = () => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string }[]).map((c) => c.name);
+    expect([names().includes('Frost Fan'), towerOf('Kori Blade')]).toEqual([false, 'lin kuei tower']);
 
     // Typed and left, then the tower is fixed on a card before Add: Add keeps to that fix.
     typeTower('LIN KUEI tower');
