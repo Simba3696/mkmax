@@ -2668,6 +2668,26 @@ describe('Cards: picking a tower', () => {
     expect(towerOf('Kori Blade')).toBe('Lin Kuei Tower');
   });
 
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=Tower gear files one tower typed with different capitals or spaces under one heading, spelled as the
+  // first card has it; fails_when=Tower gear groups by the raw name (or stops trimming), splitting one tower in two;
+  // why_new=the Tower gear tests all spell each tower one way; seam=none; no_claim=none beyond protects
+  it('files one tower typed two ways under one Tower gear heading', () => {
+    const s = defaultState();
+    const tower = (id: string, name: string, sourceNote: string) => ({ id, name, rarityId: 'epic', fusion: 1, guest: false, source: 'tower' as const, sourceNote });
+    s.cards = [tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('fan', 'Frost Fan', 'lin kuei tower ')];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub="towers" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const headings = screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((t) => /tower/i.test(t ?? ''));
+    expect(headings).toEqual(['Lin Kuei Tower 2 left']);
+  });
+
   // Regression: /ship test coverage audit on 2026-10-22 — with no tower named yet, a card's Tower box became the list at the
   // first letter typed, so only that letter was saved
   // Generated on 2026-10-22 (/ship test coverage audit, Tower dropdown)

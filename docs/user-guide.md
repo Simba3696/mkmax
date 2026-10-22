@@ -259,7 +259,7 @@ Cards also lists cards whose rarity MK Mobile Base gives differently, for exampl
 
 ### Tower gear
 
-Cards → Tower gear lists every card tagged as tower gear, grouped by the tower it drops from (the card's **Tower** box, or the tower name from a pasted list), with the towers listing the most gear first (under **Below kard threshold**, the most pieces below the threshold). Each card shows how many copies it still needs, and you can change its level there. Maxed gear leaves the list like any other card.
+Cards → Tower gear lists every card tagged as tower gear, grouped by the tower it drops from (the tower in the card's **Tower** list, or the tower name from a pasted list), with the towers listing the most gear first (under **Below kard threshold**, the most pieces below the threshold). Each card shows how many copies it still needs, and you can change its level there. Maxed gear leaves the list like any other card.
 
 - Gear tagged as tower gear with no tower name goes under "Tower not named", at the end. Pick the tower in the card's **Tower** list on Cards (or **Add a new tower…**) to file it, or paste it again with its rarity and tower, like `Kori Blade - Epic - Lin Kuei Tower`. The rarity has to be there (a line with details but no rarity is refused), and it only updates a card of that same rarity.
 - Tower names are grouped ignoring capitals, so "Lin kuei tower" goes under "Lin Kuei Tower".
