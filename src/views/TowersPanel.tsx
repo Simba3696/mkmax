@@ -39,12 +39,18 @@ export default function TowersPanel() {
   const shown = (c: Card) => filter === 'all' || belowThreshold(c) || tapped.has(c.id);
   const belowCount = gear.filter((c) => belowThreshold(c) || (filter === 'belowThreshold' && tapped.has(c.id))).length;
 
-  // Grouped by towerKey: "Lin kuei tower" files with "Lin Kuei Tower".
+  // Grouped by towerKey: "Lin kuei tower" files with "Lin Kuei Tower". Each tower is spelled as the first of all its gear
+  // has it, whatever the filter shows, so a heading matches the Tower list on Cards.
+  const spelling = new Map<string, string>();
+  for (const c of gear) {
+    const t = c.sourceNote?.trim() || NO_TOWER;
+    if (!spelling.has(towerKey(t))) spelling.set(towerKey(t), t);
+  }
   const byTower = new Map<string, { tower: string; cards: Card[] }>();
   for (const c of gear) {
     if (!shown(c)) continue;
     const t = c.sourceNote?.trim() || NO_TOWER;
-    const group = byTower.get(towerKey(t)) ?? { tower: t, cards: [] };
+    const group = byTower.get(towerKey(t)) ?? { tower: spelling.get(towerKey(t))!, cards: [] };
     group.cards.push(c);
     byTower.set(towerKey(t), group);
   }

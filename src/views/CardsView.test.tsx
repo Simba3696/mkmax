@@ -2711,3 +2711,130 @@ describe('Cards: picking a tower', () => {
     expect(towerOf('Kori Blade')).toBe('Lin Kuei Tower');
   });
 });
+
+describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
+  let update!: ReturnType<typeof useStore>['update'];
+  let lastUndo: ReturnType<typeof useStore>['lastUndo'] = null;
+  let undo!: ReturnType<typeof useStore>['undo'];
+  const tower = (id: string, name: string, sourceNote?: string, fusion = 1) => ({ id, name, rarityId: 'epic', fusion, guest: false, source: 'tower' as const, sourceNote });
+  const page = (sub: 'cards' | 'towers') => (
+    <StoreProvider>
+      <PlanProvider>
+        <Grab
+          onRender={(store) => {
+            update = store.update;
+            lastUndo = store.lastUndo;
+            undo = store.undo;
+          }}
+        />
+        <CardsView sub={sub} onSub={() => {}} />
+      </PlanProvider>
+    </StoreProvider>
+  );
+  function renderPage(cards: ReturnType<typeof defaultState>['cards'], sub: 'cards' | 'towers' = 'cards', tweak?: (s: ReturnType<typeof defaultState>) => void) {
+    const s = defaultState();
+    s.cards = cards;
+    tweak?.(s);
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    return render(page(sub));
+  }
+  const towerOf = (name: string) => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string; sourceNote?: string }[]).find((c) => c.name === name)?.sourceNote;
+  // A card's own Tower box (list or text box), found from its row.
+  const boxOf = (name: string) => {
+    let row: HTMLElement | null = screen.getAllByTitle('Tap to rename').find((el) => el.textContent === name)!;
+    while (row && !within(row).queryByLabelText('Tower')) row = row.parentElement;
+    return within(row!).getByLabelText('Tower');
+  };
+  const pickNewTower = (select: HTMLElement) =>
+    fireEvent.change(select, { target: { value: [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add a new tower…')!.value } });
+
+  // Generated on 2026-10-22 (/ship Red Team, Tower dropdown)
+  // Value: protects=a tower picked from a card's list, or No tower, can be undone, and Enter in its new-tower box leaves
+  // focus on the list that replaces it; fails_when=list picks save through the unlabelled patch, or the box's blur drops
+  // focus to the page; why_new=picking became one tap (it was typing), and the Enter path was only checked for the saved
+  // name; seam=none; no_claim=a phone's native picker
+  it("undoes a tower picked from a card's list, and keeps focus on the list after Enter", () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Shirai Ryu Tower' } });
+    expect([towerOf('Kori Blade'), lastUndo?.label]).toEqual(['Shirai Ryu Tower', 'Kori Blade: tower set to Shirai Ryu Tower']);
+    act(() => undo());
+    expect(towerOf('Kori Blade')).toBe('Lin Kuei Tower');
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: '' } });
+    expect([towerOf('Kori Blade'), lastUndo?.label]).toEqual([undefined, 'Kori Blade: tower removed']);
+    act(() => undo());
+    expect(towerOf('Kori Blade')).toBe('Lin Kuei Tower');
+
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Thunder Tower' } });
+    fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
+    expect([towerOf('Kori Blade'), boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['Thunder Tower', 'SELECT', true]);
+  });
+
+  // Generated on 2026-10-22 (/ship Red Team, Tower dropdown)
+  // Value: protects=a new-tower box left empty doesn't put the old tower back over one a sync brought in, and one left open
+  // when Cards is hidden is finished trimmed and closed when Cards is shown again; fails_when=leaving the box writes its
+  // old tower whatever the card has now, or the box stays a text box with the untrimmed name after a page switch;
+  // why_new=review (Red Team); seam=a grabbed update stands in for the sync, rerender switches the page as App does;
+  // no_claim=a real sync
+  it('keeps a tower a sync brought in, and finishes a Tower box left open across a page switch', async () => {
+    const { rerender } = renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    pickNewTower(boxOf('Kori Blade'));
+    act(() => update((d) => void (d.cards[0].sourceNote = 'Thunder Tower')));
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect(towerOf('Kori Blade')).toBe('Thunder Tower');
+    // Typed and then emptied: the same.
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'W' } });
+    act(() => update((d) => void (d.cards[0].sourceNote = 'Wind Tower')));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: '' } });
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect(towerOf('Kori Blade')).toBe('Wind Tower');
+
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: ' Fire Tower ' } });
+    rerender(page('towers'));
+    rerender(page('cards'));
+    await act(async () => {});
+    expect([towerOf('Kori Blade'), boxOf('Kori Blade').tagName]).toEqual(['Fire Tower', 'SELECT']);
+  });
+
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=Add card's plain Tower box (no tower named yet) can be emptied after it was left, so Add saves no
+  // tower, and Enter on Add card's Tower list adds the card; fails_when=the emptied plain box goes back to the tower typed
+  // before, or the list ignores Enter; why_new=the old box added on Enter and could always be cleared; seam=none;
+  // no_claim=none beyond protects
+  it("lets Add card's plain Tower box be emptied, and adds the card on Enter in the Tower list", () => {
+    renderPage([]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    const name = form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)');
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
+    fireEvent.change(name, { target: { value: 'Kori Blade' } });
+    fireEvent.change(form.getByLabelText('Tower'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.blur(form.getByLabelText('Tower'));
+    fireEvent.change(form.getByLabelText('Tower'), { target: { value: '' } });
+    fireEvent.blur(form.getByLabelText('Tower'));
+    fireEvent.click(form.getByRole('button', { name: 'Add' }));
+    expect(towerOf('Kori Blade')).toBeUndefined();
+
+    // Kori Blade names no tower, so name one through it to get the list.
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.blur(boxOf('Kori Blade'));
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
+    fireEvent.change(name, { target: { value: 'Frost Fan' } });
+    fireEvent.change(form.getByLabelText('Tower'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.keyDown(form.getByLabelText('Tower'), { key: 'Enter' });
+    expect(towerOf('Frost Fan')).toBe('Lin Kuei Tower');
+  });
+
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=a Tower gear heading under Below kard threshold is spelled as the Cards Tower list spells it, from
+  // the first of all the tower's gear; fails_when=the heading takes the spelling of the first piece the filter shows;
+  // why_new=review (maintainability); seam=none; no_claim=none beyond protects
+  it('spells a Tower gear heading the same with the filter on', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower', 4), tower('fan', 'Frost Fan', 'lin kuei tower')], 'towers', (s) => void (s.rarities.find((r) => r.id === 'epic')!.goal = 'max'));
+    fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
+    expect(screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((t) => /tower/i.test(t ?? ''))).toEqual(['Lin Kuei Tower 1 below threshold']);
+  });
+});

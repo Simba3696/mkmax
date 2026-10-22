@@ -54,17 +54,42 @@ function towerNames(cards: Card[]) {
 /** The Tower list's "Add a new tower…" choice; not a name anyone types. */
 const NEW_TOWER = '\u0000new';
 
+/** Saves a Tower box's name. With `over`, only over that tower, so one a sync brought in since stands. */
+type TowerWrite = (v: string | undefined, over?: { was: string | undefined }) => void;
+
 /**
  * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
  * While a name is being typed the box stays a text box until it's left, so it doesn't turn into the list mid-word once
- * the card saves the first letters; with no towers named yet it's only a text box.
+ * the card saves the first letters; with no towers named yet it's only a text box. A pick from the list goes to onPick
+ * (with Undo, on a card); a typed name saves as it's typed, as a rename does.
  */
-function TowerSelect({ towers, value, onChange, onEnter, className }: { towers: string[]; value: string | undefined; onChange: (v: string | undefined) => void; onEnter?: () => void; className?: string }) {
-  // The name being typed and the tower the card had before it, which an emptied box goes back to; null while picking
-  // from the list (or before the first key in the plain box).
-  const [edit, setEdit] = useState<{ text: string; before: string | undefined } | null>(null);
+function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, className }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; className?: string }) {
+  // The name being typed, the tower the card had before Add a new tower… was picked (which an emptied box goes back to;
+  // none in the plain box, which has no list to go back to), and the tower this box last saved. Null while picking from
+  // the list, or before the first key in the plain box.
+  const [edit, setEdit] = useState<{ text: string; before: string | undefined; wrote: string | undefined } | null>(null);
+  // Enter in the new-tower box puts focus on the list that replaces it, rather than dropping it to the page.
+  const focusList = useRef(false);
+  useEffect(() => {
+    focusList.current = false;
+  });
+
+  // Leaving the box saves the name trimmed, or the tower it had if it's empty, over the tower this box last saved.
+  const finish = (e: NonNullable<typeof edit>, write: TowerWrite) => write(e.text.trim() || e.before, { was: e.wrote });
+  // Hiding the page (Activity, for Tower gear) may give the box no blur, so a box left open is finished in the cleanup
+  // and closed when the page is shown again, as a rename is.
+  const open = useRef({ edit, onChange });
+  useEffect(() => void (open.current = { edit, onChange }));
+  useEffect(() => {
+    if (open.current.edit) setEdit(null);
+    return () => {
+      if (open.current.edit) finish(open.current.edit, open.current.onChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (edit || towers.length === 0) {
-    const before = edit ? edit.before : value;
+    const was = edit ?? { before: undefined, wrote: value };
     return (
       <input
         className={className}
@@ -73,22 +98,30 @@ function TowerSelect({ towers, value, onChange, onEnter, className }: { towers: 
         aria-label="Tower"
         autoFocus={!!edit}
         onChange={(e) => {
-          setEdit({ text: e.target.value, before });
-          onChange(e.target.value.trim() ? e.target.value : before);
+          const text = e.target.value;
+          if (text.trim()) onChange(text);
+          else onChange(was.before, { was: was.wrote });
+          setEdit({ text, before: was.before, wrote: text.trim() ? text : was.before });
         }}
-        onBlur={(e) => {
+        onBlur={() => {
+          if (edit) finish(edit, onChange);
           setEdit(null);
-          const next = e.target.value.trim() || before;
-          if (next !== value) onChange(next);
         }}
-        onKeyDown={(e) => e.key === 'Enter' && (onEnter ? onEnter() : e.currentTarget.blur())}
+        onKeyDown={(e) => e.key === 'Enter' && (onEnter ? onEnter() : ((focusList.current = true), e.currentTarget.blur()))}
       />
     );
   }
   const typed = value?.trim();
   const listed = typed && towers.find((t) => towerKey(t) === towerKey(typed));
   return (
-    <select className={className} value={listed || typed || ''} aria-label="Tower" onChange={(e) => (e.target.value === NEW_TOWER ? setEdit({ text: '', before: value }) : onChange(e.target.value || undefined))}>
+    <select
+      ref={(el) => void (el && focusList.current && el.focus())}
+      className={className}
+      value={listed || typed || ''}
+      aria-label="Tower"
+      onChange={(e) => (e.target.value === NEW_TOWER ? setEdit({ text: '', before: value, wrote: value }) : onPick(e.target.value || undefined))}
+      onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
+    >
       {/* Once a tower is set, picking this takes it off the card, so it says so. */}
       <option value="">{typed ? 'No tower' : 'Choose a tower…'}</option>
       {typed && !listed && <option value={typed}>{typed}</option>}
@@ -619,6 +652,14 @@ function CardList() {
       Object.assign(c, p);
     });
 
+  // With `over`, only over that tower: a Tower box left empty doesn't put its old tower back over one a sync brought in.
+  const setTower = (id: string, tower: string | undefined, over?: { was: string | undefined }, undoLabel?: string) =>
+    update((d) => {
+      const c = d.cards.find((x) => x.id === id);
+      if (!c || (over && c.sourceNote !== over.was) || c.sourceNote === tower) return noChange;
+      c.sourceNote = tower;
+    }, undoLabel);
+
   // Saved on the card as it is now. Unticking keeps a card at or past F3 on Max, as when one is entered there (see
   // entryGoal); otherwise a piece tracked only to F3 would be removed as done the moment kards were allowed again.
   const setNoKards = (c: Card, on: boolean) =>
@@ -951,7 +992,7 @@ function CardList() {
                   </label>
                 )}
                 {(rule.kind !== 'character' || c.source) && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v, sourceNote: undefined })} />}
-                {c.source === 'tower' && <TowerSelect className="w-[11rem]" towers={towers} value={c.sourceNote} onChange={(v) => patch(c.id, { sourceNote: v })} />}
+                {c.source === 'tower' && <TowerSelect className="w-[11rem]" towers={towers} value={c.sourceNote} onChange={(v, over) => setTower(c.id, v, over)} onPick={(v) => setTower(c.id, v, undefined, v ? `${c.name}: tower set to ${v}` : `${c.name}: tower removed`)} />}
                 <button className={btn.ghost} onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
                   Image
                 </button>
