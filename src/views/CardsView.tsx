@@ -1,7 +1,7 @@
 import { Activity, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, towerKey, unmarkMaxed } from '../engine';
+import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, towerKey, towerSpellings, unmarkMaxed } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -43,23 +43,19 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
  * towerKey, as Tower gear groups them, so "lin kuei tower" isn't offered beside "Lin Kuei Tower".
  */
 function towerNames(cards: Card[]) {
-  const byKey = new Map<string, string>();
-  for (const c of cards) {
-    const t = c.source === 'tower' ? c.sourceNote?.trim() : undefined;
-    if (t && !byKey.has(towerKey(t))) byKey.set(towerKey(t), t);
-  }
-  return [...byKey.values()].sort((a, b) => a.localeCompare(b));
+  return [...towerSpellings(cards).values()].sort((a, b) => a.localeCompare(b));
 }
 
 /** The Tower list's "Add a new tower…" choice; not a name anyone types. */
 const NEW_TOWER = '\u0000new';
 
-/** Saves a Tower box's name. With `over`, only over that tower, so one a sync brought in since stands. */
-type TowerWrite = (v: string | undefined, over?: { was: string | undefined }) => void;
-type TowerEdit = { text: string; before: string | undefined; wrote: string | undefined };
+/** Saves a Tower box's name. With `over`, only over the tower the box last saved, so one a sync brought in since stands. */
+type TowerWrite = (v: string | undefined, over?: { saved: string | undefined }) => void;
+// As a rename: the tower before the box opened, and the one it last saved.
+type TowerEdit = { text: string; was: string | undefined; saved: string | undefined };
 
 /** Leaving a Tower box saves the name trimmed, or the tower it had if it's empty, over the tower the box last saved. */
-const finishTower = (e: TowerEdit, write: TowerWrite) => write(e.text.trim() || e.before, { was: e.wrote });
+const finishTower = (e: TowerEdit, write: TowerWrite) => write(e.text.trim() || e.was, { saved: e.saved });
 
 /**
  * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
@@ -80,17 +76,17 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
 
   // Hiding the page (Activity, for Tower gear) may give the box no blur, so a box left open is finished in the cleanup
   // and closed when the page is shown again, as a rename is.
-  const open = useRef({ edit, onChange });
-  useEffect(() => void (open.current = { edit, onChange }));
+  const openEdit = useRef({ edit, onChange });
+  useEffect(() => void (openEdit.current = { edit, onChange }));
   useEffect(() => {
-    if (open.current.edit) setEdit(null);
+    if (openEdit.current.edit) setEdit(null);
     return () => {
-      if (open.current.edit) finishTower(open.current.edit, open.current.onChange);
+      if (openEdit.current.edit) finishTower(openEdit.current.edit, openEdit.current.onChange);
     };
   }, []);
 
   if (edit || towers.length === 0) {
-    const was = edit ?? { before: undefined, wrote: value };
+    const cur = edit ?? { was: undefined, saved: value };
     return (
       <input
         className={className}
@@ -101,14 +97,16 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
         onChange={(e) => {
           const text = e.target.value;
           if (text.trim()) onChange(text);
-          else onChange(was.before, { was: was.wrote });
-          setEdit({ text, before: was.before, wrote: text.trim() ? text : was.before });
+          else onChange(cur.was, { saved: cur.saved });
+          setEdit({ text, was: cur.was, saved: text.trim() ? text : cur.was });
         }}
         onBlur={() => {
           if (edit) finishTower(edit, onChange);
           setEdit(null);
         }}
-        onKeyDown={(e) => e.key === 'Enter' && (onEnter ? onEnter() : ((focusList.current = true), e.currentTarget.blur()))}
+        // Only a box that was typed in turns into the list; an untouched one doesn't rerender, so a flag set for it
+        // would wait and take focus the next time the list shows.
+        onKeyDown={(e) => e.key === 'Enter' && (onEnter ? onEnter() : ((focusList.current = !!edit), e.currentTarget.blur()))}
       />
     );
   }
@@ -120,7 +118,7 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
       className={className}
       value={listed || typed || ''}
       aria-label="Tower"
-      onChange={(e) => (e.target.value === NEW_TOWER ? setEdit({ text: '', before: value, wrote: value }) : onPick(e.target.value || undefined))}
+      onChange={(e) => (e.target.value === NEW_TOWER ? setEdit({ text: '', was: value, saved: value }) : onPick(e.target.value || undefined))}
       onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
     >
       {/* Once a tower is set, picking this takes it off the card, so it says so. */}
@@ -654,10 +652,10 @@ function CardList() {
     });
 
   // With `over`, only over that tower: a Tower box left empty doesn't put its old tower back over one a sync brought in.
-  const setTower = (id: string, tower: string | undefined, over?: { was: string | undefined }, undoLabel?: string) =>
+  const setTower = (id: string, tower: string | undefined, over?: { saved: string | undefined }, undoLabel?: string) =>
     update((d) => {
       const c = d.cards.find((x) => x.id === id);
-      if (!c || (over && c.sourceNote !== over.was) || c.sourceNote === tower) return noChange;
+      if (!c || (over && c.sourceNote !== over.saved) || c.sourceNote === tower) return noChange;
       c.sourceNote = tower;
     }, undoLabel);
 

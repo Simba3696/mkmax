@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addPool, ascensionCaps, towerSpellings, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -2014,5 +2014,21 @@ describe('moveRarity', () => {
     // A sync puts Gold Kameo first, so Diamond and Gold both shift down one place but stay side by side.
     s.rarities = [s.rarities.find((r) => r.id === 'kameo-gold')!, ...s.rarities.filter((r) => r.id !== 'kameo-gold')];
     expect([moveRarity(s, 'diamond', 'gold', 1), s.rarities.slice(0, 3).map((r) => r.id)]).toEqual([true, ['kameo-gold', 'gold', 'diamond']]);
+  });
+});
+
+describe('towerSpellings', () => {
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=the Cards Tower list and Tower gear headings spell a tower the same way: once per tower whatever the
+  // capitals or spaces, as the first tower gear card names it, and only from tower gear; fails_when=the two screens keep
+  // their own spelling rules again, or another source's note is read as a tower; why_new=the rule moved here from two
+  // copies; seam=none; no_claim=none beyond protects
+  it('spells each tower once, as the first tower gear card naming it has it', () => {
+    const card = (name: string, sourceNote: string, source: Card['source'] = 'tower'): Card => ({ id: name, name, rarityId: 'epic', fusion: 1, guest: false, source, sourceNote });
+    const cards = [card('Kori Blade', ' Lin Kuei Tower'), card('Frost Fan', 'lin kuei tower '), card('Ryu Kunai', 'Shirai Ryu Tower'), card('Krypt Axe', 'Krypt', 'krypt'), card('Blank', '  ')];
+    expect([...towerSpellings(cards)]).toEqual([
+      ['lin kuei tower', 'Lin Kuei Tower'],
+      ['shirai ryu tower', 'Shirai Ryu Tower'],
+    ]);
   });
 });

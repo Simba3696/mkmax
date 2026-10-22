@@ -86,6 +86,16 @@ export const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityI
  */
 export const towerKey = (name: string) => name.trim().toLowerCase();
 
+/** Each tower your tower gear names, by towerKey, spelled as the first card naming it has it. */
+export function towerSpellings(cards: Card[]) {
+  const byKey = new Map<string, string>();
+  for (const c of cards) {
+    const t = c.source === 'tower' ? c.sourceNote?.trim() : undefined;
+    if (t && !byKey.has(towerKey(t))) byKey.set(towerKey(t), t);
+  }
+  return byKey;
+}
+
 // Each change copies the whole save (store.tsx), so a record is checked against many times (every pasted line, every
 // keystroke in Add card) before it changes: its keys are worked out once per array. That holds because the record is
 // never changed in place: every change to it puts a new array in `maxed`.

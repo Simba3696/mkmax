@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { copiesToMax, copiesToThreshold, isRealmKlashGear, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel, towerKey } from '../engine';
+import { copiesToMax, copiesToThreshold, isRealmKlashGear, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel, towerKey, towerSpellings } from '../engine';
 import { CardThumb, RarityBadge } from '../ui';
 import { card, grow, row, rowTitle, stepper, stepperVal } from '../classes';
 import type { Card } from '../types';
@@ -39,18 +39,14 @@ export default function TowersPanel() {
   const shown = (c: Card) => filter === 'all' || belowThreshold(c) || tapped.has(c.id);
   const belowCount = gear.filter((c) => belowThreshold(c) || (filter === 'belowThreshold' && tapped.has(c.id))).length;
 
-  // Grouped by towerKey: "Lin kuei tower" files with "Lin Kuei Tower". Each tower is spelled as the first of all its gear
-  // has it, whatever the filter shows, so a heading matches the Tower list on Cards.
-  const spelling = new Map<string, string>();
-  for (const c of gear) {
-    const t = c.sourceNote?.trim() || NO_TOWER;
-    if (!spelling.has(towerKey(t))) spelling.set(towerKey(t), t);
-  }
+  // Grouped by towerKey: "Lin kuei tower" files with "Lin Kuei Tower". Each tower is spelled as the Tower list on Cards
+  // spells it, whatever the filter shows.
+  const spelling = towerSpellings(state.cards);
   const byTower = new Map<string, { tower: string; cards: Card[] }>();
   for (const c of gear) {
     if (!shown(c)) continue;
     const t = c.sourceNote?.trim() || NO_TOWER;
-    const group = byTower.get(towerKey(t)) ?? { tower: spelling.get(towerKey(t))!, cards: [] };
+    const group = byTower.get(towerKey(t)) ?? { tower: spelling.get(towerKey(t)) ?? t, cards: [] };
     group.cards.push(c);
     byTower.set(towerKey(t), group);
   }

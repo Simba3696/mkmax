@@ -2828,6 +2828,42 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect(towerOf('Frost Fan')).toBe('Lin Kuei Tower');
   });
 
+  // Regression: /ship review pass 2 on 2026-10-22 — Enter in an untouched plain Tower box left a flag set, so that card's
+  // list took focus from another card's box mid-word once a tower was named
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=Enter in a card's empty plain Tower box doesn't pull focus to it later, so another card's box keeps
+  // focus and takes a whole name; fails_when=Enter flags the box for focus whether or not a list replaces it;
+  // why_new=review (pass 2, confirmed with a probe); seam=jsdom moves focus on focus(); no_claim=a real keyboard
+  it("doesn't pull focus to a card's Tower list after Enter in its empty plain box", () => {
+    renderPage([tower('kori', 'Kori Blade'), tower('fan', 'Frost Fan')]);
+    fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
+    const box = boxOf('Frost Fan') as HTMLInputElement;
+    box.focus();
+    for (const typed of ['L', 'Li', 'Lin Kuei Tower']) fireEvent.change(box, { target: { value: typed } });
+    expect([towerOf('Frost Fan'), document.activeElement === box]).toEqual(['Lin Kuei Tower', true]);
+  });
+
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=Add card's new-tower box left open when Cards is hidden is finished trimmed and closed, so the list
+  // shows the tower and Add saves it; fails_when=the cleanup only covers a card's row, or keeps the untrimmed name;
+  // why_new=the page-switch test above uses a card's row; seam=rerender switches the page as App does; no_claim=none
+  it("finishes Add card's Tower box left open across a page switch", async () => {
+    const { rerender } = renderPage([tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    const form = () => within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.change(form().getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form().getByLabelText('Source'), { target: { value: 'tower' } });
+    fireEvent.change(form().getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Wrath Hammer' } });
+    pickNewTower(form().getByLabelText('Tower'));
+    fireEvent.change(form().getByLabelText('Tower'), { target: { value: ' Wind Tower ' } });
+    rerender(page('towers'));
+    rerender(page('cards'));
+    await act(async () => {});
+    const list = form().getByLabelText('Tower') as HTMLSelectElement;
+    expect([list.tagName, list.value]).toEqual(['SELECT', 'Wind Tower']);
+    fireEvent.click(form().getByRole('button', { name: 'Add' }));
+    expect(towerOf('Wrath Hammer')).toBe('Wind Tower');
+  });
+
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
   // Value: protects=a Tower gear heading under Below kard threshold is spelled as the Cards Tower list spells it, from
   // the first of all the tower's gear; fails_when=the heading takes the spelling of the first piece the filter shows;
