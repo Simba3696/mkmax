@@ -2449,6 +2449,8 @@ describe('Tower gear: the kard threshold filter', () => {
   // Value: protects=with no tower gear left, only "No tower gear left." shows: no filter and no "none below the
   // threshold" line beside it; fails_when=the total > 0 guard is dropped from the filter or the empty-filter message;
   // why_new=no test rendered Tower gear with no gear left; seam=none; no_claim=none beyond protects
+  // Extended on 2026-10-22 (/ship review): gear whose goal is F3 shows its copies to F3 once under the filter;
+  // fails_when=the copies-to-F3 lead is added in front of a goal that is F3 itself.
   it('leaves gear tracked to F3 that reaches F3 under the filter, with an Undo', () => {
     let lastUndo = null as ReturnType<typeof useStore>['lastUndo'];
     let undo!: ReturnType<typeof useStore>['undo'];
@@ -2464,6 +2466,8 @@ describe('Tower gear: the kard threshold filter', () => {
       </StoreProvider>,
     );
     fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
+    // Its goal is F3, so its copies to F3 show once, not twice.
+    expect([screen.queryByText('1 copy to F3') != null, screen.queryByText(/to F3 · /)]).toEqual([true, null]);
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
     const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string }[];
     expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }), saved().some((c) => c.id === 'kori'), lastUndo?.label]).toEqual([null, false, expect.stringMatching(/done/)]);
