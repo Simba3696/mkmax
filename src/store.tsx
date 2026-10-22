@@ -18,7 +18,13 @@ export type { SyncStatus };
  * nothing is saved, stamped or synced and no Undo is offered, though anything the recipe did outside the draft (like a
  * flag its caller reads) still happened.
  */
-type Update = (recipe: (draft: AppState) => void | typeof noChange, undoLabel?: string | (() => string), opts?: { auto?: boolean; ruleChange?: boolean }) => void;
+type Update = (
+  recipe: (draft: AppState) => void | typeof noChange,
+  undoLabel?: string | (() => string),
+  // `undoFrom` adjusts the state Undo goes back to, for a change whose first steps were saved without Undo (a Tower box
+  // saves as it's typed, then its finish re-spells other cards): Undo then takes back those steps too.
+  opts?: { auto?: boolean; ruleChange?: boolean; undoFrom?: (prev: AppState) => void },
+) => void;
 
 /**
  * What an update recipe returns when there's nothing to change, like a tap on a screen a sync has made out of date. A
@@ -184,7 +190,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // Settings rule change removes, so those are only "done".
     const gone = (names: string[], how: string) => names.length > 0 && `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} ${how} and removed`;
     const label = [typeof undoLabel === 'function' ? undoLabel() : undoLabel, gone(split.maxed, 'maxed'), gone(split.done, 'done')].filter(Boolean).join(' · ');
-    if (label) setLastUndo({ label, prev, at: Date.now() });
+    if (label) {
+      const base = opts?.undoFrom ? structuredClone(prev) : prev;
+      opts?.undoFrom?.(base);
+      setLastUndo({ label, prev: base, at: Date.now() });
+    }
     if (!opts?.auto) schedulePush();
   };
 

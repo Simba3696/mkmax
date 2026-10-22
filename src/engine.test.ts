@@ -2037,15 +2037,16 @@ describe('respellTower', () => {
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
   // Value: protects=a tower typed in a new spelling becomes its spelling on every tower gear card naming it, and the
   // spelling already shown (or a tower no card names) changes nothing; fails_when=a retyped spelling only changes one card,
-  // or picking the shown spelling re-spells cards, or other sources' notes change; why_new=new helper; seam=none;
+  // or picking the shown spelling re-spells cards, other sources' notes change, or a card already spelled that way is
+  // counted; why_new=new helper; seam=none;
   // no_claim=none beyond protects
   it('re-spells a tower on every card only when the typed spelling is new', () => {
     const card = (name: string, sourceNote: string, source: Card['source'] = 'tower'): Card => ({ id: name, name, rarityId: 'epic', fusion: 1, guest: false, source, sourceNote });
-    const cards = () => [card('Kori Blade', 'lin kuei tower'), card('Frost Fan', 'LIN KUEI TOWER '), card('Ryu Kunai', 'Shirai Ryu Tower'), card('Krypt Axe', 'lin kuei tower', 'krypt')];
+    const cards = () => [card('Kori Blade', 'lin kuei tower'), card('Frost Fan', 'LIN KUEI TOWER '), card('Ryu Kunai', 'Shirai Ryu Tower'), card('Krypt Axe', 'lin kuei tower', 'krypt'), card('Fire Fan', 'Lin Kuei Tower')];
     const fixed = cards();
     const shown = cards();
     const unknown = cards();
     expect([respellTower(fixed, 'Lin Kuei Tower'), respellTower(shown, 'lin kuei tower'), respellTower(unknown, 'Wind Tower')]).toEqual([2, 0, 0]);
-    expect([fixed.map((c) => c.sourceNote), shown, unknown]).toEqual([['Lin Kuei Tower', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'lin kuei tower'], cards(), cards()]);
+    expect([fixed.map((c) => c.sourceNote), shown, unknown]).toEqual([['Lin Kuei Tower', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'lin kuei tower', 'Lin Kuei Tower'], cards(), cards()]);
   });
 });
