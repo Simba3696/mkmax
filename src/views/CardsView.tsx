@@ -56,6 +56,10 @@ const NEW_TOWER = '\u0000new';
 
 /** Saves a Tower box's name. With `over`, only over that tower, so one a sync brought in since stands. */
 type TowerWrite = (v: string | undefined, over?: { was: string | undefined }) => void;
+type TowerEdit = { text: string; before: string | undefined; wrote: string | undefined };
+
+/** Leaving a Tower box saves the name trimmed, or the tower it had if it's empty, over the tower the box last saved. */
+const finishTower = (e: TowerEdit, write: TowerWrite) => write(e.text.trim() || e.before, { was: e.wrote });
 
 /**
  * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
@@ -67,15 +71,13 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
   // The name being typed, the tower the card had before Add a new tower… was picked (which an emptied box goes back to;
   // none in the plain box, which has no list to go back to), and the tower this box last saved. Null while picking from
   // the list, or before the first key in the plain box.
-  const [edit, setEdit] = useState<{ text: string; before: string | undefined; wrote: string | undefined } | null>(null);
+  const [edit, setEdit] = useState<TowerEdit | null>(null);
   // Enter in the new-tower box puts focus on the list that replaces it, rather than dropping it to the page.
   const focusList = useRef(false);
   useEffect(() => {
     focusList.current = false;
   });
 
-  // Leaving the box saves the name trimmed, or the tower it had if it's empty, over the tower this box last saved.
-  const finish = (e: NonNullable<typeof edit>, write: TowerWrite) => write(e.text.trim() || e.before, { was: e.wrote });
   // Hiding the page (Activity, for Tower gear) may give the box no blur, so a box left open is finished in the cleanup
   // and closed when the page is shown again, as a rename is.
   const open = useRef({ edit, onChange });
@@ -83,9 +85,8 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
   useEffect(() => {
     if (open.current.edit) setEdit(null);
     return () => {
-      if (open.current.edit) finish(open.current.edit, open.current.onChange);
+      if (open.current.edit) finishTower(open.current.edit, open.current.onChange);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (edit || towers.length === 0) {
@@ -104,7 +105,7 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
           setEdit({ text, before: was.before, wrote: text.trim() ? text : was.before });
         }}
         onBlur={() => {
-          if (edit) finish(edit, onChange);
+          if (edit) finishTower(edit, onChange);
           setEdit(null);
         }}
         onKeyDown={(e) => e.key === 'Enter' && (onEnter ? onEnter() : ((focusList.current = true), e.currentTarget.blur()))}
