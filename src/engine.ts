@@ -104,7 +104,8 @@ export function respellTower(cards: Card[], tower: string) {
   const key = towerKey(tower);
   let changed = 0;
   for (const c of cards) {
-    if (c.source !== 'tower' || c.sourceNote === tower || !c.sourceNote?.trim() || towerKey(c.sourceNote) !== key) continue;
+    // Already spelled that way, give or take spaces at the ends (as an older build could save it): nothing to fix.
+    if (c.source !== 'tower' || c.sourceNote?.trim() === tower || !c.sourceNote?.trim() || towerKey(c.sourceNote) !== key) continue;
     c.sourceNote = tower;
     changed++;
   }

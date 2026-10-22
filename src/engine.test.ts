@@ -2037,18 +2037,19 @@ describe('respellTower', () => {
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
   // Value: protects=a typed tower name becomes its spelling on every tower gear card naming it another way, however mixed
   // (typing the spelling already shown still fixes the others), and a tower no card names changes nothing; fails_when=a
-  // retyped spelling only changes some cards, other sources' notes change, or a card already spelled that way is counted;
+  // retyped spelling only changes some cards, other sources' notes change, or a card already spelled that way (even with a
+  // space at the end) is counted;
   // why_new=new helper; seam=none; no_claim=none beyond protects
   it('spells a tower as typed on every card naming it another way', () => {
     const card = (name: string, sourceNote: string, source: Card['source'] = 'tower'): Card => ({ id: name, name, rarityId: 'epic', fusion: 1, guest: false, source, sourceNote });
-    const cards = () => [card('Kori Blade', 'lin kuei tower'), card('Frost Fan', 'LIN KUEI TOWER '), card('Ryu Kunai', 'Shirai Ryu Tower'), card('Krypt Axe', 'lin kuei tower', 'krypt'), card('Fire Fan', 'Lin Kuei Tower')];
+    const cards = () => [card('Kori Blade', 'lin kuei tower'), card('Frost Fan', 'LIN KUEI TOWER '), card('Ryu Kunai', 'Shirai Ryu Tower'), card('Krypt Axe', 'lin kuei tower', 'krypt'), card('Fire Fan', 'Lin Kuei Tower'), card('Wind Fan', 'Lin Kuei Tower ')];
     const fixed = cards();
     const shown = cards();
     const unknown = cards();
-    expect([respellTower(fixed, 'Lin Kuei Tower'), respellTower(shown, 'lin kuei tower'), respellTower(unknown, 'Wind Tower')]).toEqual([2, 2, 0]);
+    expect([respellTower(fixed, 'Lin Kuei Tower'), respellTower(shown, 'lin kuei tower'), respellTower(unknown, 'Wind Tower')]).toEqual([2, 3, 0]);
     expect([fixed.map((c) => c.sourceNote), shown.map((c) => c.sourceNote), unknown]).toEqual([
-      ['Lin Kuei Tower', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'lin kuei tower', 'Lin Kuei Tower'],
-      ['lin kuei tower', 'lin kuei tower', 'Shirai Ryu Tower', 'lin kuei tower', 'lin kuei tower'],
+      ['Lin Kuei Tower', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'lin kuei tower', 'Lin Kuei Tower', 'Lin Kuei Tower '],
+      ['lin kuei tower', 'lin kuei tower', 'Shirai Ryu Tower', 'lin kuei tower', 'lin kuei tower', 'lin kuei tower'],
       cards(),
     ]);
   });
