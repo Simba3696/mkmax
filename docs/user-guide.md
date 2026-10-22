@@ -298,8 +298,8 @@ Expired packs are left out of the plan and Pack ranking. They stay until you cle
 - **Sort** shows once you have 2 packs: **Ending soonest** (the default) or **Currency**, which groups each section's packs under a heading per currency, in the order they're listed in Settings. Sort choices are remembered on each device and aren't synced.
 - **Summary line**, for example "400 Souls · 3 cards per buy · bought 2/5" for a random pack, or "300 Blood Rubies · store item · bought 0/2" for a store item. 2/5 means 2 bought of a 5-purchase limit.
 - **Timing chip**, the same one as on the Plan: blue "starts in …", gold "… left" (red under 24 hours), or grey "permanent" or "expired". Countdowns update every minute.
-- **Drop pills** show each card's chance per roll. "(deleted card)" means the card is gone from Cards. "No drops entered yet." means the pack has no odds. A Kasket shows a line saying how many cards share its odds, and its pills list that pool (see [Kaskets](#kaskets)).
-- **Long drop lists:** a pack with more than 12 cards in its drop list shows the first 8 and a **+N more** pill. Tap it to see the rest, and **Show fewer** to fold it again. Lists start folded each time you open Packs.
+- **Drop pills** show each card's chance per roll, in name order, whatever order you entered them in. "(deleted card)" means the card is gone from Cards. "No drops entered yet." means the pack has no odds. A Kasket shows a line saying how many cards share its odds, and its pills list that pool (see [Kaskets](#kaskets)).
+- **Long drop lists:** a pack with more than 12 cards in its drop list shows the first 8 by name and a **+N more** pill. Tap it to see the rest, and **Show fewer** to fold it again. Lists start folded each time you open Packs.
 
 With no packs, the tab says "No packs yet."
 
@@ -311,8 +311,8 @@ On Packs, tap **I bought one**. This deducts the cost, and a store item also lev
 - **I bought one** is greyed out once the purchase limit is reached.
 - **I bought one** works even when your balance is lower than the cost, since the balance you typed may be out of date. The balance then goes below 0 until you type in the real one.
 - **−1** on a store item also takes a copy off its card.
-- After buying a random pack, **What did you pull?** opens: "Tap + for each copy you got." Cards you don't track can be ignored. **Done** closes it, and so does **−1**.
-- After buying a Kasket, **What did you pull?** shows a search box instead of a list, since a Kasket gives one card: type part of the card's name, pick it, then tap +. It finds any card of the Kasket's rarity, listing the ones it can give right now first, so a card the app didn't expect (after a game update, say) can still be logged here.
+- After buying a random pack, **What did you pull?** opens: "Tap + for each copy you got." The pack's cards are listed in name order. Cards you don't track can be ignored. **Done** closes it, and so does **−1**.
+- After buying a Kasket, **What did you pull?** shows a search box instead of a list, since a Kasket gives one card: type part of the card's name, pick it, then tap +. It finds any card of the Kasket's rarity, listing the ones it can give right now first (each group in name order), so a card the app didn't expect (after a game update, say) can still be logged here.
 
 ### Entering a pack from its info screen
 
@@ -332,9 +332,9 @@ Tap **+ Add pack** (or **Edit** on a pack).
 - **Drop chances:** type the chance per card, per roll, as a percent. List only cards you track; the rest of the pool doesn't matter. **Total listed** turns red over 100%, which usually means a typo or a group rate typed on every card (use an even pool for those). It doesn't stop you saving.
 - **Item** (store items): one card picker, with no %.
 
-**Choosing a card for a drop:** type part of the name and pick from the list. Every word has to be in the name, in any order (`man sky` finds Man in the Sky). Each result shows its rarity and level ("new" means not owned), and cards already in the pack are left out. Up to 40 results show.
+**Choosing a card for a drop:** type part of the name and pick from the list. Every word has to be in the name, in any order (`man sky` finds Man in the Sky). Results are in name order, whatever their rarity. Each result shows its rarity and level ("new" means not owned), and cards already in the pack are left out. Up to 40 results show.
 
-**Even pools:** for odds like "9% for one random Rare tower item", tap **+ Even pool…**, tick the cards you want, and enter the 9% and how many items the whole pool has (every item, the ticked ones included; nothing is added to or taken off that count). Each ticked card gets 9% ÷ that number. If you leave the pool size blank, it divides by the number of cards you ticked, so leave it blank only when the ticked cards are the whole pool. If you enter fewer items than you ticked, it uses the number ticked. Ticks stay when you switch the rarity list, so a pool can mix rarities. A card that's already listed, like one with its own 1.5% line, gets its pool share added to that chance, and the editor shows the before and after first.
+**Even pools:** for odds like "9% for one random Rare tower item", tap **+ Even pool…**, tick the cards you want (listed in name order), and enter the 9% and how many items the whole pool has (every item, the ticked ones included; nothing is added to or taken off that count). Each ticked card gets 9% ÷ that number. If you leave the pool size blank, it divides by the number of cards you ticked, so leave it blank only when the ticked cards are the whole pool. If you enter fewer items than you ticked, it uses the number ticked. Ticks stay when you switch the rarity list, so a pool can mix rarities. A card that's already listed, like one with its own 1.5% line, gets its pool share added to that chance, and the editor shows the before and after first.
 
 **Adding a card from the editor:** under "Card not in your list yet? Add it here:", **Add card** adds a card to Cards straight away, even if you then cancel the pack. It joins the drops at 0%, so type its real chance (in a store item it becomes the item). It only asks for name, rarity and level, so set **Goal**, **Max**, **Guest** and **Source** on the card in Cards afterwards. Realm Klash gear is kept at any level below F10, since it's always tracked to F10. A card added at or past its rarity's kard threshold, while **Track until** is that threshold, is tracked on to its max, as in Cards. A level that is already the card's goal (any card at its top level, or an owned Kameo) would be done at once, so **Add card** is greyed out and says to pick a lower level.
 

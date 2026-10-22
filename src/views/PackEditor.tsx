@@ -333,6 +333,7 @@ export default function PackEditor({ initial, onClose }: { initial: Pack | null;
               <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-2 gap-y-0 my-[0.4rem] max-h-[220px] md:max-h-[300px] overflow-y-auto">
                 {state.cards
                   .filter((c) => c.rarityId === poolRarity)
+                  .sort((a, b) => a.name.localeCompare(b.name))
                   .map((c) => (
                     <label key={c.id} className={check}>
                       <input
