@@ -56,27 +56,30 @@ const NEW_TOWER = '\u0000new';
 
 /**
  * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
- * While a new name is being typed the box stays a text box, so it doesn't turn into the list mid-word once the card
- * saves it; with no towers named yet it's only a text box.
+ * While a name is being typed the box stays a text box until it's left, so it doesn't turn into the list mid-word once
+ * the card saves the first letters; with no towers named yet it's only a text box.
  */
 function TowerSelect({ towers, value, onChange, onEnter, className }: { towers: string[]; value: string | undefined; onChange: (v: string | undefined) => void; onEnter?: () => void; className?: string }) {
-  const [text, setText] = useState<string | null>(null); // null: picking from the list
-  if (text !== null || towers.length === 0) {
+  // The name being typed and the tower the card had before it, which an emptied box goes back to; null while picking
+  // from the list (or before the first key in the plain box).
+  const [edit, setEdit] = useState<{ text: string; before: string | undefined } | null>(null);
+  if (edit || towers.length === 0) {
+    const before = edit ? edit.before : value;
     return (
       <input
         className={className}
-        value={text ?? value ?? ''}
+        value={edit?.text ?? value ?? ''}
         placeholder={towers.length ? 'New tower name' : 'e.g. Lin Kuei Tower'}
         aria-label="Tower"
-        autoFocus={text !== null}
+        autoFocus={!!edit}
         onChange={(e) => {
-          if (text !== null) setText(e.target.value);
-          onChange(e.target.value || undefined);
+          setEdit({ text: e.target.value, before });
+          onChange(e.target.value.trim() ? e.target.value : before);
         }}
         onBlur={(e) => {
-          setText(null);
-          const t = e.target.value.trim();
-          if (t !== e.target.value) onChange(t || undefined);
+          setEdit(null);
+          const next = e.target.value.trim() || before;
+          if (next !== value) onChange(next);
         }}
         onKeyDown={(e) => e.key === 'Enter' && (onEnter ? onEnter() : e.currentTarget.blur())}
       />
@@ -85,8 +88,9 @@ function TowerSelect({ towers, value, onChange, onEnter, className }: { towers: 
   const typed = value?.trim();
   const listed = typed && towers.find((t) => t.toLowerCase() === typed.toLowerCase());
   return (
-    <select className={className} value={listed || typed || ''} aria-label="Tower" onChange={(e) => (e.target.value === NEW_TOWER ? setText('') : onChange(e.target.value || undefined))}>
-      <option value="">Choose a tower…</option>
+    <select className={className} value={listed || typed || ''} aria-label="Tower" onChange={(e) => (e.target.value === NEW_TOWER ? setEdit({ text: '', before: value }) : onChange(e.target.value || undefined))}>
+      {/* Once a tower is set, picking this takes it off the card, so it says so. */}
+      <option value="">{typed ? 'No tower' : 'Choose a tower…'}</option>
       {typed && !listed && <option value={typed}>{typed}</option>}
       {towers.map((t) => (
         <option key={t} value={t}>
