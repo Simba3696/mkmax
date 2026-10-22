@@ -2445,18 +2445,10 @@ describe('Tower gear: the kard threshold filter', () => {
 
     fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
     expect(headings()).toEqual(['Thunder Tower 2 below threshold', 'Lin Kuei Tower 1 below threshold']);
+    // More than one copy to F3 reads in the plural (Wrath Hammer at F0, tracked to F10).
+    expect(screen.queryByText('3 copies to F3 · 10 copies to F10')).not.toBeNull();
   });
 
-  // Generated on 2026-10-22 (/ship review, Tower gear filter)
-  // Value: protects=with the filter on, gear tracked only to F3 that's raised to F3 is done and leaves the list with an
-  // Undo that brings it back; fails_when=the filter keeps a done piece on screen, or the step loses its done Undo;
-  // why_new=the other filter tests track Epic to Max; seam=none; no_claim=done handling on Cards (store tests)
-  // Extended on 2026-10-22 (/ship test coverage audit, Tower gear filter)
-  // Value: protects=with no tower gear left, only "No tower gear left." shows: no filter and no "none below the
-  // threshold" line beside it; fails_when=the total > 0 guard is dropped from the filter or the empty-filter message;
-  // why_new=no test rendered Tower gear with no gear left; seam=none; no_claim=none beyond protects
-  // Extended on 2026-10-22 (/ship review): gear whose goal is F3 shows its copies to F3 once under the filter;
-  // fails_when=the copies-to-F3 lead is added in front of a goal that is F3 itself.
   // Generated on 2026-10-22 (/ship adversarial review, Tower gear filter)
   // Value: protects=under the filter, a level tap a sync got to first saves nothing and doesn't keep its piece listed;
   // fails_when=the piece is pinned before the store checks the tap, so gear a sync took to F3 stays listed and counted;
@@ -2488,6 +2480,16 @@ describe('Tower gear: the kard threshold filter', () => {
     expect([saved[0].fusion, screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }), filter.options[1].textContent]).toEqual([4, null, 'Below kard threshold (0)']);
   });
 
+  // Generated on 2026-10-22 (/ship review, Tower gear filter)
+  // Value: protects=with the filter on, gear tracked only to F3 that's raised to F3 is done and leaves the list with an
+  // Undo that brings it back; fails_when=the filter keeps a done piece on screen, or the step loses its done Undo;
+  // why_new=the other filter tests track Epic to Max; seam=none; no_claim=done handling on Cards (store tests)
+  // Extended on 2026-10-22 (/ship test coverage audit, Tower gear filter)
+  // Value: protects=with no tower gear left, only "No tower gear left." shows: no filter and no "none below the
+  // threshold" line beside it; fails_when=the total > 0 guard is dropped from the filter or the empty-filter message;
+  // why_new=no test rendered Tower gear with no gear left; seam=none; no_claim=none beyond protects
+  // Extended on 2026-10-22 (/ship review): gear whose goal is F3 shows its copies to F3 once under the filter;
+  // fails_when=the copies-to-F3 lead is added in front of a goal that is F3 itself.
   it('leaves gear tracked to F3 that reaches F3 under the filter, with an Undo', () => {
     let lastUndo = null as ReturnType<typeof useStore>['lastUndo'];
     let undo!: ReturnType<typeof useStore>['undo'];
