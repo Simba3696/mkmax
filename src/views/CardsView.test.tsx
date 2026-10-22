@@ -3548,7 +3548,12 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   it('goes on from the name saved on hiding, so a later Undo leaves one spelling', () => {
     renderPage([tower('kori', 'Kori Blade', 'lin kuei tower'), tower('fan', 'Frost Fan', 'lin kuei tower')]);
     pickNewTower(boxOf('Kori Blade'));
-    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
+    // Extended on 2026-10-22 (/ship test coverage, Tower dropdown): typed with an end space, so the card shows the name
+    // untrimmed until the hide saves it trimmed. Value: protects=whether the hide's save went through is judged from the
+    // tower saved, not the one before; fails_when=the card's tower is read before the hide's save renders (an end space
+    // then looks refused), so Undo puts the typed card back to the old spelling; why_new=every other hide case types
+    // no end spaces or has no Undo or emptying after it; seam=none; no_claim=a phone closing the app
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower ' } });
     appShows('hidden');
     appShows('visible');
     fireEvent.change(boxOf('Kori Blade'), { target: { value: 'LIN KUEI TOWER' } });

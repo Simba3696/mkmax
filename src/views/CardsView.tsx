@@ -1,4 +1,4 @@
-import { Activity, useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
@@ -103,7 +103,9 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   // left. It's done at once (flushSync), so the store's save runs before the page can be frozen or closed, not in a later
   // task that may never come.
   const openEdit = useRef({ edit, onChange, held, settle, value });
-  useEffect(() => void (openEdit.current = { edit, onChange, held, settle, value }));
+  // Kept up to date in a layout effect, which runs inside flushSync's commit, so the hide's read-back below sees the
+  // tower its save left.
+  useLayoutEffect(() => void (openEdit.current = { edit, onChange, held, settle, value }));
   useEffect(() => {
     if (openEdit.current.edit) setEdit(null);
     const away = () => {
