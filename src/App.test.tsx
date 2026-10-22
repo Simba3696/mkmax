@@ -590,6 +590,17 @@ describe('the Undo bar', () => {
     expect(showing('Added h')).toBe(true);
     act(() => void vi.advanceTimersByTime(600));
     expect(showing('Added h')).toBe(false);
+
+    // Extended on 2026-10-22 (/ship review, testing): a change with the same label as the one showing (the same tower
+    // spelling fixed twice) still gets its own 8 seconds; fails_when=the timer is keyed on the label, so the old timer
+    // closes nothing and the bar stays up for good.
+    add('i', 'Added x');
+    act(() => void vi.advanceTimersByTime(5_000));
+    add('j', 'Added x');
+    act(() => void vi.advanceTimersByTime(7_900));
+    expect(showing('Added x')).toBe(true);
+    act(() => void vi.advanceTimersByTime(200));
+    expect(showing('Added x')).toBe(false);
   });
 
   // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)

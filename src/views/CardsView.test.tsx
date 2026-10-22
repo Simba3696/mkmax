@@ -3648,4 +3648,22 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.blur(boxOf('Ryu Kunai'));
     expect(towerOf('Ryu Kunai')).toBe('Shirai Ryu Tower');
   });
+
+  // Generated on 2026-10-22 (/ship review, testing, Tower dropdown)
+  // Value: protects=a Tower box finished with the name the card already has saves nothing, whether it's left or the app
+  // is hidden: no new stamp (so this device's copy doesn't look newest to a sync) and no Undo; fails_when=setTower saves a
+  // finish that changes nothing; why_new=review (testing): every finish test changes the tower; seam=none; no_claim=a
+  // real sync push
+  it('saves nothing when a Tower box is finished with the tower the card already has', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    const stamp = () => JSON.parse(localStorage.getItem('mkmax:v1')!).updatedAt;
+    const before = stamp();
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.blur(boxOf('Kori Blade'));
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
+    appShows('hidden');
+    expect([stamp(), towerOf('Kori Blade'), lastUndo]).toEqual([before, 'Lin Kuei Tower', null]);
+  });
 });
