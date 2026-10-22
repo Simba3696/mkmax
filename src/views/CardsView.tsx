@@ -1,4 +1,5 @@
 import { Activity, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerSpellings, unmarkMaxed } from '../engine';
@@ -78,7 +79,8 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   // Hiding the page (Activity, for Tower gear) may give the box no blur, so a box left open is finished in the cleanup
   // and closed when the page is shown again, as a rename is.
   // Hiding the app gives no blur either, and a phone may close it while it's away, so the name is finished then too; the
-  // box stays open with what was typed, and is finished again when it's left.
+  // box stays open with what was typed, and is finished again when it's left. It's finished at once (flushSync), so the
+  // store's save runs before the page can be frozen or closed, not in a later task that may never come.
   const openEdit = useRef({ edit, onChange });
   useEffect(() => void (openEdit.current = { edit, onChange }));
   useEffect(() => {
@@ -86,8 +88,10 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
     const away = () => {
       const e = openEdit.current.edit;
       if (document.visibilityState !== 'hidden' || !e) return;
-      finishTower(e, openEdit.current.onChange);
-      setEdit({ ...e, saved: e.text.trim() || e.was });
+      flushSync(() => {
+        finishTower(e, openEdit.current.onChange);
+        setEdit({ ...e, saved: e.text.trim() || e.was });
+      });
     };
     document.addEventListener('visibilitychange', away);
     return () => {

@@ -46,15 +46,20 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: (sh
       clearTimeout(t);
       t = document.visibilityState === 'hidden' ? undefined : setTimeout(() => onDismiss(entry), UNDO_SHOW_MS);
     };
+    // Some browsers restore a page from the back-forward cache with only pageshow, no visibility change.
+    const onPageShow = (e: PageTransitionEvent) => e.persisted && start();
     start();
     document.addEventListener('visibilitychange', start);
+    window.addEventListener('pageshow', onPageShow);
     return () => {
       clearTimeout(t);
       document.removeEventListener('visibilitychange', start);
+      window.removeEventListener('pageshow', onPageShow);
     };
-    // Restart the timer for each new change, not on every render.
+    // Restart the timer for each new change (each is a new entry, even two made in the same millisecond), not on every
+    // render; the timer only ever closes the change it was started for.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry.at]);
+  }, [entry]);
   // Undo and ✕ act on the change the bar showed when pressed. Pressing them can finish a box being typed in (a Tower
   // name), which may put a new change in the bar before the tap lands; that one is shown, not undone or dropped unseen.
   // A key press (a click with no pointer, detail 0) acts on the change showing then.

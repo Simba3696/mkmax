@@ -461,6 +461,21 @@ describe('the Undo bar', () => {
     expect(screen.queryByText('Added a')).toBeTruthy();
     act(() => void vi.advanceTimersByTime(1_500));
     expect(screen.queryByText('Added a')).toBeNull();
+
+    // Extended on 2026-10-22 (/ship test coverage audit, Tower dropdown)
+    // Value: protects=a change made while the app is already away (a Tower name finished as the app is hidden) gets its
+    // full 8 seconds once the app shows; fails_when=the bar only pauses on a hide that comes after it shows, so a change
+    // made while hidden starts counting at once and is gone on return; why_new=the steps above make the change before
+    // hiding; seam=fake timers, document.visibilityState mocked; no_claim=a real phone's event order on hiding
+    appShows('hidden');
+    add('b', 'Added b');
+    act(() => void vi.advanceTimersByTime(20_000));
+    expect(screen.queryByText('Added b')).toBeTruthy();
+    appShows('visible');
+    act(() => void vi.advanceTimersByTime(7_000));
+    expect(screen.queryByText('Added b')).toBeTruthy();
+    act(() => void vi.advanceTimersByTime(1_500));
+    expect(screen.queryByText('Added b')).toBeNull();
   });
 
   // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
@@ -484,5 +499,94 @@ describe('the Undo bar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect([ids(), screen.queryByText('Added c')]).toEqual([['a', 'b'], null]);
+  });
+
+  // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
+  // Value: protects=a plain tap or a key press on Undo undoes the change showing, and on ✕ closes the bar keeping it,
+  // also a key press on ✕ after an earlier press that a new change replaced; fails_when=the pressed-entry match fails, so
+  // a real tap does nothing, or a stale press blocks the keyboard; why_new=review (state machines, testing); seam=pointer
+  // clicks sent with detail 1, key clicks with detail 0; no_claim=a real tap's event order
+  it('undoes or closes the change showing on a plain tap or a key press', () => {
+    renderApp();
+    const press = (name: string, detail: number) => {
+      if (detail) fireEvent.pointerDown(screen.getByRole('button', { name }));
+      fireEvent.click(screen.getByRole('button', { name }), { detail });
+    };
+    add('a', 'Added a');
+    press('Undo', 1);
+    expect([ids(), screen.queryByText('Added a')]).toEqual([[], null]);
+    add('b', 'Added b');
+    press('Undo', 0);
+    expect([ids(), screen.queryByText('Added b')]).toEqual([[], null]);
+    add('c', 'Added c');
+    press('Dismiss', 1);
+    expect([ids(), screen.queryByText('Added c')]).toEqual([['c'], null]);
+    add('d', 'Added d');
+    press('Dismiss', 0);
+    expect([ids(), screen.queryByText('Added d')]).toEqual([['c', 'd'], null]);
+    add('e', 'Added e');
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Dismiss' }));
+    add('f', 'Added f');
+    press('Dismiss', 0);
+    expect([ids(), screen.queryByText('Added f')]).toEqual([['c', 'd', 'e', 'f'], null]);
+  });
+
+  // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
+  // Value: protects=the bar goes after 8 seconds, and a change that replaces the one showing gets its own full 8 seconds,
+  // even one made in the same millisecond, and after time away; fails_when=the timer is keyed on the change's time, so a
+  // change made in the same millisecond keeps the old timer, which closes nothing, and the bar never goes; why_new=review
+  // (state machines); seam=fake timers (Date frozen, so two changes share a millisecond), document.visibilityState
+  // mocked; no_claim=none beyond protects
+  it('gives each change its own 8 seconds, even two made in the same millisecond', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    renderApp();
+    const showing = (label: string) => screen.queryByText(label) !== null;
+    add('a', 'Added a');
+    act(() => void vi.advanceTimersByTime(7_900));
+    expect(showing('Added a')).toBe(true);
+    act(() => void vi.advanceTimersByTime(200));
+    expect([showing('Added a'), ids()]).toEqual([false, ['a']]);
+
+    add('b', 'Added b');
+    act(() => void vi.advanceTimersByTime(5_000));
+    add('c', 'Added c');
+    act(() => void vi.advanceTimersByTime(5_000));
+    expect(showing('Added c')).toBe(true);
+    act(() => void vi.advanceTimersByTime(3_100));
+    expect(showing('Added c')).toBe(false);
+
+    add('d', 'Added d');
+    add('e', 'Added e');
+    act(() => void vi.advanceTimersByTime(8_100));
+    expect(showing('Added e')).toBe(false);
+
+    add('f', 'Added f');
+    add('g', 'Added g');
+    appShows('hidden');
+    act(() => void vi.advanceTimersByTime(20_000));
+    appShows('visible');
+    act(() => void vi.advanceTimersByTime(7_000));
+    expect(showing('Added g')).toBe(true);
+    act(() => void vi.advanceTimersByTime(1_500));
+    expect(showing('Added g')).toBe(false);
+  });
+
+  // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=a page restored from the back-forward cache with only pageshow (no visibility change) gives the bar
+  // its 8 seconds again, so it doesn't stay up for good (holding an app update's reload); fails_when=only a visibility
+  // change restarts the time paused on hiding; why_new=review (Red Team); seam=fake timers, document.visibilityState
+  // mocked, a pageshow with persisted sent by hand; no_claim=which browsers skip the visibility change
+  it('restarts its time when the page is restored with only pageshow', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    renderApp();
+    add('a', 'Added a');
+    appShows('hidden');
+    act(() => void vi.advanceTimersByTime(20_000));
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    act(() => void window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true })));
+    act(() => void vi.advanceTimersByTime(7_000));
+    expect(screen.queryByText('Added a')).toBeTruthy();
+    act(() => void vi.advanceTimersByTime(1_500));
+    expect(screen.queryByText('Added a')).toBeNull();
   });
 });

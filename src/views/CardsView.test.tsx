@@ -3472,4 +3472,49 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.blur(box());
     expect((form.getByLabelText('Tower') as HTMLSelectElement).value).toBe('Wind Tower');
   });
+
+  // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
+  // Value: protects=in Add card a tower stepped to with the keys is taken at once, so Enter on the list adds the card
+  // with it and leaving the list keeps it for Add, and an emptied new-tower box left goes back to the tower picked before;
+  // fails_when=Enter adds with the tower before the step, leaving drops the step, or the emptied box clears the tower;
+  // why_new=review (state machines); seam=keyDown, change and keyUp sent in a closed list's order; no_claim=none beyond
+  // protects
+  it("adds or keeps Add card's tower stepped to with the keys, and puts back an emptied box's tower", () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    const form = towerForm();
+    const name = form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)');
+    const count = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards.length;
+    fireEvent.change(name, { target: { value: 'Ice Fan' } });
+    step(form.getByLabelText('Tower'), 'Shirai Ryu Tower');
+    fireEvent.keyDown(form.getByLabelText('Tower'), { key: 'Enter' });
+    expect([towerOf('Ice Fan'), lastUndo]).toEqual(['Shirai Ryu Tower', null]);
+
+    fireEvent.change(name, { target: { value: 'Frost Fan' } });
+    step(form.getByLabelText('Tower'), 'Lin Kuei Tower');
+    fireEvent.blur(form.getByLabelText('Tower'));
+    expect([(form.getByLabelText('Tower') as HTMLSelectElement).value, count()]).toEqual(['Lin Kuei Tower', 3]);
+    fireEvent.click(form.getByRole('button', { name: 'Add' }));
+    expect(towerOf('Frost Fan')).toBe('Lin Kuei Tower');
+
+    emptiedBox(form.getByLabelText('Tower'), () => form.getByPlaceholderText('New tower name'));
+    fireEvent.blur(form.getByPlaceholderText('New tower name'));
+    expect([(form.getByLabelText('Tower') as HTMLSelectElement).value, lastUndo]).toEqual(['Lin Kuei Tower', null]);
+    fireEvent.change(name, { target: { value: 'Jade Fan' } });
+    fireEvent.click(form.getByRole('button', { name: 'Add' }));
+    expect(towerOf('Jade Fan')).toBe('Lin Kuei Tower');
+  });
+
+  // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=a Tower name finished as the app is hidden is saved to storage before the hide event returns, with
+  // the other cards re-spelled, so a phone closing the app right then keeps it; fails_when=the finish waits for a later
+  // render and effect to be saved, which a closed app never runs; why_new=review (Red Team); seam=document.visibilityState
+  // mocked, the hide event sent outside act so nothing flushes it for the test; no_claim=a real phone freezing the page
+  it('saves a tower name finished on hiding the app before the hide event returns', () => {
+    renderPage([tower('kori', 'Kori Blade', 'lin kuei tower'), tower('fan', 'Frost Fan', 'lin kuei tower')]);
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower ' } });
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect([towerOf('Kori Blade'), towerOf('Frost Fan')]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower']);
+  });
 });
