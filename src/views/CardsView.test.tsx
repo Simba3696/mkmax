@@ -447,11 +447,6 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     expect(saved().cards.map((c: { name: string; rarityId: string; fusion: number }) => [c.name, c.rarityId, c.fusion])).toEqual([['Jade, Lizard', 'diamond', 0]]);
   });
 
-  // Regression: /ship review of stale-screens-and-schedule — a pasted card a sync added just before Add went in twice
-  // Found by /ship on 2026-10-14
-  // Value: protects=Paste a list's Add skips a card a sync added after the list was read, and saves nothing for it;
-  // fails_when=the list as drawn is trusted, so the same card is saved twice; why_new=review (adversarial);
-  // seam=a grabbed update stands in for the sync, SyncLoop.nextStamp spied; no_claim=a real sync
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
   // Value: protects=a pasted tower line another device already applied, in the Tower list's spelling, just before Add saves
   // and stamps nothing; fails_when=the sync guard compares tower names letter for letter, so the line counts as an update
@@ -473,6 +468,11 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     expect([saved().cards.find((c: { id: string }) => c.id === 'kori').sourceNote, lastUndo, stamps.mock.calls.length]).toEqual(['Lin Kuei Tower', null, 1]);
   });
 
+  // Regression: /ship review of stale-screens-and-schedule — a pasted card a sync added just before Add went in twice
+  // Found by /ship on 2026-10-14
+  // Value: protects=Paste a list's Add skips a card a sync added after the list was read, and saves nothing for it;
+  // fails_when=the list as drawn is trusted, so the same card is saved twice; why_new=review (adversarial);
+  // seam=a grabbed update stands in for the sync, SyncLoop.nextStamp spied; no_claim=a real sync
   it("doesn't add a pasted card twice when a sync added it just before Add", () => {
     const stamps = renderWith([]);
     const add = pasteList('Jade, Lizard');
@@ -2999,9 +2999,10 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
   // Value: protects=a tower typed in Add card in a new spelling is fixed on the visible cards naming it when the box is
   // finished (Enter or leaving it), with Undo, a hidden card is left alone, Add keeps that tower for the next card, and a
-  // later Add takes the list's current spelling, so a fix made after leaving the box isn't undone; fails_when=Add card
-  // doesn't re-spell, re-spells a hidden card, or an Add puts an old spelling back on the other cards; why_new=review (Red
-  // Team); seam=none; no_claim=none beyond protects
+  // later Add takes the list's current spelling, so a fix made after leaving the box isn't undone; Undo of an Enter that
+  // re-spelled and added takes the new card out too, as Undo puts back the whole app; fails_when=Add card doesn't
+  // re-spell, re-spells a hidden card, or an Add puts an old spelling back on the other cards; why_new=review (Red Team);
+  // seam=none; no_claim=none beyond protects
   it('fixes a tower spelling typed in Add card, and never puts an old spelling back on Add', () => {
     renderPage([{ ...tower('ghost', 'Ghost Blade', 'LIN KUEI TOWER'), rarityId: 'gone' }, tower('kori', 'Kori Blade', 'lin kuei tower')]);
     const options = (select: HTMLElement) => [...(select as HTMLSelectElement).options].map((o) => o.textContent);
@@ -3081,7 +3082,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     box.focus();
     fireEvent.change(box, { target: { value: 'Lin Kuei Tower' } });
     fireEvent.keyDown(box, { key: 'Enter' });
-    expect([document.activeElement === box, towerOf('Lin Kuei Tower')]).toEqual([true, undefined]);
+    expect([document.activeElement === box, (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as unknown[]).length]).toEqual([true, 0]);
     fireEvent.change(form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Kori Blade' } });
     box.focus();
     fireEvent.keyDown(box, { key: 'Enter' });
@@ -3143,18 +3144,44 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   });
 
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
-  // Value: protects=Paste a list saves a tower as the Tower list spells it, on a new card and on a card it moves to tower
-  // gear, and a tower no card names yet takes the spelling of its first line; fails_when=a pasted line saves its own
-  // capitals, so a second spelling comes back (and can become the one shown); why_new=review (Red Team); seam=none;
-  // no_claim=none beyond protects
+  // Value: protects=Paste a list saves a tower as the Tower list spells it, on new cards and on cards it updates; a tower
+  // no card names yet takes the spelling of the first new card naming it, or failing that the first updated one; a card
+  // moved to another tower is updated; a card under a removed rarity doesn't spell a tower; fails_when=a pasted line saves
+  // its own capitals (a second spelling comes back), the sync guard stops seeing a move to another tower, or a hidden
+  // card's spelling is used; why_new=review (Red Team, testing, coverage audit); seam=none; no_claim=none beyond protects
   it('saves a pasted tower as the Tower list spells it', () => {
-    renderPage([{ id: 'mask', name: 'Ryu Mask', rarityId: 'epic', fusion: 1, guest: false }, tower('kori', 'Kori Blade', 'Lin Kuei Tower')]);
+    const plain = (id: string, name: string) => ({ id, name, rarityId: 'epic', fusion: 1, guest: false });
+    renderPage([
+      { ...tower('ghost', 'Ghost Blade', 'WIND TOWER'), rarityId: 'gone' },
+      plain('mask', 'Ryu Mask'),
+      plain('kunai', 'Ryu Kunai'),
+      plain('chain', 'Ryu Chain'),
+      tower('kori', 'Kori Blade', 'Lin Kuei Tower'),
+      tower('jade', 'Jade Fan', 'Lin Kuei Tower'),
+    ]);
     const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
     fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
-    fireEvent.change(document.querySelector('textarea')!, {
-      target: { value: ['Ryu Mask - Epic - LIN KUEI TOWER', 'Frost Fan - Epic - lin kuei tower - F2', 'Ice Fan - Epic - wind tower', 'Wind Fan - Epic - Wind Tower'].join('\n') },
-    });
-    fireEvent.click(form.getByRole('button', { name: /^Add \d+, update \d+$/ }));
-    expect(['Ryu Mask', 'Frost Fan', 'Kori Blade', 'Ice Fan', 'Wind Fan'].map(towerOf)).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin Kuei Tower', 'wind tower', 'wind tower']);
+    const lines = [
+      'Ryu Mask - Epic - LIN KUEI TOWER',
+      'Ryu Kunai - Epic - FIRE TOWER',
+      'Frost Fan - Epic - lin kuei tower - F2',
+      'Ice Fan - Epic - fire tower',
+      'Wind Fan - Epic - Wind Tower',
+      'Ryu Chain - Epic - water tower',
+      'Jade Fan - Epic - WATER TOWER',
+    ];
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: lines.join('\n') } });
+    fireEvent.click(form.getByRole('button', { name: 'Add 3, update 4' }));
+    expect(['Ryu Mask', 'Frost Fan', 'Kori Blade', 'Ryu Kunai', 'Ice Fan', 'Wind Fan', 'Ryu Chain', 'Jade Fan', 'Ghost Blade'].map(towerOf)).toEqual([
+      'Lin Kuei Tower',
+      'Lin Kuei Tower',
+      'Lin Kuei Tower',
+      'fire tower',
+      'fire tower',
+      'Wind Tower',
+      'water tower',
+      'water tower',
+      'WIND TOWER',
+    ]);
   });
 });
