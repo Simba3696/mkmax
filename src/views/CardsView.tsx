@@ -39,6 +39,66 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
 }
 
 /**
+ * The towers your tower gear already names, A to Z, each spelled as the first card naming it has it. Grouped ignoring
+ * case, as Tower gear groups them, so "lin kuei tower" isn't offered beside "Lin Kuei Tower".
+ */
+function towerNames(cards: Card[]) {
+  const byKey = new Map<string, string>();
+  for (const c of cards) {
+    const t = c.source === 'tower' ? c.sourceNote?.trim() : undefined;
+    if (t && !byKey.has(t.toLowerCase())) byKey.set(t.toLowerCase(), t);
+  }
+  return [...byKey.values()].sort((a, b) => a.localeCompare(b));
+}
+
+/** The Tower list's "Add a new tower…" choice; not a name anyone types. */
+const NEW_TOWER = '\u0000new';
+
+/**
+ * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
+ * While a new name is being typed the box stays a text box, so it doesn't turn into the list mid-word once the card
+ * saves it; with no towers named yet it's only a text box.
+ */
+function TowerSelect({ towers, value, onChange, onEnter, className }: { towers: string[]; value: string | undefined; onChange: (v: string | undefined) => void; onEnter?: () => void; className?: string }) {
+  const [text, setText] = useState<string | null>(null); // null: picking from the list
+  if (text !== null || towers.length === 0) {
+    return (
+      <input
+        className={className}
+        value={text ?? value ?? ''}
+        placeholder={towers.length ? 'New tower name' : 'e.g. Lin Kuei Tower'}
+        aria-label="Tower"
+        autoFocus={text !== null}
+        onChange={(e) => {
+          if (text !== null) setText(e.target.value);
+          onChange(e.target.value || undefined);
+        }}
+        onBlur={(e) => {
+          setText(null);
+          const t = e.target.value.trim();
+          if (t !== e.target.value) onChange(t || undefined);
+        }}
+        onKeyDown={(e) => e.key === 'Enter' && (onEnter ? onEnter() : e.currentTarget.blur())}
+      />
+    );
+  }
+  const typed = value?.trim();
+  const listed = typed && towers.find((t) => t.toLowerCase() === typed.toLowerCase());
+  return (
+    <select className={className} value={listed || typed || ''} aria-label="Tower" onChange={(e) => (e.target.value === NEW_TOWER ? setText('') : onChange(e.target.value || undefined))}>
+      <option value="">Choose a tower…</option>
+      {typed && !listed && <option value={typed}>{typed}</option>}
+      {towers.map((t) => (
+        <option key={t} value={t}>
+          {t}
+        </option>
+      ))}
+      <option value={NEW_TOWER}>Add a new tower…</option>
+    </select>
+  );
+}
+
+/**
  * Goal for rarities with a Fusion Up Kard threshold: stop at the threshold (kards finish it) or buy all the way
  * to max. Stored only when it differs from the rarity's goal. Realm Klash gear is always bought to max, so it gets
  * a label instead of a choice (see isRealmKlashName), and so does a card marked No kards (see cardGoal).
@@ -401,6 +461,7 @@ type CardSort = (typeof CARD_SORTS)[number];
 function CardList() {
   const { state, update } = useStore();
   const { now, ctx } = usePlan();
+  const towers = useMemo(() => towerNames(state.cards), [state.cards]);
   const events = useEvents();
   const [rarity, setRarity] = useState<string>('all');
   const [q, setQ] = useState('');
@@ -721,7 +782,7 @@ function CardList() {
           {draftRule?.kind === 'equipment' && shown.source === 'tower' && (
             <label className={field}>
               <span>Tower</span>
-              <input value={shown.sourceNote ?? ''} placeholder="e.g. Lin Kuei Tower" onChange={(e) => setDraft({ ...shown, sourceNote: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
+              <TowerSelect towers={towers} value={shown.sourceNote} onChange={(v) => setDraft({ ...shown, sourceNote: v })} onEnter={add} />
             </label>
           )}
           <button className={`${btn.primary} md:-col-end-1`} onClick={add} disabled={!shown.name.trim() || (!!draftRule && isMaxed({ ...(shown as Card), goal: formGoal(shown as Card, draftRule).goal }, draftRule)) || addsMaxed}>
@@ -886,16 +947,7 @@ function CardList() {
                   </label>
                 )}
                 {(rule.kind !== 'character' || c.source) && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v, sourceNote: undefined })} />}
-                {c.source === 'tower' && (
-                  <input
-                    className="w-[11rem]"
-                    value={c.sourceNote ?? ''}
-                    placeholder="Tower name"
-                    aria-label="Tower"
-                    onChange={(e) => patch(c.id, { sourceNote: e.target.value || undefined })}
-                    onBlur={(e) => e.target.value !== e.target.value.trim() && patch(c.id, { sourceNote: e.target.value.trim() || undefined })}
-                  />
-                )}
+                {c.source === 'tower' && <TowerSelect className="w-[11rem]" towers={towers} value={c.sourceNote} onChange={(v) => patch(c.id, { sourceNote: v })} />}
                 <button className={btn.ghost} onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
                   Image
                 </button>

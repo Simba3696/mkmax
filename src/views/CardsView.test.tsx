@@ -2524,3 +2524,75 @@ describe('Tower gear: the kard threshold filter', () => {
     expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ })?.textContent, saved().some((c) => c.id === 'kori')]).toEqual(['Lin Kuei Tower 1 below threshold', true]);
   });
 });
+
+describe('Cards: picking a tower', () => {
+  function renderTowers() {
+    const s = defaultState();
+    const tower = (id: string, name: string, sourceNote: string) => ({ id, name, rarityId: 'epic', fusion: 1, guest: false, source: 'tower' as const, sourceNote });
+    // Shirai Ryu named twice, with different capitals: one tower, spelled as the first card has it.
+    s.cards = [tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower'), tower('mask', 'Ryu Mask', 'shirai ryu tower'), tower('kori', 'Kori Blade', 'Lin Kuei Tower')];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub="cards" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+  }
+  const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string; sourceNote?: string }[];
+  const towerOf = (name: string) => saved().find((c) => c.name === name)?.sourceNote;
+  const options = (select: HTMLElement) => [...(select as HTMLSelectElement).options].map((o) => o.textContent);
+
+  // Generated on 2026-10-22 (Tower dropdown)
+  // Value: protects=Add card offers the towers your gear already names, A to Z and once each whatever the capitals, saves
+  // the one picked, and takes a new name through Add a new tower…; fails_when=the list repeats a tower in other capitals,
+  // the pick isn't saved, or a new tower can't be added; why_new=the Tower box was a text box; seam=none;
+  // no_claim=the paste list, which still takes the tower from the line
+  it('picks a tower for a new card from the ones already named, or adds a new one', () => {
+    renderTowers();
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    const name = form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)');
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
+    expect(options(form.getByLabelText('Tower'))).toEqual(['Choose a tower…', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'Add a new tower…']);
+
+    fireEvent.change(name, { target: { value: 'Ryu Chain' } });
+    fireEvent.change(form.getByLabelText('Tower'), { target: { value: 'Shirai Ryu Tower' } });
+    fireEvent.click(form.getByRole('button', { name: 'Add' }));
+
+    fireEvent.change(name, { target: { value: 'Wrath Hammer' } });
+    fireEvent.change(form.getByLabelText('Tower'), { target: { value: '\u0000new' } });
+    fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Thunder Tower' } });
+    fireEvent.click(form.getByRole('button', { name: 'Add' }));
+    expect([towerOf('Ryu Chain'), towerOf('Wrath Hammer')]).toEqual(['Shirai Ryu Tower', 'Thunder Tower']);
+  });
+
+  // Generated on 2026-10-22 (Tower dropdown)
+  // Value: protects=a card's Tower box switches it to another named tower, a new tower typed after Add a new tower… is saved
+  // and then listed, and leaving that box empty keeps the tower it had; fails_when=picking Add a new tower… clears the
+  // card's tower, or a new name never joins the list; why_new=the Tower box was a text box; seam=none; no_claim=none
+  it("changes a card's tower from the list, and keeps it when Add a new tower… is left empty", () => {
+    renderTowers();
+    // Kori Blade's box: the only one showing Lin Kuei Tower, then whichever tower it has.
+    let koriTower = 'Lin Kuei Tower';
+    const box = () => screen.getAllByRole('combobox', { name: 'Tower' }).find((el) => (el as HTMLSelectElement).value === koriTower)!;
+
+    fireEvent.change(box(), { target: { value: 'Shirai Ryu Tower' } });
+    koriTower = 'Shirai Ryu Tower';
+    expect(towerOf('Kori Blade')).toBe('Shirai Ryu Tower');
+
+    // Add a new tower…, then leaving the box empty: the card keeps its tower.
+    fireEvent.change(box(), { target: { value: '\u0000new' } });
+    fireEvent.blur(screen.getByPlaceholderText('New tower name'));
+    expect(towerOf('Kori Blade')).toBe('Shirai Ryu Tower');
+
+    // A new name typed there is saved, and the list then offers it. Lin Kuei Tower is gone: no card names it any more.
+    fireEvent.change(box(), { target: { value: '\u0000new' } });
+    const input = screen.getByPlaceholderText('New tower name');
+    fireEvent.change(input, { target: { value: 'Thunder Tower' } });
+    fireEvent.blur(input);
+    koriTower = 'Thunder Tower';
+    expect([towerOf('Kori Blade'), options(box())]).toEqual(['Thunder Tower', ['Choose a tower…', 'Shirai Ryu Tower', 'Thunder Tower', 'Add a new tower…']]);
+  });
+});
