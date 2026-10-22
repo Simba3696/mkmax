@@ -3624,4 +3624,23 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.blur(boxOf('Kori Blade'));
     expect([towerOf('Kori Blade'), lastUndo, boxOf('Kori Blade').tagName]).toEqual(['Thunder Tower', null, 'SELECT']);
   });
+
+  // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
+  // Value: protects=hiding the app after a sync changed a card mid-name keeps the synced tower and leaves the box going
+  // back to the tower it opened on, so a name the hide never saved isn't written back later; fails_when=the box takes the
+  // refused name as its starting point and emptying it after more typing puts that name on the card; why_new=review
+  // (state machines); seam=document.visibilityState mocked, a sync made with the store's update; no_claim=a real sync
+  it("doesn't go on from a name the hide couldn't save over a tower a sync brought in", () => {
+    renderPage([tower('kori', 'Kori Blade', 'Wind Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    pickNewTower(boxOf('Ryu Kunai'));
+    fireEvent.change(boxOf('Ryu Kunai'), { target: { value: 'Fire Tower' } });
+    act(() => update((d) => void (d.cards.find((c) => c.id === 'kunai')!.sourceNote = 'Thunder Tower')));
+    appShows('hidden');
+    expect(towerOf('Ryu Kunai')).toBe('Thunder Tower');
+    appShows('visible');
+    fireEvent.change(boxOf('Ryu Kunai'), { target: { value: 'X' } });
+    fireEvent.change(boxOf('Ryu Kunai'), { target: { value: '' } });
+    fireEvent.blur(boxOf('Ryu Kunai'));
+    expect(towerOf('Ryu Kunai')).toBe('Shirai Ryu Tower');
+  });
 });

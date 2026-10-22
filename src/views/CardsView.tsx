@@ -102,23 +102,24 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   // a tower held by the arrow keys is saved); the box stays open with what was typed, and is finished again when it's
   // left. It's done at once (flushSync), so the store's save runs before the page can be frozen or closed, not in a later
   // task that may never come.
-  const openEdit = useRef({ edit, onChange, held, settle });
-  useEffect(() => void (openEdit.current = { edit, onChange, held, settle }));
+  const openEdit = useRef({ edit, onChange, held, settle, value });
+  useEffect(() => void (openEdit.current = { edit, onChange, held, settle, value }));
   useEffect(() => {
     if (openEdit.current.edit) setEdit(null);
     const away = () => {
       if (document.visibilityState !== 'hidden') return;
       const { edit: e, onChange: write, held: h, settle: done } = openEdit.current;
-      if (e)
-        flushSync(() => {
-          finishTower(e, write);
-          // A box that opened on a tower goes on from the name it just saved, so finishing it again later (its Undo, or
-          // an emptied box) goes back to that, the spelling every card now has, not to the one before the app was left.
-          // One that opened on none (the plain box, or a card with no tower) still leaves none when it's emptied.
-          const now = e.text.trim() || e.was;
-          setEdit({ ...e, was: e.was === undefined ? undefined : now, saved: now });
-        });
-      else if (h !== null && h !== NEW_TOWER) flushSync(() => done(h, false));
+      if (e) {
+        flushSync(() => finishTower(e, write));
+        // A box that opened on a tower goes on from the name it just saved, so finishing it again later (its Undo, or
+        // an emptied box) goes back to that, the spelling every card now has, not to the one before the app was left.
+        // One that opened on none (the plain box, or a card with no tower) still leaves none when it's emptied. If the
+        // save didn't go through (a tower a sync brought in since stands), the box goes on as it was. The save has
+        // rendered by now (flushSync), so the tower this box shows is the one saved.
+        const now = e.text.trim() || e.was;
+        const saved = openEdit.current.value === now;
+        flushSync(() => setEdit({ ...e, was: saved && e.was !== undefined ? now : e.was, saved: saved ? now : e.saved }));
+      } else if (h !== null && h !== NEW_TOWER) flushSync(() => done(h, false));
     };
     document.addEventListener('visibilitychange', away);
     return () => {

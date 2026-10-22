@@ -579,6 +579,17 @@ describe('the Undo bar', () => {
     expect(showing('Added g')).toBe(true);
     act(() => void vi.advanceTimersByTime(1_500));
     expect(showing('Added g')).toBe(false);
+
+    // Extended on 2026-10-22 (/ship review, testing): changes saved without Undo while the bar is up (as typing a tower
+    // name makes) leave its 8 seconds alone; fails_when=the timer restarts on every render, so typing keeps the bar up.
+    add('h', 'Added h');
+    for (let i = 0; i < 3; i++) {
+      act(() => void vi.advanceTimersByTime(2_500));
+      act(() => update((d) => void (d.cards[0].name = `a${i}`)));
+    }
+    expect(showing('Added h')).toBe(true);
+    act(() => void vi.advanceTimersByTime(600));
+    expect(showing('Added h')).toBe(false);
   });
 
   // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
