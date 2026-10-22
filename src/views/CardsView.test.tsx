@@ -2457,6 +2457,37 @@ describe('Tower gear: the kard threshold filter', () => {
   // why_new=no test rendered Tower gear with no gear left; seam=none; no_claim=none beyond protects
   // Extended on 2026-10-22 (/ship review): gear whose goal is F3 shows its copies to F3 once under the filter;
   // fails_when=the copies-to-F3 lead is added in front of a goal that is F3 itself.
+  // Generated on 2026-10-22 (/ship adversarial review, Tower gear filter)
+  // Value: protects=under the filter, a level tap a sync got to first saves nothing and doesn't keep its piece listed;
+  // fails_when=the piece is pinned before the store checks the tap, so gear a sync took to F3 stays listed and counted;
+  // why_new=the stale-tap test above runs with the filter off; seam=a grabbed update stands in for the sync;
+  // no_claim=a real sync
+  it("doesn't keep a piece listed for a tap a sync got to first", () => {
+    let update!: ReturnType<typeof useStore>['update'];
+    const s = defaultState();
+    s.rarities.find((r) => r.id === 'epic')!.goal = 'max';
+    s.cards = [{ id: 'kori', name: 'Kori Blade', rarityId: 'epic', fusion: 3, guest: false, source: 'tower', sourceNote: 'Lin Kuei Tower' }];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <CardsView sub="towers" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const filter = screen.getByLabelText('Filter by kard threshold') as HTMLSelectElement;
+    fireEvent.change(filter, { target: { value: 'belowThreshold' } });
+    // The tap as the screen had it at F2, landing after a sync took Kori Blade to F3.
+    const raise = screen.getByRole('button', { name: 'Raise level' });
+    act(() => {
+      update((d) => void (d.cards[0].fusion = 4));
+      raise.click();
+    });
+    const saved = JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
+    expect([saved[0].fusion, screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }), filter.options[1].textContent]).toEqual([4, null, 'Below kard threshold (0)']);
+  });
+
   it('leaves gear tracked to F3 that reaches F3 under the filter, with an Undo', () => {
     let lastUndo = null as ReturnType<typeof useStore>['lastUndo'];
     let undo!: ReturnType<typeof useStore>['undo'];

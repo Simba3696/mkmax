@@ -26,8 +26,10 @@ export default function TowersPanel() {
 
   // A level tap steps from the level it showed: saving that level ± 1 would undo a level a sync has added since.
   const stepLevel = (c: Card, by: 1 | -1) => {
-    if (filter !== 'all' && !tapped.has(c.id)) setTapped(new Set([...tapped, c.id]));
-    update((d) => (d.cards.find((x) => x.id === c.id)?.fusion === c.fusion && stepCard(d, c.id, by) ? undefined : noChange));
+    let stepped = false as boolean;
+    update((d) => (d.cards.find((x) => x.id === c.id)?.fusion === c.fusion && (stepped = stepCard(d, c.id, by)) ? undefined : noChange));
+    // Only a tap that changed the level keeps its piece listed: one a sync got to first saved nothing to tap back.
+    if (stepped && filter !== 'all') setTapped((t) => (t.has(c.id) ? t : new Set([...t, c.id])));
   };
 
   const gear = state.cards.filter((c) => c.source === 'tower' && ctx.rules.has(c.rarityId));
@@ -85,7 +87,7 @@ export default function TowersPanel() {
               // The filter is for farming toward the kard threshold, so its distance leads; gear whose goal is the threshold
               // already shows it as copies to its goal.
               const thr = thresholdLevel(rule);
-              const toThr = filter === 'belowThreshold' && thr != null && thr !== target && belowThreshold(c) ? copiesToThreshold(c, rule) : 0;
+              const toThr = filter === 'belowThreshold' && thr != null && thr < target && belowThreshold(c) ? copiesToThreshold(c, rule) : 0;
               return (
                 <div key={c.id} className={`${row} items-center`}>
                   <CardThumb card={c} rule={rule} size={36} />
