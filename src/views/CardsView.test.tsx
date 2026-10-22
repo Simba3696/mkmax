@@ -2386,7 +2386,13 @@ describe('Tower gear: the kard threshold filter', () => {
 
     // Under the filter, Kori Blade (tracked to F10) leads with its copies to the kard threshold.
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
-    expect([names(), screen.queryByText('1 below threshold') != null, screen.queryByText('1 copy to F3 · 8 copies to F10') != null]).toEqual([['Kori Blade'], true, true]);
+    // The intro still counts every piece of tower gear, not just the ones the filter lists.
+    expect([
+      names(),
+      screen.queryByText('1 below threshold') != null,
+      screen.queryByText('1 copy to F3 · 8 copies to F10') != null,
+      screen.queryByText(/5 items left in total\./) != null,
+    ]).toEqual([['Kori Blade'], true, true, true]);
 
     // F2 → F3: it reaches the threshold but stays listed, so it can be tapped back, and both counts still count it.
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
