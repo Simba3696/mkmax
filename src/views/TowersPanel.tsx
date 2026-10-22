@@ -97,8 +97,18 @@ export default function TowersPanel() {
                       <RarityBadge rule={rule} />
                       <span className="text-muted">
                         {' '}
-                        {toThr > 0 && `${toThr} ${toThr === 1 ? 'copy' : 'copies'} to ${levelLabel(rule, thr!)} · `}
-                        {toGo} {toGo === 1 ? 'copy' : 'copies'} to {levelLabel(rule, target)}
+                        {/* Each count kept whole, so on a phone the line breaks at the dot rather than inside a count. */}
+                        {toThr > 0 ? (
+                          <>
+                            <span className="whitespace-nowrap">{`${toThr} ${toThr === 1 ? 'copy' : 'copies'} to ${levelLabel(rule, thr!)}`}</span>
+                            {' · '}
+                            <span className="whitespace-nowrap">{`${toGo} ${toGo === 1 ? 'copy' : 'copies'} to ${levelLabel(rule, target)}`}</span>
+                          </>
+                        ) : (
+                          <>
+                            {toGo} {toGo === 1 ? 'copy' : 'copies'} to {levelLabel(rule, target)}
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>

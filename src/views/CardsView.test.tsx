@@ -2347,6 +2347,9 @@ describe('Cards: No kards', () => {
 });
 
 describe('Tower gear: the kard threshold filter', () => {
+  // A piece's copies line as a whole: under the filter each count is its own span, so it isn't one text node.
+  const copiesLine = (text: string) => screen.queryByText((_, el) => el?.tagName === 'SPAN' && el.classList.contains('text-muted') && el.textContent?.trim() === text);
+
   // Generated on 2026-10-22 (Tower gear filter)
   // Value: protects=Below kard threshold lists only tower gear that still needs copies before Fusion Up Kards work, with
   // counts on both options and per tower, and a piece raised to the threshold stays listed until the filter changes;
@@ -2390,7 +2393,7 @@ describe('Tower gear: the kard threshold filter', () => {
     expect([
       names(),
       screen.queryByText('1 below threshold') != null,
-      screen.queryByText('1 copy to F3 · 8 copies to F10') != null,
+      copiesLine('1 copy to F3 · 8 copies to F10') != null,
       screen.queryByText(/5 items left in total\./) != null,
     ]).toEqual([['Kori Blade'], true, true, true]);
 
@@ -2446,7 +2449,7 @@ describe('Tower gear: the kard threshold filter', () => {
     fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
     expect(headings()).toEqual(['Thunder Tower 2 below threshold', 'Lin Kuei Tower 1 below threshold']);
     // More than one copy to F3 reads in the plural (Wrath Hammer at F0, tracked to F10).
-    expect(screen.queryByText('3 copies to F3 · 10 copies to F10')).not.toBeNull();
+    expect(copiesLine('3 copies to F3 · 10 copies to F10')).not.toBeNull();
   });
 
   // Generated on 2026-10-22 (/ship adversarial review, Tower gear filter)
@@ -2506,7 +2509,7 @@ describe('Tower gear: the kard threshold filter', () => {
     );
     fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
     // Its goal is F3, so its copies to F3 show once, not twice.
-    expect([screen.queryByText('1 copy to F3') != null, screen.queryByText(/to F3 · /)]).toEqual([true, null]);
+    expect(copiesLine('1 copy to F3')).not.toBeNull();
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
     const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string }[];
     expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }), saved().some((c) => c.id === 'kori'), lastUndo?.label]).toEqual([null, false, expect.stringMatching(/done/)]);
