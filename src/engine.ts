@@ -97,13 +97,11 @@ export function towerSpellings(cards: Card[]) {
 }
 
 /**
- * A tower typed in a spelling other than the one shown for it (by towerSpellings) becomes its spelling on every tower
- * gear card naming it, so fixing a spelling on one card shows everywhere. Returns how many cards it changed.
+ * A tower name typed on a card becomes its spelling on every tower gear card naming it some other way, so fixing a
+ * spelling on one card shows everywhere, however mixed it was. Returns how many cards it changed.
  */
 export function respellTower(cards: Card[], tower: string) {
   const key = towerKey(tower);
-  const shown = towerSpellings(cards).get(key);
-  if (!shown || shown === tower) return 0;
   let changed = 0;
   for (const c of cards) {
     if (c.source !== 'tower' || c.sourceNote === tower || !c.sourceNote?.trim() || towerKey(c.sourceNote) !== key) continue;

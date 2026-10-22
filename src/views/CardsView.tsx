@@ -337,6 +337,13 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
             .map((c) => ({ c, patch: u.patch, line: u.line })),
         );
         if (!cards.length && !saving.length) return noChange;
+        // A pasted tower is saved as the Tower list spells it (one tower however it's typed), so a pasted line can't bring
+        // a second spelling back; a tower no card names yet takes the spelling of the first line naming it.
+        const spellings = towerSpellings(d.cards.filter((c) => d.rarities.some((r) => r.id === c.rarityId)));
+        const listSpelling = (note: string) => {
+          if (!spellings.has(towerKey(note))) spellings.set(towerKey(note), note.trim());
+          return spellings.get(towerKey(note))!;
+        };
         const fresh = cards.map(
           (c): Card => ({
             id: newId(),
@@ -345,7 +352,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
             fusion: levelOf(c),
             guest: false,
             source: c.source ?? initialSource(c, d.rarities),
-            ...(c.sourceNote && { sourceNote: c.sourceNote }),
+            ...(c.sourceNote && { sourceNote: listSpelling(c.sourceNote) }),
             ...(c.maxLevel != null && { maxLevel: c.maxLevel }),
           }),
         );
@@ -360,7 +367,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // Stage (a Gold card made ascendable) comes off it, since it has copies to go again.
         recordMaxed(d, fresh.filter((f) => atTopLevel(f, ruleOf(f))));
         unmarkMaxed(d, fresh.filter((f, i) => cards[i].maxLevel !== undefined && !atTopLevel(f, ruleOf(f))));
-        for (const { c, patch } of saving) Object.assign(c, patch);
+        for (const { c, patch } of saving) Object.assign(c, patch.sourceNote ? { ...patch, sourceNote: listSpelling(patch.sourceNote) } : patch);
         added = cards.length;
         updated = saving.length;
         const touched = [...fresh, ...saving.map(({ c }) => c)];

@@ -2618,6 +2618,9 @@ describe('Cards: picking a tower', () => {
     expect(towerOf('Kori Blade')).toBeUndefined();
   });
 
+  // Extended on 2026-10-22 (/ship review): Value: protects=Enter there leaves focus on the Tower list that replaces the box;
+  // fails_when=the box is left without moving focus, so it drops to the page; why_new=review (testing); seam=none;
+  // no_claim=a real keyboard
   // Generated on 2026-10-22 (/ship test coverage audit, Tower dropdown)
   // Value: protects=a new tower typed in Add card stays chosen once the box is left, and Enter in that box adds the card;
   // fails_when=the list drops a tower no card names yet (showing Choose a tower… while Add saves it), or Enter stops adding;
@@ -2641,7 +2644,8 @@ describe('Cards: picking a tower', () => {
     pickNewTower(list);
     fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Wind Tower' } });
     fireEvent.keyDown(form.getByPlaceholderText('New tower name'), { key: 'Enter' });
-    expect(towerOf('Wrath Hammer')).toBe('Wind Tower');
+    // Focus moves to the Tower list that replaces the box.
+    expect([towerOf('Wrath Hammer'), form.getByLabelText('Tower').tagName, document.activeElement === form.getByLabelText('Tower')]).toEqual(['Wind Tower', 'SELECT', true]);
   });
 
   // Generated on 2026-10-22 (/ship coverage gate, Tower dropdown)
@@ -3102,5 +3106,33 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     box.focus();
     for (const typed of ['L', 'Li', 'Lin Kuei Tower']) fireEvent.change(box, { target: { value: typed } });
     expect([towerOf('Kori Blade'), document.activeElement === box]).toEqual(['Lin Kuei Tower', true]);
+  });
+
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=a tower retyped on a card becomes its spelling on every card naming it another way, even when one of
+  // them already had the typed spelling; fails_when=the re-spell decides what's new from one other card's spelling, so a
+  // third spelling is left behind; why_new=review (maintainability); seam=none; no_claim=none beyond protects
+  it('fixes every other spelling of a tower when it is retyped, however mixed', () => {
+    renderPage([tower('kori', 'Kori Blade', 'lin kuei tower'), tower('fan', 'Frost Fan', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'lin kuei tower')]);
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
+    expect([['Kori Blade', 'Frost Fan', 'Ryu Kunai'].map(towerOf), lastUndo?.label]).toEqual([['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin Kuei Tower'], 'Respelled 1 other card: Lin Kuei Tower']);
+  });
+
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=Paste a list saves a tower as the Tower list spells it, on a new card and on a card it moves to tower
+  // gear, and a tower no card names yet takes the spelling of its first line; fails_when=a pasted line saves its own
+  // capitals, so a second spelling comes back (and can become the one shown); why_new=review (Red Team); seam=none;
+  // no_claim=none beyond protects
+  it('saves a pasted tower as the Tower list spells it', () => {
+    renderPage([{ id: 'mask', name: 'Ryu Mask', rarityId: 'epic', fusion: 1, guest: false }, tower('kori', 'Kori Blade', 'Lin Kuei Tower')]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    fireEvent.change(document.querySelector('textarea')!, {
+      target: { value: ['Ryu Mask - Epic - LIN KUEI TOWER', 'Frost Fan - Epic - lin kuei tower - F2', 'Ice Fan - Epic - wind tower', 'Wind Fan - Epic - Wind Tower'].join('\n') },
+    });
+    fireEvent.click(form.getByRole('button', { name: /^Add \d+, update \d+$/ }));
+    expect(['Ryu Mask', 'Frost Fan', 'Kori Blade', 'Ice Fan', 'Wind Fan'].map(towerOf)).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin Kuei Tower', 'wind tower', 'wind tower']);
   });
 });
