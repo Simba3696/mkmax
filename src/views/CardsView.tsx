@@ -70,7 +70,7 @@ const finishTower = (e: TowerEdit, write: TowerWrite) => {
  * the card saves the first letters; with no towers named yet it's only a text box. A pick from the list goes to onPick
  * (with Undo, on a card); a typed name saves as it's typed, as a rename does.
  */
-function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, className }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; className?: string }) {
+function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; className?: string; placeholder?: string }) {
   // The name being typed, the tower the card had before Add a new tower… was picked (which an emptied box goes back to;
   // none in the plain box, which has no list to go back to), and the tower this box last saved. Null while picking from
   // the list, or before the first key in the plain box.
@@ -98,7 +98,7 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
       <input
         className={className}
         value={edit?.text ?? value ?? ''}
-        placeholder={towers.length ? 'New tower name' : 'Tower name, e.g. Lin Kuei Tower'}
+        placeholder={towers.length ? 'New tower name' : placeholder}
         aria-label="Tower"
         autoFocus={!!edit}
         onChange={(e) => {
@@ -113,7 +113,8 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
         }}
         // Only a box with a name open (typed in, or opened from Add a new tower…) turns into the list; an untouched plain
         // box doesn't rerender, so a flag set for it would wait and take focus the next time the list shows.
-        onKeyDown={(e) => e.key === 'Enter' && (onEnter ? onEnter() : ((focusList.current = !!edit), e.currentTarget.blur()))}
+        // Enter finishes the name (so a new spelling is fixed on the other cards first), then does the form's Enter.
+        onKeyDown={(e) => e.key === 'Enter' && ((focusList.current = !!edit), e.currentTarget.blur(), onEnter?.())}
       />
     );
   }
@@ -538,8 +539,6 @@ function CardList() {
     return () => void (cancelled = true);
   }, []);
   const rarityFixes = useMemo(() => (catalog ? rarityMismatches(state.cards, ctx.rules, catalog) : []), [catalog, state.cards, ctx.rules]);
-  // Whether Add card's tower was typed in its box (so Add may re-spell it on other cards) rather than picked from the list.
-  const [towerTyped, setTowerTyped] = useState(false);
   const [draft, setDraft] = useState<Omit<Card, 'id'>>({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0, maxLevel: null, guest: false });
   // Counts picks in the Rarity box, so a pasted list follows a new pick but not a sync that removed the picked rarity.
   const [picks, setPicks] = useState(0);
@@ -664,6 +663,7 @@ function CardList() {
     });
 
   // With `over`, only over that tower: a Tower box left empty doesn't put its old tower back over one a sync brought in.
+  const respelledLabel = (tower: string | undefined, n: number) => `Respelled ${tower} on ${n} other card${n === 1 ? '' : 's'}`;
   // A finished typed name in a new spelling also re-spells the tower on the other cards naming it; that changes cards the
   // user didn't touch, so it has Undo even though typing doesn't. The box saved this card as it was typed, so Undo also
   // puts this card back to the tower the box opened on.
@@ -677,13 +677,26 @@ function CardList() {
         if (c.sourceNote === tower && !respelled) return noChange;
         c.sourceNote = tower;
       },
-      () => (respelled ? `Respelled ${tower} on ${respelled} other card${respelled === 1 ? '' : 's'}` : (undoLabel ?? '')),
+      () => (respelled ? respelledLabel(tower, respelled) : (undoLabel ?? '')),
       {
         undoFrom: (p) => {
           const typedOn = respelled ? p.cards.find((x) => x.id === id) : undefined;
           if (typedOn) typedOn.sourceNote = over?.was;
         },
       },
+    );
+  };
+
+  // Add card's Tower box fixes a tower's spelling on the cards naming it when a name typed there is finished, as a card's
+  // own box does, with Undo; Add then saves the card with that spelling.
+  const respellFromAdd = (tower: string) => {
+    let respelled = 0;
+    update(
+      (d) => {
+        respelled = respellTower(d.cards.filter((x) => d.rarities.some((r) => r.id === x.rarityId)), tower);
+        return respelled ? undefined : noChange;
+      },
+      () => respelledLabel(tower, respelled),
     );
   };
 
@@ -756,9 +769,7 @@ function CardList() {
   function add() {
     if (!shown.name.trim()) return;
     let added = false;
-    let respelled = 0;
-    update(
-      (d) => {
+    update((d) => {
       // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
       // delete it. Its kind and steps come from the rarity as it is now.
       const rule = d.rarities.find((r) => r.id === shown.rarityId);
@@ -766,9 +777,9 @@ function CardList() {
       const isEquip = rule.kind === 'equipment';
       const typed = isEquip && shown.source === 'tower' ? shown.sourceNote?.trim() : undefined;
       const visible = d.cards.filter((x) => d.rarities.some((r) => r.id === x.rarityId));
-      // Only a tower typed in the box re-spells the others. One picked from the list, or kept from the last Add after a
-      // fix or a sync re-spelled it, takes the spelling the list shows now, so an Add never puts an old spelling back.
-      const tower = typed && !towerTyped ? (towerSpellings(visible).get(towerKey(typed)) ?? typed) : typed;
+      // As the list spells it now (a spelling typed in the box was fixed on the other cards when the box was finished),
+      // so an Add never puts an old spelling back, even one kept from the last card after a fix or a sync.
+      const tower = typed && (towerSpellings(visible).get(towerKey(typed)) ?? typed);
       const card: Card = {
         id: newId(),
         ...shown,
@@ -784,18 +795,11 @@ function CardList() {
       const saved = { ...card, goal: formGoal(card, rule).goal };
       // Nor a card on the Maxed record (Add is greyed out for that too).
       if (isMaxed(saved, rule) || onMaxedRecord(d, saved)) return noChange;
-      // A tower typed in a new spelling fixes it on the cards already naming it; that's the only part of Add with Undo.
-      respelled = tower && towerTyped ? respellTower(visible, tower) : 0;
       d.cards.push(saved);
       added = true;
-      },
-      () => (respelled ? `Respelled ${shown.sourceNote?.trim()} on ${respelled} other card${respelled === 1 ? '' : 's'}, added ${shown.name.trim()}` : ''),
-    );
+    });
     // The typed name stays for another try when nothing was added.
-    if (added) {
-      setDraft({ ...shown, name: '', fusion: 0, guest: false });
-      setTowerTyped(false);
-    }
+    if (added) setDraft({ ...shown, name: '', fusion: 0, guest: false });
   }
 
   const rarityOrder = (c: Card) => (sortBy === 'name' ? 0 : state.rarities.findIndex((r) => r.id === c.rarityId));
@@ -870,10 +874,10 @@ function CardList() {
               <TowerSelect
                 towers={towers}
                 value={shown.sourceNote}
-                // A key typed marks it; leaving the box keeps the mark (so leaving it after an Add on Enter doesn't make the
-                // next Add re-spell), and emptying it back to the old tower clears it.
-                onChange={(v, over) => (setDraft({ ...shown, sourceNote: v }), setTowerTyped((t) => (over ? t && !!over.respell : true)))}
-                onPick={(v) => (setDraft({ ...shown, sourceNote: v }), setTowerTyped(false))}
+                onChange={(v, over) => {
+                  setDraft({ ...shown, sourceNote: v });
+                  if (over?.respell && v) respellFromAdd(v);
+                }}
                 onEnter={add}
               />
             </label>
@@ -1040,7 +1044,7 @@ function CardList() {
                   </label>
                 )}
                 {(rule.kind !== 'character' || c.source) && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v, sourceNote: undefined })} />}
-                {c.source === 'tower' && <TowerSelect className="w-[11rem]" towers={towers} value={c.sourceNote} onChange={(v, over) => setTower(c.id, v, over)} onPick={(v) => setTower(c.id, v, undefined, v ? `${c.name}: tower set to ${v}` : `${c.name}: tower removed`)} />}
+                {c.source === 'tower' && <TowerSelect className="w-[11rem]" placeholder="Tower name" towers={towers} value={c.sourceNote} onChange={(v, over) => setTower(c.id, v, over)} onPick={(v) => setTower(c.id, v, undefined, v ? `${c.name}: tower set to ${v}` : `${c.name}: tower removed`)} />}
                 <button className={btn.ghost} onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
                   Image
                 </button>

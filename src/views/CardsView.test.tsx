@@ -347,7 +347,7 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     fireEvent.change(name, { target: { value: 'Kori Blade' } });
     fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
     fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
-    fireEvent.change(form.getByPlaceholderText('Tower name, e.g. Lin Kuei Tower'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.change(form.getByPlaceholderText('e.g. Lin Kuei Tower'), { target: { value: 'Lin Kuei Tower' } });
     fireEvent.change(form.getByLabelText('Goal'), { target: { value: 'max' } });
     const addGear = form.getByRole('button', { name: 'Add' });
     act(() => {
@@ -2971,42 +2971,42 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   });
 
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
-  // Value: protects=Add card with a tower typed in a new spelling fixes it on the visible cards naming it, with an Undo
-  // that takes the card back out and the spellings back, keeps that tower for the next card, and a later Add of that kept
-  // tower takes the list's current spelling instead of putting the old one back; a hidden card is never re-spelled;
-  // fails_when=Add re-spells from a tower kept from the last Add, Undo leaves the card or the new spelling, or the hidden
-  // card changes; why_new=review (Red Team, testing); seam=none; no_claim=none beyond protects
-  it('fixes a tower spelling from Add card only when typed there, with Undo', () => {
+  // Value: protects=a tower typed in Add card in a new spelling is fixed on the visible cards naming it when the box is
+  // finished (Enter or leaving it), with Undo, a hidden card is left alone, Add keeps that tower for the next card, and a
+  // later Add takes the list's current spelling, so a fix made after leaving the box isn't undone; fails_when=Add card
+  // doesn't re-spell, re-spells a hidden card, or an Add puts an old spelling back on the other cards; why_new=review (Red
+  // Team); seam=none; no_claim=none beyond protects
+  it('fixes a tower spelling typed in Add card, and never puts an old spelling back on Add', () => {
     renderPage([{ ...tower('ghost', 'Ghost Blade', 'LIN KUEI TOWER'), rarityId: 'gone' }, tower('kori', 'Kori Blade', 'lin kuei tower')]);
     const options = (select: HTMLElement) => [...(select as HTMLSelectElement).options].map((o) => o.textContent);
     const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
     const name = form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)');
-    const addTyped = (card: string) => {
-      fireEvent.change(name, { target: { value: card } });
+    const typeTower = (text: string) => {
       pickNewTower(form.getByLabelText('Tower'));
-      fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
-      fireEvent.keyDown(form.getByPlaceholderText('New tower name'), { key: 'Enter' });
+      fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: text } });
     };
     fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
     fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
     expect(options(form.getByLabelText('Tower'))).toEqual(['Choose a tower…', 'lin kuei tower', 'Add a new tower…']);
-    addTyped('Frost Fan');
-    expect([towerOf('Frost Fan'), towerOf('Kori Blade'), towerOf('Ghost Blade'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER', 'Respelled Lin Kuei Tower on 1 other card, added Frost Fan']);
+    fireEvent.change(name, { target: { value: 'Frost Fan' } });
+    typeTower('Lin Kuei Tower');
+    fireEvent.keyDown(form.getByPlaceholderText('New tower name'), { key: 'Enter' });
+    expect([towerOf('Frost Fan'), towerOf('Kori Blade'), towerOf('Ghost Blade'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER', 'Respelled Lin Kuei Tower on 1 other card']);
+    // Add keeps the tower for the next card.
+    expect((form.getByLabelText('Tower') as HTMLSelectElement).value).toBe('Lin Kuei Tower');
     act(() => undo());
     expect([towerOf('Frost Fan'), towerOf('Kori Blade')]).toEqual([undefined, 'lin kuei tower']);
 
+    // Typed and left, then the tower is fixed on a card before Add: Add keeps to that fix.
+    typeTower('LIN KUEI tower');
     fireEvent.blur(form.getByPlaceholderText('New tower name'));
-    addTyped('Frost Fan');
-    // Leaving the box after an Add on Enter keeps the tower for the next card.
-    fireEvent.blur(form.getByPlaceholderText('New tower name'));
-    expect((form.getByLabelText('Tower') as HTMLSelectElement).value).toBe('Lin Kuei Tower');
-    // Then the tower is re-spelled on a card, and the next Add keeps to that spelling instead of putting its own back.
+    expect(towerOf('Kori Blade')).toBe('LIN KUEI tower');
     pickNewTower(boxOf('Kori Blade'));
-    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'LIN KUEI TOWER' } });
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
     fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
     fireEvent.change(name, { target: { value: 'Ice Fan' } });
     fireEvent.click(form.getByRole('button', { name: 'Add' }));
-    expect(['Kori Blade', 'Frost Fan', 'Ice Fan'].map(towerOf)).toEqual(['LIN KUEI TOWER', 'LIN KUEI TOWER', 'LIN KUEI TOWER']);
+    expect([towerOf('Kori Blade'), towerOf('Ice Fan'), towerOf('Ghost Blade')]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER']);
   });
 
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
@@ -3024,5 +3024,20 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
       return within(row!).queryByText(/^tower/)?.textContent;
     };
     expect([chipOf('Frost Fan'), chipOf('Ryu Blank')]).toEqual(['tower', 'tower']);
+  });
+
+  // Generated on 2026-10-22 (/ship coverage audit, Tower dropdown)
+  // Value: protects=a tower first named on a card through Add a new tower…, in a new spelling of a tower other cards name,
+  // re-spells them, and its Undo leaves that card with no tower again; fails_when=Undo only puts back a tower the card
+  // had, so the card keeps the typed tower; why_new=the Undo tests above retype on cards that already had a tower;
+  // seam=none; no_claim=none beyond protects
+  it('undoes a re-spell typed on a card that had no tower, leaving it with none', () => {
+    renderPage([tower('kori', 'Kori Blade', 'lin kuei tower'), tower('fan', 'Frost Fan')]);
+    pickNewTower(boxOf('Frost Fan'));
+    fireEvent.change(boxOf('Frost Fan'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.keyDown(boxOf('Frost Fan'), { key: 'Enter' });
+    expect([towerOf('Kori Blade'), towerOf('Frost Fan'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'Respelled Lin Kuei Tower on 1 other card']);
+    act(() => undo());
+    expect([towerOf('Kori Blade'), towerOf('Frost Fan')]).toEqual(['lin kuei tower', undefined]);
   });
 });

@@ -228,7 +228,7 @@ describe('pasted tower names', () => {
   // again, so the preview counts an update that changes nothing on screen; why_new=review (Red Team); seam=none;
   // no_claim=none beyond protects
   it('treats a tower in other capitals as the same tower', () => {
-    const existing: Card[] = [{ id: 'k', name: 'Kori Blade', rarityId: 'epic', fusion: 3, guest: false, source: 'tower', sourceNote: 'Lin Kuei Tower' }];
+    const existing: Card[] = [{ id: 'k', name: 'Kori Blade', rarityId: 'epic', fusion: 3, guest: false, source: 'tower', sourceNote: 'Lin Kuei Tower ' }];
     const same = parseCardList('Kori Blade - Epic - lin kuei tower - F2', rarities, 'epic', existing);
     const moved = parseCardList('Kori Blade - Epic - Shirai Ryu Tower - F2', rarities, 'epic', existing);
     // A source change still updates when neither line names a tower.
