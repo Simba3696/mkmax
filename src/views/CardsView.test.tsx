@@ -2442,7 +2442,7 @@ describe('Tower gear: the kard threshold filter', () => {
   // Undo that brings it back; fails_when=the filter keeps a done piece on screen, or the step loses its done Undo;
   // why_new=the other filter tests track Epic to Max; seam=none; no_claim=done handling on Cards (store tests)
   it('leaves gear tracked to F3 that reaches F3 under the filter, with an Undo', () => {
-    let lastUndo: ReturnType<typeof useStore>['lastUndo'] = null;
+    let lastUndo = null as ReturnType<typeof useStore>['lastUndo'];
     let undo!: ReturnType<typeof useStore>['undo'];
     const s = defaultState(); // Epic gear keeps its default goal, F3
     s.cards = [{ id: 'kori', name: 'Kori Blade', rarityId: 'epic', fusion: 3, guest: false, source: 'tower', sourceNote: 'Lin Kuei Tower' }];
