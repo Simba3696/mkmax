@@ -298,7 +298,7 @@ Expired packs are left out of the plan and Pack ranking. They stay until you cle
 - **Summary line**, for example "400 Souls · 3 cards per buy · bought 2/5" for a random pack, or "300 Blood Rubies · store item · bought 0/2" for a store item. 2/5 means 2 bought of a 5-purchase limit.
 - **Timing chip**, the same one as on the Plan: blue "starts in …", gold "… left" (red under 24 hours), or grey "permanent" or "expired". Countdowns update every minute.
 - **Drop pills** show each card's chance per roll, in name order, whatever order you entered them in. "(deleted card)" means the card is gone from Cards. "No drops entered yet." means the pack has no odds. A Kasket shows a line saying how many cards share its odds, and its pills list that pool (see [Kaskets](#kaskets)).
-- **Long drop lists:** a pack with more than 12 cards in its drop list shows the first 8 and a **+N more** pill. Tap it to see the rest, and **Show fewer** to fold it again. Lists start folded each time you open Packs.
+- **Long drop lists:** a pack with more than 12 cards in its drop list shows the first 8 by name and a **+N more** pill. Tap it to see the rest, and **Show fewer** to fold it again. Lists start folded each time you open Packs.
 
 With no packs, the tab says "No packs yet."
 

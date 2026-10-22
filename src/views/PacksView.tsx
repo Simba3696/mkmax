@@ -60,7 +60,9 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
   };
   const rules = new Map(state.rarities.map((r) => [r.id, r]));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
-  const cardName = (id: string) => state.cards.find((c) => c.id === id)?.name ?? '(deleted card)';
+  // Looked up once per render: sorting a Kasket's pool asks for each name many times.
+  const names = new Map(state.cards.map((c) => [c.id, c.name]));
+  const cardName = (id: string) => names.get(id) ?? '(deleted card)';
   /** Drops in name order, so a card is quick to find in a long list; the pack keeps them in the order entered. */
   const byName = (drops: DropEntry[]) => [...drops].sort((a, b) => cardName(a.cardId).localeCompare(cardName(b.cardId)));
   /** Packs whose long drop list is unfolded; folded again when the tab is reopened. */
