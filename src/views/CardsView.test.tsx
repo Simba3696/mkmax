@@ -2583,12 +2583,14 @@ describe('Cards: picking a tower', () => {
     // Ryu Kunai and Ryu Mask ("shirai ryu tower") both show Shirai Ryu Tower picked.
     const picked = (tower: string) => screen.getAllByRole('combobox', { name: 'Tower' }).filter((el) => (el as HTMLSelectElement).value === tower).length;
     expect(picked('Shirai Ryu Tower')).toBe(2);
-    // Kori Blade's box: the only one showing Lin Kuei Tower, then whichever tower it has.
-    let koriTower = 'Lin Kuei Tower';
-    const box = () => screen.getAllByRole('combobox', { name: 'Tower' }).find((el) => (el as HTMLSelectElement).value === koriTower)!;
+    // Kori Blade's own box, found from its row, so other cards sharing its tower can't stand in for it.
+    const box = () => {
+      let row: HTMLElement | null = screen.getAllByTitle('Tap to rename').find((el) => el.textContent === 'Kori Blade')!;
+      while (row && !within(row).queryByRole('combobox', { name: 'Tower' })) row = row.parentElement;
+      return within(row!).getByRole('combobox', { name: 'Tower' });
+    };
 
     fireEvent.change(box(), { target: { value: 'Shirai Ryu Tower' } });
-    koriTower = 'Shirai Ryu Tower';
     expect(towerOf('Kori Blade')).toBe('Shirai Ryu Tower');
 
     // Add a new tower…, then leaving the box empty: the card keeps its tower.
@@ -2609,7 +2611,6 @@ describe('Cards: picking a tower', () => {
     const input = screen.getByPlaceholderText('New tower name');
     fireEvent.change(input, { target: { value: ' Thunder Tower ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    koriTower = 'Thunder Tower';
     expect([towerOf('Kori Blade'), options(box())]).toEqual(['Thunder Tower', ['No tower', 'Shirai Ryu Tower', 'Thunder Tower', 'Add a new tower…']]);
 
     // No tower (the empty choice, once a tower is set) leaves the card with none (filed under Tower not named on Tower gear).

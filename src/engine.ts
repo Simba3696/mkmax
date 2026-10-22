@@ -80,6 +80,12 @@ export const atTopLevel = (card: Card, rule: RarityRule) => card.fusion >= targe
 /** A card's rarity and name key, whatever its case or word order. cardKey in cardList.ts is this key too. */
 export const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityId}|${nameKey(c.name)}`;
 
+/**
+ * One tower however its name was typed, since tower names are typed by hand: "lin kuei tower " is Lin Kuei Tower. Tower
+ * gear groups by it, and the Tower list on Cards offers each tower once by it.
+ */
+export const towerKey = (name: string) => name.trim().toLowerCase();
+
 // Each change copies the whole save (store.tsx), so a record is checked against many times (every pasted line, every
 // keystroke in Add card) before it changes: its keys are worked out once per array. That holds because the record is
 // never changed in place: every change to it puts a new array in `maxed`.

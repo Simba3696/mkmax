@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { copiesToMax, copiesToThreshold, isRealmKlashGear, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel } from '../engine';
+import { copiesToMax, copiesToThreshold, isRealmKlashGear, levelLabel, maxFusion, stepCard, targetLevel, thresholdLevel, towerKey } from '../engine';
 import { CardThumb, RarityBadge } from '../ui';
 import { card, grow, row, rowTitle, stepper, stepperVal } from '../classes';
 import type { Card } from '../types';
@@ -39,14 +39,14 @@ export default function TowersPanel() {
   const shown = (c: Card) => filter === 'all' || belowThreshold(c) || tapped.has(c.id);
   const belowCount = gear.filter((c) => belowThreshold(c) || (filter === 'belowThreshold' && tapped.has(c.id))).length;
 
-  // Grouped ignoring case, since tower names are typed by hand: "Lin kuei tower" files with "Lin Kuei Tower".
+  // Grouped by towerKey: "Lin kuei tower" files with "Lin Kuei Tower".
   const byTower = new Map<string, { tower: string; cards: Card[] }>();
   for (const c of gear) {
     if (!shown(c)) continue;
     const t = c.sourceNote?.trim() || NO_TOWER;
-    const group = byTower.get(t.toLowerCase()) ?? { tower: t, cards: [] };
+    const group = byTower.get(towerKey(t)) ?? { tower: t, cards: [] };
     group.cards.push(c);
-    byTower.set(t.toLowerCase(), group);
+    byTower.set(towerKey(t), group);
   }
   const rarityOrder = (c: Card) => state.rarities.findIndex((r) => r.id === c.rarityId);
   const towers = [...byTower.values()]

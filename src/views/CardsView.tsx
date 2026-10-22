@@ -1,7 +1,7 @@
 import { Activity, useEffect, useMemo, useRef, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, unmarkMaxed } from '../engine';
+import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, towerKey, unmarkMaxed } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -39,14 +39,14 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
 }
 
 /**
- * The towers your tower gear already names, A to Z, each spelled as the first card naming it has it. Grouped ignoring
- * case, as Tower gear groups them, so "lin kuei tower" isn't offered beside "Lin Kuei Tower".
+ * The towers your tower gear already names, A to Z, each spelled as the first card naming it has it. Matched by
+ * towerKey, as Tower gear groups them, so "lin kuei tower" isn't offered beside "Lin Kuei Tower".
  */
 function towerNames(cards: Card[]) {
   const byKey = new Map<string, string>();
   for (const c of cards) {
     const t = c.source === 'tower' ? c.sourceNote?.trim() : undefined;
-    if (t && !byKey.has(t.toLowerCase())) byKey.set(t.toLowerCase(), t);
+    if (t && !byKey.has(towerKey(t))) byKey.set(towerKey(t), t);
   }
   return [...byKey.values()].sort((a, b) => a.localeCompare(b));
 }
@@ -86,7 +86,7 @@ function TowerSelect({ towers, value, onChange, onEnter, className }: { towers: 
     );
   }
   const typed = value?.trim();
-  const listed = typed && towers.find((t) => t.toLowerCase() === typed.toLowerCase());
+  const listed = typed && towers.find((t) => towerKey(t) === towerKey(typed));
   return (
     <select className={className} value={listed || typed || ''} aria-label="Tower" onChange={(e) => (e.target.value === NEW_TOWER ? setEdit({ text: '', before: value }) : onChange(e.target.value || undefined))}>
       {/* Once a tower is set, picking this takes it off the card, so it says so. */}
