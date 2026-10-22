@@ -452,6 +452,27 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
   // Value: protects=Paste a list's Add skips a card a sync added after the list was read, and saves nothing for it;
   // fails_when=the list as drawn is trusted, so the same card is saved twice; why_new=review (adversarial);
   // seam=a grabbed update stands in for the sync, SyncLoop.nextStamp spied; no_claim=a real sync
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=a pasted tower line another device already applied, in the Tower list's spelling, just before Add saves
+  // and stamps nothing; fails_when=the sync guard compares tower names letter for letter, so the line counts as an update
+  // that changes nothing; why_new=review (Red Team); seam=a grabbed update stands in for the sync, SyncLoop.nextStamp spied;
+  // no_claim=a real sync
+  it("saves nothing for a pasted tower a sync already gave the card in the list's spelling", () => {
+    const stamps = renderWith([
+      { id: 'kori', name: 'Kori Blade', rarityId: 'epic', fusion: 1, guest: false },
+      { id: 'fan', name: 'Frost Fan', rarityId: 'epic', fusion: 1, guest: false, source: 'tower', sourceNote: 'Lin Kuei Tower' },
+    ]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Kori Blade - Epic - lin kuei tower' } });
+    const apply = form.getByRole('button', { name: 'update 1' });
+    act(() => {
+      update((d) => void Object.assign(d.cards.find((c) => c.id === 'kori')!, { source: 'tower', sourceNote: 'Lin Kuei Tower' }));
+      apply.click();
+    });
+    expect([saved().cards.find((c: { id: string }) => c.id === 'kori').sourceNote, lastUndo, stamps.mock.calls.length]).toEqual(['Lin Kuei Tower', null, 1]);
+  });
+
   it("doesn't add a pasted card twice when a sync added it just before Add", () => {
     const stamps = renderWith([]);
     const add = pasteList('Jade, Lizard');
@@ -2693,7 +2714,7 @@ describe('Cards: picking a tower', () => {
   });
 
   // Regression: /ship test coverage audit on 2026-10-22 — with no tower named yet, a card's Tower box became the list at the
-  // first letter typed, so only that letter was saved
+  // first letter typed, so only that letter was saved (confirmed red with the `edit ||` text-box condition taken out)
   // Generated on 2026-10-22 (/ship test coverage audit, Tower dropdown)
   // Value: protects=a tower gear card's Tower box takes a whole name when no card names a tower yet; fails_when=the first
   // keystroke saves a tower and the box turns into the list mid-word; why_new=the tests above all start with towers named,
@@ -2771,7 +2792,8 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     pickNewTower(boxOf('Kori Blade'));
     fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Thunder Tower' } });
     fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
-    expect([towerOf('Kori Blade'), boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['Thunder Tower', 'SELECT', true]);
+    // A tower no other card names re-spells nothing, so finishing it offers no Undo.
+    expect([towerOf('Kori Blade'), boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade'), lastUndo]).toEqual(['Thunder Tower', 'SELECT', true, null]);
   });
 
   // Generated on 2026-10-22 (/ship Red Team, Tower dropdown)

@@ -329,8 +329,12 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         const levelOf = (c: (typeof newCards)[number]) => ((c.fusion ?? 0) <= maxFusion(d.rarities.find((r) => r.id === c.rarityId)!) ? (c.fusion ?? 0) : 0);
         // Nor to a card left without its rarity (an older build or an imported file can leave one): it has no rules to
         // check its goal against. Nor one a sync has already updated that way (the same list pasted on another device).
+        // A tower in other capitals is the same tower (towerKey), as the list was read with: one a sync already gave the
+        // card, in the Tower list's spelling, isn't a change.
         const changes = (c: Card, patch: (typeof updates)[number]['patch']) =>
-          Object.entries(patch).some(([k, v]) => (k === 'maxLevel' ? (c.maxLevel ?? null) : c[k as keyof typeof patch]) !== v);
+          Object.entries(patch).some(([k, v]) =>
+            k === 'maxLevel' ? (c.maxLevel ?? null) !== v : k === 'sourceNote' ? towerKey(c.sourceNote ?? '') !== towerKey((v as string | undefined) ?? '') : c[k as keyof typeof patch] !== v,
+          );
         const saving = updates.flatMap((u) =>
           d.cards
             .filter((c) => c.id === u.cardId && d.rarities.some((r) => r.id === c.rarityId) && changes(c, u.patch))
@@ -338,7 +342,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         );
         if (!cards.length && !saving.length) return noChange;
         // A pasted tower is saved as the Tower list spells it (one tower however it's typed), so a pasted line can't bring
-        // a second spelling back; a tower no card names yet takes the spelling of the first line naming it.
+        // a second spelling back; a tower no card names yet takes the spelling of the first new card naming it, or failing
+        // that the first updated one.
         const spellings = towerSpellings(d.cards.filter((c) => d.rarities.some((r) => r.id === c.rarityId)));
         const listSpelling = (note: string) => {
           if (!spellings.has(towerKey(note))) spellings.set(towerKey(note), note.trim());
