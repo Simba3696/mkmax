@@ -76,22 +76,46 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
     focusList.current = false;
   });
 
+  // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
+  // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step
+  // is held (shown, not saved) until the list is left, Enter is pressed or the app is hidden: on a card, where each pick
+  // saves with Undo, any tower; anywhere, Add a new tower…, which leaving the list drops. A tap or a click saves at once.
+  // A key marks the change it makes before it's let go (a pick in a list a key opened is at worst held until it's left).
+  const [held, setHeld] = useState<string | null>(null);
+  const keyed = useRef(false);
+  const typed = value?.trim();
+  const listed = typed && towers.find((t) => towerKey(t) === towerKey(typed));
+  const current = listed || typed || '';
+  // Leaving the list drops a held Add a new tower…; Enter opens its box.
+  const settle = (v: string, enter: boolean) => {
+    setHeld(null);
+    if (v === NEW_TOWER) {
+      if (enter) setEdit({ text: '', was: value, saved: value });
+    } else if (v !== current) pick(v || undefined);
+  };
+
   // Hiding the page (Activity, for Tower gear) may give the box no blur, so a box left open is finished in the cleanup
   // and closed when the page is shown again, as a rename is.
-  // Hiding the app gives no blur either, and a phone may close it while it's away, so the name is finished then too; the
-  // box stays open with what was typed, and is finished again when it's left. It's finished at once (flushSync), so the
-  // store's save runs before the page can be frozen or closed, not in a later task that may never come.
-  const openEdit = useRef({ edit, onChange });
-  useEffect(() => void (openEdit.current = { edit, onChange }));
+  // Hiding the app gives no blur either, and a phone may close it while it's away, so the name is finished then too (and
+  // a tower held by the arrow keys is saved); the box stays open with what was typed, and is finished again when it's
+  // left. It's done at once (flushSync), so the store's save runs before the page can be frozen or closed, not in a later
+  // task that may never come.
+  const openEdit = useRef({ edit, onChange, held, settle });
+  useEffect(() => void (openEdit.current = { edit, onChange, held, settle }));
   useEffect(() => {
     if (openEdit.current.edit) setEdit(null);
     const away = () => {
-      const e = openEdit.current.edit;
-      if (document.visibilityState !== 'hidden' || !e) return;
-      flushSync(() => {
-        finishTower(e, openEdit.current.onChange);
-        setEdit({ ...e, saved: e.text.trim() || e.was });
-      });
+      if (document.visibilityState !== 'hidden') return;
+      const { edit: e, onChange: write, held: h, settle: done } = openEdit.current;
+      if (e)
+        flushSync(() => {
+          finishTower(e, write);
+          // The box goes on from the name it just saved, so finishing it again later (its Undo, or an emptied box) goes
+          // back to that, the spelling every card now has, not to the one before the app was left.
+          const now = e.text.trim() || e.was;
+          setEdit({ ...e, was: now, saved: now });
+        });
+      else if (h !== null && h !== NEW_TOWER) flushSync(() => done(h, false));
     };
     document.addEventListener('visibilitychange', away);
     return () => {
@@ -99,14 +123,6 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
       if (openEdit.current.edit) finishTower(openEdit.current.edit, openEdit.current.onChange);
     };
   }, []);
-
-  // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
-  // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step
-  // is held (shown, not saved) until the list is left or Enter is pressed: on a card, where each pick saves with Undo,
-  // any tower; anywhere, Add a new tower…, which leaving the list drops. A tap or a click saves at once. A key marks the
-  // change it makes before it's let go (a pick in a list a key opened is at worst held until the list is left).
-  const [held, setHeld] = useState<string | null>(null);
-  const keyed = useRef(false);
 
   if (edit || towers.length === 0) {
     const cur = edit ?? { was: undefined, saved: value };
@@ -150,16 +166,6 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
       />
     );
   }
-  const typed = value?.trim();
-  const listed = typed && towers.find((t) => towerKey(t) === towerKey(typed));
-  const current = listed || typed || '';
-  // Leaving the list drops a held Add a new tower…; Enter opens its box.
-  const settle = (v: string, enter: boolean) => {
-    setHeld(null);
-    if (v === NEW_TOWER) {
-      if (enter) setEdit({ text: '', was: value, saved: value });
-    } else if (v !== current) pick(v || undefined);
-  };
   return (
     <select
       ref={(el) => void (el && focusList.current && el.focus())}

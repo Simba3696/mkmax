@@ -62,9 +62,14 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: (sh
   }, [entry]);
   // Undo and ✕ act on the change the bar showed when pressed. Pressing them can finish a box being typed in (a Tower
   // name), which may put a new change in the bar before the tap lands; that one is shown, not undone or dropped unseen.
-  // A key press (a click with no pointer, detail 0) acts on the change showing then.
+  // A key press (a click with no pointer, detail 0) acts on the change showing then. A press is used once, so a later
+  // click that came without one (from some accessibility tools) acts on the change showing too.
   const pressed = useRef<UndoEntry | null>(null);
-  const shown = (e: MouseEvent) => (e.detail > 0 && pressed.current) || entry;
+  const shown = (e: MouseEvent) => {
+    const p = pressed.current;
+    pressed.current = null;
+    return (e.detail > 0 && p) || entry;
+  };
   return (
     // Above the tab bar on phones; on wider screens, centred over the content beside the rail. Settings' rarity arrows
     // scroll to sit just above it (clearOfUndoBar in classes.ts): raise that margin if this gets taller or moves up.

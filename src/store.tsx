@@ -33,11 +33,11 @@ type Update = (
  */
 export const noChange: unique symbol = Symbol('noChange');
 
-/** The most recent undoable change: the state from just before it. */
+/** The most recent undoable change: the state from just before it. Each change is a new entry, which is how the Undo bar
+ * tells two apart (see UndoToast). */
 export interface UndoEntry {
   label: string;
   prev: AppState;
-  at: number;
 }
 
 interface SyncApi {
@@ -194,7 +194,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (label) {
       const base = opts?.undoFrom ? structuredClone(prev) : prev;
       opts?.undoFrom?.(base);
-      setLastUndo({ label, prev: base, at: Date.now() });
+      setLastUndo({ label, prev: base });
     }
     if (!opts?.auto) schedulePush();
   };

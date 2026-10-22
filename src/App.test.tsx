@@ -529,6 +529,16 @@ describe('the Undo bar', () => {
     add('f', 'Added f');
     press('Dismiss', 0);
     expect([ids(), screen.queryByText('Added f')]).toEqual([['c', 'd', 'e', 'f'], null]);
+
+    // A press is used once: after one that a new change made stale, a click with no press before it (as some
+    // accessibility tools send) acts on the change showing.
+    add('g', 'Added g');
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Undo' }));
+    add('h', 'Added h');
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }), { detail: 1 });
+    expect(screen.queryByText('Added h')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }), { detail: 1 });
+    expect([ids(), screen.queryByText('Added h')]).toEqual([['c', 'd', 'e', 'f', 'g'], null]);
   });
 
   // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)

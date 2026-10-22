@@ -3070,6 +3070,20 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect([towerOf('Kori Blade'), towerOf('Frost Fan')]).toEqual(['lin kuei tower', undefined]);
   });
 
+  // Generated on 2026-10-22 (/ship test coverage audit, Tower dropdown)
+  // Value: protects=a card a sync removes while its Tower box is open goes quietly: the box finished as its row leaves
+  // saves nothing, re-spells no other card and offers no Undo; fails_when=setTower stops checking the card is still
+  // there, so the finish throws or re-spells the other cards for a card that's gone; why_new=the sync tests above change
+  // a card's tower, never remove the card; seam=a grabbed update stands in for the sync; no_claim=a real sync
+  it("saves nothing when a sync removes a card while its Tower box is open", () => {
+    renderPage([tower('kori', 'Kori Blade', 'lin kuei tower'), tower('fan', 'Frost Fan', 'lin kuei tower')]);
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
+    act(() => update((d) => void (d.cards = d.cards.filter((c) => c.id !== 'kori'))));
+    const names = (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string }[]).map((c) => c.name);
+    expect([names, towerOf('Frost Fan'), lastUndo]).toEqual([['Frost Fan'], 'lin kuei tower', null]);
+  });
+
   // Regression: /ship review run 4 on 2026-10-22 — Enter in Add card's plain Tower box blurred it, dropping focus to the page
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
   // Value: protects=Enter in Add card's plain Tower box (no tower named yet) keeps focus in the box, whether Add goes
@@ -3160,10 +3174,12 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
       plain('chain', 'Ryu Chain'),
       tower('kori', 'Kori Blade', 'Lin Kuei Tower'),
       tower('jade', 'Jade Fan', 'Lin Kuei Tower'),
+      tower('axe', 'Kori Axe', 'Lin Kuei Tower'),
     ]);
     const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
     fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
     const lines = [
+      'Kori Axe - Epic - Krypt',
       'Ryu Mask - Epic - LIN KUEI TOWER',
       'Ryu Kunai - Epic - FIRE TOWER',
       'Frost Fan - Epic - lin kuei tower - F2',
@@ -3173,7 +3189,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
       'Jade Fan - Epic - WATER TOWER',
     ];
     fireEvent.change(document.querySelector('textarea')!, { target: { value: lines.join('\n') } });
-    fireEvent.click(form.getByRole('button', { name: 'Add 3, update 4' }));
+    fireEvent.click(form.getByRole('button', { name: 'Add 3, update 5' }));
     expect(['Ryu Mask', 'Frost Fan', 'Kori Blade', 'Ryu Kunai', 'Ice Fan', 'Wind Fan', 'Ryu Chain', 'Jade Fan', 'Ghost Blade'].map(towerOf)).toEqual([
       'Lin Kuei Tower',
       'Lin Kuei Tower',
@@ -3185,6 +3201,12 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
       'water tower',
       'WIND TOWER',
     ]);
+    // Extended on 2026-10-22 (/ship test coverage audit, Tower dropdown)
+    // Value: protects=a pasted line moving tower gear to Krypt saves it as Krypt with no tower; fails_when=the pasted
+    // update runs every update's tower through the Tower list's spelling, so a line with no tower throws or keeps one;
+    // why_new=every update above names a tower; seam=none; no_claim=the parser's patch (cardList.test.ts)
+    const axe = (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string; source?: string; sourceNote?: string }[]).find((c) => c.name === 'Kori Axe');
+    expect([axe?.source, axe?.sourceNote]).toEqual(['krypt', undefined]);
   });
 
   // A step through a closed list with a key, as a computer's arrow keys make: the key goes down, the list changes, the key
@@ -3516,5 +3538,50 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
     document.dispatchEvent(new Event('visibilitychange'));
     expect([towerOf('Kori Blade'), towerOf('Frost Fan')]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower']);
+  });
+
+  // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
+  // Value: protects=a box finished on hiding the app goes on from the name it saved: retyped after coming back and left,
+  // its Undo puts every card back to that one spelling, and emptied it keeps that name; fails_when=the box keeps the tower
+  // it opened on, so Undo puts the typed card back to the old spelling and the other cards to the new one; why_new=review
+  // (state machines); seam=document.visibilityState mocked; no_claim=a phone closing the app
+  it('goes on from the name saved on hiding, so a later Undo leaves one spelling', () => {
+    renderPage([tower('kori', 'Kori Blade', 'lin kuei tower'), tower('fan', 'Frost Fan', 'lin kuei tower')]);
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
+    appShows('hidden');
+    appShows('visible');
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'LIN KUEI TOWER' } });
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect([towerOf('Kori Blade'), towerOf('Frost Fan')]).toEqual(['LIN KUEI TOWER', 'LIN KUEI TOWER']);
+    act(() => undo());
+    expect([towerOf('Kori Blade'), towerOf('Frost Fan')]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower']);
+
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Thunder Tower' } });
+    appShows('hidden');
+    appShows('visible');
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: '' } });
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect(towerOf('Kori Blade')).toBe('Thunder Tower');
+  });
+
+  // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=a tower stepped to with the keys on a card's list is saved, with Undo, when the app is hidden (a tab
+  // closed or reloaded gives no blur), before the hide event returns, while a held Add a new tower… opens nothing;
+  // fails_when=only leaving the list or Enter saves a step, so closing the tab loses the tower the list showed;
+  // why_new=review (Red Team); seam=keyDown, change and keyUp in a closed list's order, document.visibilityState mocked,
+  // the hide sent outside act; no_claim=a real browser closing the tab
+  it('saves a tower held by the keys when the app is hidden', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    step(boxOf('Kori Blade'), 'Shirai Ryu Tower');
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect([towerOf('Kori Blade'), lastUndo?.label]).toEqual(['Shirai Ryu Tower', 'Kori Blade: tower set to Shirai Ryu Tower']);
+    appShows('visible');
+
+    step(boxOf('Ryu Kunai'), newTowerValue(boxOf('Ryu Kunai')));
+    appShows('hidden');
+    expect([towerOf('Ryu Kunai'), boxOf('Ryu Kunai').tagName]).toEqual(['Shirai Ryu Tower', 'SELECT']);
   });
 });
