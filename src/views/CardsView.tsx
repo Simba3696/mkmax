@@ -38,14 +38,6 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
   );
 }
 
-/**
- * The towers your tower gear already names, A to Z, each spelled as the first card naming it has it. Matched by
- * towerKey, as Tower gear groups them, so "lin kuei tower" isn't offered beside "Lin Kuei Tower".
- */
-function towerNames(cards: Card[]) {
-  return [...towerSpellings(cards).values()].sort((a, b) => a.localeCompare(b));
-}
-
 /** The Tower list's "Add a new tower…" choice; not a name anyone types. */
 const NEW_TOWER = '\u0000new';
 
@@ -113,8 +105,24 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
         }}
         // Only a box with a name open (typed in, or opened from Add a new tower…) turns into the list; an untouched plain
         // box doesn't rerender, so a flag set for it would wait and take focus the next time the list shows.
-        // Enter finishes the name (so a new spelling is fixed on the other cards first), then does the form's Enter.
-        onKeyDown={(e) => e.key === 'Enter' && ((focusList.current = !!edit), e.currentTarget.blur(), onEnter?.())}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          if (!onEnter) {
+            focusList.current = !!edit;
+            return e.currentTarget.blur();
+          }
+          // The name is finished first (so a new spelling is fixed on the other cards), then the form's Enter runs. It's
+          // finished in place rather than by leaving the box, so focus stays here while it's still a text box; if the
+          // form's Enter names the first tower and the list replaces the box, the list takes focus. The flag is dropped
+          // once this Enter's render is done, so an Enter that changed nothing can't leave it set for later.
+          focusList.current = true;
+          if (edit) {
+            finishTower(edit, onChange);
+            setEdit(null);
+          }
+          onEnter();
+          queueMicrotask(() => void (focusList.current = false));
+        }}
       />
     );
   }
@@ -505,10 +513,13 @@ type CardSort = (typeof CARD_SORTS)[number];
 function CardList() {
   const { state, update } = useStore();
   const { now, ctx } = usePlan();
-  // Cards under a rarity a sync removed are hidden everywhere, so they don't name or spell a tower either.
-  const towers = useMemo(() => towerNames(state.cards.filter((c) => state.rarities.some((r) => r.id === c.rarityId))), [state.cards, state.rarities]);
+  // Each tower your gear names, spelled as the first card naming it has it (towerSpellings), so "lin kuei tower" isn't
+  // offered beside "Lin Kuei Tower". Cards under a rarity a sync removed are hidden everywhere, so they don't count.
+  const spellings = useMemo(() => towerSpellings(state.cards.filter((c) => state.rarities.some((r) => r.id === c.rarityId))), [state.cards, state.rarities]);
+  // The Tower list, A to Z.
+  const towers = useMemo(() => [...spellings.values()].sort((a, b) => a.localeCompare(b)), [spellings]);
   // A card's chip names its tower as the Tower list spells it, so one row doesn't show it two ways.
-  const towerLabel = (note: string) => towers.find((t) => towerKey(t) === towerKey(note)) ?? note.trim();
+  const towerLabel = (note: string) => spellings.get(towerKey(note)) ?? note.trim();
   const events = useEvents();
   const [rarity, setRarity] = useState<string>('all');
   const [q, setQ] = useState('');
@@ -662,8 +673,9 @@ function CardList() {
       Object.assign(c, p);
     });
 
+  // The count first, so it still shows when a phone cuts the Undo bar short.
+  const respelledLabel = (tower: string | undefined, n: number) => `Respelled ${n} other card${n === 1 ? '' : 's'}: ${tower}`;
   // With `over`, only over that tower: a Tower box left empty doesn't put its old tower back over one a sync brought in.
-  const respelledLabel = (tower: string | undefined, n: number) => `Respelled ${tower} on ${n} other card${n === 1 ? '' : 's'}`;
   // A finished typed name in a new spelling also re-spells the tower on the other cards naming it; that changes cards the
   // user didn't touch, so it has Undo even though typing doesn't. The box saved this card as it was typed, so Undo also
   // puts this card back to the tower the box opened on.
@@ -678,12 +690,14 @@ function CardList() {
         c.sourceNote = tower;
       },
       () => (respelled ? respelledLabel(tower, respelled) : (undoLabel ?? '')),
-      {
-        undoFrom: (p) => {
-          const typedOn = respelled ? p.cards.find((x) => x.id === id) : undefined;
-          if (typedOn) typedOn.sourceNote = over?.was;
-        },
-      },
+      over?.respell
+        ? {
+            undoFrom: (p) => {
+              const typedOn = respelled ? p.cards.find((x) => x.id === id) : undefined;
+              if (typedOn) typedOn.sourceNote = over.was;
+            },
+          }
+        : undefined,
     );
   };
 

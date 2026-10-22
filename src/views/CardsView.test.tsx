@@ -2944,7 +2944,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect([['Kori Blade', 'Frost Fan', 'Ryu Kunai', 'Ghost Blade'].map(towerOf), options(boxOf('Kori Blade')), lastUndo?.label]).toEqual([
       ['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER'],
       ['No tower', 'Lin Kuei Tower', 'Add a new tower…'],
-      'Respelled Lin Kuei Tower on 2 other cards',
+      'Respelled 2 other cards: Lin Kuei Tower',
     ]);
     act(() => undo());
     expect([['Kori Blade', 'Frost Fan', 'Ryu Kunai'].map(towerOf), options(boxOf('Kori Blade'))]).toEqual([
@@ -2967,7 +2967,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     for (const typed of ['L', 'Lin', 'Lin Kuei Tower']) fireEvent.change(boxOf('Kori Blade'), { target: { value: typed } });
     expect(lastUndo).toBeNull();
     fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
-    expect([towerOf('Kori Blade'), towerOf('Frost Fan'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'Respelled Lin Kuei Tower on 1 other card']);
+    expect([towerOf('Kori Blade'), towerOf('Frost Fan'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'Respelled 1 other card: Lin Kuei Tower']);
   });
 
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
@@ -2991,7 +2991,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(name, { target: { value: 'Frost Fan' } });
     typeTower('Lin Kuei Tower');
     fireEvent.keyDown(form.getByPlaceholderText('New tower name'), { key: 'Enter' });
-    expect([towerOf('Frost Fan'), towerOf('Kori Blade'), towerOf('Ghost Blade'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER', 'Respelled Lin Kuei Tower on 1 other card']);
+    expect([towerOf('Frost Fan'), towerOf('Kori Blade'), towerOf('Ghost Blade'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER', 'Respelled 1 other card: Lin Kuei Tower']);
     // Add keeps the tower for the next card.
     expect((form.getByLabelText('Tower') as HTMLSelectElement).value).toBe('Lin Kuei Tower');
     act(() => undo());
@@ -3036,8 +3036,71 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     pickNewTower(boxOf('Frost Fan'));
     fireEvent.change(boxOf('Frost Fan'), { target: { value: 'Lin Kuei Tower' } });
     fireEvent.keyDown(boxOf('Frost Fan'), { key: 'Enter' });
-    expect([towerOf('Kori Blade'), towerOf('Frost Fan'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'Respelled Lin Kuei Tower on 1 other card']);
+    expect([towerOf('Kori Blade'), towerOf('Frost Fan'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'Respelled 1 other card: Lin Kuei Tower']);
     act(() => undo());
     expect([towerOf('Kori Blade'), towerOf('Frost Fan')]).toEqual(['lin kuei tower', undefined]);
+  });
+
+  // Regression: /ship review run 4 on 2026-10-22 — Enter in Add card's plain Tower box blurred it, dropping focus to the page
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=Enter in Add card's plain Tower box (no tower named yet) keeps focus in the box, whether Add goes
+  // through or is refused for an empty name; fails_when=Enter leaves the box before adding, so focus drops to the page;
+  // why_new=review (Red Team, confirmed with a probe); seam=jsdom focus; no_claim=a real keyboard
+  it("keeps focus in Add card's plain Tower box after Enter", () => {
+    renderPage([]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
+    const box = form.getByLabelText('Tower') as HTMLInputElement;
+    box.focus();
+    fireEvent.change(box, { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect([document.activeElement === box, towerOf('Lin Kuei Tower')]).toEqual([true, undefined]);
+    fireEvent.change(form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Kori Blade' } });
+    box.focus();
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect([towerOf('Kori Blade'), document.activeElement === form.getByLabelText('Tower')]).toEqual(['Lin Kuei Tower', true]);
+  });
+
+  // Generated on 2026-10-22 (/ship coverage audit, Tower dropdown)
+  // Value: protects=finishing Add card's Tower box with a tower no card names offers no Undo, and one left open with a new
+  // spelling when Cards is hidden still fixes that spelling on the other cards; fails_when=Add card saves a re-spell that
+  // changes nothing ("Respelled 0 other cards"), or the hide cleanup skips the re-spell; why_new=review (coverage audit);
+  // seam=rerender switches the page as App does; no_claim=real Activity hiding
+  it("re-spells from Add card's box only when there's a spelling to fix, even across a page switch", async () => {
+    const { rerender } = renderPage([tower('kori', 'Kori Blade', 'lin kuei tower')]);
+    const form = () => within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.change(form().getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form().getByLabelText('Source'), { target: { value: 'tower' } });
+    pickNewTower(form().getByLabelText('Tower'));
+    fireEvent.change(form().getByPlaceholderText('New tower name'), { target: { value: 'Wind Tower' } });
+    fireEvent.blur(form().getByPlaceholderText('New tower name'));
+    expect(lastUndo).toBeNull();
+    pickNewTower(form().getByLabelText('Tower'));
+    fireEvent.change(form().getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
+    rerender(page('towers'));
+    rerender(page('cards'));
+    await act(async () => {});
+    expect([towerOf('Kori Blade'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Respelled 1 other card: Lin Kuei Tower']);
+  });
+
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=an Enter in Add card's untouched plain Tower box that adds nothing (no name) doesn't leave that box
+  // set to take focus later, so a card's Tower box keeps focus and takes a whole name when the first tower is named;
+  // fails_when=the focus flag set for Add card's Enter isn't dropped, so Add card's list steals focus mid-word;
+  // why_new=review (Red Team fix, focus pattern); seam=jsdom focus; no_claim=a real keyboard
+  it("doesn't pull focus to Add card's Tower list after an Enter that added nothing", async () => {
+    renderPage([tower('kori', 'Kori Blade')]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
+    const addBox = form.getByLabelText('Tower');
+    addBox.focus();
+    fireEvent.keyDown(addBox, { key: 'Enter' });
+    await act(async () => {});
+    const box = boxOf('Kori Blade') as HTMLInputElement;
+    box.focus();
+    for (const typed of ['L', 'Li', 'Lin Kuei Tower']) fireEvent.change(box, { target: { value: typed } });
+    expect([towerOf('Kori Blade'), document.activeElement === box]).toEqual(['Lin Kuei Tower', true]);
   });
 });
