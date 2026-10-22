@@ -77,6 +77,11 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   useEffect(() => {
     focusList.current = false;
   });
+  // Whether the list or box has focus. When one replaces the other while it does (No tower picked on the last tower
+  // named turns the list into the plain box, or a sync names the first or last tower), the one that replaces it takes
+  // focus, so a keyboard user doesn't lose their place. A removed element gives no blur, so the flag holds until then.
+  const focused = useRef(false);
+  const keepFocus = (el: HTMLElement | null) => void (el && (focusList.current || focused.current) && el !== document.activeElement && el.focus());
 
   // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
   // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step
@@ -134,6 +139,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
     const cur = edit ?? { was: undefined, saved: value };
     return (
       <input
+        ref={keepFocus}
         className={className}
         value={edit?.text ?? value ?? ''}
         placeholder={towers.length ? 'New tower name' : placeholder}
@@ -145,7 +151,9 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
           else onChange(cur.was, { saved: cur.saved });
           setEdit({ text, was: cur.was, saved: text.trim() ? text : cur.was });
         }}
+        onFocus={() => void (focused.current = true)}
         onBlur={() => {
+          focused.current = false;
           if (edit) finishTower(edit, onChange);
           setEdit(null);
         }}
@@ -174,7 +182,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   }
   return (
     <select
-      ref={(el) => void (el && focusList.current && el.focus())}
+      ref={keepFocus}
       className={className}
       value={held ?? current}
       aria-label="Tower"
@@ -190,7 +198,11 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
       }}
       onKeyUp={() => void (keyed.current = false)}
       onPointerDown={() => void (keyed.current = false)}
-      onBlur={() => held !== null && settle(held, false)}
+      onFocus={() => void (focused.current = true)}
+      onBlur={() => {
+        focused.current = false;
+        if (held !== null) settle(held, false);
+      }}
     >
       {/* Once a tower is set, picking this takes it off the card, so it says so. */}
       <option value="">{typed ? 'No tower' : 'Choose a tower…'}</option>

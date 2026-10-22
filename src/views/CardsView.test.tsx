@@ -3682,4 +3682,20 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.blur(boxOf('Kori Blade'));
     expect(towerOf('Kori Blade')).toBeUndefined();
   });
+
+  // Generated on 2026-10-22 (/ship adversarial, Tower dropdown)
+  // Value: protects=when a card's Tower list turns into the plain box while it has focus (No tower picked from the keys on
+  // the last tower named), or the plain box into the list (a sync names the first tower), the control that replaces it
+  // keeps keyboard focus; fails_when=the swap drops focus to the page; why_new=review (adversarial, accessibility);
+  // seam=keyDown, change and keyUp in a closed list's order, a sync made with the store's update; no_claim=a screen reader
+  it('keeps keyboard focus when the Tower list and the plain box replace each other', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower')]);
+    boxOf('Kori Blade').focus();
+    step(boxOf('Kori Blade'), '');
+    fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
+    expect([towerOf('Kori Blade'), boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual([undefined, 'INPUT', true]);
+
+    act(() => update((d) => void (d.cards[0].sourceNote = 'Wind Tower')));
+    expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['SELECT', true]);
+  });
 });
