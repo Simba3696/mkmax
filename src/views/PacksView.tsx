@@ -60,7 +60,11 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
   };
   const rules = new Map(state.rarities.map((r) => [r.id, r]));
   const curName = (id: string) => state.currencies.find((c) => c.id === id)?.name ?? id;
-  const cardName = (id: string) => state.cards.find((c) => c.id === id)?.name ?? '(deleted card)';
+  // Looked up once per render: sorting a Kasket's pool asks for each name many times.
+  const names = new Map(state.cards.map((c) => [c.id, c.name]));
+  const cardName = (id: string) => names.get(id) ?? '(deleted card)';
+  /** Drops in name order, so a card is quick to find in a long list; the pack keeps them in the order entered. */
+  const byName = (drops: DropEntry[]) => [...drops].sort((a, b) => cardName(a.cardId).localeCompare(cardName(b.cardId)));
   /** Packs whose long drop list is unfolded; folded again when the tab is reopened. */
   const [openDrops, setOpenDrops] = useState<ReadonlySet<string>>(new Set());
   const toggleDrops = (id: string) =>
@@ -167,7 +171,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
           tick Store item again when the shop has it.
         </div>
       )}
-      <DropList pack={p} drops={packDrops(ctx, p)} cardName={cardName} open={openDrops.has(p.id)} onToggle={() => toggleDrops(p.id)} />
+      <DropList pack={p} drops={byName(packDrops(ctx, p))} cardName={cardName} open={openDrops.has(p.id)} onToggle={() => toggleDrops(p.id)} />
       <div className="hidden lg:block lg:flex-1" aria-hidden />
       <div className={actions}>
         {packStatus(p, now) === 'active' && (
@@ -216,7 +220,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
               {pullRow(state.cards.find((c) => c.id === pulled))}
             </>
           ) : (
-            p.drops.map((d) => pullRow(state.cards.find((c) => c.id === d.cardId)))
+            byName(p.drops).map((d) => pullRow(state.cards.find((c) => c.id === d.cardId)))
           )}
           <div className={actions}>
             <button className={btn.primary} onClick={() => setPulling(null)}>
