@@ -56,8 +56,8 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: (sh
       document.removeEventListener('visibilitychange', start);
       window.removeEventListener('pageshow', onPageShow);
     };
-    // Restart the timer for each new change (each is a new entry, even two made in the same millisecond), not on every
-    // render; the timer only ever closes the change it was started for.
+    // Restart the timer for each new change (each is a new entry), not on every render; the timer only ever closes the
+    // change it was started for.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry]);
   // Undo and ✕ act on the change the bar showed when pressed. Pressing them can finish a box being typed in (a Tower

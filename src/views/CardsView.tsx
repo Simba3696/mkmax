@@ -45,11 +45,13 @@ const NEW_TOWER = '\u0000new';
 /**
  * Saves a Tower box's name. With `over`, only over the tower the box last saved, so one a sync brought in since stands;
  * `respell` marks a finished typed name, which fixes the tower's spelling on other cards too (respellTower), and `was`
- * is the tower the box opened on, which that fix's Undo puts back. A card's box and Add card's take the same `over`.
+ * is the tower the box goes back to (see TowerEdit), which that fix's Undo puts back. A card's box and Add card's take
+ * the same `over`.
  */
 type TowerWrite = (v: string | undefined, over?: TowerOver) => void;
 type TowerOver = { saved: string | undefined; respell?: boolean; was?: string };
-// As a rename: what an emptied box goes back to (`was`, none in the plain box) and the tower the box last saved.
+// As a rename: what an emptied box goes back to (`was`: the tower the box opened on, or the name saved when the app was
+// hidden if it opened on one; none in the plain box) and the tower the box last saved.
 type TowerEdit = { text: string; was: string | undefined; saved: string | undefined };
 
 /** Leaving a Tower box saves the name trimmed, or the tower it had if it's empty, over the tower the box last saved. */
@@ -66,9 +68,9 @@ const finishTower = (e: TowerEdit, write: TowerWrite) => {
  */
 function TowerSelect({ towers, value, onChange, onPick, onEnter, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; className?: string; placeholder?: string }) {
   const pick = onPick ?? onChange;
-  // The name being typed, the tower the card had before Add a new tower… was picked (which an emptied box goes back to;
-  // none in the plain box, which has no list to go back to), and the tower this box last saved. Null while picking from
-  // the list, or before the first key in the plain box.
+  // The name being typed, the tower an emptied box goes back to (the one the card had before Add a new tower… was picked,
+  // or the name saved when the app was hidden; none in the plain box, which has no list to go back to), and the tower
+  // this box last saved. Null while picking from the list, or before the first key in the plain box.
   const [edit, setEdit] = useState<TowerEdit | null>(null);
   // Enter in the new-tower box puts focus on the list that replaces it, rather than dropping it to the page.
   const focusList = useRef(false);
@@ -110,10 +112,11 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
       if (e)
         flushSync(() => {
           finishTower(e, write);
-          // The box goes on from the name it just saved, so finishing it again later (its Undo, or an emptied box) goes
-          // back to that, the spelling every card now has, not to the one before the app was left.
+          // A box that opened on a tower goes on from the name it just saved, so finishing it again later (its Undo, or
+          // an emptied box) goes back to that, the spelling every card now has, not to the one before the app was left.
+          // One that opened on none (the plain box, or a card with no tower) still leaves none when it's emptied.
           const now = e.text.trim() || e.was;
-          setEdit({ ...e, was: now, saved: now });
+          setEdit({ ...e, was: e.was === undefined ? undefined : now, saved: now });
         });
       else if (h !== null && h !== NEW_TOWER) flushSync(() => done(h, false));
     };
@@ -739,7 +742,7 @@ function CardList() {
   // With `over`, only over that tower: a Tower box left empty doesn't put its old tower back over one a sync brought in.
   // A finished typed name in a new spelling also re-spells the tower on the other cards naming it; that changes cards the
   // user didn't touch, so it has Undo even though typing doesn't. The box saved this card as it was typed, so Undo also
-  // puts this card back to the tower the box opened on.
+  // puts this card back to the tower the box goes back to.
   const setTower = (id: string, tower: string | undefined, over?: TowerOver, undoLabel?: string) => {
     let respelled = 0;
     update(

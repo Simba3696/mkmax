@@ -3583,5 +3583,45 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     step(boxOf('Ryu Kunai'), newTowerValue(boxOf('Ryu Kunai')));
     appShows('hidden');
     expect([towerOf('Ryu Kunai'), boxOf('Ryu Kunai').tagName]).toEqual(['Shirai Ryu Tower', 'SELECT']);
+    appShows('visible');
+    fireEvent.blur(boxOf('Ryu Kunai'));
+
+    // No tower is a held step too (an empty value), so hiding takes the tower off.
+    step(boxOf('Ryu Kunai'), '');
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect([towerOf('Ryu Kunai'), lastUndo?.label]).toEqual([undefined, 'Ryu Kunai: tower removed']);
+  });
+
+  // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=a box that opened on no tower (the plain box, in Add card or on a card) still leaves none when it's
+  // emptied after the app was hidden and shown again, and a card's new-tower box left with a new name saves it trimmed
+  // with no Undo; fails_when=hiding makes the saved name the box's starting point even with no tower to start from, so
+  // emptying writes it back and Add saves a tower the box no longer shows; why_new=review (Red Team, state machines);
+  // seam=document.visibilityState mocked; no_claim=a phone closing the app
+  it('empties a box that opened on no tower after hiding the app, and saves a new name left in a box trimmed', () => {
+    renderPage([tower('kori', 'Kori Blade')]);
+    const form = towerForm();
+    fireEvent.change(form.getByLabelText('Tower'), { target: { value: 'Wind Tower' } });
+    appShows('hidden');
+    appShows('visible');
+    fireEvent.change(form.getByLabelText('Tower'), { target: { value: '' } });
+    fireEvent.change(form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Ice Fan' } });
+    fireEvent.keyDown(form.getByLabelText('Tower'), { key: 'Enter' });
+    expect([towerOf('Kori Blade'), towerOf('Ice Fan'), JSON.parse(localStorage.getItem('mkmax:v1')!).cards.length]).toEqual([undefined, undefined, 2]);
+
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Wind Tower' } });
+    appShows('hidden');
+    appShows('visible');
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: '' } });
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect(towerOf('Kori Blade')).toBeUndefined();
+
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.blur(boxOf('Kori Blade'));
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: ' Thunder Tower ' } });
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect([towerOf('Kori Blade'), lastUndo, boxOf('Kori Blade').tagName]).toEqual(['Thunder Tower', null, 'SELECT']);
   });
 });
