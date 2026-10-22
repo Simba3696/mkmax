@@ -62,7 +62,8 @@ const finishTower = (e: TowerEdit, write: TowerWrite) => {
  * the card saves the first letters; with no towers named yet it's only a text box. A pick from the list goes to onPick
  * (with Undo, on a card); a typed name saves as it's typed, as a rename does.
  */
-function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; className?: string; placeholder?: string }) {
+function TowerSelect({ towers, value, onChange, onPick, onEnter, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; className?: string; placeholder?: string }) {
+  const pick = onPick ?? onChange;
   // The name being typed, the tower the card had before Add a new tower… was picked (which an emptied box goes back to;
   // none in the plain box, which has no list to go back to), and the tower this box last saved. Null while picking from
   // the list, or before the first key in the plain box.
@@ -75,14 +76,32 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
 
   // Hiding the page (Activity, for Tower gear) may give the box no blur, so a box left open is finished in the cleanup
   // and closed when the page is shown again, as a rename is.
+  // Hiding the app gives no blur either, and a phone may close it while it's away, so the name is finished then too; the
+  // box stays open with what was typed, and is finished again when it's left.
   const openEdit = useRef({ edit, onChange });
   useEffect(() => void (openEdit.current = { edit, onChange }));
   useEffect(() => {
     if (openEdit.current.edit) setEdit(null);
+    const away = () => {
+      const e = openEdit.current.edit;
+      if (document.visibilityState !== 'hidden' || !e) return;
+      finishTower(e, openEdit.current.onChange);
+      setEdit({ ...e, saved: e.text.trim() || e.was });
+    };
+    document.addEventListener('visibilitychange', away);
     return () => {
+      document.removeEventListener('visibilitychange', away);
       if (openEdit.current.edit) finishTower(openEdit.current.edit, openEdit.current.onChange);
     };
   }, []);
+
+  // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
+  // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step
+  // is held (shown, not saved) until the list is left or Enter is pressed: on a card, where each pick saves with Undo,
+  // any tower; anywhere, Add a new tower…, which leaving the list drops. A tap or a click saves at once. A key marks the
+  // change it makes before it's let go (a pick in a list a key opened is at worst held until the list is left).
+  const [held, setHeld] = useState<string | null>(null);
+  const keyed = useRef(false);
 
   if (edit || towers.length === 0) {
     const cur = edit ?? { was: undefined, saved: value };
@@ -128,14 +147,33 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
   }
   const typed = value?.trim();
   const listed = typed && towers.find((t) => towerKey(t) === towerKey(typed));
+  const current = listed || typed || '';
+  // Leaving the list drops a held Add a new tower…; Enter opens its box.
+  const settle = (v: string, enter: boolean) => {
+    setHeld(null);
+    if (v === NEW_TOWER) {
+      if (enter) setEdit({ text: '', was: value, saved: value });
+    } else if (v !== current) pick(v || undefined);
+  };
   return (
     <select
       ref={(el) => void (el && focusList.current && el.focus())}
       className={className}
-      value={listed || typed || ''}
+      value={held ?? current}
       aria-label="Tower"
-      onChange={(e) => (e.target.value === NEW_TOWER ? setEdit({ text: '', was: value, saved: value }) : onPick(e.target.value || undefined))}
-      onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
+      onChange={(e) => {
+        const v = e.target.value;
+        if (keyed.current && (v === NEW_TOWER || onPick)) return setHeld(v === current ? null : v);
+        settle(v, true);
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter') return void (keyed.current = true);
+        if (held !== null) return settle(held, true);
+        onEnter?.();
+      }}
+      onKeyUp={() => void (keyed.current = false)}
+      onPointerDown={() => void (keyed.current = false)}
+      onBlur={() => held !== null && settle(held, false)}
     >
       {/* Once a tower is set, picking this takes it off the card, so it says so. */}
       <option value="">{typed ? 'No tower' : 'Choose a tower…'}</option>

@@ -3186,4 +3186,92 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
       'WIND TOWER',
     ]);
   });
+
+  // A step through a closed list with a key, as a computer's arrow keys make: the key goes down, the list changes, the key
+  // comes up.
+  const step = (select: HTMLElement, value: string) => {
+    fireEvent.keyDown(select, { key: 'ArrowDown' });
+    fireEvent.change(select, { target: { value } });
+    fireEvent.keyUp(select, { key: 'ArrowDown' });
+  };
+  const newTowerValue = (select: HTMLElement) => [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add a new tower…')!.value;
+
+  // Generated on 2026-10-22 (/ship adversarial, Tower dropdown)
+  // Value: protects=stepping through a card's Tower list with the arrow keys saves only the tower it's left on (or Enter
+  // is pressed on), with one Undo back to the tower it had, and stepping onto Add a new tower… opens the box only on
+  // Enter; fails_when=each step saves with its own Undo, so Undo can't get back to the tower the card had, or stepping
+  // past the last tower turns the list into a text box; why_new=review (adversarial); seam=keyDown, change and keyUp sent
+  // in the order a computer's closed list sends them; no_claim=a real browser's key handling
+  it('saves a tower stepped to with the keys only when the list is left, with one Undo', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    step(boxOf('Kori Blade'), '');
+    step(boxOf('Kori Blade'), 'Shirai Ryu Tower');
+    expect([towerOf('Kori Blade'), (boxOf('Kori Blade') as HTMLSelectElement).value, lastUndo]).toEqual(['Lin Kuei Tower', 'Shirai Ryu Tower', null]);
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect([towerOf('Kori Blade'), lastUndo?.label]).toEqual(['Shirai Ryu Tower', 'Kori Blade: tower set to Shirai Ryu Tower']);
+    act(() => undo());
+    expect(towerOf('Kori Blade')).toBe('Lin Kuei Tower');
+
+    // Enter saves the step too; stepping back to the tower it has saves nothing.
+    step(boxOf('Kori Blade'), '');
+    fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
+    expect([towerOf('Kori Blade'), lastUndo?.label]).toEqual([undefined, 'Kori Blade: tower removed']);
+    act(() => undo());
+    step(boxOf('Ryu Kunai'), 'Lin Kuei Tower');
+    step(boxOf('Ryu Kunai'), 'Shirai Ryu Tower');
+    fireEvent.blur(boxOf('Ryu Kunai'));
+    expect([towerOf('Ryu Kunai'), lastUndo]).toEqual(['Shirai Ryu Tower', null]);
+
+    // Add a new tower… stepped onto and left is dropped; Enter on it opens the box.
+    step(boxOf('Kori Blade'), newTowerValue(boxOf('Kori Blade')));
+    expect(boxOf('Kori Blade').tagName).toBe('SELECT');
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect([boxOf('Kori Blade').tagName, (boxOf('Kori Blade') as HTMLSelectElement).value, towerOf('Kori Blade')]).toEqual(['SELECT', 'Lin Kuei Tower', 'Lin Kuei Tower']);
+    step(boxOf('Kori Blade'), newTowerValue(boxOf('Kori Blade')));
+    fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
+    expect([boxOf('Kori Blade').tagName, towerOf('Kori Blade')]).toEqual(['INPUT', 'Lin Kuei Tower']);
+  });
+
+  // Generated on 2026-10-22 (/ship adversarial, Tower dropdown)
+  // Value: protects=in Add card a tower stepped to with the keys is taken at once (it has no Undo to fill), while Add a
+  // new tower… waits for Enter; fails_when=Add saves the tower before the step, or stepping onto Add a new tower… opens
+  // the box; why_new=review (adversarial); seam=keyDown, change and keyUp sent in a closed list's order; no_claim=none
+  it("takes Add card's tower stepped to with the keys at once, and opens its new-tower box only on Enter", () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
+    step(form.getByLabelText('Tower'), newTowerValue(form.getByLabelText('Tower')));
+    fireEvent.blur(form.getByLabelText('Tower'));
+    expect(form.getByLabelText('Tower').tagName).toBe('SELECT');
+    step(form.getByLabelText('Tower'), 'Shirai Ryu Tower');
+    fireEvent.change(form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Ryu Chain' } });
+    fireEvent.click(form.getByRole('button', { name: 'Add' }));
+    expect(towerOf('Ryu Chain')).toBe('Shirai Ryu Tower');
+
+    step(form.getByLabelText('Tower'), newTowerValue(form.getByLabelText('Tower')));
+    fireEvent.keyDown(form.getByLabelText('Tower'), { key: 'Enter' });
+    expect([form.getByLabelText('Tower').tagName, towerOf('Ryu Chain'), JSON.parse(localStorage.getItem('mkmax:v1')!).cards.length]).toEqual(['INPUT', 'Shirai Ryu Tower', 3]);
+  });
+
+  // Generated on 2026-10-22 (/ship adversarial, Tower dropdown)
+  // Value: protects=a tower name typed in a card's new-tower box is finished when the app is hidden (a phone may close it
+  // there), fixing its spelling on the other cards with Undo, while the box stays open with the name; leaving it later
+  // saves no second Undo; fails_when=only a blur finishes the box, so a closed app keeps two spellings, or hiding closes
+  // the box mid-name; why_new=review (adversarial); seam=document.visibilityState mocked; no_claim=a phone closing the app
+  it('finishes a typed tower name when the app is hidden, and keeps the box open', () => {
+    renderPage([tower('kori', 'Kori Blade', 'lin kuei tower'), tower('fan', 'Frost Fan', 'lin kuei tower')]);
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower ' } });
+    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
+    expect([towerOf('Kori Blade'), towerOf('Frost Fan'), lastUndo?.label, (boxOf('Kori Blade') as HTMLInputElement).value]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'Respelled 1 other card: Lin Kuei Tower', 'Lin Kuei Tower ']);
+    hidden.mockReturnValue('visible');
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
+    const respell = lastUndo;
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect([towerOf('Kori Blade'), boxOf('Kori Blade').tagName, lastUndo === respell]).toEqual(['Lin Kuei Tower', 'SELECT', true]);
+    act(() => undo());
+    expect([towerOf('Kori Blade'), towerOf('Frost Fan')]).toEqual(['lin kuei tower', 'lin kuei tower']);
+  });
 });
