@@ -761,21 +761,66 @@ describe('Packs: card lists in name order', () => {
   // Value: protects=a pack's drop pills and its What did you pull? rows list cards in name order, while the pack keeps
   // its drops as entered; fails_when=either list follows entry order again, or the saved drops get reordered;
   // why_new=no test pinned their order; seam=none; no_claim=how odds are worked out (engine tests)
+  // Extended on 2026-10-22 (/ship coverage pass 1): a drop whose card has left the list (maxed or deleted) sorts as
+  // "(deleted card)" without breaking either list, and gets no pull row; fails_when=the sort reads a missing card's name.
   it('lists drop pills and pulled cards by name, keeping the saved order', () => {
     const drops = [
       { cardId: 'subzero', chance: 1 },
       { cardId: 'kori', chance: 3 },
+      { cardId: 'gone', chance: 4 },
       { cardId: 'ashrah', chance: 2 },
     ];
     const live = renderWith(drops);
     const pills = () => [...document.getElementById('pack-Live Pack')!.querySelectorAll('span')].map((s) => s.textContent ?? '').filter((t) => t.endsWith('%'));
-    expect(pills()).toEqual(['Ashrah, Kold Steel 2%', 'Kori Blade 3%', 'Sub-Zero, Klassic 1%']);
+    expect(pills()).toEqual(['(deleted card) 4%', 'Ashrah, Kold Steel 2%', 'Kori Blade 3%', 'Sub-Zero, Klassic 1%']);
 
     fireEvent.click(live.getByRole('button', { name: 'I bought one' }));
     // The pull step's own rows: the drop pills above them hold the same names.
     const pullStep = within(live.getByText('What did you pull?').closest('div')!.parentElement!);
     const pulled = pullStep.getAllByText(/^(Sub-Zero, Klassic|Kori Blade|Ashrah, Kold Steel)$/).map((n) => n.textContent);
-    expect([pulled, JSON.parse(localStorage.getItem('mkmax:v1')!).packs[0].drops]).toEqual([['Ashrah, Kold Steel', 'Kori Blade', 'Sub-Zero, Klassic'], drops]);
+    expect([pulled, pullStep.queryByText(/deleted card/), JSON.parse(localStorage.getItem('mkmax:v1')!).packs[0].drops]).toEqual([
+      ['Ashrah, Kold Steel', 'Kori Blade', 'Sub-Zero, Klassic'],
+      null,
+      drops,
+    ]);
+  });
+
+  // Generated on 2026-10-22 (alphabetical card lists, /ship coverage pass 1)
+  // Value: protects=a Kasket's pool pills are in name order, so its folded list shows the first 8 by name, and its pull
+  // search lists the cards it can give now first, each group by name; fails_when=pills follow the order cards were
+  // added, the list is sorted after folding, or the search stops putting the can-give-now cards first; why_new=no screen
+  // test drew a Kasket; seam=none; no_claim=which cards are in the pool (engine kasketPool tests)
+  it("lists a Kasket's pool pills and its pull search by name, the cards it can give now first", () => {
+    const s = defaultState();
+    // 13 Diamonds not owned yet (the pool: one more than 12, so its pills fold), added M to A, then two owned ones.
+    const pool = [...'MLKJIHGFEDCBA'].map((l) => ({ id: `new-${l}`, name: `${l} Fighter`, rarityId: 'diamond', fusion: 0, guest: false }));
+    s.cards = [
+      ...pool,
+      { id: 'owned-z', name: 'Zz Owned', rarityId: 'diamond', fusion: 2, guest: false },
+      { id: 'owned-a', name: 'Aa Owned', rarityId: 'diamond', fusion: 2, guest: false },
+      { id: 'kori', name: 'Kori Blade', rarityId: 'epic', fusion: 2, guest: false },
+    ];
+    s.packs = [pack('Kasket', { endsAt: '2026-10-20T12:00', drops: [], kasket: 'diamond' })];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <PacksView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const kasket = within(document.getElementById('pack-Kasket')!);
+    const pills = [...document.getElementById('pack-Kasket')!.querySelectorAll('span')].map((s) => s.textContent ?? '').filter((t) => t.endsWith('%'));
+    expect(pills).toEqual([...'ABCDEFGH'].map((l) => `${l} Fighter 7.69%`));
+
+    fireEvent.click(kasket.getByRole('button', { name: 'I bought one' }));
+    fireEvent.focus(kasket.getByRole('combobox', { name: 'Card' }));
+    // Aa Owned comes after M Fighter: the Kasket can't give it now. Kori Blade isn't a Diamond.
+    expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.firstChild?.textContent)).toEqual([
+      ...[...'ABCDEFGHIJKLM'].map((l) => `${l} Fighter`),
+      'Aa Owned',
+      'Zz Owned',
+    ]);
   });
 
   // Generated on 2026-10-22 (alphabetical card lists)
