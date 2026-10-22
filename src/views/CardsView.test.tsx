@@ -2350,8 +2350,8 @@ describe('Tower gear: the kard threshold filter', () => {
   // Generated on 2026-10-22 (Tower gear filter)
   // Value: protects=Below kard threshold lists only tower gear that still needs copies before Fusion Up Kards work, with
   // counts on both options and per tower, and a piece raised to the threshold stays listed until the filter changes;
-  // fails_when=the filter reads the level instead of copiesToThreshold (so No kards gear or a rarity with no kards slips
-  // in), a raised piece vanishes mid-tap, or the counts go stale; why_new=Tower gear had no filter; seam=none;
+  // fails_when=the filter reads the level instead of copiesToThreshold (so No kards gear, Realm Klash gear or a rarity
+  // with no kards slips in), a raised piece vanishes mid-tap, or the counts go stale; why_new=Tower gear had no filter; seam=none;
   // no_claim=how the plan values those copies (engine tests)
   it('lists only gear below the kard threshold, and keeps a piece raised to it until the filter changes', () => {
     const s = defaultState();
@@ -2363,6 +2363,7 @@ describe('Tower gear: the kard threshold filter', () => {
       tower('fan', 'Kitana Fan', 'epic', 4), // at F3: kards can finish it
       tower('gloves', 'Kombat Gloves', 'uncommon', 1), // Uncommon has no kards, so no threshold
       tower('mask', 'Noob Mask', 'epic', 1, { noKards: true }), // No kards: the threshold means nothing to it
+      tower('sash', 'Shadow Sash', 'epic', 1), // Realm Klash gear never takes kards, even tagged as tower gear
     ];
     localStorage.setItem('mkmax:v1', JSON.stringify(s));
     render(
@@ -2377,9 +2378,9 @@ describe('Tower gear: the kard threshold filter', () => {
     // Names on the tower's card only: the Cards page stays in the document, hidden, and lists the same cards.
     const names = () => {
       const section = screen.queryByRole('heading', { name: /^Lin Kuei Tower/ })?.closest('section');
-      return section ? [...new Set(within(section as HTMLElement).queryAllByText(/^(Kori Blade|Kitana Fan|Kombat Gloves|Noob Mask)$/).map((n) => n.textContent))] : [];
+      return section ? [...new Set(within(section as HTMLElement).queryAllByText(/^(Kori Blade|Kitana Fan|Kombat Gloves|Noob Mask|Shadow Sash)$/).map((n) => n.textContent))] : [];
     };
-    expect([options(), names().length]).toEqual([['All tower gear (4)', 'Below kard threshold (1)'], 4]);
+    expect([options(), names().length]).toEqual([['All tower gear (5)', 'Below kard threshold (1)'], 5]);
 
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
     expect([names(), screen.queryByText('1 below threshold') != null]).toEqual([['Kori Blade'], true]);

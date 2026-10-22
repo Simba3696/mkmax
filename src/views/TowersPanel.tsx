@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { copiesToMax, copiesToThreshold, levelLabel, maxFusion, stepCard, targetLevel } from '../engine';
+import { copiesToMax, copiesToThreshold, isRealmKlashGear, levelLabel, maxFusion, stepCard, targetLevel } from '../engine';
 import { CardThumb, RarityBadge } from '../ui';
 import { card, grow, row, rowTitle, stepper, stepperVal } from '../classes';
 import type { Card } from '../types';
@@ -31,9 +31,9 @@ export default function TowersPanel() {
   };
 
   const gear = state.cards.filter((c) => c.source === 'tower' && ctx.rules.has(c.rarityId));
-  // Still needs copies before Fusion Up Kards can take over. Gear marked No kards, and a rarity with no kards, has no
-  // threshold to reach, so it never counts.
-  const belowThreshold = (c: Card) => copiesToThreshold(c, ctx.rules.get(c.rarityId)!) > 0;
+  // Still needs copies before Fusion Up Kards can take over. Gear marked No kards, Realm Klash gear and a rarity with no
+  // kards have no threshold to reach, so they never count.
+  const belowThreshold = (c: Card) => !isRealmKlashGear(state, c) && copiesToThreshold(c, ctx.rules.get(c.rarityId)!) > 0;
   const shown = (c: Card) => filter === 'all' || belowThreshold(c) || tapped.has(c.id);
   const belowCount = gear.filter((c) => belowThreshold(c) || (filter === 'belowThreshold' && tapped.has(c.id))).length;
 
