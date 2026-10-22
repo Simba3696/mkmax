@@ -2844,10 +2844,11 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   });
 
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
-  // Value: protects=Add card's new-tower box left open when Cards is hidden is finished trimmed and closed, so the list
-  // shows the tower and Add saves it; fails_when=the cleanup only covers a card's row, or keeps the untrimmed name;
-  // why_new=the page-switch test above uses a card's row; seam=rerender switches the page as App does; no_claim=none
-  it("finishes Add card's Tower box left open across a page switch", async () => {
+  // Value: protects=Add card's new-tower box left open when Cards is hidden is closed into the list when Cards is shown
+  // again, still showing the typed tower, and Add saves it; fails_when=the box isn't closed when the page is shown again;
+  // why_new=the page-switch test above uses a card's row; seam=rerender switches the page as App does; no_claim=the save
+  // on hide, which Add card can't show (the box saves as it's typed, and Add trims the tower), so the row test covers it
+  it("closes Add card's Tower box left open across a page switch, keeping the typed tower", async () => {
     const { rerender } = renderPage([tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
     const form = () => within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
     fireEvent.change(form().getByLabelText('Rarity'), { target: { value: 'epic' } });
