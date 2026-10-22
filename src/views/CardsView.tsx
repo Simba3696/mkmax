@@ -72,16 +72,20 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   // or the name saved when the app was hidden; none in the plain box, which has no list to go back to), and the tower
   // this box last saved. Null while picking from the list, or before the first key in the plain box.
   const [edit, setEdit] = useState<TowerEdit | null>(null);
-  // Enter in the new-tower box puts focus on the list that replaces it, rather than dropping it to the page.
+  // Enter in a card's new-tower box leaves it (so it's finished) and puts focus on the list that replaces it, rather than
+  // dropping it to the page.
   const focusList = useRef(false);
   useEffect(() => {
     focusList.current = false;
   });
-  // Whether the list or box has focus. When one replaces the other while it does (No tower picked on the last tower
-  // named turns the list into the plain box, or a sync names the first or last tower), the one that replaces it takes
-  // focus, so a keyboard user doesn't lose their place. A removed element gives no blur, so the flag holds until then.
+  // Whether the list or box has focus, and whether it was last used from the keyboard. When one replaces the other while
+  // a keyboard user is on it (No tower picked on the last tower named turns the list into the plain box, Add card's Enter
+  // names the first tower, or a sync names the first or last tower), the one that replaces it takes focus, so they don't
+  // lose their place. A tap or click never moves focus, so a phone doesn't open its keyboard on the new box. A removed
+  // element gives no blur, so the flags hold until then.
   const focused = useRef(false);
-  const keepFocus = (el: HTMLElement | null) => void (el && (focusList.current || focused.current) && el !== document.activeElement && el.focus());
+  const byKeys = useRef(false);
+  const keepFocus = (el: HTMLElement | null) => void (el && (focusList.current || (focused.current && byKeys.current)) && el !== document.activeElement && el.focus());
 
   // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
   // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step
@@ -157,9 +161,11 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
           if (edit) finishTower(edit, onChange);
           setEdit(null);
         }}
+        onPointerDown={() => void (byKeys.current = false)}
         // Only a box with a name open (typed in, or opened from Add a new tower…) turns into the list; an untouched plain
         // box doesn't rerender, so a flag set for it would wait and take focus the next time the list shows.
         onKeyDown={(e) => {
+          byKeys.current = true;
           if (e.key !== 'Enter') return;
           if (!onEnter) {
             focusList.current = !!edit;
@@ -167,15 +173,12 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
           }
           // The name is finished first (so a new spelling is fixed on the other cards), then the form's Enter runs. It's
           // finished in place rather than by leaving the box, so focus stays here while it's still a text box; if the
-          // form's Enter names the first tower and the list replaces the box, the list takes focus. The flag is dropped
-          // once this Enter's render is done, so an Enter that changed nothing can't leave it set for later.
-          focusList.current = true;
+          // form's Enter names the first tower and the list replaces the box, the list takes focus (keepFocus).
           if (edit) {
             finishTower(edit, onChange);
             setEdit(null);
           }
           onEnter();
-          queueMicrotask(() => void (focusList.current = false));
         }}
       />
     );
@@ -192,12 +195,13 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
         settle(v, true);
       }}
       onKeyDown={(e) => {
+        byKeys.current = true;
         if (e.key !== 'Enter') return void (keyed.current = true);
         if (held !== null) return settle(held, true);
         onEnter?.();
       }}
       onKeyUp={() => void (keyed.current = false)}
-      onPointerDown={() => void (keyed.current = false)}
+      onPointerDown={() => void (keyed.current = byKeys.current = false)}
       onFocus={() => void (focused.current = true)}
       onBlur={() => {
         focused.current = false;
@@ -594,7 +598,8 @@ function CardList() {
   const { now, ctx } = usePlan();
   // Each tower your gear names, spelled as the first card naming it has it (towerSpellings), so "lin kuei tower" isn't
   // offered beside "Lin Kuei Tower". Cards under a rarity a sync removed are hidden everywhere, so they don't count.
-  const spellings = useMemo(() => towerSpellings(state), [state.cards, state.rarities]);
+  const { cards: allCards, rarities } = state;
+  const spellings = useMemo(() => towerSpellings({ cards: allCards, rarities }), [allCards, rarities]);
   // The Tower list, A to Z.
   const towers = useMemo(() => [...spellings.values()].sort((a, b) => a.localeCompare(b)), [spellings]);
   // A card's chip names its tower as the Tower list spells it, so one row doesn't show it two ways.

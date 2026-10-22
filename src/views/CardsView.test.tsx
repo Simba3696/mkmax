@@ -3697,5 +3697,11 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
 
     act(() => update((d) => void (d.cards[0].sourceNote = 'Wind Tower')));
     expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['SELECT', true]);
+
+    // Extended on 2026-10-22 (/ship review, Red Team): a tap or click never carries focus over, so a phone doesn't open
+    // its keyboard on the plain box; fails_when=any focus, not just the keyboard's, moves to the box that replaces the list.
+    fireEvent.pointerDown(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: '' } });
+    expect([towerOf('Kori Blade'), boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual([undefined, 'INPUT', false]);
   });
 });
