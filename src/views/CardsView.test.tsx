@@ -2874,4 +2874,54 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
     expect(screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((t) => /tower/i.test(t ?? ''))).toEqual(['Lin Kuei Tower 1 below threshold']);
   });
+
+  // Generated on 2026-10-22 (/ship coverage audit, Tower dropdown)
+  // Value: protects=changing the source away from Tower gear clears the tower, on a card and in Add card, so going back to
+  // Tower gear asks for a tower again and a tower no card names any more leaves the list; fails_when=a source change keeps
+  // the old tower (the Tower list skipping other sources makes that easy to miss), so the card or the next card added
+  // comes back to Tower gear with it; why_new=no test changes the source of gear with a tower set; seam=none;
+  // no_claim=none beyond protects
+  it('clears the tower when the source changes, on a card and in Add card', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    const options = (select: HTMLElement) => [...(select as HTMLSelectElement).options].map((o) => o.textContent);
+    const sourceOf = (name: string) => {
+      let row: HTMLElement | null = screen.getAllByTitle('Tap to rename').find((el) => el.textContent === name)!;
+      while (row && !within(row).queryByLabelText('Source')) row = row.parentElement;
+      return within(row!).getByLabelText('Source');
+    };
+    fireEvent.change(sourceOf('Kori Blade'), { target: { value: 'krypt' } });
+    fireEvent.change(sourceOf('Kori Blade'), { target: { value: 'tower' } });
+    const box = boxOf('Kori Blade') as HTMLSelectElement;
+    expect([towerOf('Kori Blade'), box.value, options(box)]).toEqual([undefined, '', ['Choose a tower…', 'Shirai Ryu Tower', 'Add a new tower…']]);
+
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
+    fireEvent.change(form.getByLabelText('Tower'), { target: { value: 'Shirai Ryu Tower' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'krypt' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
+    fireEvent.change(form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Ryu Chain' } });
+    fireEvent.click(form.getByRole('button', { name: 'Add' }));
+    expect([(form.getByLabelText('Tower') as HTMLSelectElement).value, towerOf('Ryu Chain')]).toEqual(['', undefined]);
+  });
+
+  // Generated on 2026-10-22 (/ship coverage audit, Tower dropdown)
+  // Value: protects=tower gear with no tower (or only spaces) is listed under Tower not named on Tower gear, after the
+  // named towers even when it has more gear; fails_when=the heading lookup by the Tower list's spelling loses its
+  // fallback, so the unnamed group has no name, or it sorts in among the towers; why_new=the Tower gear tests all name a
+  // tower; seam=none; no_claim=none beyond protects
+  it('lists tower gear with no tower under Tower not named, last', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('fan', 'Frost Fan'), tower('mask', 'Ryu Mask', '  ')], 'towers');
+    expect(screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((t) => /tower/i.test(t ?? ''))).toEqual(['Lin Kuei Tower 1 left', 'Tower not named 2 left']);
+  });
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=a tower gear card's source chip names its tower as the Tower list spells it, so a card saved as
+  // "shirai ryu tower " doesn't show its tower two ways on one row; fails_when=the chip prints the saved text as it is;
+  // why_new=review (maintainability); seam=none; no_claim=none beyond protects
+  it("spells a card's tower chip as the Tower list does", () => {
+    renderPage([tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower'), tower('mask', 'Ryu Mask', 'shirai ryu tower ')]);
+    let row: HTMLElement | null = screen.getAllByTitle('Tap to rename').find((el) => el.textContent === 'Ryu Mask')!;
+    while (row && !within(row).queryByLabelText('Tower')) row = row.parentElement;
+    expect([within(row!).queryByText(/^tower: /)?.textContent, (within(row!).getByLabelText('Tower') as HTMLSelectElement).value]).toEqual(['tower: Shirai Ryu Tower', 'Shirai Ryu Tower']);
+  });
 });

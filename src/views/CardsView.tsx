@@ -104,8 +104,8 @@ function TowerSelect({ towers, value, onChange, onPick = onChange, onEnter, clas
           if (edit) finishTower(edit, onChange);
           setEdit(null);
         }}
-        // Only a box that was typed in turns into the list; an untouched one doesn't rerender, so a flag set for it
-        // would wait and take focus the next time the list shows.
+        // Only a box with a name open (typed in, or opened from Add a new tower…) turns into the list; an untouched plain
+        // box doesn't rerender, so a flag set for it would wait and take focus the next time the list shows.
         onKeyDown={(e) => e.key === 'Enter' && (onEnter ? onEnter() : ((focusList.current = !!edit), e.currentTarget.blur()))}
       />
     );
@@ -498,6 +498,8 @@ function CardList() {
   const { state, update } = useStore();
   const { now, ctx } = usePlan();
   const towers = useMemo(() => towerNames(state.cards), [state.cards]);
+  // A card's chip names its tower as the Tower list spells it, so one row doesn't show it two ways.
+  const towerLabel = (note: string) => towers.find((t) => towerKey(t) === towerKey(note)) ?? note.trim();
   const events = useEvents();
   const [rarity, setRarity] = useState<string>('all');
   const [q, setQ] = useState('');
@@ -945,7 +947,7 @@ function CardList() {
                         site says {ctx.rules.get(c.keptRarity)?.label ?? c.keptRarity}
                       </Chip>
                     )}
-                    {c.source && <Chip tone="source">{SOURCE_LABELS[c.source]}{c.source === 'tower' && c.sourceNote && `: ${c.sourceNote}`}</Chip>}
+                    {c.source && <Chip tone="source">{SOURCE_LABELS[c.source]}{c.source === 'tower' && c.sourceNote?.trim() && `: ${towerLabel(c.sourceNote)}`}</Chip>}
                     {c.source === 'challenge' && (() => {
                       const ch = challengeFor(c, events, now);
                       return ch && <Chip tone="limited">challenge {challengeWhen(ch, now)}</Chip>;
