@@ -110,7 +110,8 @@ export function respellTower(s: Pick<AppState, 'cards' | 'rarities'>, tower: str
   let changed = 0;
   for (const c of shownCards(s)) {
     if (c === skip) continue;
-    // Already spelled that way, give or take spaces at the ends (as an older build could save it): nothing to fix.
+    // Already spelled that way, give or take spaces at the ends (as a Tower box saves it while it's typed, or an older
+    // build saved it): nothing to fix.
     if (c.source !== 'tower' || c.sourceNote?.trim() === tower || !c.sourceNote?.trim() || towerKey(c.sourceNote) !== key) continue;
     c.sourceNote = tower;
     changed++;

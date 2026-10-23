@@ -71,14 +71,13 @@ describe('update undo labels', () => {
     act(() => void (gone = api().update((d) => void d.cards.push({ id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false }), 'added Raiden')));
     expect(gone).toBe(api().lastUndo);
     act(() => api().dismissUndo());
-    act(() => void api().update((d) => void (d.cards[0].fusion = 11), 'Raiden to F10', { alsoUndo: gone }));
+    act(() => void api().update((d) => void (d.cards[0].fusion = 11), 'Raiden to F10', { alsoUndo: true }));
     expect([levels(), api().lastUndo?.label]).toEqual([[], 'Raiden is maxed and removed']);
     act(() => api().undo());
     expect(levels()).toEqual(['Raiden 0']);
 
-    let shown: ReturnType<Store['update']>;
-    act(() => void (shown = api().update((d) => void d.cards.push({ id: 's', name: 'Scorpion', rarityId: 'diamond', fusion: 0, guest: false }), 'added Scorpion')));
-    act(() => void api().update((d) => void (d.cards[0].fusion = 11), 'Raiden to F10', { alsoUndo: shown }));
+    act(() => void api().update((d) => void d.cards.push({ id: 's', name: 'Scorpion', rarityId: 'diamond', fusion: 0, guest: false }), 'added Scorpion'));
+    act(() => void api().update((d) => void (d.cards[0].fusion = 11), 'Raiden to F10', { alsoUndo: true }));
     expect([levels(), api().lastUndo?.label]).toEqual([['Scorpion 0'], 'Raiden to F10 · Raiden is maxed and removed · added Scorpion']);
     act(() => api().undo());
     expect(levels()).toEqual(['Raiden 0']);
@@ -107,7 +106,7 @@ describe('update undo labels', () => {
     const { update, undo, replace } = api();
     act(() => {
       replace(replaced);
-      update((d) => void d.cards.push({ ...raiden, id: 'k', name: 'Kitana' }), 'added Kitana', { alsoUndo: before });
+      update((d) => void d.cards.push({ ...raiden, id: 'k', name: 'Kitana' }), 'added Kitana', { alsoUndo: true });
       undo(before);
       undo();
     });
@@ -145,7 +144,7 @@ describe('update undo labels', () => {
     pullNow = true;
     act(() => {
       void sync.syncNow();
-      update((d) => void d.cards.push({ ...raiden, id: 'k', name: 'Kitana' }), 'added Kitana', { alsoUndo: before });
+      update((d) => void d.cards.push({ ...raiden, id: 'k', name: 'Kitana' }), 'added Kitana', { alsoUndo: true });
       undo(before);
       undo();
     });

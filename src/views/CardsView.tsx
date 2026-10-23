@@ -1,6 +1,6 @@
 import { Activity, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { newId, noChange, useStore, type UndoEntry } from '../store';
+import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerSpellings, unmarkMaxed } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
@@ -69,11 +69,6 @@ if (typeof document !== 'undefined') {
   document.addEventListener('pointerdown', () => void (lastInput = 'pointer'), true);
 }
 
-// The Undo of Add card's last re-spell. That Undo goes back to before the re-spell, so it would also take out a card Add
-// saves while it shows; Add carries on from it (alsoUndo), so the bar names the card ("Added Ice Fan · Respelled …"),
-// and so does each Add after while it shows. Kept outside the page, which a tab switch takes down while the bar stays.
-let addUndo: UndoEntry | undefined;
-
 /**
  * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
  * While a name is being typed the box stays a text box until it's left, so it doesn't turn into the list mid-word once
@@ -127,8 +122,8 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
     } else if (v !== current) pick(v || undefined);
   };
 
-  // Hiding the page (Activity, for Tower gear) may give the box no blur, so a box left open is finished in the cleanup
-  // and closed when the page is shown again, as a rename is.
+  // Hiding the page (Activity, for Tower gear or Maxed) may give the box no blur, so a box left open is finished in the
+  // cleanup and closed when the page is shown again, as a rename is.
   // Hiding the app gives no blur either, and a phone may close it while it's away, so the name is finished then too (and
   // a tower held by the arrow keys is saved); the box stays open with what was typed, and is finished again when it's
   // left. It's done at once (flushSync), so the store's save runs before the page can be frozen or closed, not in a later
@@ -809,15 +804,13 @@ function CardList() {
   // own box does, with Undo; Add then saves the card with that spelling.
   const respellFromAdd = (tower: string) => {
     let respelled = 0;
-    // One that re-spells nothing (a new tower) leaves the Undo showing, so an Add after it still joins that.
-    addUndo =
-      update(
-        (d) => {
-          respelled = respellTower(d, tower);
-          return respelled ? undefined : noChange;
-        },
-        () => respelledLabel(tower, respelled),
-      ) ?? addUndo;
+    update(
+      (d) => {
+        respelled = respellTower(d, tower);
+        return respelled ? undefined : noChange;
+      },
+      () => respelledLabel(tower, respelled),
+    );
   };
 
   // Saved on the card as it is now. Unticking keeps a card at or past F3 on Max, as when one is entered there (see
@@ -889,7 +882,9 @@ function CardList() {
   function add() {
     if (!shown.name.trim()) return;
     let added = false;
-    const entry = update(
+    // Adding a card has no Undo of its own, but any Undo showing goes back to before it, so would take it out too: the
+    // Add carries on from that Undo (alsoUndo), and the bar names the card first ("Added Ice Fan · …").
+    update(
       (d) => {
         // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
         // delete it. Its kind and steps come from the rarity as it is now.
@@ -918,10 +913,9 @@ function CardList() {
         d.cards.push(saved);
         added = true;
       },
-      addUndo && `Added ${shown.name.trim()}`,
-      { alsoUndo: addUndo },
+      `Added ${shown.name.trim()}`,
+      { alsoUndo: true },
     );
-    if (entry) addUndo = entry;
     // The typed name stays for another try when nothing was added.
     if (added) setDraft({ ...shown, name: '', fusion: 0, guest: false });
   }

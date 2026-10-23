@@ -3102,6 +3102,22 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect([boxOf('Frost Fan').tagName, document.activeElement === boxOf('Frost Fan'), towerOf('Frost Fan')]).toEqual(['SELECT', true, undefined]);
   });
 
+  // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=an Add while any Undo shows (here a card's tower pick) joins it and is named first in the bar, so the
+  // Undo that takes the new card out says so; fails_when=only Add card's own re-spell Undo is joined, so undoing the pick
+  // silently removes the card just added; why_new=review (Red Team); seam=none; no_claim=none beyond protects
+  it('names an Add in whatever Undo shows, such as a tower pick', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Shirai Ryu Tower' } });
+    const form = towerForm();
+    fireEvent.change(form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Ice Fan' } });
+    fireEvent.click(form.getByRole('button', { name: 'Add' }));
+    expect(lastUndo?.label).toBe('Added Ice Fan · Kori Blade: tower set to Shirai Ryu Tower');
+    act(() => undo());
+    const names = () => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string }[]).map((c) => c.name);
+    expect([names(), towerOf('Kori Blade')]).toEqual([['Kori Blade', 'Ryu Kunai'], 'Lin Kuei Tower']);
+  });
+
   // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
   // Value: protects=an Add after a tab switch still joins and is named in the Undo of Add card's re-spell while it shows,
   // so that Undo never takes out a card it doesn't name; fails_when=what Add card joins lives in the page, which a tab

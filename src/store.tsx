@@ -23,10 +23,10 @@ type Update = (
   undoLabel?: string | (() => string),
   // `undoFrom` adjusts the state Undo goes back to, for a change whose first steps were saved without Undo (a Tower box
   // saves as it's typed, then its finish re-spells other cards): Undo then takes back those steps too.
-  // `alsoUndo` carries on from an Undo entry while it's still the one showing (Add card's Add after its Tower box
-  // re-spelled other cards): the Undo then goes back to where that one did, and its label names this change too. When
-  // that entry isn't showing any more, this change's own label is dropped.
-  opts?: { auto?: boolean; ruleChange?: boolean; undoFrom?: (prev: AppState) => void; alsoUndo?: UndoEntry },
+  // `alsoUndo` carries on from the Undo entry showing, for a change with no Undo of its own (Add card's Add): that Undo
+  // goes back to before it, so it would take this change out too, and its label now says so, this change first. With
+  // no Undo showing, this change's own label is dropped and it gets none.
+  opts?: { auto?: boolean; ruleChange?: boolean; undoFrom?: (prev: AppState) => void; alsoUndo?: boolean },
 ) => UndoEntry | undefined;
 
 /**
@@ -204,7 +204,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // Settings rule change removes, so those are only "done".
     const gone = (names: string[], how: string) => names.length > 0 && `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} ${how} and removed`;
     const own = typeof undoLabel === 'function' ? undoLabel() : undoLabel;
-    const joined = opts?.alsoUndo && opts.alsoUndo === shownUndo.current ? opts.alsoUndo : undefined;
+    const joined = (opts?.alsoUndo && shownUndo.current) || undefined;
     // Newest first, so a phone's one-line bar shows what this change did even when the label is cut short.
     const label = [(!opts?.alsoUndo || joined) && own, gone(split.maxed, 'maxed'), gone(split.done, 'done'), joined?.label].filter(Boolean).join(' · ');
     let entry: UndoEntry | undefined;
