@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, respellTower, towerKey, towerRespells, towerSpellings, unifyTowerSpellings, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addPool, ascensionCaps, respellTower, towerKey, towerName, towerRespells, towerSpellings, unifyTowerSpellings, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -2135,9 +2135,11 @@ describe('respellTower', () => {
 
   // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
   // Value: protects=a tower typed with two spaces or a non-breaking space inside is the same tower as one typed with
-  // one, as Paste a list reads it: one entry in the Tower list, re-spelled by a typed name and merged by the version 18
-  // step; fails_when=towerKey only trims and lowercases again, so a stray double space makes a look-alike second tower
-  // that nothing merges; why_new=review (Red Team); seam=none; no_claim=none beyond protects
+  // one, as Paste a list reads it: one entry in the Tower list, spelled and saved tidied (one space between words) by
+  // the list and the version 18 step, and a name that differs only in spaces isn't another spelling, so typing it
+  // re-spells (and counts) nothing; fails_when=towerKey only trims and lowercases again, so a stray double space makes a
+  // look-alike second tower, or spaces count as a spelling, so finishing a name re-spells cards invisibly with an Undo;
+  // why_new=review (Red Team, twice); seam=none; no_claim=none beyond protects
   it('counts spaces inside a tower name as one', () => {
     const card = (name: string, sourceNote: string): Card => ({ id: name, name, rarityId: 'epic', fusion: 1, guest: false, source: 'tower', sourceNote });
     const rarities = defaultState().rarities;
@@ -2145,12 +2147,15 @@ describe('respellTower', () => {
     const typed = cards();
     const saved = { cards: cards(), rarities };
     unifyTowerSpellings(saved);
-    expect([towerKey(' Lin  Kuei\u00a0Tower '), [...towerSpellings({ cards: cards(), rarities }).values()], respellTower({ cards: typed, rarities }, 'Lin Kuei Tower'), typed.map((c) => c.sourceNote), saved.cards.map((c) => c.sourceNote)]).toEqual([
-      'lin kuei tower',
-      ['Lin Kuei Tower'],
-      2,
-      ['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin Kuei Tower'],
-      ['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin Kuei Tower'],
-    ]);
+    const spaced = [card('Fire Fan', 'Lin\u00a0Kuei  Tower')];
+    expect([
+      towerKey(' Lin  Kuei\u00a0Tower '),
+      towerName(' Lin  Kuei\u00a0Tower '),
+      [...towerSpellings({ cards: spaced, rarities }).values()],
+      towerRespells({ cards: spaced, rarities }, 'Lin Kuei Tower'),
+      respellTower({ cards: typed, rarities }, 'Lin Kuei Tower'),
+      typed.map((c) => c.sourceNote),
+      saved.cards.map((c) => c.sourceNote),
+    ]).toEqual(['lin kuei tower', 'Lin Kuei Tower', ['Lin Kuei Tower'], 0, 1, ['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin\tKuei Tower'], ['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin Kuei Tower']]);
   });
 });

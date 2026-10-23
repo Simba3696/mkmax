@@ -2570,13 +2570,13 @@ describe('Cards: picking a tower', () => {
   const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string; sourceNote?: string }[];
   const towerOf = (name: string) => saved().find((c) => c.name === name)?.sourceNote;
   const options = (select: HTMLElement) => [...(select as HTMLSelectElement).options].map((o) => o.textContent);
-  // Add a new tower… picked by its label, not the hidden value behind it.
+  // Add or rename a tower… picked by its label, not the hidden value behind it.
   const pickNewTower = (select: HTMLElement) =>
-    fireEvent.change(select, { target: { value: [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add a new tower…')!.value } });
+    fireEvent.change(select, { target: { value: [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add or rename a tower…')!.value } });
 
   // Generated on 2026-10-22 (Tower dropdown)
   // Value: protects=Add card offers the towers your gear already names, A to Z and once each whatever the capitals, saves
-  // the one picked, and takes a new name through Add a new tower…; fails_when=the list repeats a tower in other capitals,
+  // the one picked, and takes a new name through Add or rename a tower…; fails_when=the list repeats a tower in other capitals,
   // the pick isn't saved, or a new tower can't be added; why_new=the Tower box was a text box; seam=none;
   // no_claim=the paste list, which still takes the tower from the line
   it('picks a tower for a new card from the ones already named, or adds a new one', () => {
@@ -2585,7 +2585,7 @@ describe('Cards: picking a tower', () => {
     const name = form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)');
     fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
     fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
-    expect(options(form.getByLabelText('Tower'))).toEqual(['Choose a tower…', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'Add a new tower…']);
+    expect(options(form.getByLabelText('Tower'))).toEqual(['Choose a tower…', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'Add or rename a tower…']);
 
     fireEvent.change(name, { target: { value: 'Ryu Chain' } });
     fireEvent.change(form.getByLabelText('Tower'), { target: { value: 'Shirai Ryu Tower' } });
@@ -2599,13 +2599,13 @@ describe('Cards: picking a tower', () => {
   });
 
   // Generated on 2026-10-22 (Tower dropdown)
-  // Value: protects=a card's Tower box switches it to another named tower, a new tower typed after Add a new tower… is saved
-  // and then listed, and leaving that box empty keeps the tower it had; fails_when=picking Add a new tower… clears the
+  // Value: protects=a card's Tower box switches it to another named tower, a new tower typed after Add or rename a tower… is saved
+  // and then listed, and leaving that box empty keeps the tower it had; fails_when=picking Add or rename a tower… clears the
   // card's tower, or a new name never joins the list; why_new=the Tower box was a text box; seam=none; no_claim=none
   // Extended on 2026-10-22 (/ship test coverage audit): a card spelled in other capitals shows the list's tower, a name
   // typed and then erased keeps the tower, Enter finishes a new name, and No tower clears it; fails_when=the spelling
   // match goes, erasing clears the tower, Enter does nothing, or No tower stops saving
-  it("changes a card's tower from the list, and keeps it when Add a new tower… is left empty", () => {
+  it("changes a card's tower from the list, and keeps it when Add or rename a tower… is left empty", () => {
     renderTowers();
     // Ryu Kunai and Ryu Mask ("shirai ryu tower") both show Shirai Ryu Tower picked.
     const picked = (tower: string) => screen.getAllByRole('combobox', { name: 'Tower' }).filter((el) => (el as HTMLSelectElement).value === tower).length;
@@ -2620,7 +2620,7 @@ describe('Cards: picking a tower', () => {
     fireEvent.change(box(), { target: { value: 'Shirai Ryu Tower' } });
     expect(towerOf('Kori Blade')).toBe('Shirai Ryu Tower');
 
-    // Add a new tower…, then leaving the box empty: the card keeps its tower.
+    // Add or rename a tower…, then leaving the box empty: the card keeps its tower.
     pickNewTower(box());
     fireEvent.blur(screen.getByPlaceholderText('New tower name'));
     expect(towerOf('Kori Blade')).toBe('Shirai Ryu Tower');
@@ -2638,7 +2638,7 @@ describe('Cards: picking a tower', () => {
     const input = screen.getByPlaceholderText('New tower name');
     fireEvent.change(input, { target: { value: ' Thunder Tower ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect([towerOf('Kori Blade'), options(box())]).toEqual(['Thunder Tower', ['No tower', 'Shirai Ryu Tower', 'Thunder Tower', 'Add a new tower…']]);
+    expect([towerOf('Kori Blade'), options(box())]).toEqual(['Thunder Tower', ['No tower', 'Shirai Ryu Tower', 'Thunder Tower', 'Add or rename a tower…']]);
 
     // No tower (the empty choice, once a tower is set) leaves the card with none (filed under Tower not named on Tower gear).
     fireEvent.change(box(), { target: { value: '' } });
@@ -2666,7 +2666,7 @@ describe('Cards: picking a tower', () => {
     fireEvent.blur(input);
     // No card names Thunder Tower yet, so it's offered on its own, ahead of the towers your gear names.
     const list = form.getByLabelText('Tower') as HTMLSelectElement;
-    expect([list.value, options(list)]).toEqual(['Thunder Tower', ['No tower', 'Thunder Tower', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'Add a new tower…']]);
+    expect([list.value, options(list)]).toEqual(['Thunder Tower', ['No tower', 'Thunder Tower', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'Add or rename a tower…']]);
 
     pickNewTower(list);
     fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Wind Tower' } });
@@ -2779,7 +2779,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     return within(row!).getByLabelText('Tower');
   };
   const pickNewTower = (select: HTMLElement) =>
-    fireEvent.change(select, { target: { value: [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add a new tower…')!.value } });
+    fireEvent.change(select, { target: { value: [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add or rename a tower…')!.value } });
 
   // Generated on 2026-10-22 (/ship Red Team, Tower dropdown)
   // Value: protects=a tower picked from a card's list, or No tower, can be undone, and Enter in its new-tower box leaves
@@ -2926,7 +2926,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(sourceOf('Kori Blade'), { target: { value: 'krypt' } });
     fireEvent.change(sourceOf('Kori Blade'), { target: { value: 'tower' } });
     const box = boxOf('Kori Blade') as HTMLSelectElement;
-    expect([towerOf('Kori Blade'), box.value, options(box)]).toEqual([undefined, '', ['Choose a tower…', 'Shirai Ryu Tower', 'Add a new tower…']]);
+    expect([towerOf('Kori Blade'), box.value, options(box)]).toEqual([undefined, '', ['Choose a tower…', 'Shirai Ryu Tower', 'Add or rename a tower…']]);
 
     const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
     fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
@@ -2977,13 +2977,13 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.keyDown(boxOf('Frost Fan'), { key: 'Enter' });
     expect([['Kori Blade', 'Frost Fan', 'Ryu Kunai', 'Ghost Blade'].map(towerOf), options(boxOf('Kori Blade')), lastUndo?.label]).toEqual([
       ['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER'],
-      ['No tower', 'Lin Kuei Tower', 'Add a new tower…'],
+      ['No tower', 'Lin Kuei Tower', 'Add or rename a tower…'],
       'Respelled 2 other cards: Lin Kuei Tower',
     ]);
     act(() => undo());
     expect([['Kori Blade', 'Frost Fan', 'Ryu Kunai'].map(towerOf), options(boxOf('Kori Blade'))]).toEqual([
       ['lin kuei tower', 'Lin kuei Tower', 'lin kuei tower'],
-      ['No tower', 'lin kuei tower', 'Add a new tower…'],
+      ['No tower', 'lin kuei tower', 'Add or rename a tower…'],
     ]);
   });
 
@@ -3023,7 +3023,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     };
     fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
     fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
-    expect(options(form.getByLabelText('Tower'))).toEqual(['Choose a tower…', 'lin kuei tower', 'Add a new tower…']);
+    expect(options(form.getByLabelText('Tower'))).toEqual(['Choose a tower…', 'lin kuei tower', 'Add or rename a tower…']);
     fireEvent.change(name, { target: { value: 'Frost Fan' } });
     typeTower('Lin Kuei Tower');
     fireEvent.keyDown(form.getByPlaceholderText('New tower name'), { key: 'Enter' });
@@ -3259,7 +3259,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   });
 
   // Generated on 2026-10-22 (/ship coverage audit, Tower dropdown)
-  // Value: protects=a tower first named on a card through Add a new tower…, in a new spelling of a tower other cards name,
+  // Value: protects=a tower first named on a card through Add or rename a tower…, in a new spelling of a tower other cards name,
   // re-spells them, and its Undo leaves that card with no tower again; fails_when=Undo only puts back a tower the card
   // had, so the card keeps the typed tower; why_new=the Undo tests above retype on cards that already had a tower;
   // seam=none; no_claim=none beyond protects
@@ -3419,11 +3419,11 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(select, { target: { value } });
     fireEvent.keyUp(select, { key: 'ArrowDown' });
   };
-  const newTowerValue = (select: HTMLElement) => [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add a new tower…')!.value;
+  const newTowerValue = (select: HTMLElement) => [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add or rename a tower…')!.value;
 
   // Generated on 2026-10-22 (/ship adversarial, Tower dropdown)
   // Value: protects=stepping through a card's Tower list with the arrow keys saves only the tower it's left on (or Enter
-  // is pressed on), with one Undo back to the tower it had, and stepping onto Add a new tower… opens the box only on
+  // is pressed on), with one Undo back to the tower it had, and stepping onto Add or rename a tower… opens the box only on
   // Enter; fails_when=each step saves with its own Undo, so Undo can't get back to the tower the card had, or stepping
   // past the last tower turns the list into a text box; why_new=review (adversarial); seam=keyDown, change and keyUp sent
   // in the order a computer's closed list sends them; no_claim=a real browser's key handling
@@ -3447,7 +3447,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.blur(boxOf('Ryu Kunai'));
     expect([towerOf('Ryu Kunai'), lastUndo]).toEqual(['Shirai Ryu Tower', null]);
 
-    // Add a new tower… stepped onto and left is dropped; Enter on it opens the box.
+    // Add or rename a tower… stepped onto and left is dropped; Enter on it opens the box.
     step(boxOf('Kori Blade'), newTowerValue(boxOf('Kori Blade')));
     expect(boxOf('Kori Blade').tagName).toBe('SELECT');
     fireEvent.blur(boxOf('Kori Blade'));
@@ -3459,7 +3459,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
 
   // Generated on 2026-10-22 (/ship adversarial, Tower dropdown)
   // Value: protects=in Add card a tower stepped to with the keys is taken at once (it has no Undo to fill), while Add a
-  // new tower… waits for Enter; fails_when=Add saves the tower before the step, or stepping onto Add a new tower… opens
+  // new tower… waits for Enter; fails_when=Add saves the tower before the step, or stepping onto Add or rename a tower… opens
   // the box; why_new=review (adversarial); seam=keyDown, change and keyUp sent in a closed list's order; no_claim=none
   it("takes Add card's tower stepped to with the keys at once, and opens its new-tower box only on Enter", () => {
     renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
@@ -3512,7 +3512,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
     return form;
   };
-  /** Add a new tower…, then a name typed and erased: the box is open and empty. */
+  /** Add or rename a tower…, then a name typed and erased: the box is open and empty. */
   const emptiedBox = (select: HTMLElement, box: () => HTMLElement) => {
     pickNewTower(select);
     fireEvent.change(box(), { target: { value: 'W' } });
@@ -3522,7 +3522,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
   // Value: protects=a tower stepped to with the keys on a card's list is saved by Enter (with Undo) and No tower by
   // leaving the list, stepping back to the card's tower saves nothing on Enter, and a click after Tab left the list saves
-  // at once (and opens Add a new tower…); fails_when=Enter or leaving drops a held step, a step back offers an Undo, or a
+  // at once (and opens Add or rename a tower…); fails_when=Enter or leaving drops a held step, a step back offers an Undo, or a
   // Tab leaves the key flag set so the next click is held; why_new=review (state machines, testing); seam=keyDown, change
   // and keyUp sent in a closed list's order, pointerDown for a click; no_claim=a real browser's key handling
   it('settles a held step on Enter or leaving, and a click after Tab saves at once', () => {
@@ -3628,7 +3628,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
 
   // Generated on 2026-10-23 (/ship review, state machines and Red Team, Tower dropdown)
   // Value: protects=a page switch that gives the list no blur (a swipe to another tab) settles a tower step held by the
-  // keys as leaving the list does (a tower saved with Undo, No tower taking it off, Add a new tower… dropped), and a held
+  // keys as leaving the list does (a tower saved with Undo, No tower taking it off, Add or rename a tower… dropped), and a held
   // step or an open box marks the page as busy for an app update only while it's showing; fails_when=the switch only
   // finishes an open box, so the list shows a tower the card doesn't have, or a held step isn't marked and an update's
   // reload saves it unseen, or a hidden page keeps its mark and holds the update; why_new=review (state machines, Red
@@ -3708,6 +3708,49 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect([boxOf('Kori Blade').tagName, towerOf('Frost Fan'), lastUndo?.label]).toEqual(['SELECT', 'Lin Kuei Tower', 'Respelled 1 other card: Lin Kuei Tower']);
   });
 
+  // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
+  // Value: protects=a Tower box left open by switching apps stays open when focus comes back to it, and is finished
+  // and closed as leaving does (re-spelling with Undo, its being-typed mark gone) when the window comes back with focus
+  // elsewhere, for a card's new-tower box, a card's plain box and Add card's box; fails_when=nothing finishes a box whose
+  // window blur was ignored, so it stays open, unfocused and marked, holding app updates; why_new=review (state
+  // machines); seam=document.hasFocus mocked, the window's focus event sent by hand; no_claim=a real browser's focus
+  // restore
+  it('finishes a box left open by switching apps once the window is back with focus elsewhere', async () => {
+    const editing = () => document.querySelectorAll('[data-editing]').length;
+    const awayAndBack = async (box: HTMLElement, focusBack: boolean) => {
+      vi.mocked(document.hasFocus).mockReturnValue(false);
+      box.focus();
+      box.blur();
+      vi.mocked(document.hasFocus).mockReturnValue(true);
+      if (focusBack) box.focus();
+      window.dispatchEvent(new Event('focus'));
+      await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+    };
+    const { unmount } = renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('fan', 'Frost Fan', 'lin kuei tower')]);
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower ' } });
+    await awayAndBack(boxOf('Kori Blade'), true);
+    expect([boxOf('Kori Blade').tagName, towerOf('Frost Fan'), editing()]).toEqual(['INPUT', 'lin kuei tower', 1]);
+    await awayAndBack(boxOf('Kori Blade'), false);
+    expect([boxOf('Kori Blade').tagName, towerOf('Frost Fan'), lastUndo?.label, editing()]).toEqual(['SELECT', 'Lin Kuei Tower', 'Respelled 1 other card: Lin Kuei Tower', 0]);
+
+    // A card's plain box (no tower named anywhere).
+    unmount();
+    localStorage.clear();
+    renderPage([tower('kori', 'Kori Blade')]);
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: ' Wind  Tower ' } });
+    await awayAndBack(boxOf('Kori Blade'), false);
+    expect([towerOf('Kori Blade'), editing()]).toEqual(['Wind Tower', 0]);
+
+    // Add card's box: finished there too, so its re-spell runs and the form keeps the tower.
+    act(() => update((d) => void (d.cards.find((c) => c.id === 'kori')!.sourceNote = 'lin kuei tower')));
+    const form = towerForm();
+    pickNewTower(form.getByLabelText('Tower'));
+    fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
+    await awayAndBack(form.getByPlaceholderText('New tower name'), false);
+    expect([towerOf('Kori Blade'), (form.getByLabelText('Tower') as HTMLSelectElement).value, editing()]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 0]);
+  });
+
   // Generated on 2026-10-23 (/ship review, Codex design, Tower dropdown)
   // Value: protects=while a tower name is typed in a card's box or Add card's, the box says under it how many other
   // cards finishing it will re-spell, counting only cards spelled another way, and says nothing for a new tower or once
@@ -3719,7 +3762,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     const hint = () => screen.queryByText(/other cards? when you finish$/)?.textContent ?? null;
     pickNewTower(boxOf('Kori Blade'));
     fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei tower ' } });
-    expect([hint(), boxOf('Kori Blade').getAttribute('aria-describedby') === screen.getByText(/when you finish$/).id]).toEqual(['Respells 2 other cards when you finish', true]);
+    expect([hint(), boxOf('Kori Blade').getAttribute('aria-describedby') === screen.getByText(/when you finish$/).id]).toEqual(['Renames the tower on 2 other cards when you finish', true]);
     fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Wind Tower' } });
     expect([hint(), boxOf('Kori Blade').hasAttribute('aria-describedby')]).toEqual([null, false]);
     fireEvent.blur(boxOf('Kori Blade'));
@@ -3727,8 +3770,10 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     const form = towerForm();
     pickNewTower(form.getByLabelText('Tower'));
     fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'lin kuei tower' } });
-    // In Add card it sits above the box, so the box stays in line with the form's other boxes.
-    expect([hint(), screen.getByText(/when you finish$/).nextElementSibling === form.getByPlaceholderText('New tower name')]).toEqual(['Respells 1 other card when you finish', true]);
+    // In Add card it's a note under the form, outside the Tower field, so the box being typed in never moves; it's
+    // still linked to the box.
+    const note = screen.getByText(/when you finish$/);
+    expect([hint(), note.closest('label'), form.getByPlaceholderText('New tower name').getAttribute('aria-describedby') === note.id]).toEqual(['Renames the tower on 1 other card when you finish', null, true]);
     fireEvent.blur(form.getByPlaceholderText('New tower name'));
     expect([hint(), towerOf('Jade Fan')]).toEqual([null, 'lin kuei tower']);
   });
@@ -3904,7 +3949,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
 
   // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
   // Value: protects=a tower stepped to with the keys on a card's list is saved, with Undo, when the app is hidden (a tab
-  // closed or reloaded gives no blur), before the hide event returns, while a held Add a new tower… opens nothing;
+  // closed or reloaded gives no blur), before the hide event returns, while a held Add or rename a tower… opens nothing;
   // fails_when=only leaving the list or Enter saves a step, so closing the tab loses the tower the list showed;
   // why_new=review (Red Team); seam=keyDown, change and keyUp in a closed list's order, document.visibilityState mocked,
   // the hide sent outside act; no_claim=a real browser closing the tab

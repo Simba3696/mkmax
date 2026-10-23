@@ -237,6 +237,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     schedulePush();
   };
 
+  // As undo: only the entry showing as of now, so a bar's timer or ✕ for a change since replaced closes nothing.
+  const dismissUndo = (shown?: UndoEntry) => {
+    if (shown && shown !== shownUndo.current) return;
+    clearUndo();
+  };
+
   const paused = () => Promise.resolve();
   const sync: SyncApi = {
     status,
@@ -254,10 +260,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: (shown) => {
-          if (!shown || shown === shownUndo.current) shownUndo.current = null;
-          setLastUndo((cur) => (shown && cur !== shown ? cur : null));
-        }, unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo, unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
   );
 }
 
