@@ -25,7 +25,7 @@ type Update = (
   // saves as it's typed, then its finish re-spells other cards): Undo then takes back those steps too.
   // `alsoUndo` carries on from the Undo entry showing, for a change with no Undo of its own (Add card's Add): that Undo
   // goes back to before it, so it would take this change out too, and its label now says so, this change first. With
-  // no Undo showing, this change's own label is dropped and it gets none.
+  // no Undo showing, this change's own label is dropped, so it gets an Undo only for cards it removes (maxed or done).
   opts?: { auto?: boolean; ruleChange?: boolean; undoFrom?: (prev: AppState) => void; alsoUndo?: boolean },
 ) => void;
 

@@ -120,6 +120,9 @@ describe('update undo labels', () => {
   // store's side; seam=none; no_claim=the gist download itself (SyncLoop.syncNow stands in, handing the store a remote
   // copy as a pull does)
   it("lets nothing use an Undo from before a sync's changes, even before the screen updates", () => {
+    // Sync is on here, so each change schedules a push: fake timers keep it from running after the test, off the network.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    onTestFinished(() => void vi.useRealTimers());
     localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
     const raiden = { id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false };
     const remote = { ...defaultState(), cards: [{ ...raiden, id: 's', name: 'Scorpion' }] };

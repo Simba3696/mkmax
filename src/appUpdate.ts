@@ -16,7 +16,8 @@ function reloadWhenIdle() {
   const busy = () => !!document.querySelector('[data-modal], [data-undo]');
   if (!busy()) return location.reload();
   // Pop-ups are portalled onto <body> but the Undo bar is inside #root, so watch the whole tree. The bar goes by
-  // itself after 8 seconds of the app showing, so this waits that long at most once the pop-up is closed.
+  // itself once the app has shown for 8 seconds in a row (the time starts over each time the app comes back), so
+  // this waits for that once the pop-up is closed.
   const observer = new MutationObserver(() => {
     if (busy()) return;
     observer.disconnect();
