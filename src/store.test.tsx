@@ -51,6 +51,39 @@ describe('update undo labels', () => {
     expect(api().lastUndo).toBeNull();
   });
 
+  // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
+  // Value: protects=a change carrying on from an Undo that's gone (alsoUndo) drops only its own label: a card it maxes and
+  // removes still gets an Undo that brings it back, and one carrying on from the Undo showing names that change, its own
+  // and the card maxed, and goes back to where that Undo did; update hands back the entry it made; fails_when=a carried
+  // change whose Undo is gone also drops the maxed label, so a removed card has no Undo, or a joined label leaves out the
+  // card it maxed; why_new=alsoUndo was only reached from Add card, whose adds never remove a card; seam=none;
+  // no_claim=Add card's own use of it (CardsView tests)
+  it('keeps the maxed label on a change that carries on from an Undo, showing or gone', () => {
+    let latest: Store | undefined;
+    render(
+      <StoreProvider>
+        <Grab onRender={(store) => (latest = store)} />
+      </StoreProvider>,
+    );
+    const api = () => latest!;
+    const levels = () => api().state.cards.map((c) => `${c.name} ${c.fusion}`);
+    let gone: ReturnType<Store['update']>;
+    act(() => void (gone = api().update((d) => void d.cards.push({ id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false }), 'added Raiden')));
+    expect(gone).toBe(api().lastUndo);
+    act(() => api().dismissUndo());
+    act(() => void api().update((d) => void (d.cards[0].fusion = 11), 'Raiden to F10', { alsoUndo: gone }));
+    expect([levels(), api().lastUndo?.label]).toEqual([[], 'Raiden is maxed and removed']);
+    act(() => api().undo());
+    expect(levels()).toEqual(['Raiden 0']);
+
+    let shown: ReturnType<Store['update']>;
+    act(() => void (shown = api().update((d) => void d.cards.push({ id: 's', name: 'Scorpion', rarityId: 'diamond', fusion: 0, guest: false }), 'added Scorpion')));
+    act(() => void api().update((d) => void (d.cards[0].fusion = 11), 'Raiden to F10', { alsoUndo: shown }));
+    expect([levels(), api().lastUndo?.label]).toEqual([['Scorpion 0'], 'added Scorpion · Raiden to F10 · Raiden is maxed and removed']);
+    act(() => api().undo());
+    expect(levels()).toEqual(['Raiden 0']);
+  });
+
   // Value: protects=a recipe that finds nothing to change saves, stamps and offers Undo for nothing; fails_when=update
   // ignores the recipe's noChange and stamps updatedAt (making this device's copy look newest to sync); why_new=recipes
   // couldn't call off a change before; seam=none; no_claim=the sync push timer (no sync token is set)

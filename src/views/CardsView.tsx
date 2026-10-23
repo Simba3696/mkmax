@@ -803,13 +803,15 @@ function CardList() {
   // own box does, with Undo; Add then saves the card with that spelling.
   const respellFromAdd = (tower: string) => {
     let respelled = 0;
-    addUndo.current = update(
-      (d) => {
-        respelled = respellTower(d, tower);
-        return respelled ? undefined : noChange;
-      },
-      () => respelledLabel(tower, respelled),
-    );
+    // One that re-spells nothing (a new tower) leaves the Undo showing, so an Add after it still joins that.
+    addUndo.current =
+      update(
+        (d) => {
+          respelled = respellTower(d, tower);
+          return respelled ? undefined : noChange;
+        },
+        () => respelledLabel(tower, respelled),
+      ) ?? addUndo.current;
   };
   // That Undo goes back to before the re-spell, so it would also take out a card Add saves while it shows. Add carries
   // on from it (alsoUndo), so the bar says so ("… · added Ice Fan"), and so does each Add after while it shows.

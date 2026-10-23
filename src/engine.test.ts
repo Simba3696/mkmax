@@ -197,6 +197,22 @@ describe('the Maxed record', () => {
     const current = { ...old, version: 18 } as unknown as AppState;
     expect(normalize(current).cards.map((c) => c.sourceNote)).toEqual(['lin kuei tower ', 'Lin Kuei Tower', 'LIN KUEI TOWER', ' Wind Tower', 'wind tower', 'Shirai Ryu Tower', undefined]);
   });
+
+  // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
+  // Value: protects=version 18 takes the spelling the Tower list shows even when a hidden card naming that tower comes
+  // first in the save, and leaves a Krypt or challenge card's note alone even when it reads like a tower; fails_when=the
+  // first card in the save sets the spelling, so the list's spelling flips to a hidden card's, or a non-tower note is
+  // trimmed or re-spelled; why_new=the step's test had the shown card first and no non-tower note naming a tower;
+  // seam=none; no_claim=none beyond protects
+  it('keeps the shown spelling over an earlier hidden card, and leaves non-tower notes alone', () => {
+    const gear = (id: string, sourceNote: string, rarityId = 'epic', source: Card['source'] = 'tower') => card(id, 1, { rarityId, source, sourceNote });
+    const old = {
+      ...defaultState(),
+      version: 17,
+      cards: [gear('hidden', 'LIN KUEI TOWER', 'gone'), gear('kori', 'Lin Kuei Tower'), gear('krypt', ' lin kuei tower ', 'epic', 'krypt'), gear('elder', 'lin kuei tower', 'epic', 'challenge')],
+    } as unknown as AppState;
+    expect(normalize(old).cards.map((c) => c.sourceNote)).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', ' lin kuei tower ', 'lin kuei tower']);
+  });
 });
 
 describe('kameos', () => {

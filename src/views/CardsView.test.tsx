@@ -3071,6 +3071,19 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     const names = () => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string }[]).map((c) => c.name);
     expect([names(), towerOf('Kori Blade')]).toEqual([['Kori Blade', 'Frost Fan'], 'lin kuei tower']);
 
+    // Re-spelled again and an Add named; then a new tower, which re-spells nothing, doesn't stop the next Add being named,
+    // since the bar's Undo still takes it out.
+    pickNewTower(form.getByLabelText('Tower'));
+    fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.blur(form.getByPlaceholderText('New tower name'));
+    addNamed('Ice Fan');
+    pickNewTower(form.getByLabelText('Tower'));
+    fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Thunder Tower' } });
+    fireEvent.blur(form.getByPlaceholderText('New tower name'));
+    addNamed('Jade Fan');
+    expect(lastUndo?.label).toBe('Respelled 1 other card: Lin Kuei Tower · added Ice Fan · added Jade Fan');
+    act(() => undo());
+
     // Re-spelled again, then the bar is dismissed: the next Add has no Undo.
     pickNewTower(form.getByLabelText('Tower'));
     fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
@@ -3500,9 +3513,10 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
 
   // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
   // Value: protects=hiding the app with Add card's box open re-spells the cards naming a new spelling (with Undo), keeps
-  // a new name for Add with no Undo, and puts an emptied box back to the tower picked before, each time leaving the box
-  // open; fails_when=hiding skips the re-spell or its Undo, offers an Undo for a new name, loses the tower Add saves, or
-  // closes the box; why_new=review (state machines); seam=document.visibilityState mocked; no_claim=a phone closing the app
+  // a new name for Add with no Undo of its own (each Add is named in the re-spell's Undo while it shows), and puts an
+  // emptied box back to the tower picked before, each time leaving the box open; fails_when=hiding skips the re-spell or
+  // its Undo, offers an Undo for a new name, loses the tower Add saves, or closes the box; why_new=review (state
+  // machines); seam=document.visibilityState mocked; no_claim=a phone closing the app
   it("finishes Add card's box when the app is hidden, in each case, and keeps it open", () => {
     renderPage([tower('kori', 'Kori Blade', 'lin kuei tower')]);
     const form = towerForm();
@@ -3528,10 +3542,13 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.click(form.getByRole('button', { name: 'Add' }));
     fireEvent.blur(box());
     expect(towerOf('Wrath Hammer')).toBe('Wind Tower');
+    // Each Add while the re-spell's Undo shows is named in it, as that Undo takes it out too.
+    expect(lastUndo?.label).toBe('Respelled 1 other card: Lin Kuei Tower · added Ice Fan · added Wrath Hammer');
+    const joined = lastUndo;
 
     emptiedBox(form.getByLabelText('Tower'), box);
     appShows('hidden');
-    expect([lastUndo === respell, form.getByLabelText('Tower').tagName]).toEqual([true, 'INPUT']);
+    expect([lastUndo === joined, form.getByLabelText('Tower').tagName]).toEqual([true, 'INPUT']);
     appShows('visible');
     fireEvent.blur(box());
     expect((form.getByLabelText('Tower') as HTMLSelectElement).value).toBe('Wind Tower');
