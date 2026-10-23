@@ -163,6 +163,8 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
       <input
         ref={keepFocus}
         className={className}
+        // A name being typed holds an app update's reload (appUpdate.ts), which would finish it unseen.
+        data-editing={edit ? '' : undefined}
         value={edit?.text ?? value ?? ''}
         placeholder={towers.length ? 'New tower name' : placeholder}
         aria-label="Tower"

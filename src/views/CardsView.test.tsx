@@ -3103,6 +3103,22 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   });
 
   // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=a Tower box carries data-editing (which holds an app update's reload) only while a name is open in
+  // it, not as a plain box nobody has typed in or once it's left; fails_when=the mark is missing while typing, so a
+  // reload finishes the name unseen, or stays after the box is left, so the update never comes; why_new=review (Red
+  // Team); seam=none; no_claim=the reload itself (appUpdate.test.ts)
+  it('marks a Tower box as being typed in only while a name is open', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('fan', 'Frost Fan')]);
+    const editing = () => document.querySelectorAll('[data-editing]').length;
+    expect(editing()).toBe(0);
+    pickNewTower(boxOf('Frost Fan'));
+    fireEvent.change(boxOf('Frost Fan'), { target: { value: 'Wind' } });
+    expect([editing(), boxOf('Frost Fan').hasAttribute('data-editing')]).toEqual([1, true]);
+    fireEvent.blur(boxOf('Frost Fan'));
+    expect(editing()).toBe(0);
+  });
+
+  // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
   // Value: protects=an Add while any Undo shows (here a card's tower pick) joins it and is named first in the bar, so the
   // Undo that takes the new card out says so; fails_when=only Add card's own re-spell Undo is joined, so undoing the pick
   // silently removes the card just added; why_new=review (Red Team); seam=none; no_claim=none beyond protects

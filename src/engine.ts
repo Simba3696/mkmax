@@ -86,8 +86,9 @@ export const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityI
  */
 export const towerKey = (name: string) => name.trim().toLowerCase();
 
-// Cards under a rarity a sync removed are hidden everywhere, so they don't spell a tower or get re-spelled: the Tower
-// list, chips, Add card, Paste a list and Tower gear all go by the cards that show.
+// Cards under a rarity a sync removed are hidden everywhere, so they don't spell a tower and a typed name doesn't
+// re-spell them (only the version 18 step, unifyTowerSpellings, does): the Tower list, chips, Add card, Paste a list
+// and Tower gear all go by the cards that show.
 const shownCards = (s: Pick<AppState, 'cards' | 'rarities'>) => s.cards.filter((c) => s.rarities.some((r) => r.id === c.rarityId));
 
 /** Each tower your tower gear names, by towerKey, spelled as the first card naming it has it. */

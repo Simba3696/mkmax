@@ -114,4 +114,19 @@ describe('app update reload', () => {
     bar.remove();
     await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
   });
+
+  // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=a Tower name being typed (data-editing) holds the reload, which comes once the box drops its mark,
+  // even when the box itself stays on the page; fails_when=the reload goes ahead mid-typing and finishes the name unseen,
+  // re-spelling other cards with an Undo it throws away, or never comes because only added or removed elements are
+  // watched; why_new=review (Red Team); seam=none; no_claim=a real service worker update (registerSW mocked,
+  // location.reload stubbed)
+  it('waits while a Tower name is being typed, and reloads once the box drops its mark', async () => {
+    const box = show('data-editing');
+    sw.needReload();
+    await Promise.resolve();
+    expect(reload).not.toHaveBeenCalled();
+    box.removeAttribute('data-editing');
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+  });
 });
