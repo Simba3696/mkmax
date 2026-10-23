@@ -3704,4 +3704,24 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(boxOf('Kori Blade'), { target: { value: '' } });
     expect([towerOf('Kori Blade'), boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual([undefined, 'INPUT', false]);
   });
+
+  // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
+  // Value: protects=a keyboard user who has only Tabbed onto a card's Tower box keeps focus when a sync turns it into the
+  // list, while a box focused by a tap doesn't take focus that way; fails_when=only a key pressed on the control counts as
+  // the keyboard's, so Tab alone loses focus on a sync, or a tap counts too; why_new=review (state machines); seam=a sync
+  // made with the store's update, focus() standing in for Tab; no_claim=a real Tab key
+  it('keeps focus on a sync swap after Tab alone, but not after a tap', () => {
+    renderPage([tower('kori', 'Kori Blade'), tower('kunai', 'Ryu Kunai')]);
+    boxOf('Kori Blade').focus();
+    act(() => update((d) => void (d.cards[1].sourceNote = 'Wind Tower')));
+    expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['SELECT', true]);
+
+    act(() => update((d) => void (d.cards[1].sourceNote = undefined)));
+    expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['INPUT', true]);
+    boxOf('Kori Blade').blur();
+    fireEvent.pointerDown(boxOf('Kori Blade'));
+    boxOf('Kori Blade').focus();
+    act(() => update((d) => void (d.cards[1].sourceNote = 'Wind Tower')));
+    expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['SELECT', false]);
+  });
 });

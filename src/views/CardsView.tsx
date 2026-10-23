@@ -83,9 +83,22 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   // names the first tower, or a sync names the first or last tower), the one that replaces it takes focus, so they don't
   // lose their place. A tap or click never moves focus, so a phone doesn't open its keyboard on the new box. A removed
   // element gives no blur, so the flags hold until then.
+  // Focus that no tap or click came just before (Tab, or focus carried over here) counts as the keyboard's too.
   const focused = useRef(false);
   const byKeys = useRef(false);
+  const pointed = useRef(false);
   const keepFocus = (el: HTMLElement | null) => void (el && (focusList.current || (focused.current && byKeys.current)) && el !== document.activeElement && el.focus());
+  const focusTracking = {
+    onFocus: () => {
+      focused.current = true;
+      byKeys.current = !pointed.current;
+      pointed.current = false;
+    },
+    onPointerDown: () => {
+      pointed.current = true;
+      byKeys.current = false;
+    },
+  };
 
   // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
   // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step
@@ -155,13 +168,13 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
           else onChange(cur.was, { saved: cur.saved });
           setEdit({ text, was: cur.was, saved: text.trim() ? text : cur.was });
         }}
-        onFocus={() => void (focused.current = true)}
+        onFocus={focusTracking.onFocus}
         onBlur={() => {
-          focused.current = false;
+          focused.current = pointed.current = false;
           if (edit) finishTower(edit, onChange);
           setEdit(null);
         }}
-        onPointerDown={() => void (byKeys.current = false)}
+        onPointerDown={focusTracking.onPointerDown}
         // Only a box with a name open (typed in, or opened from Add a new tower…) turns into the list; an untouched plain
         // box doesn't rerender, so a flag set for it would wait and take focus the next time the list shows.
         onKeyDown={(e) => {
@@ -201,10 +214,13 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
         onEnter?.();
       }}
       onKeyUp={() => void (keyed.current = false)}
-      onPointerDown={() => void (keyed.current = byKeys.current = false)}
-      onFocus={() => void (focused.current = true)}
+      onPointerDown={() => {
+        keyed.current = false;
+        focusTracking.onPointerDown();
+      }}
+      onFocus={focusTracking.onFocus}
       onBlur={() => {
-        focused.current = false;
+        focused.current = pointed.current = false;
         if (held !== null) settle(held, false);
       }}
     >
