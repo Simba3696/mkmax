@@ -23,8 +23,11 @@ type Update = (
   undoLabel?: string | (() => string),
   // `undoFrom` adjusts the state Undo goes back to, for a change whose first steps were saved without Undo (a Tower box
   // saves as it's typed, then its finish re-spells other cards): Undo then takes back those steps too.
-  opts?: { auto?: boolean; ruleChange?: boolean; undoFrom?: (prev: AppState) => void },
-) => void;
+  // `alsoUndo` carries on from an Undo entry while it's still the one showing (Add card's Add after its Tower box
+  // re-spelled other cards): the Undo then goes back to where that one did, and its label names this change too. When
+  // that entry isn't showing any more, this change's own label is dropped.
+  opts?: { auto?: boolean; ruleChange?: boolean; undoFrom?: (prev: AppState) => void; alsoUndo?: UndoEntry },
+) => UndoEntry | undefined;
 
 /**
  * What an update recipe returns when there's nothing to change, like a tap on a screen a sync has made out of date. A
@@ -84,6 +87,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [newerSave, setNewerSave] = useState(savedByNewerApp);
 
   const [lastUndo, setLastUndo] = useState<UndoEntry | null>(null);
+  // The entry showing, also set as soon as a change makes one, so a second change in the same tap (Add card's Enter
+  // re-spells, then adds) can carry on from it before the next render (alsoUndo).
+  const shownUndo = useRef(lastUndo);
+  shownUndo.current = lastUndo;
 
   useEffect(() => save(state), [state]);
 
@@ -190,13 +197,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // A card done at its kard threshold (gear, by default) isn't maxed (it's not on the Maxed page), and nor is a card a
     // Settings rule change removes, so those are only "done".
     const gone = (names: string[], how: string) => names.length > 0 && `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} ${how} and removed`;
-    const label = [typeof undoLabel === 'function' ? undoLabel() : undoLabel, gone(split.maxed, 'maxed'), gone(split.done, 'done')].filter(Boolean).join(' · ');
+    const own = typeof undoLabel === 'function' ? undoLabel() : undoLabel;
+    const joined = opts?.alsoUndo && opts.alsoUndo === shownUndo.current ? opts.alsoUndo : undefined;
+    const label = [joined?.label, (!opts?.alsoUndo || joined) && own, gone(split.maxed, 'maxed'), gone(split.done, 'done')].filter(Boolean).join(' · ');
+    let entry: UndoEntry | undefined;
     if (label) {
-      const base = opts?.undoFrom ? structuredClone(prev) : prev;
-      opts?.undoFrom?.(base);
-      setLastUndo({ label, prev: base });
+      const base = joined ? joined.prev : opts?.undoFrom ? structuredClone(prev) : prev;
+      if (!joined) opts?.undoFrom?.(base);
+      entry = { label, prev: base };
+      shownUndo.current = entry;
+      setLastUndo(entry);
     }
     if (!opts?.auto) schedulePush();
+    return entry;
   };
 
   const replace = (s: AppState) => {

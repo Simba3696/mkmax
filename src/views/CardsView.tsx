@@ -1,6 +1,6 @@
 import { Activity, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { newId, noChange, useStore } from '../store';
+import { newId, noChange, useStore, type UndoEntry } from '../store';
 import { usePlan } from '../planner';
 import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerSpellings, unmarkMaxed } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
@@ -803,7 +803,7 @@ function CardList() {
   // own box does, with Undo; Add then saves the card with that spelling.
   const respellFromAdd = (tower: string) => {
     let respelled = 0;
-    update(
+    addUndo.current = update(
       (d) => {
         respelled = respellTower(d, tower);
         return respelled ? undefined : noChange;
@@ -811,6 +811,9 @@ function CardList() {
       () => respelledLabel(tower, respelled),
     );
   };
+  // That Undo goes back to before the re-spell, so it would also take out a card Add saves while it shows. Add carries
+  // on from it (alsoUndo), so the bar says so ("… · added Ice Fan"), and so does each Add after while it shows.
+  const addUndo = useRef<UndoEntry | undefined>(undefined);
 
   // Saved on the card as it is now. Unticking keeps a card at or past F3 on Max, as when one is entered there (see
   // entryGoal); otherwise a piece tracked only to F3 would be removed as done the moment kards were allowed again.
@@ -881,34 +884,39 @@ function CardList() {
   function add() {
     if (!shown.name.trim()) return;
     let added = false;
-    update((d) => {
-      // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
-      // delete it. Its kind and steps come from the rarity as it is now.
-      const rule = d.rarities.find((r) => r.id === shown.rarityId);
-      if (!rule) return noChange;
-      const isEquip = rule.kind === 'equipment';
-      const typed = isEquip && shown.source === 'tower' ? shown.sourceNote?.trim() : undefined;
-      // As the list spells it now (a spelling typed in the box was fixed on the other cards when the box was finished),
-      // so an Add never puts an old spelling back, even one kept from the last card after a fix or a sync.
-      const tower = typed && (towerSpellings(d).get(towerKey(typed)) ?? typed);
-      const card: Card = {
-        id: newId(),
-        ...shown,
-        name: shown.name.trim(),
-        // Not a level a sync took off the rarity after the form was drawn either (the form's own clamp is on `shown`).
-        fusion: shown.fusion <= maxFusion(rule) ? shown.fusion : 0,
-        guest: rule.hasGuests && shown.guest,
-        source: isEquip ? shown.source : initialSource(shown, d.rarities),
-        sourceNote: tower || undefined,
-      };
-      // The goal the form showed for it (see formGoal), worked out with the rarity as it is now. A card already at it would
-      // be done at once, so it isn't added (Add is greyed out for it; Enter in the name box comes here too).
-      const saved = { ...card, goal: formGoal(card, rule).goal };
-      // Nor a card on the Maxed record (Add is greyed out for that too).
-      if (isMaxed(saved, rule) || onMaxedRecord(d, saved)) return noChange;
-      d.cards.push(saved);
-      added = true;
-    });
+    const entry = update(
+      (d) => {
+        // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
+        // delete it. Its kind and steps come from the rarity as it is now.
+        const rule = d.rarities.find((r) => r.id === shown.rarityId);
+        if (!rule) return noChange;
+        const isEquip = rule.kind === 'equipment';
+        const typed = isEquip && shown.source === 'tower' ? shown.sourceNote?.trim() : undefined;
+        // As the list spells it now (a spelling typed in the box was fixed on the other cards when the box was finished),
+        // so an Add never puts an old spelling back, even one kept from the last card after a fix or a sync.
+        const tower = typed && (towerSpellings(d).get(towerKey(typed)) ?? typed);
+        const card: Card = {
+          id: newId(),
+          ...shown,
+          name: shown.name.trim(),
+          // Not a level a sync took off the rarity after the form was drawn either (the form's own clamp is on `shown`).
+          fusion: shown.fusion <= maxFusion(rule) ? shown.fusion : 0,
+          guest: rule.hasGuests && shown.guest,
+          source: isEquip ? shown.source : initialSource(shown, d.rarities),
+          sourceNote: tower || undefined,
+        };
+        // The goal the form showed for it (see formGoal), worked out with the rarity as it is now. A card already at it would
+        // be done at once, so it isn't added (Add is greyed out for it; Enter in the name box comes here too).
+        const saved = { ...card, goal: formGoal(card, rule).goal };
+        // Nor a card on the Maxed record (Add is greyed out for that too).
+        if (isMaxed(saved, rule) || onMaxedRecord(d, saved)) return noChange;
+        d.cards.push(saved);
+        added = true;
+      },
+      addUndo.current && `added ${shown.name.trim()}`,
+      { alsoUndo: addUndo.current },
+    );
+    if (entry) addUndo.current = entry;
     // The typed name stays for another try when nothing was added.
     if (added) setDraft({ ...shown, name: '', fusion: 0, guest: false });
   }

@@ -160,7 +160,7 @@ describe('the Maxed record', () => {
   it('loads an older save with an empty record, and keeps only well-formed entries', () => {
     const old = { ...defaultState(), version: 16 } as unknown as AppState;
     delete (old as Partial<AppState>).maxed;
-    expect([normalize(old).version, normalize(old).maxed]).toEqual([17, []]);
+    expect([normalize(old).version, normalize(old).maxed]).toEqual([18, []]);
     const odd = normalize({ ...old, maxed: [{ name: 'Kori Blade', rarityId: 'epic' }, { name: 3 }, null, 'x'] } as unknown as AppState);
     expect(odd.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic' }]);
     // A day that isn't text would break the page, and the same card twice would list twice: one entry, with the day a
@@ -169,6 +169,33 @@ describe('the Maxed record', () => {
     expect(twice.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic', at: '2026-10-01' }]);
     // Loading a save again changes nothing (save-migration: a current save comes out unchanged).
     expect(normalize(structuredClone(twice))).toEqual(twice);
+  });
+
+  // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=version 18 saves every tower gear card's tower in the spelling the Tower list shows (the first shown
+  // card naming it), trimmed, hidden cards too, and leaves other sources and a newer save alone; fails_when=old mixed
+  // spellings survive, so the spelling shown flips when the card it came from leaves the list, or the step runs again on
+  // a current save; why_new=review (Red Team) of mixed spellings in older saves; seam=none; no_claim=none beyond protects
+  it('saves each tower in the spelling the Tower list shows, once', () => {
+    const gear = (id: string, sourceNote: string | undefined, rarityId = 'epic', source: Card['source'] = 'tower') => card(id, 1, { rarityId, source, sourceNote });
+    const old = {
+      ...defaultState(),
+      version: 17,
+      cards: [
+        gear('a', 'lin kuei tower '),
+        gear('b', 'Lin Kuei Tower'),
+        gear('c', 'LIN KUEI TOWER', 'gone'),
+        gear('d', ' Wind Tower', 'gone'),
+        gear('e', 'wind tower', 'gone'),
+        gear('f', 'Shirai Ryu Tower', 'epic', 'krypt'),
+        gear('g', undefined),
+      ],
+    } as unknown as AppState;
+    const out = normalize(old);
+    expect([out.version, out.cards.map((c) => c.sourceNote)]).toEqual([18, ['lin kuei tower', 'lin kuei tower', 'lin kuei tower', 'Wind Tower', 'Wind Tower', 'Shirai Ryu Tower', undefined]]);
+    // A save already at version 18 isn't re-spelled again (a spelling typed since stands).
+    const current = { ...old, version: 18 } as unknown as AppState;
+    expect(normalize(current).cards.map((c) => c.sourceNote)).toEqual(['lin kuei tower ', 'Lin Kuei Tower', 'LIN KUEI TOWER', ' Wind Tower', 'wind tower', 'Shirai Ryu Tower', undefined]);
   });
 });
 

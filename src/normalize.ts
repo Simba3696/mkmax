@@ -1,7 +1,7 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
 import type { AppState, Card, MaxedCard, RarityRule } from './types';
 import { ASCENSION_KARD_COST, ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
-import { REALM_KLASH_CURRENCY, kasketShape, pruneDone, recordKey } from './engine';
+import { REALM_KLASH_CURRENCY, kasketShape, pruneDone, recordKey, unifyTowerSpellings } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
 import { fixPackNames } from './events';
 import { kasketIn } from './kaskets';
@@ -122,7 +122,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 17,
+    version: 18,
     rarities: s.rarities!.map((r) => ({
       ...r,
       // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
@@ -205,6 +205,10 @@ export function normalize(input: unknown): AppState {
       return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
     });
   }
+  // Version 18 saves each tower in one spelling, the one the Tower list shows. Older builds had a free text box, so one
+  // tower could be saved in several capitals, and the spelling shown switched when the card it came from left the list.
+  // Done once: from then on a tower keeps one spelling (a new spelling typed on a card is saved on every card naming it).
+  if (version < 18) unifyTowerSpellings(out);
   // Version 17 adds the Maxed record (`maxed`), which starts empty, so nothing in an older save changes either; the bump
   // keeps a build from before it from pulling the record and dropping it.
   // Version 16 adds No kards on cards (`noKards`), so nothing in an older save changes. The bump is what matters: a build

@@ -2744,6 +2744,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   let update!: ReturnType<typeof useStore>['update'];
   let lastUndo: ReturnType<typeof useStore>['lastUndo'] = null;
   let undo!: ReturnType<typeof useStore>['undo'];
+  let dismissUndo!: ReturnType<typeof useStore>['dismissUndo'];
   const tower = (id: string, name: string, sourceNote?: string, fusion = 1) => ({ id, name, rarityId: 'epic', fusion, guest: false, source: 'tower' as const, sourceNote });
   const page = (sub: 'cards' | 'towers') => (
     <StoreProvider>
@@ -2753,6 +2754,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
             update = store.update;
             lastUndo = store.lastUndo;
             undo = store.undo;
+            dismissUndo = store.dismissUndo;
           }}
         />
         <CardsView sub={sub} onSub={() => {}} />
@@ -3003,9 +3005,10 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   // Value: protects=a tower typed in Add card in a new spelling is fixed on the visible cards naming it when the box is
   // finished (Enter or leaving it), with Undo, a hidden card is left alone, Add keeps that tower for the next card, and a
   // later Add takes the list's current spelling, so a fix made after leaving the box isn't undone; Undo of an Enter that
-  // re-spelled and added takes the new card out too, as Undo puts back the whole app; fails_when=Add card doesn't
-  // re-spell, re-spells a hidden card, or an Add puts an old spelling back on the other cards; why_new=review (Red Team);
-  // seam=none; no_claim=none beyond protects
+  // re-spelled and added takes the new card out too, as Undo puts back the whole app, and the bar says so ("· added
+  // Frost Fan"); fails_when=Add card doesn't re-spell, re-spells a hidden card, an Add puts an old spelling back on the
+  // other cards, or the bar hides that its Undo takes the new card out; why_new=review (Red Team); seam=none;
+  // no_claim=none beyond protects
   it('fixes a tower spelling typed in Add card, and never puts an old spelling back on Add', () => {
     renderPage([{ ...tower('ghost', 'Ghost Blade', 'LIN KUEI TOWER'), rarityId: 'gone' }, tower('kori', 'Kori Blade', 'lin kuei tower')]);
     const options = (select: HTMLElement) => [...(select as HTMLSelectElement).options].map((o) => o.textContent);
@@ -3021,7 +3024,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(name, { target: { value: 'Frost Fan' } });
     typeTower('Lin Kuei Tower');
     fireEvent.keyDown(form.getByPlaceholderText('New tower name'), { key: 'Enter' });
-    expect([towerOf('Frost Fan'), towerOf('Kori Blade'), towerOf('Ghost Blade'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER', 'Respelled 1 other card: Lin Kuei Tower']);
+    expect([towerOf('Frost Fan'), towerOf('Kori Blade'), towerOf('Ghost Blade'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER', 'Respelled 1 other card: Lin Kuei Tower · added Frost Fan']);
     // Add keeps the tower for the next card.
     expect((form.getByLabelText('Tower') as HTMLSelectElement).value).toBe('Lin Kuei Tower');
     act(() => undo());
@@ -3039,6 +3042,42 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(name, { target: { value: 'Ice Fan' } });
     fireEvent.click(form.getByRole('button', { name: 'Add' }));
     expect([towerOf('Kori Blade'), towerOf('Ice Fan'), towerOf('Ghost Blade')]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER']);
+  });
+
+  // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=an Add only joins the Undo of Add card's re-spell while that Undo shows: a plain Add has no Undo, each
+  // Add while it shows is named in the bar and taken out by its Undo, and once it's dismissed an Add gets no Undo of its
+  // own; fails_when=every Add gets an Undo, a second Add isn't named though Undo takes it out, or an Add after the bar
+  // went joins a re-spell no longer offered; why_new=the bar now names the add; seam=none; no_claim=none beyond protects
+  it('names each Add in the Undo of Add card\'s re-spell only while that Undo shows', () => {
+    renderPage([tower('kori', 'Kori Blade', 'lin kuei tower')]);
+    const form = towerForm();
+    const name = form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)');
+    const addNamed = (card: string) => {
+      fireEvent.change(name, { target: { value: card } });
+      fireEvent.click(form.getByRole('button', { name: 'Add' }));
+    };
+    addNamed('Frost Fan');
+    expect([towerOf('Frost Fan'), lastUndo]).toEqual([undefined, null]);
+
+    pickNewTower(form.getByLabelText('Tower'));
+    fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.keyDown(form.getByPlaceholderText('New tower name'), { key: 'Enter' });
+    expect(lastUndo?.label).toBe('Respelled 1 other card: Lin Kuei Tower');
+    addNamed('Ice Fan');
+    addNamed('Jade Fan');
+    expect(lastUndo?.label).toBe('Respelled 1 other card: Lin Kuei Tower · added Ice Fan · added Jade Fan');
+    act(() => undo());
+    const names = () => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string }[]).map((c) => c.name);
+    expect([names(), towerOf('Kori Blade')]).toEqual([['Kori Blade', 'Frost Fan'], 'lin kuei tower']);
+
+    // Re-spelled again, then the bar is dismissed: the next Add has no Undo.
+    pickNewTower(form.getByLabelText('Tower'));
+    fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.blur(form.getByPlaceholderText('New tower name'));
+    act(() => dismissUndo());
+    addNamed('Wrath Hammer');
+    expect([towerOf('Wrath Hammer'), lastUndo]).toEqual(['Lin Kuei Tower', null]);
   });
 
   // Generated on 2026-10-22 (/ship review, Tower dropdown)

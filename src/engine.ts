@@ -118,6 +118,20 @@ export function respellTower(s: Pick<AppState, 'cards' | 'rarities'>, tower: str
   return changed;
 }
 
+/**
+ * Saves every tower gear card's tower in the one spelling the Tower list shows (towerSpellings), trimmed. A tower only
+ * hidden cards name takes the first of them's spelling. For saves from before one spelling was kept per tower.
+ */
+export function unifyTowerSpellings(s: Pick<AppState, 'cards' | 'rarities'>) {
+  const spelling = towerSpellings(s);
+  for (const c of s.cards) {
+    const t = c.source === 'tower' ? c.sourceNote?.trim() : undefined;
+    if (!t) continue;
+    if (!spelling.has(towerKey(t))) spelling.set(towerKey(t), t);
+    c.sourceNote = spelling.get(towerKey(t));
+  }
+}
+
 // Each change copies the whole save (store.tsx), so a record is checked against many times (every pasted line, every
 // keystroke in Add card) before it changes: its keys are worked out once per array. That holds because the record is
 // never changed in place: every change to it puts a new array in `maxed`.
