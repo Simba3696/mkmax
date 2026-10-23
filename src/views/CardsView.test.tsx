@@ -3077,6 +3077,19 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect(enterEmpty('W', '')).toEqual(['SELECT', true, 'Lin Kuei Tower']);
   });
 
+  // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
+  // Value: protects=Enter in a card's plain Tower box, after typing the first tower anyone names, puts focus on the list
+  // that replaces the box; fails_when=the flag asks whether the box opened on a tower (or what's left in it) instead of
+  // whether a list replaces it, so focus drops to the page; why_new=this case was only tested by leaving the box;
+  // seam=none; no_claim=a real keyboard
+  it("keeps focus on a card's Tower list after Enter in its plain box once a typed name makes it the first tower", () => {
+    renderPage([tower('kori', 'Kori Blade')]);
+    boxOf('Kori Blade').focus();
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
+    expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade'), towerOf('Kori Blade')]).toEqual(['SELECT', true, 'Lin Kuei Tower']);
+  });
+
   // Generated on 2026-10-23 (/ship review, maintainability, Tower dropdown)
   // Value: protects=Enter in the new-tower box of a card with no tower, while other cards name towers, leaves the card
   // with none and puts focus on the list that replaces the box; fails_when=the flag asks whether the card keeps a tower
