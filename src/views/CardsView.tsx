@@ -78,8 +78,8 @@ if (typeof document !== 'undefined') {
 function TowerSelect({ towers, value, onChange, onPick, onEnter, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; className?: string; placeholder?: string }) {
   const pick = onPick ?? onChange;
   // The name being typed, the tower an emptied box goes back to (the one the card had before Add a new tower… was picked,
-  // or the name saved when the app was hidden; none in the plain box, which has no list to go back to), and the tower
-  // this box last saved. Null while picking from the list, or before the first key in the plain box.
+  // or, if it opened on one, the name saved when the app was hidden; none in the plain box, which has no list to go back
+  // to), and the tower this box last saved. Null while picking from the list, or before the first key in the plain box.
   const [edit, setEdit] = useState<TowerEdit | null>(null);
   // Enter in a card's new-tower box leaves it (so it's finished) and puts focus on the list that replaces it, rather than
   // dropping it to the page.
@@ -102,8 +102,9 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
 
   // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
   // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step
-  // is held (shown, not saved) until the list is left, Enter is pressed or the app is hidden: on a card, where each pick
-  // saves with Undo, any tower; anywhere, Add a new tower…, which leaving the list drops. A tap or a click saves at once.
+  // is held (shown, not saved) until the list is left or Enter is pressed (a held tower is also saved when the app is
+  // hidden): on a card, where each pick saves with Undo, any tower; anywhere, Add a new tower…, which leaving the list
+  // drops. A tap or a click saves at once.
   // A key marks the change it makes before it's let go (a pick in a list a key opened is at worst held until it's left).
   const [held, setHeld] = useState<string | null>(null);
   const keyed = useRef(false);

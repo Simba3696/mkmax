@@ -54,7 +54,7 @@ describe('update undo labels', () => {
   // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
   // Value: protects=a change carrying on from an Undo that's gone (alsoUndo) drops only its own label: a card it maxes and
   // removes still gets an Undo that brings it back, and one carrying on from the Undo showing names that change, its own
-  // and the card maxed, and goes back to where that Undo did; update hands back the entry it made; fails_when=a carried
+  // and the card maxed, and goes back to where that Undo did; fails_when=a carried
   // change whose Undo is gone also drops the maxed label, so a removed card has no Undo, or a joined label leaves out the
   // card it maxed; why_new=alsoUndo was only reached from Add card, whose adds never remove a card; seam=none;
   // no_claim=Add card's own use of it (CardsView tests)
@@ -67,9 +67,8 @@ describe('update undo labels', () => {
     );
     const api = () => latest!;
     const levels = () => api().state.cards.map((c) => `${c.name} ${c.fusion}`);
-    let gone: ReturnType<Store['update']>;
-    act(() => void (gone = api().update((d) => void d.cards.push({ id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false }), 'added Raiden')));
-    expect(gone).toBe(api().lastUndo);
+    act(() => void api().update((d) => void d.cards.push({ id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false }), 'added Raiden'));
+    expect(api().lastUndo?.label).toBe('added Raiden');
     act(() => api().dismissUndo());
     act(() => void api().update((d) => void (d.cards[0].fusion = 11), 'Raiden to F10', { alsoUndo: true }));
     expect([levels(), api().lastUndo?.label]).toEqual([[], 'Raiden is maxed and removed']);
@@ -99,8 +98,8 @@ describe('update undo labels', () => {
     const api = () => latest!;
     const names = () => api().state.cards.map((c) => c.name);
     const raiden = { id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false };
-    let before: ReturnType<Store['update']>;
-    act(() => void (before = api().update((d) => void d.cards.push(raiden), 'added Raiden')));
+    act(() => void api().update((d) => void d.cards.push(raiden), 'added Raiden'));
+    const before = api().lastUndo!;
     const replaced = { ...defaultState(), cards: [{ ...raiden, id: 's', name: 'Scorpion' }] };
     // All in one go, as a tap landing between a sync's data and its render: the store from before the replace is used.
     const { update, undo, replace } = api();
@@ -138,8 +137,8 @@ describe('update undo labels', () => {
     );
     const api = () => latest!;
     const names = () => api().state.cards.map((c) => c.name);
-    let before: ReturnType<Store['update']>;
-    act(() => void (before = api().update((d) => void d.cards.push(raiden), 'added Raiden')));
+    act(() => void api().update((d) => void d.cards.push(raiden), 'added Raiden'));
+    const before = api().lastUndo!;
     const { update, undo, sync } = api();
     pullNow = true;
     act(() => {

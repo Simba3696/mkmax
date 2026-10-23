@@ -27,7 +27,7 @@ type Update = (
   // goes back to before it, so it would take this change out too, and its label now says so, this change first. With
   // no Undo showing, this change's own label is dropped and it gets none.
   opts?: { auto?: boolean; ruleChange?: boolean; undoFrom?: (prev: AppState) => void; alsoUndo?: boolean },
-) => UndoEntry | undefined;
+) => void;
 
 /**
  * What an update recipe returns when there's nothing to change, like a tap on a screen a sync has made out of date. A
@@ -207,16 +207,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const joined = (opts?.alsoUndo && shownUndo.current) || undefined;
     // Newest first, so a phone's one-line bar shows what this change did even when the label is cut short.
     const label = [(!opts?.alsoUndo || joined) && own, gone(split.maxed, 'maxed'), gone(split.done, 'done'), joined?.label].filter(Boolean).join(' · ');
-    let entry: UndoEntry | undefined;
     if (label) {
       const base = joined ? joined.prev : opts?.undoFrom ? structuredClone(prev) : prev;
       if (!joined) opts?.undoFrom?.(base);
-      entry = { label, prev: base };
+      const entry = { label, prev: base };
       shownUndo.current = entry;
       setLastUndo(entry);
     }
     if (!opts?.auto) schedulePush();
-    return entry;
   };
 
   const replace = (s: AppState) => {
