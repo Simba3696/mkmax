@@ -3044,6 +3044,22 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect([towerOf('Kori Blade'), towerOf('Ice Fan'), towerOf('Ghost Blade')]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER']);
   });
 
+  // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=Enter in a card's plain Tower box (no towers named) that was typed in and emptied leaves the box, as
+  // Enter does when a list replaces it; fails_when=Enter always sends focus on to the list, so the same box, still a box
+  // as the card has no tower, takes focus back and Enter seems to do nothing; why_new=review (Red Team); seam=none;
+  // no_claim=a phone's keyboard closing
+  it('leaves an emptied plain Tower box on Enter', () => {
+    renderPage([tower('fan', 'Frost Fan')]);
+    const box = boxOf('Frost Fan');
+    box.focus();
+    fireEvent.keyDown(box, { key: 'a' });
+    fireEvent.change(box, { target: { value: 'abc' } });
+    fireEvent.change(box, { target: { value: '' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect([boxOf('Frost Fan').tagName, document.activeElement === boxOf('Frost Fan'), towerOf('Frost Fan')]).toEqual(['INPUT', false, undefined]);
+  });
+
   // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
   // Value: protects=an Add after a tab switch still joins and is named in the Undo of Add card's re-spell while it shows,
   // so that Undo never takes out a card it doesn't name; fails_when=what Add card joins lives in the page, which a tab
