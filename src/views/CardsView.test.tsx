@@ -3118,6 +3118,22 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect(editing()).toBe(0);
   });
 
+  // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
+  // Value: protects=a plain Tower box (no tower named anywhere) carries the mark only once something is typed in it, and
+  // drops it when it's emptied and left, staying a plain box; fails_when=the mark is always on, so anyone with tower gear
+  // and no tower named holds every app update for good; why_new=only boxes opened from the list were checked;
+  // seam=none; no_claim=the reload itself (appUpdate.test.ts)
+  it('marks a plain Tower box only while something is typed in it', () => {
+    renderPage([tower('fan', 'Frost Fan')]);
+    const editing = () => document.querySelectorAll('[data-editing]').length;
+    expect([boxOf('Frost Fan').tagName, editing()]).toEqual(['INPUT', 0]);
+    fireEvent.change(boxOf('Frost Fan'), { target: { value: 'W' } });
+    expect(editing()).toBe(1);
+    fireEvent.change(boxOf('Frost Fan'), { target: { value: '' } });
+    fireEvent.blur(boxOf('Frost Fan'));
+    expect([boxOf('Frost Fan').tagName, editing()]).toEqual(['INPUT', 0]);
+  });
+
   // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
   // Value: protects=an Add while any Undo shows (here a card's tower pick) joins it and is named first in the bar, so the
   // Undo that takes the new card out says so; fails_when=only Add card's own re-spell Undo is joined, so undoing the pick
