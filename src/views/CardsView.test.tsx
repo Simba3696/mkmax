@@ -3005,7 +3005,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   // Value: protects=a tower typed in Add card in a new spelling is fixed on the visible cards naming it when the box is
   // finished (Enter or leaving it), with Undo, a hidden card is left alone, Add keeps that tower for the next card, and a
   // later Add takes the list's current spelling, so a fix made after leaving the box isn't undone; Undo of an Enter that
-  // re-spelled and added takes the new card out too, as Undo puts back the whole app, and the bar says so ("· added
+  // re-spelled and added takes the new card out too, as Undo puts back the whole app, and the bar says so ("Added
   // Frost Fan"); fails_when=Add card doesn't re-spell, re-spells a hidden card, an Add puts an old spelling back on the
   // other cards, or the bar hides that its Undo takes the new card out; why_new=review (Red Team); seam=none;
   // no_claim=none beyond protects
@@ -3024,7 +3024,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(name, { target: { value: 'Frost Fan' } });
     typeTower('Lin Kuei Tower');
     fireEvent.keyDown(form.getByPlaceholderText('New tower name'), { key: 'Enter' });
-    expect([towerOf('Frost Fan'), towerOf('Kori Blade'), towerOf('Ghost Blade'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER', 'Respelled 1 other card: Lin Kuei Tower · added Frost Fan']);
+    expect([towerOf('Frost Fan'), towerOf('Kori Blade'), towerOf('Ghost Blade'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER', 'Added Frost Fan · Respelled 1 other card: Lin Kuei Tower']);
     // Add keeps the tower for the next card.
     expect((form.getByLabelText('Tower') as HTMLSelectElement).value).toBe('Lin Kuei Tower');
     act(() => undo());
@@ -3042,6 +3042,45 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(name, { target: { value: 'Ice Fan' } });
     fireEvent.click(form.getByRole('button', { name: 'Add' }));
     expect([towerOf('Kori Blade'), towerOf('Ice Fan'), towerOf('Ghost Blade')]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', 'LIN KUEI TOWER']);
+  });
+
+  // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
+  // Value: protects=an Add after a tab switch still joins and is named in the Undo of Add card's re-spell while it shows,
+  // so that Undo never takes out a card it doesn't name; fails_when=what Add card joins lives in the page, which a tab
+  // switch takes down, so the Add comes back unnamed but undone; why_new=review (state machines); seam=none; no_claim=the
+  // real tab bar (the page is taken down and put back as App does)
+  it("names an Add after a tab switch in the Undo of Add card's re-spell", () => {
+    const tree = (show: boolean) => (
+      <StoreProvider>
+        <PlanProvider>
+          <Grab
+            onRender={(store) => {
+              lastUndo = store.lastUndo;
+              undo = store.undo;
+            }}
+          />
+          {show && <CardsView sub="cards" onSub={() => {}} />}
+        </PlanProvider>
+      </StoreProvider>
+    );
+    const s = defaultState();
+    s.cards = [tower('kori', 'Kori Blade', 'lin kuei tower')];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    const { rerender } = render(tree(true));
+    let form = towerForm();
+    pickNewTower(form.getByLabelText('Tower'));
+    fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.blur(form.getByPlaceholderText('New tower name'));
+    rerender(tree(false));
+    rerender(tree(true));
+    form = towerForm();
+    fireEvent.change(form.getByLabelText('Tower'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.change(form.getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)'), { target: { value: 'Ice Fan' } });
+    fireEvent.click(form.getByRole('button', { name: 'Add' }));
+    expect(lastUndo?.label).toBe('Added Ice Fan · Respelled 1 other card: Lin Kuei Tower');
+    act(() => undo());
+    const names = () => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string }[]).map((c) => c.name);
+    expect([names(), towerOf('Kori Blade')]).toEqual([['Kori Blade'], 'lin kuei tower']);
   });
 
   // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
@@ -3066,7 +3105,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect(lastUndo?.label).toBe('Respelled 1 other card: Lin Kuei Tower');
     addNamed('Ice Fan');
     addNamed('Jade Fan');
-    expect(lastUndo?.label).toBe('Respelled 1 other card: Lin Kuei Tower · added Ice Fan · added Jade Fan');
+    expect(lastUndo?.label).toBe('Added Jade Fan · Added Ice Fan · Respelled 1 other card: Lin Kuei Tower');
     act(() => undo());
     const names = () => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { name: string }[]).map((c) => c.name);
     expect([names(), towerOf('Kori Blade')]).toEqual([['Kori Blade', 'Frost Fan'], 'lin kuei tower']);
@@ -3081,7 +3120,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Thunder Tower' } });
     fireEvent.blur(form.getByPlaceholderText('New tower name'));
     addNamed('Jade Fan');
-    expect(lastUndo?.label).toBe('Respelled 1 other card: Lin Kuei Tower · added Ice Fan · added Jade Fan');
+    expect(lastUndo?.label).toBe('Added Jade Fan · Added Ice Fan · Respelled 1 other card: Lin Kuei Tower');
     act(() => undo());
 
     // Re-spelled again, then the bar is dismissed: the next Add has no Undo.
@@ -3543,7 +3582,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     fireEvent.blur(box());
     expect(towerOf('Wrath Hammer')).toBe('Wind Tower');
     // Each Add while the re-spell's Undo shows is named in it, as that Undo takes it out too.
-    expect(lastUndo?.label).toBe('Respelled 1 other card: Lin Kuei Tower · added Ice Fan · added Wrath Hammer');
+    expect(lastUndo?.label).toBe('Added Wrath Hammer · Added Ice Fan · Respelled 1 other card: Lin Kuei Tower');
     const joined = lastUndo;
 
     emptiedBox(form.getByLabelText('Tower'), box);

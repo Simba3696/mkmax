@@ -136,11 +136,14 @@ export function normalize(input: unknown): AppState {
     })),
     currencies: s.currencies?.length ? s.currencies : base.currencies,
     // No kards counts only when it's exactly true: any other value (a hand-edited backup's "false", say) is dropped, as
-    // it would otherwise turn the flag on, or differ from a card without it and look like a sync conflict.
+    // it would otherwise turn the flag on, or differ from a card without it and look like a sync conflict. A tower name
+    // that isn't text (a hand-edited number, say) is dropped too, as the Tower list and Tower gear read it as text.
     cards: s.cards!.map((c) => {
-      if (c.noKards === undefined || c.noKards === true) return c;
+      const badNote = c.sourceNote !== undefined && typeof c.sourceNote !== 'string';
+      if ((c.noKards === undefined || c.noKards === true) && !badNote) return c;
       const out = { ...c };
-      delete out.noKards;
+      if (out.noKards !== undefined && out.noKards !== true) delete out.noKards;
+      if (badNote) delete out.sourceNote;
       return out;
     }),
     packs: s.packs!,
@@ -205,10 +208,6 @@ export function normalize(input: unknown): AppState {
       return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
     });
   }
-  // Version 18 saves each tower in one spelling, the one the Tower list shows. Older builds had a free text box, so one
-  // tower could be saved in several capitals, and the spelling shown switched when the card it came from left the list.
-  // Done once: from then on a tower keeps one spelling (a new spelling typed on a card is saved on every card naming it).
-  if (version < 18) unifyTowerSpellings(out);
   // Version 17 adds the Maxed record (`maxed`), which starts empty, so nothing in an older save changes either; the bump
   // keeps a build from before it from pulling the record and dropping it.
   // Version 16 adds No kards on cards (`noKards`), so nothing in an older save changes. The bump is what matters: a build
@@ -218,5 +217,10 @@ export function normalize(input: unknown): AppState {
   // cards per purchase or a null rarity.
   out.packs = out.packs.map(kasketShape);
   pruneDone(out);
+  // Version 18 saves each tower in one spelling, the one the Tower list shows. Older builds had a free text box, so one
+  // tower could be saved in several capitals, and the spelling shown switched when the card it came from left the list.
+  // Done once: from then on a tower keeps one spelling (a new spelling typed on a card is saved on every card naming it).
+  // After pruneDone, so the spelling comes from cards that stay, as the list shows them.
+  if (version < 18) unifyTowerSpellings(out);
   return out;
 }

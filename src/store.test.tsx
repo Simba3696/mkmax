@@ -79,9 +79,39 @@ describe('update undo labels', () => {
     let shown: ReturnType<Store['update']>;
     act(() => void (shown = api().update((d) => void d.cards.push({ id: 's', name: 'Scorpion', rarityId: 'diamond', fusion: 0, guest: false }), 'added Scorpion')));
     act(() => void api().update((d) => void (d.cards[0].fusion = 11), 'Raiden to F10', { alsoUndo: shown }));
-    expect([levels(), api().lastUndo?.label]).toEqual([['Scorpion 0'], 'added Scorpion · Raiden to F10 · Raiden is maxed and removed']);
+    expect([levels(), api().lastUndo?.label]).toEqual([['Scorpion 0'], 'Raiden to F10 · Raiden is maxed and removed · added Scorpion']);
     act(() => api().undo());
     expect(levels()).toEqual(['Raiden 0']);
+  });
+
+  // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=once the save is replaced (Import, or a sync bringing in another device's data), the Undo from before
+  // can't be used in the same moment, before the screen updates: a change carrying on from it gets no Undo of its own,
+  // and Undo of it does nothing; fails_when=the Undo is only dropped at the next render, so Undo or a joined change puts
+  // back a copy from before the replace, wiping what it brought in; why_new=review (Red Team); seam=none; no_claim=a
+  // real sync pull (replace stands in for it; both clear the Undo the same way)
+  it('lets nothing use an Undo from before a replace, even before the screen updates', () => {
+    let latest: Store | undefined;
+    render(
+      <StoreProvider>
+        <Grab onRender={(store) => (latest = store)} />
+      </StoreProvider>,
+    );
+    const api = () => latest!;
+    const names = () => api().state.cards.map((c) => c.name);
+    const raiden = { id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false };
+    let before: ReturnType<Store['update']>;
+    act(() => void (before = api().update((d) => void d.cards.push(raiden), 'added Raiden')));
+    const replaced = { ...defaultState(), cards: [{ ...raiden, id: 's', name: 'Scorpion' }] };
+    // All in one go, as a tap landing between a sync's data and its render: the store from before the replace is used.
+    const { update, undo, replace } = api();
+    act(() => {
+      replace(replaced);
+      update((d) => void d.cards.push({ ...raiden, id: 'k', name: 'Kitana' }), 'added Kitana', { alsoUndo: before });
+      undo(before);
+      undo();
+    });
+    expect([names(), api().lastUndo]).toEqual([['Scorpion', 'Kitana'], null]);
   });
 
   // Value: protects=a recipe that finds nothing to change saves, stamps and offers Undo for nothing; fails_when=update

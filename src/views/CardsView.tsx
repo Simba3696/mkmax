@@ -69,6 +69,11 @@ if (typeof document !== 'undefined') {
   document.addEventListener('pointerdown', () => void (lastInput = 'pointer'), true);
 }
 
+// The Undo of Add card's last re-spell. That Undo goes back to before the re-spell, so it would also take out a card Add
+// saves while it shows; Add carries on from it (alsoUndo), so the bar names the card ("Added Ice Fan · Respelled …"),
+// and so does each Add after while it shows. Kept outside the page, which a tab switch takes down while the bar stays.
+let addUndo: UndoEntry | undefined;
+
 /**
  * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
  * While a name is being typed the box stays a text box until it's left, so it doesn't turn into the list mid-word once
@@ -804,18 +809,15 @@ function CardList() {
   const respellFromAdd = (tower: string) => {
     let respelled = 0;
     // One that re-spells nothing (a new tower) leaves the Undo showing, so an Add after it still joins that.
-    addUndo.current =
+    addUndo =
       update(
         (d) => {
           respelled = respellTower(d, tower);
           return respelled ? undefined : noChange;
         },
         () => respelledLabel(tower, respelled),
-      ) ?? addUndo.current;
+      ) ?? addUndo;
   };
-  // That Undo goes back to before the re-spell, so it would also take out a card Add saves while it shows. Add carries
-  // on from it (alsoUndo), so the bar says so ("… · added Ice Fan"), and so does each Add after while it shows.
-  const addUndo = useRef<UndoEntry | undefined>(undefined);
 
   // Saved on the card as it is now. Unticking keeps a card at or past F3 on Max, as when one is entered there (see
   // entryGoal); otherwise a piece tracked only to F3 would be removed as done the moment kards were allowed again.
@@ -915,10 +917,10 @@ function CardList() {
         d.cards.push(saved);
         added = true;
       },
-      addUndo.current && `added ${shown.name.trim()}`,
-      { alsoUndo: addUndo.current },
+      addUndo && `Added ${shown.name.trim()}`,
+      { alsoUndo: addUndo },
     );
-    if (entry) addUndo.current = entry;
+    if (entry) addUndo = entry;
     // The typed name stays for another try when nothing was added.
     if (added) setDraft({ ...shown, name: '', fusion: 0, guest: false });
   }

@@ -198,6 +198,22 @@ describe('the Maxed record', () => {
     expect(normalize(current).cards.map((c) => c.sourceNote)).toEqual(['lin kuei tower ', 'Lin Kuei Tower', 'LIN KUEI TOWER', ' Wind Tower', 'wind tower', 'Shirai Ryu Tower', undefined]);
   });
 
+  // Generated on 2026-10-23 (/ship review, data migration and Red Team, Tower dropdown)
+  // Value: protects=version 18 takes a tower's spelling from cards that stay, not one removed as done on the same load,
+  // and a hand-edited tower name that isn't text is dropped on every load instead of failing the whole save;
+  // fails_when=the step runs before done cards are removed, so a gone card sets the spelling, or a non-text name throws
+  // and the save is treated as unreadable; why_new=review (data migration, Red Team); seam=none; no_claim=none beyond
+  // protects
+  it('spells a tower from cards that stay, and drops a tower name that is not text', () => {
+    const gear = (id: string, fusion: number, sourceNote: unknown) => card(id, fusion, { rarityId: 'epic', source: 'tower', sourceNote: sourceNote as string });
+    const old = { ...defaultState(), version: 17, cards: [gear('done', 11, 'LIN KUEI TOWER'), gear('kori', 1, 'Lin Kuei Tower'), gear('fan', 1, 'lin kuei tower'), gear('odd', 1, 42)] } as unknown as AppState;
+    const out = normalize(old);
+    expect(out.cards.map((c) => [c.id, c.sourceNote])).toEqual([['kori', 'Lin Kuei Tower'], ['fan', 'Lin Kuei Tower'], ['odd', undefined]]);
+    // Dropped on a current save too, so Tower gear never reads it.
+    const current = normalize({ ...defaultState(), cards: [gear('odd', 1, { x: 1 })] } as unknown as AppState);
+    expect('sourceNote' in current.cards[0]).toBe(false);
+  });
+
   // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
   // Value: protects=version 18 takes the spelling the Tower list shows even when a hidden card naming that tower comes
   // first in the save, and leaves a Krypt or challenge card's note alone even when it reads like a tower; fails_when=the

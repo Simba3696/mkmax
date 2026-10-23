@@ -91,6 +91,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // re-spells, then adds) can carry on from it before the next render (alsoUndo).
   const shownUndo = useRef(lastUndo);
   shownUndo.current = lastUndo;
+  // Cleared at once too, so nothing in the same moment (an Add, or Undo itself) can use an Undo that's going: after a
+  // sync or a replace, it would put back a copy from before the other device's changes.
+  const clearUndo = () => {
+    shownUndo.current = null;
+    setLastUndo(null);
+  };
 
   useEffect(() => save(state), [state]);
 
@@ -111,7 +117,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           applyRemote: (remote) => {
             setLocal(normalize(remote));
             // The snapshot predates the other device's changes; restoring it would silently drop them.
-            setLastUndo(null);
+            clearUndo();
           },
           canRead: (remote) => {
             try {
@@ -175,7 +181,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!holdIfNewer(e.key, e.newValue)) return;
       clearTimeout(pushTimer.current);
       setNewerSave(true);
-      setLastUndo(null);
+      clearUndo();
       if (loop.config) setStatus({ kind: 'error', message: NEWER_SAVE_MESSAGE });
     };
     window.addEventListener('storage', onStorage);
@@ -199,7 +205,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const gone = (names: string[], how: string) => names.length > 0 && `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} ${how} and removed`;
     const own = typeof undoLabel === 'function' ? undoLabel() : undoLabel;
     const joined = opts?.alsoUndo && opts.alsoUndo === shownUndo.current ? opts.alsoUndo : undefined;
-    const label = [joined?.label, (!opts?.alsoUndo || joined) && own, gone(split.maxed, 'maxed'), gone(split.done, 'done')].filter(Boolean).join(' · ');
+    // Newest first, so a phone's one-line bar shows what this change did even when the label is cut short.
+    const label = [(!opts?.alsoUndo || joined) && own, gone(split.maxed, 'maxed'), gone(split.done, 'done'), joined?.label].filter(Boolean).join(' · ');
     let entry: UndoEntry | undefined;
     if (label) {
       const base = joined ? joined.prev : opts?.undoFrom ? structuredClone(prev) : prev;
@@ -218,15 +225,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     pruneDone(next);
     stateRef.current = next;
     setState(next);
-    setLastUndo(null);
+    clearUndo();
     schedulePush();
   };
 
+  // The entry showing as of now, not as of the last render: a sync applied a moment ago has cleared it already.
   const undo = (shown?: UndoEntry) => {
-    if (!lastUndo || (shown && shown !== lastUndo) || savedByNewerApp()) return;
+    const cur = shownUndo.current;
+    if (!cur || (shown && shown !== cur) || savedByNewerApp()) return;
     // A fresh stamp so sync treats the restored copy as this device's newest change.
-    setLocal({ ...lastUndo.prev, updatedAt: loop.nextStamp() });
-    setLastUndo(null);
+    setLocal({ ...cur.prev, updatedAt: loop.nextStamp() });
+    clearUndo();
     schedulePush();
   };
 
@@ -247,7 +256,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: (shown) => setLastUndo((cur) => (shown && cur !== shown ? cur : null)), unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: (shown) => {
+          if (!shown || shown === shownUndo.current) shownUndo.current = null;
+          setLastUndo((cur) => (shown && cur !== shown ? cur : null));
+        }, unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
   );
 }
 
