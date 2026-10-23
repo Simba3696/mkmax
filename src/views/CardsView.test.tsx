@@ -3712,6 +3712,8 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   // made with the store's update, focus() standing in for Tab; no_claim=a real Tab key
   it('keeps focus on a sync swap after Tab alone, but not after a tap', () => {
     renderPage([tower('kori', 'Kori Blade'), tower('kunai', 'Ryu Kunai')]);
+    // Tab is pressed on whatever had focus before, then focus lands on the box.
+    fireEvent.keyDown(document.body, { key: 'Tab' });
     boxOf('Kori Blade').focus();
     act(() => update((d) => void (d.cards[1].sourceNote = 'Wind Tower')));
     expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['SELECT', true]);
@@ -3723,5 +3725,59 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     boxOf('Kori Blade').focus();
     act(() => update((d) => void (d.cards[1].sourceNote = 'Wind Tower')));
     expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['SELECT', false]);
+  });
+
+  // Generated on 2026-10-23 (/ship review, state machines and Red Team, Tower dropdown)
+  // Value: protects=whether focus carries over goes by how the user last acted on the page: keys after a click on the
+  // focused list carry it, while a tap on Add card's label, or focus coming back with the app after a tap, doesn't;
+  // fails_when=only events on the control count, so a click before the keys, a label tap or the app's return read
+  // wrongly; why_new=review (state machines, Red Team); seam=a sync made with the store's update, focus()/blur() standing
+  // in for the browser; no_claim=a real phone browser
+  it('carries focus by how the user last acted on the page: keys, not a label tap or the app coming back', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower')]);
+    fireEvent.pointerDown(boxOf('Kori Blade'));
+    boxOf('Kori Blade').focus();
+    fireEvent.pointerDown(boxOf('Kori Blade'));
+    step(boxOf('Kori Blade'), '');
+    fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
+    expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['INPUT', true]);
+    act(() => update((d) => void (d.cards[0].sourceNote = 'Lin Kuei Tower')));
+    expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['SELECT', true]);
+
+    // After a tap, focus coming back (as with the app) is still a tap's.
+    boxOf('Kori Blade').blur();
+    fireEvent.pointerDown(boxOf('Kori Blade'));
+    boxOf('Kori Blade').focus();
+    boxOf('Kori Blade').blur();
+    boxOf('Kori Blade').focus();
+    act(() => update((d) => void (d.cards[0].sourceNote = undefined)));
+    expect([boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade')]).toEqual(['INPUT', false]);
+
+    // A tap on Add card's label focuses its Tower list without touching the list itself.
+    act(() => update((d) => void (d.cards[0].sourceNote = 'Lin Kuei Tower')));
+    const form = towerForm();
+    fireEvent.pointerDown(form.getByText('Tower', { selector: 'span' }));
+    form.getByLabelText('Tower').focus();
+    act(() => update((d) => void (d.cards[0].sourceNote = undefined)));
+    expect([form.getByLabelText('Tower').tagName, document.activeElement === form.getByLabelText('Tower')]).toEqual(['INPUT', false]);
+  });
+
+  // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
+  // Value: protects=a tower stepped to with the keys and still held is dropped once a sync takes it out of the list, so
+  // leaving the list or hiding the app saves nothing the list doesn't show; fails_when=the held step outlives its option
+  // and is saved, with an Undo, over what the card shows; why_new=review (state machines); seam=a sync made with the
+  // store's update, document.visibilityState mocked; no_claim=a real sync
+  it('drops a held step a sync takes out of the list', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower'), tower('fan', 'Frost Fan')]);
+    step(boxOf('Kori Blade'), 'Shirai Ryu Tower');
+    act(() => update((d) => void (d.cards.find((c) => c.id === 'kunai')!.source = 'krypt')));
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect([towerOf('Kori Blade'), lastUndo]).toEqual(['Lin Kuei Tower', null]);
+
+    act(() => update((d) => void (d.cards.find((c) => c.id === 'kunai')!.source = 'tower')));
+    step(boxOf('Frost Fan'), 'Shirai Ryu Tower');
+    act(() => update((d) => void (d.cards.find((c) => c.id === 'kunai')!.sourceNote = 'shirai ryu tower')));
+    appShows('hidden');
+    expect([towerOf('Frost Fan'), lastUndo]).toEqual([undefined, null]);
   });
 });

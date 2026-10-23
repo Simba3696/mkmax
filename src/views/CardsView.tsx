@@ -60,6 +60,15 @@ const finishTower = (e: TowerEdit, write: TowerWrite) => {
   write(typed || e.was, { saved: e.saved, respell: !!typed, was: e.was });
 };
 
+// How the user last acted on the page: with keys (Tab, arrows, Enter, typing) or a pointer (a tap or click). It's watched
+// on the whole page, so a tap on a label counts, a key after a click counts as keys, and focus coming back with the app
+// changes nothing.
+let lastInput: 'key' | 'pointer' = 'pointer';
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', () => void (lastInput = 'key'), true);
+  document.addEventListener('pointerdown', () => void (lastInput = 'pointer'), true);
+}
+
 /**
  * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
  * While a name is being typed the box stays a text box until it's left, so it doesn't turn into the list mid-word once
@@ -78,27 +87,13 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   useEffect(() => {
     focusList.current = false;
   });
-  // Whether the list or box has focus, and whether it was last used from the keyboard. When one replaces the other while
-  // a keyboard user is on it (No tower picked on the last tower named turns the list into the plain box, Add card's Enter
-  // names the first tower, or a sync names the first or last tower), the one that replaces it takes focus, so they don't
-  // lose their place. A tap or click never moves focus, so a phone doesn't open its keyboard on the new box. A removed
-  // element gives no blur, so the flags hold until then.
-  // Focus that no tap or click came just before (Tab, or focus carried over here) counts as the keyboard's too.
+  // Whether the list or box has focus. When one replaces the other while it does and the user last acted with keys (No
+  // tower picked on the last tower named turns the list into the plain box, Add card's Enter names the first tower, or a
+  // sync names the first or last tower), the one that replaces it takes focus, so a keyboard user doesn't lose their
+  // place. After a tap or click focus never moves, so a phone doesn't open its keyboard on the new box. A removed element
+  // gives no blur, so the flag holds until then.
   const focused = useRef(false);
-  const byKeys = useRef(false);
-  const pointed = useRef(false);
-  const keepFocus = (el: HTMLElement | null) => void (el && (focusList.current || (focused.current && byKeys.current)) && el !== document.activeElement && el.focus());
-  const focusTracking = {
-    onFocus: () => {
-      focused.current = true;
-      byKeys.current = !pointed.current;
-      pointed.current = false;
-    },
-    onPointerDown: () => {
-      pointed.current = true;
-      byKeys.current = false;
-    },
-  };
+  const keepFocus = (el: HTMLElement | null) => void (el && (focusList.current || (focused.current && lastInput === 'key')) && el !== document.activeElement && el.focus());
 
   // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
   // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step
@@ -110,6 +105,10 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   const typed = value?.trim();
   const listed = typed && towers.find((t) => towerKey(t) === towerKey(typed));
   const current = listed || typed || '';
+  // A step a sync has made stale (its tower removed or re-spelled, or the list gone) is dropped, so leaving the list or
+  // hiding the app never saves a tower the list doesn't show.
+  const heldNow = !edit && towers.length && (held === null || held === '' || held === NEW_TOWER || held === typed || towers.includes(held)) ? held : null;
+  useEffect(() => void (held !== null && heldNow === null && setHeld(null)), [held, heldNow]);
   // Leaving the list drops a held Add a new tower…; Enter opens its box.
   const settle = (v: string, enter: boolean) => {
     setHeld(null);
@@ -124,10 +123,10 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   // a tower held by the arrow keys is saved); the box stays open with what was typed, and is finished again when it's
   // left. It's done at once (flushSync), so the store's save runs before the page can be frozen or closed, not in a later
   // task that may never come.
-  const openEdit = useRef({ edit, onChange, held, settle, value });
+  const openEdit = useRef({ edit, onChange, held: heldNow, settle, value });
   // Kept up to date in a layout effect, which runs inside flushSync's commit, so the hide's read-back below sees the
   // tower its save left.
-  useLayoutEffect(() => void (openEdit.current = { edit, onChange, held, settle, value }));
+  useLayoutEffect(() => void (openEdit.current = { edit, onChange, held: heldNow, settle, value }));
   useEffect(() => {
     if (openEdit.current.edit) setEdit(null);
     const away = () => {
@@ -168,17 +167,15 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
           else onChange(cur.was, { saved: cur.saved });
           setEdit({ text, was: cur.was, saved: text.trim() ? text : cur.was });
         }}
-        onFocus={focusTracking.onFocus}
+        onFocus={() => void (focused.current = true)}
         onBlur={() => {
-          focused.current = pointed.current = false;
+          focused.current = false;
           if (edit) finishTower(edit, onChange);
           setEdit(null);
         }}
-        onPointerDown={focusTracking.onPointerDown}
         // Only a box with a name open (typed in, or opened from Add a new tower…) turns into the list; an untouched plain
         // box doesn't rerender, so a flag set for it would wait and take focus the next time the list shows.
         onKeyDown={(e) => {
-          byKeys.current = true;
           if (e.key !== 'Enter') return;
           if (!onEnter) {
             focusList.current = !!edit;
@@ -200,7 +197,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
     <select
       ref={keepFocus}
       className={className}
-      value={held ?? current}
+      value={heldNow ?? current}
       aria-label="Tower"
       onChange={(e) => {
         const v = e.target.value;
@@ -208,20 +205,16 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
         settle(v, true);
       }}
       onKeyDown={(e) => {
-        byKeys.current = true;
         if (e.key !== 'Enter') return void (keyed.current = true);
-        if (held !== null) return settle(held, true);
+        if (heldNow !== null) return settle(heldNow, true);
         onEnter?.();
       }}
       onKeyUp={() => void (keyed.current = false)}
-      onPointerDown={() => {
-        keyed.current = false;
-        focusTracking.onPointerDown();
-      }}
-      onFocus={focusTracking.onFocus}
+      onPointerDown={() => void (keyed.current = false)}
+      onFocus={() => void (focused.current = true)}
       onBlur={() => {
-        focused.current = pointed.current = false;
-        if (held !== null) settle(held, false);
+        focused.current = false;
+        if (heldNow !== null) settle(heldNow, false);
       }}
     >
       {/* Once a tower is set, picking this takes it off the card, so it says so. */}
