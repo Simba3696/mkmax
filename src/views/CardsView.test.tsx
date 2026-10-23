@@ -3077,6 +3077,18 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect(enterEmpty('W', '')).toEqual(['SELECT', true, 'Lin Kuei Tower']);
   });
 
+  // Generated on 2026-10-23 (/ship review, maintainability, Tower dropdown)
+  // Value: protects=Enter in the new-tower box of a card with no tower, while other cards name towers, leaves the card
+  // with none and puts focus on the list that replaces the box; fails_when=the flag asks whether the card keeps a tower
+  // rather than whether a list replaces the box, so focus drops to the page; why_new=review (maintainability); the test
+  // above only has a card with a tower; seam=none; no_claim=a real keyboard
+  it("keeps focus on the Tower list after Enter in the empty new-tower box of a card with no tower", () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('fan', 'Frost Fan')]);
+    pickNewTower(boxOf('Frost Fan'));
+    fireEvent.keyDown(boxOf('Frost Fan'), { key: 'Enter' });
+    expect([boxOf('Frost Fan').tagName, document.activeElement === boxOf('Frost Fan'), towerOf('Frost Fan')]).toEqual(['SELECT', true, undefined]);
+  });
+
   // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
   // Value: protects=an Add after a tab switch still joins and is named in the Undo of Add card's re-spell while it shows,
   // so that Undo never takes out a card it doesn't name; fails_when=what Add card joins lives in the page, which a tab

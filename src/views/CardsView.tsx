@@ -183,13 +183,13 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
           if (edit) finishTower(edit, onChange);
           setEdit(null);
         }}
-        // Only a box with a name open (typed in, or opened from Add a new tower…) that leaves the card with a tower turns
-        // into the list; an untouched plain box doesn't rerender, so a flag set for it would wait and take focus the next
+        // A box with a name open (typed in, or opened from Add a new tower…) turns into the list when it's left while the
+        // list has towers; an untouched plain box doesn't rerender, so a flag set for it would wait and take focus the next
         // time the list shows, and an emptied plain box stays a box, which the flag would focus again.
         onKeyDown={(e) => {
           if (e.key !== 'Enter') return;
           if (!onEnter) {
-            focusList.current = !!edit && !!(edit.text.trim() || edit.was);
+            focusList.current = !!edit && towers.length > 0;
             return e.currentTarget.blur();
           }
           // The name is finished first (so a new spelling is fixed on the other cards), then the form's Enter runs. It's

@@ -87,10 +87,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [newerSave, setNewerSave] = useState(savedByNewerApp);
 
   const [lastUndo, setLastUndo] = useState<UndoEntry | null>(null);
-  // The entry showing, also set as soon as a change makes one, so a second change in the same tap (Add card's Enter
-  // re-spells, then adds) can carry on from it before the next render (alsoUndo).
+  // The entry showing, set by every change to `lastUndo` as it's made, so a second change in the same tap (Add card's
+  // Enter re-spells, then adds) can carry on from it before the next render (alsoUndo). Never set from a render, which
+  // could read an older `lastUndo` (one with a clear still queued) and bring back an Undo that's going.
   const shownUndo = useRef(lastUndo);
-  shownUndo.current = lastUndo;
   // Cleared at once too, so nothing in the same moment (an Add, or Undo itself) can use an Undo that's going: after a
   // sync or a replace, it would put back a copy from before the other device's changes.
   const clearUndo = () => {
