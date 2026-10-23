@@ -209,9 +209,10 @@ describe('the Maxed record', () => {
     const old = { ...defaultState(), version: 17, cards: [gear('done', 11, 'LIN KUEI TOWER'), gear('kori', 1, 'Lin Kuei Tower'), gear('fan', 1, 'lin kuei tower'), gear('odd', 1, 42)] } as unknown as AppState;
     const out = normalize(old);
     expect(out.cards.map((c) => [c.id, c.sourceNote])).toEqual([['kori', 'Lin Kuei Tower'], ['fan', 'Lin Kuei Tower'], ['odd', undefined]]);
-    // Dropped on a current save too, so Tower gear never reads it.
-    const current = normalize({ ...defaultState(), cards: [gear('odd', 1, { x: 1 })] } as unknown as AppState);
-    expect('sourceNote' in current.cards[0]).toBe(false);
+    // Dropped on a current save too, so Tower gear never reads it, on any card, and a card's No kards stays.
+    const krypt = card('krypt', 1, { rarityId: 'epic', source: 'krypt', sourceNote: 7 as unknown as string });
+    const current = normalize({ ...defaultState(), cards: [gear('odd', 1, { x: 1 }), krypt, { ...gear('nk', 1, 9), noKards: true }] } as unknown as AppState);
+    expect(current.cards.map((c) => ['sourceNote' in c, c.noKards ?? null])).toEqual([[false, null], [false, null], [false, true]]);
   });
 
   // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)

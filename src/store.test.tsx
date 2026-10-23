@@ -114,6 +114,44 @@ describe('update undo labels', () => {
     expect([names(), api().lastUndo]).toEqual([['Scorpion', 'Kitana'], null]);
   });
 
+  // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
+  // Value: protects=once a sync brings in another device's changes, the Undo from before can't be used in the same
+  // moment, before the screen updates: Undo of it does nothing and a change carrying on from it gets no Undo of its own;
+  // fails_when=a sync clears the Undo only at the next render (or not at all), so Undo puts back the copy from before and
+  // the next push overwrites the other device's changes; why_new=only replace was driven, and syncLoop tests stub the
+  // store's side; seam=none; no_claim=the gist download itself (SyncLoop.syncNow stands in, handing the store a remote
+  // copy as a pull does)
+  it("lets nothing use an Undo from before a sync's changes, even before the screen updates", () => {
+    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
+    const raiden = { id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false };
+    const remote = { ...defaultState(), cards: [{ ...raiden, id: 's', name: 'Scorpion' }] };
+    let pullNow = false;
+    vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(function (this: unknown) {
+      // A pull that finds the other device's copy newer hands it to the store, as SyncLoop does.
+      if (pullNow) (this as { deps: { applyRemote: (s: typeof remote) => void } }).deps.applyRemote(remote);
+      return Promise.resolve();
+    });
+    let latest: Store | undefined;
+    render(
+      <StoreProvider>
+        <Grab onRender={(store) => (latest = store)} />
+      </StoreProvider>,
+    );
+    const api = () => latest!;
+    const names = () => api().state.cards.map((c) => c.name);
+    let before: ReturnType<Store['update']>;
+    act(() => void (before = api().update((d) => void d.cards.push(raiden), 'added Raiden')));
+    const { update, undo, sync } = api();
+    pullNow = true;
+    act(() => {
+      void sync.syncNow();
+      update((d) => void d.cards.push({ ...raiden, id: 'k', name: 'Kitana' }), 'added Kitana', { alsoUndo: before });
+      undo(before);
+      undo();
+    });
+    expect([names(), api().lastUndo]).toEqual([['Scorpion', 'Kitana'], null]);
+  });
+
   // Value: protects=a recipe that finds nothing to change saves, stamps and offers Undo for nothing; fails_when=update
   // ignores the recipe's noChange and stamps updatedAt (making this device's copy look newest to sync); why_new=recipes
   // couldn't call off a change before; seam=none; no_claim=the sync push timer (no sync token is set)
