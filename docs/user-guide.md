@@ -594,7 +594,8 @@ The bottom of Settings shows which version you have and the date of that change,
 ### Updates
 
 - An app left open only looks for a new version when you pull to refresh or import a backup from a newer version (or when it's fully closed and reopened). If one is out, the app reloads into it by itself.
-- If a pop-up such as the pack editor is open when a new version is found, the app waits and reloads once you close it, so nothing you've typed is lost. It also waits while the Undo bar is showing (8 seconds while MK Max is showing), so you can still undo a save that closed the pop-up.- The daily event schedule refresh isn't a new version, so it doesn't reload the app.
+- If a pop-up such as the pack editor is open when a new version is found, the app waits and reloads once you close it, so nothing you've typed is lost. It also waits while the Undo bar is showing (8 seconds while MK Max is showing), so you can still undo a save that closed the pop-up.
+- The daily event schedule refresh isn't a new version, so it doesn't reload the app.
 - Updates never change your data, apart from the one-time upgrade of older saves.
 - Settings shows which [version](#version) you have.
 
