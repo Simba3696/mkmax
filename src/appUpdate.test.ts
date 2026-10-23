@@ -75,4 +75,43 @@ describe('app update reload', () => {
     bar.remove();
     await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
   });
+
+  // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
+  // Value: protects=the reload notices the Undo bar going when it sits inside #root, as it does in the real app, not
+  // only when it's a direct child of <body>, and reloads just once; fails_when=the watch stops looking below <body>'s
+  // own children, so the update never loads until the app is next opened; why_new=the other tests put the bar straight
+  // on <body>, where a shallow watch also sees it go; seam=none; no_claim=a real service worker update or React's
+  // own Undo bar (registerSW mocked, location.reload stubbed)
+  it('notices the Undo bar going from inside #root, and reloads once', async () => {
+    const root = document.createElement('div');
+    root.id = 'root';
+    document.body.append(root);
+    const bar = document.createElement('div');
+    bar.setAttribute('data-undo', '');
+    root.append(bar);
+    sw.needReload();
+    expect(reload).not.toHaveBeenCalled();
+    bar.remove();
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+    root.append(document.createElement('p'));
+    await Promise.resolve();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
+  // Value: protects=a new build found while the app is already in the background with the Undo bar up still waits for
+  // the bar, so the change's sync push goes first; fails_when=an update found while hidden reloads at once and cancels
+  // that pending push; why_new=the other hidden test finds the update while the app is showing, then hides it;
+  // seam=none; no_claim=a real service worker update or sync push (registerSW mocked, location.reload stubbed)
+  it('waits for the Undo bar when the update is found with the app already hidden', async () => {
+    appShows('hidden');
+    const bar = show('data-undo');
+    sw.needReload();
+    expect(reload).not.toHaveBeenCalled();
+    appShows('visible');
+    await Promise.resolve();
+    expect(reload).not.toHaveBeenCalled();
+    bar.remove();
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+  });
 });
