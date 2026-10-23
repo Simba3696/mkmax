@@ -3623,6 +3623,85 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect([after.tagName, after.value, lastUndo]).toEqual(['SELECT', 'Thunder Tower', null]);
   });
 
+  // Generated on 2026-10-23 (/ship review, state machines and Red Team, Tower dropdown)
+  // Value: protects=a page switch that gives the list no blur (a swipe to another tab) settles a tower step held by the
+  // keys as leaving the list does (a tower saved with Undo, No tower taking it off, Add a new tower… dropped), and a held
+  // step or an open box marks the page as busy for an app update only while it's showing; fails_when=the switch only
+  // finishes an open box, so the list shows a tower the card doesn't have, or a held step isn't marked and an update's
+  // reload saves it unseen, or a hidden page keeps its mark and holds the update; why_new=review (state machines, Red
+  // Team); seam=Activity hides the page (rerender to Tower gear and back), keyDown, change and keyUp in a closed list's
+  // order; no_claim=a real swipe
+  it('settles a held step across a page switch, and marks a held step or open box as busy only while showing', async () => {
+    const { rerender } = renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    const editing = () => document.querySelectorAll('[data-editing]').length;
+    const away = async () => {
+      rerender(page('towers'));
+      rerender(page('cards'));
+      await act(async () => {});
+    };
+    step(boxOf('Kori Blade'), 'Shirai Ryu Tower');
+    expect([editing(), towerOf('Kori Blade')]).toEqual([1, 'Lin Kuei Tower']);
+    await away();
+    expect([towerOf('Kori Blade'), lastUndo?.label, (boxOf('Kori Blade') as HTMLSelectElement).value, editing()]).toEqual(['Shirai Ryu Tower', 'Kori Blade: tower set to Shirai Ryu Tower', 'Shirai Ryu Tower', 0]);
+
+    step(boxOf('Ryu Kunai'), '');
+    await away();
+    expect([towerOf('Ryu Kunai'), lastUndo?.label]).toEqual([undefined, 'Ryu Kunai: tower removed']);
+
+    step(boxOf('Kori Blade'), newTowerValue(boxOf('Kori Blade')));
+    await away();
+    expect([towerOf('Kori Blade'), boxOf('Kori Blade').tagName, editing()]).toEqual(['Shirai Ryu Tower', 'SELECT', 0]);
+
+    // A box left open is finished and unmarked while the page is hidden, not only once it's shown again.
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Wind Tower' } });
+    expect(editing()).toBe(1);
+    rerender(page('towers'));
+    await act(async () => {});
+    expect([towerOf('Kori Blade'), editing()]).toEqual(['Wind Tower', 0]);
+  });
+
+  // Generated on 2026-10-23 (/ship review, Codex design, Tower dropdown)
+  // Value: protects=while a tower name is typed in a card's box or Add card's, the box says under it how many other
+  // cards finishing it will re-spell, counting only cards spelled another way, and says nothing for a new tower or once
+  // the box is left; fails_when=the re-spell changes untouched cards with no word beforehand, or the hint counts cards
+  // already spelled that way; why_new=review (Codex design); seam=none;
+  // no_claim=how the hint looks on a phone
+  it('says under a typed tower name how many other cards finishing it re-spells', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('fan', 'Frost Fan', 'lin kuei tower'), tower('jade', 'Jade Fan', 'LIN KUEI TOWER')]);
+    const hint = () => screen.queryByText(/other cards? when you finish$/)?.textContent ?? null;
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei tower ' } });
+    expect([hint(), boxOf('Kori Blade').getAttribute('aria-describedby') === screen.getByText(/when you finish$/).id]).toEqual(['Respells 2 other cards when you finish', true]);
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Wind Tower' } });
+    expect([hint(), boxOf('Kori Blade').hasAttribute('aria-describedby')]).toEqual([null, false]);
+    fireEvent.blur(boxOf('Kori Blade'));
+
+    const form = towerForm();
+    pickNewTower(form.getByLabelText('Tower'));
+    fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'lin kuei tower' } });
+    expect(hint()).toBe('Respells 1 other card when you finish');
+    fireEvent.blur(form.getByPlaceholderText('New tower name'));
+    expect([hint(), towerOf('Jade Fan')]).toEqual([null, 'lin kuei tower']);
+  });
+
+  // Generated on 2026-10-23 (/ship review, state matrix, Tower dropdown)
+  // Value: protects=Undo of a re-spell made from Add card's box, with no Add after it, puts the other cards' spelling
+  // back and adds nothing, while the form keeps the tower, shown as the list now spells it; fails_when=the re-spell's
+  // Undo also clears the form or adds the card, or leaves the cards re-spelled; why_new=review (state machines): only an
+  // Add after the re-spell was undone; seam=none; no_claim=none beyond protects
+  it("undoes Add card's re-spell alone, keeping the tower in the form", () => {
+    renderPage([tower('kori', 'Kori Blade', 'lin kuei tower')]);
+    const form = towerForm();
+    pickNewTower(form.getByLabelText('Tower'));
+    fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.blur(form.getByPlaceholderText('New tower name'));
+    expect([towerOf('Kori Blade'), lastUndo?.label]).toEqual(['Lin Kuei Tower', 'Respelled 1 other card: Lin Kuei Tower']);
+    act(() => undo());
+    const saved = JSON.parse(localStorage.getItem('mkmax:v1')!).cards as unknown[];
+    expect([towerOf('Kori Blade'), saved.length, (form.getByLabelText('Tower') as HTMLSelectElement).value, lastUndo]).toEqual(['lin kuei tower', 1, 'lin kuei tower', null]);
+  });
+
   // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
   // Value: protects=hiding the app with a card's box open saves a new name trimmed with no Undo, keeps the tower when the
   // box is empty, and keeps a tower a sync brought in (re-spelling nothing), each time leaving the box open, and leaving

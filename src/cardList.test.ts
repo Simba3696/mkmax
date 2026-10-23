@@ -235,5 +235,9 @@ describe('pasted tower names', () => {
     const unnamed: Card[] = [{ ...existing[0], sourceNote: undefined }];
     const krypt = parseCardList('Kori Blade - Epic - Krypt - F2', rarities, 'epic', unnamed);
     expect([same.updates.length, same.duplicates.length, moved.updates.map((u) => u.patch), krypt.updates.map((u) => u.patch.source)]).toEqual([0, 1, [{ source: 'tower', sourceNote: 'Shirai Ryu Tower' }], ['krypt']]);
+    // Extended on 2026-10-23 (/ship review, Red Team): a card saved with two spaces inside its tower is the same tower as
+    // the pasted line's one; fails_when=towerKey stops squeezing spaces, so the paste counts an update to a look-alike.
+    const spaced: Card[] = [{ ...existing[0], sourceNote: 'Lin  Kuei Tower' }];
+    expect(parseCardList('Kori Blade - Epic - Lin Kuei Tower - F2', rarities, 'epic', spaced).updates).toEqual([]);
   });
 });

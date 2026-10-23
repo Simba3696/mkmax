@@ -81,10 +81,11 @@ export const atTopLevel = (card: Card, rule: RarityRule) => card.fusion >= targe
 export const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityId}|${nameKey(c.name)}`;
 
 /**
- * One tower however its name was typed, since tower names are typed by hand: "lin kuei tower " is Lin Kuei Tower. Tower
+ * One tower however its name was typed, since tower names are typed by hand: "lin  kuei tower " is Lin Kuei Tower. Spaces
+ * inside count as one, as Paste a list reads them (a name copied from notes can have two, or a non-breaking one). Tower
  * gear groups by it, and the Tower list on Cards offers each tower once by it.
  */
-export const towerKey = (name: string) => name.trim().toLowerCase();
+export const towerKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
 
 // Cards under a rarity a sync removed are hidden everywhere, so they don't spell a tower and a typed name doesn't
 // re-spell them (only the version 18 step, unifyTowerSpellings, does): the Tower list, chips, Add card, Paste a list
@@ -107,18 +108,23 @@ export function towerSpellings(s: Pick<AppState, 'cards' | 'rarities'>) {
  * it changed.
  */
 export function respellTower(s: Pick<AppState, 'cards' | 'rarities'>, tower: string, skip?: Card) {
-  const key = towerKey(tower);
   let changed = 0;
   for (const c of shownCards(s)) {
-    if (c === skip) continue;
-    // Already spelled that way, give or take spaces at the ends (as a Tower box saves it while it's typed, or an older
-    // build saved it): nothing to fix.
-    if (c.source !== 'tower' || c.sourceNote?.trim() === tower || !c.sourceNote?.trim() || towerKey(c.sourceNote) !== key) continue;
+    if (c === skip || !spelledOtherwise(c, tower)) continue;
     c.sourceNote = tower;
     changed++;
   }
   return changed;
 }
+
+/** How many cards respellTower would change for a name typed on the card with id `skipId` (none: Add card's box). */
+export const towerRespells = (s: Pick<AppState, 'cards' | 'rarities'>, tower: string, skipId?: string) =>
+  shownCards(s).filter((c) => c.id !== skipId && spelledOtherwise(c, tower)).length;
+
+// Tower gear naming the tower another way. Already spelled that way, give or take spaces at the ends (as a Tower box
+// saves it while it's typed, or an older build saved it), is nothing to fix.
+const spelledOtherwise = (c: Card, tower: string) =>
+  c.source === 'tower' && !!c.sourceNote?.trim() && c.sourceNote.trim() !== tower && towerKey(c.sourceNote) === towerKey(tower);
 
 /**
  * Saves every tower gear card's tower in the one spelling the Tower list shows (towerSpellings), trimmed. A tower only

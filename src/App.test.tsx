@@ -501,6 +501,62 @@ describe('the Undo bar', () => {
     expect([ids(), screen.queryByText('Added c')]).toEqual([['a', 'b'], null]);
   });
 
+  // Generated on 2026-10-23 (/ship review, state matrix, Tower dropdown)
+  // Value: protects=a press on Undo or ✕ acts only on the change it showed, whatever kind came in before the click: an
+  // Add carried on from the Undo the press showed, a level change that removed a maxed card, a re-spell from Add card's Tower box,
+  // and a re-spell the press itself makes by finishing a card's Tower box; that change stays showing and nothing is
+  // undone or closed; fails_when=a kind of change gets its own way to Undo (its base, or the label of the Undo it carried
+  // on from) that the press check misses, so a stale press undoes or closes it unseen; why_new=review (state machines):
+  // only plain changes were pressed stale; seam=the store's update makes the carried Add and the level change as Add
+  // card and a level tap do, the press's blur is sent by hand between pointerdown and click; no_claim=a real tap's
+  // event order
+  it('acts only on the change a press showed, for each kind of change', () => {
+    const gear = (id: string, name: string, sourceNote: string) => ({ id, name, rarityId: 'epic', fusion: 1, guest: false, source: 'tower', sourceNote });
+    localStorage.setItem('mkmax:v1', JSON.stringify({ ...defaultState(), cards: [gear('kori', 'Kori Blade', 'lin kuei tower'), gear('fan', 'Frost Fan', 'lin kuei tower')] }));
+    renderApp();
+    const towerOf = (id: string) => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; sourceNote?: string }[]).find((c) => c.id === id)?.sourceNote;
+    const stalePress = (name: 'Undo' | 'Dismiss', newer: () => void) => {
+      fireEvent.pointerDown(screen.getByRole('button', { name }));
+      newer();
+      fireEvent.click(screen.getByRole('button', { name }), { detail: 1 });
+    };
+
+    // An Add that carries on from the Undo the press showed.
+    add('a', 'Added a');
+    stalePress('Undo', () => act(() => update((d) => void d.cards.push({ id: 'b', name: 'b', rarityId: 'epic', fusion: 1, guest: false }), 'Added b', { alsoUndo: true })));
+    expect([ids(), screen.queryByText('Added b · Added a') !== null]).toEqual([['kori', 'fan', 'a', 'b'], true]);
+
+    // A level change that removed a card as maxed.
+    act(() => update((d) => void d.cards.push({ id: 'm', name: 'Mileena', rarityId: 'diamond', fusion: 1, guest: false }), 'Added Mileena'));
+    act(() => update((d) => void (d.cards.find((c) => c.id === 'm')!.fusion = 11), 'Mileena to F10'));
+    expect(screen.queryByText('Mileena to F10 · Mileena is maxed and removed')).toBeTruthy();
+    stalePress('Undo', () => add('d', 'Added d'));
+    expect([ids().includes('m'), screen.queryByText('Added d') !== null]).toEqual([false, true]);
+
+    // A re-spell from Add card's Tower box.
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: 'Cards' }));
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
+    stalePress('Dismiss', () => {
+      fireEvent.change(form.getByLabelText('Tower'), { target: { value: '\u0000new' } });
+      fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
+      fireEvent.blur(form.getByPlaceholderText('New tower name'));
+    });
+    expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Respelled 2 other cards: Lin Kuei Tower') !== null]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', true]);
+
+    // A re-spell the press makes itself, by finishing a card's Tower box as focus leaves it.
+    const box = () => {
+      let r: HTMLElement | null = screen.getAllByTitle('Tap to rename').find((t) => t.textContent === 'Kori Blade')!;
+      while (r && !r.querySelector('[aria-label=Tower]')) r = r.parentElement;
+      return r!.querySelector<HTMLElement>('[aria-label=Tower]')!;
+    };
+    fireEvent.change(box(), { target: { value: '\u0000new' } });
+    fireEvent.change(box(), { target: { value: 'Lin Kuei tower' } });
+    stalePress('Undo', () => fireEvent.blur(box()));
+    expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Respelled 1 other card: Lin Kuei tower') !== null]).toEqual(['Lin Kuei tower', 'Lin Kuei tower', true]);
+  });
+
   // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
   // Value: protects=a plain tap or a key press on Undo undoes the change showing, and on ✕ closes the bar keeping it,
   // also a key press on ✕ after an earlier press that a new change replaced; fails_when=the pressed-entry match fails, so

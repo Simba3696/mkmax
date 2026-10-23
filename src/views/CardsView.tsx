@@ -1,8 +1,8 @@
-import { Activity, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Activity, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerSpellings, unmarkMaxed } from '../engine';
+import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerRespells, towerSpellings, unmarkMaxed } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -73,10 +73,12 @@ if (typeof document !== 'undefined') {
  * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
  * While a name is being typed the box stays a text box until it's left, so it doesn't turn into the list mid-word once
  * the card saves the first letters; with no towers named yet it's only a text box. A pick from the list goes to onPick
- * (with Undo, on a card); a typed name saves as it's typed, as a rename does.
+ * (with Undo, on a card); a typed name saves as it's typed, as a rename does. `respells` counts the other cards a typed
+ * name would re-spell when it's finished, which the box says under it beforehand.
  */
-function TowerSelect({ towers, value, onChange, onPick, onEnter, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; className?: string; placeholder?: string }) {
+function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; respells: (name: string) => number; className?: string; placeholder?: string }) {
   const pick = onPick ?? onChange;
+  const hintId = useId();
   // The name being typed, the tower an emptied box goes back to (the one the card had before Add a new tower… was picked,
   // or, if it opened on one, the name saved when the app was hidden; none in the plain box, which has no list to go back
   // to), and the tower this box last saved. Null while picking from the list, or before the first key in the plain box.
@@ -123,8 +125,8 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
     } else if (v !== current) pick(v || undefined);
   };
 
-  // Hiding the page (Activity, for Tower gear or Maxed) may give the box no blur, so a box left open is finished in the
-  // cleanup and closed when the page is shown again, as a rename is.
+  // Hiding the page (Activity, for Tower gear or Maxed, or a swipe to another tab) may give the box or list no blur, so
+  // in the cleanup a box left open is finished and closed and a held step is settled, as leaving them does.
   // Hiding the app gives no blur either, and a phone may close it while it's away, so the name is finished then too (and
   // a tower held by the arrow keys is saved); the box stays open with what was typed, and is finished again when it's
   // left. It's done at once (flushSync), so the store's save runs before the page can be frozen or closed, not in a later
@@ -134,7 +136,6 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   // tower its save left.
   useLayoutEffect(() => void (openEdit.current = { edit, onChange, held: heldNow, settle, value }));
   useEffect(() => {
-    if (openEdit.current.edit) setEdit(null);
     const away = () => {
       if (document.visibilityState !== 'hidden') return;
       const { edit: e, onChange: write, held: h, settle: done } = openEdit.current;
@@ -153,59 +154,76 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
     document.addEventListener('visibilitychange', away);
     return () => {
       document.removeEventListener('visibilitychange', away);
-      if (openEdit.current.edit) finishTower(openEdit.current.edit, openEdit.current.onChange);
+      const { edit: e, onChange: write, held: h, settle: done } = openEdit.current;
+      // A held step is settled as leaving the list does: a tower is saved with Undo, Add a new tower… is dropped.
+      if (e) finishTower(e, write);
+      else if (h !== null) done(h, false);
+      // Closed now, not when the page is shown again: a hidden box still marked as being typed in holds an app update.
+      setEdit(null);
     };
   }, []);
 
   if (edit || towers.length === 0) {
     const cur = edit ?? { was: undefined, saved: value };
+    // Said before the name is finished, as the re-spell changes cards the user didn't touch.
+    const others = edit?.text.trim() ? respells(edit.text.trim()) : 0;
     return (
-      <input
-        ref={keepFocus}
-        className={className}
-        // A name being typed holds an app update's reload (appUpdate.ts), which would finish it unseen.
-        data-editing={edit ? '' : undefined}
-        value={edit?.text ?? value ?? ''}
-        placeholder={towers.length ? 'New tower name' : placeholder}
-        aria-label="Tower"
-        autoFocus={!!edit}
-        onChange={(e) => {
-          const text = e.target.value;
-          if (text.trim()) onChange(text);
-          else onChange(cur.was, { saved: cur.saved });
-          setEdit({ text, was: cur.was, saved: text.trim() ? text : cur.was });
-        }}
-        onFocus={() => void (focused.current = true)}
-        onBlur={() => {
-          focused.current = false;
-          if (edit) finishTower(edit, onChange);
-          setEdit(null);
-        }}
-        // A box with a name open (typed in, or opened from Add a new tower…) turns into the list when it's left while the
-        // list has towers; an untouched plain box doesn't rerender, so a flag set for it would wait and take focus the next
-        // time the list shows, and an emptied plain box stays a box, which the flag would focus again.
-        onKeyDown={(e) => {
-          if (e.key !== 'Enter') return;
-          if (!onEnter) {
-            focusList.current = !!edit && towers.length > 0;
-            return e.currentTarget.blur();
-          }
-          // The name is finished first (so a new spelling is fixed on the other cards), then the form's Enter runs. It's
-          // finished in place rather than by leaving the box, so focus stays here while it's still a text box; if the
-          // form's Enter names the first tower and the list replaces the box, the list takes focus (keepFocus).
-          if (edit) {
-            finishTower(edit, onChange);
+      <>
+        <input
+          ref={keepFocus}
+          className={className}
+          aria-describedby={others ? hintId : undefined}
+          // A name being typed holds an app update's reload (appUpdate.ts), which would finish it unseen.
+          data-editing={edit ? '' : undefined}
+          value={edit?.text ?? value ?? ''}
+          placeholder={towers.length ? 'New tower name' : placeholder}
+          aria-label="Tower"
+          autoFocus={!!edit}
+          onChange={(e) => {
+            const text = e.target.value;
+            if (text.trim()) onChange(text);
+            else onChange(cur.was, { saved: cur.saved });
+            setEdit({ text, was: cur.was, saved: text.trim() ? text : cur.was });
+          }}
+          onFocus={() => void (focused.current = true)}
+          onBlur={() => {
+            focused.current = false;
+            if (edit) finishTower(edit, onChange);
             setEdit(null);
-          }
-          onEnter();
-        }}
-      />
+          }}
+          // A box with a name open (typed in, or opened from Add a new tower…) turns into the list when it's left while the
+          // list has towers; an untouched plain box doesn't rerender, so a flag set for it would wait and take focus the next
+          // time the list shows, and an emptied plain box stays a box, which the flag would focus again.
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            if (!onEnter) {
+              focusList.current = !!edit && towers.length > 0;
+              return e.currentTarget.blur();
+            }
+            // The name is finished first (so a new spelling is fixed on the other cards), then the form's Enter runs. It's
+            // finished in place rather than by leaving the box, so focus stays here while it's still a text box; if the
+            // form's Enter names the first tower and the list replaces the box, the list takes focus (keepFocus).
+            if (edit) {
+              finishTower(edit, onChange);
+              setEdit(null);
+            }
+            onEnter();
+          }}
+        />
+        {others > 0 && (
+          <span id={hintId} className="text-small text-muted">
+            Respells {others} other card{others === 1 ? '' : 's'} when you finish
+          </span>
+        )}
+      </>
     );
   }
   return (
     <select
       ref={keepFocus}
       className={className}
+      // A held step holds an app update's reload too, which would save it unseen as hiding the app does.
+      data-editing={heldNow !== null ? '' : undefined}
       value={heldNow ?? current}
       aria-label="Tower"
       onChange={(e) => {
@@ -1000,6 +1018,7 @@ function CardList() {
                   if (over?.respell && v) respellFromAdd(v);
                 }}
                 onEnter={add}
+                respells={(t) => towerRespells(state, t)}
               />
             </label>
           )}
@@ -1165,7 +1184,7 @@ function CardList() {
                   </label>
                 )}
                 {(rule.kind !== 'character' || c.source) && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v, sourceNote: undefined })} />}
-                {c.source === 'tower' && <TowerSelect className="w-[11rem]" placeholder="Tower name" towers={towers} value={c.sourceNote} onChange={(v, over) => setTower(c.id, v, over)} onPick={(v) => setTower(c.id, v, undefined, v ? `${c.name}: tower set to ${v}` : `${c.name}: tower removed`)} />}
+                {c.source === 'tower' && <TowerSelect className="w-[11rem]" placeholder="Tower name" towers={towers} value={c.sourceNote} respells={(t) => towerRespells(state, t, c.id)} onChange={(v, over) => setTower(c.id, v, over)} onPick={(v) => setTower(c.id, v, undefined, v ? `${c.name}: tower set to ${v}` : `${c.name}: tower removed`)} />}
                 <button className={btn.ghost} onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
                   Image
                 </button>

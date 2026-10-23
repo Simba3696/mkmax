@@ -117,21 +117,21 @@ describe('update undo labels', () => {
   // moment, before the screen updates: Undo of it does nothing and a change carrying on from it gets no Undo of its own;
   // fails_when=a sync clears the Undo only at the next render (or not at all), so Undo puts back the copy from before and
   // the next push overwrites the other device's changes; why_new=only replace was driven, and syncLoop tests stub the
-  // store's side; seam=none; no_claim=the gist download itself (SyncLoop.syncNow stands in, handing the store a remote
-  // copy as a pull does)
-  it("lets nothing use an Undo from before a sync's changes, even before the screen updates", () => {
-    // Sync is on here, so each change schedules a push: fake timers keep it from running after the test, off the network.
+  // store's side; seam=fetch answers as the gist (a push, then another device's newer copy for the pull), fake timers
+  // run the push; no_claim=GitHub itself
+  it("lets nothing use an Undo from before a sync's changes, even before the screen updates", async () => {
+    // Sync is on here, so each change schedules a push: fake timers say when it runs.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     onTestFinished(() => void vi.useRealTimers());
     localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
-    const raiden = { id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false };
-    const remote = { ...defaultState(), cards: [{ ...raiden, id: 's', name: 'Scorpion' }] };
-    let pullNow = false;
-    vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(function (this: unknown) {
-      // A pull that finds the other device's copy newer hands it to the store, as SyncLoop does.
-      if (pullNow) (this as { deps: { applyRemote: (s: typeof remote) => void } }).deps.applyRemote(remote);
-      return Promise.resolve();
+    // The gist's copy: what a pull downloads, and what a push writes.
+    let gist = { ...defaultState(), updatedAt: 5000 };
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') gist = JSON.parse(JSON.parse(init.body as string).files['mkmax-data.json'].content);
+      return new Response(JSON.stringify({ id: 'g1', description: null, files: { 'mkmax-data.json': { content: JSON.stringify(gist), raw_url: '' } } }));
     });
+    onTestFinished(() => void vi.unstubAllGlobals());
+    const raiden = { id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false };
     let latest: Store | undefined;
     render(
       <StoreProvider>
@@ -140,12 +140,23 @@ describe('update undo labels', () => {
     );
     const api = () => latest!;
     const names = () => api().state.cards.map((c) => c.name);
+    // Each act lets the download's promises run and the status it sets render.
+    const settled = async () => {
+      for (let i = 0; i < 20 && api().sync.status.kind !== 'idle'; i++) await act(async () => {});
+      expect(api().sync.status.kind).toBe('idle');
+    };
+    await settled();
+    // The change is pushed, as it is a moment after it's made, while its Undo is still up.
     act(() => void api().update((d) => void d.cards.push(raiden), 'added Raiden'));
     const before = api().lastUndo!;
+    await act(() => vi.advanceTimersByTimeAsync(1500));
+    await settled();
+    expect(gist.cards.map((c) => c.name)).toEqual(['Raiden']);
+    // Then another device changes the gist, and the next pull brings that in; a tap lands in the same moment.
+    gist = { ...gist, cards: [{ ...raiden, id: 's', name: 'Scorpion' }], updatedAt: gist.updatedAt! + 1 };
     const { update, undo, sync } = api();
-    pullNow = true;
-    act(() => {
-      void sync.syncNow();
+    await act(async () => {
+      await sync.syncNow();
       update((d) => void d.cards.push({ ...raiden, id: 'k', name: 'Kitana' }), 'added Kitana', { alsoUndo: true });
       undo(before);
       undo();
