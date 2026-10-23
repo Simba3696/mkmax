@@ -17,6 +17,9 @@ beforeEach(() => {
   // The catalog and the event schedule are fetched at start; neither matters here, so stay offline.
   vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));
   history.replaceState(null, '', '#packs');
+  // jsdom says the page has focus only while an element holds it; a real window has focus whatever holds it, and a Tower
+  // box ignores a blur that comes with the window losing focus.
+  vi.spyOn(document, 'hasFocus').mockReturnValue(true);
 });
 afterEach(() => {
   cleanup();

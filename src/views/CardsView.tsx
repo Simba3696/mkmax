@@ -74,9 +74,11 @@ if (typeof document !== 'undefined') {
  * While a name is being typed the box stays a text box until it's left, so it doesn't turn into the list mid-word once
  * the card saves the first letters; with no towers named yet it's only a text box. A pick from the list goes to onPick
  * (with Undo, on a card); a typed name saves as it's typed, as a rename does. `respells` counts the other cards a typed
- * name would re-spell when it's finished, which the box says under it beforehand.
+ * name would re-spell when it's finished, which a line says beforehand: on its own line at the end of a card's row of
+ * controls, or above the box (`hintAbove`) in a form whose boxes line up along the bottom (Add card), so nothing moves
+ * sideways or out of line while it comes and goes.
  */
-function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; respells: (name: string) => number; className?: string; placeholder?: string }) {
+function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintAbove, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; respells: (name: string) => number; hintAbove?: boolean; className?: string; placeholder?: string }) {
   const pick = onPick ?? onChange;
   const hintId = useId();
   // The name being typed, the tower an emptied box goes back to (the one the card had before Add a new tower… was picked,
@@ -167,8 +169,14 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, class
     const cur = edit ?? { was: undefined, saved: value };
     // Said before the name is finished, as the re-spell changes cards the user didn't touch.
     const others = edit?.text.trim() ? respells(edit.text.trim()) : 0;
+    const hint = others > 0 && (
+      <span id={hintId} className={hintAbove ? 'text-small text-muted' : 'text-small text-muted basis-full order-last'}>
+        Respells {others} other card{others === 1 ? '' : 's'} when you finish
+      </span>
+    );
     return (
       <>
+        {hintAbove && hint}
         <input
           ref={keepFocus}
           className={className}
@@ -187,6 +195,9 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, class
           }}
           onFocus={() => void (focused.current = true)}
           onBlur={() => {
+            // Some browsers (Chrome) blur the box when you switch to another app or tab. It stays open then, as hiding
+            // the app finishes it (above), so a name can be copied from elsewhere and finished on return.
+            if (!document.hasFocus()) return;
             focused.current = false;
             if (edit) finishTower(edit, onChange);
             setEdit(null);
@@ -210,11 +221,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, class
             onEnter();
           }}
         />
-        {others > 0 && (
-          <span id={hintId} className="text-small text-muted">
-            Respells {others} other card{others === 1 ? '' : 's'} when you finish
-          </span>
-        )}
+        {!hintAbove && hint}
       </>
     );
   }
@@ -804,7 +811,8 @@ function CardList() {
     update(
       (d) => {
         const c = d.cards.find((x) => x.id === id);
-        if (!c || (over && c.sourceNote !== over.saved)) return noChange;
+        // Nor on a card a sync took off tower gear: its list going away settles a held step or finishes its box.
+        if (!c || c.source !== 'tower' || (over && c.sourceNote !== over.saved)) return noChange;
         respelled = over?.respell && tower ? respellTower(d, tower, c) : 0;
         if (c.sourceNote === tower && !respelled) return noChange;
         c.sourceNote = tower;
@@ -1019,6 +1027,7 @@ function CardList() {
                 }}
                 onEnter={add}
                 respells={(t) => towerRespells(state, t)}
+                hintAbove
               />
             </label>
           )}

@@ -20,6 +20,9 @@ beforeEach(() => {
   // The Tower controls go by how the user last acted on the whole page (keys or a tap), which outlives a test: start each
   // one from a tap, whatever the last test pressed.
   fireEvent.pointerDown(document.body);
+  // jsdom says the page has focus only while an element holds it, but these tests blur boxes they never focused; a real
+  // window has focus whatever holds it, and a Tower box ignores a blur that comes with the window losing focus.
+  vi.spyOn(document, 'hasFocus').mockReturnValue(true);
 });
 afterEach(() => {
   cleanup();
@@ -3661,6 +3664,50 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect([towerOf('Kori Blade'), editing()]).toEqual(['Wind Tower', 0]);
   });
 
+  // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
+  // Value: protects=a tower step held by the keys, or a held No tower, is dropped when a sync takes the card off tower
+  // gear and its list goes away: nothing is saved on the card and no Undo shows; fails_when=the list's cleanup settles
+  // the held step as a page switch does, writing a tower onto a Krypt card with a stray "tower set to" Undo;
+  // why_new=review (state machines): the page-switch settle also runs when the list unmounts; seam=a sync made with the
+  // store's update; no_claim=none beyond protects
+  it('drops a held step when a sync takes the card off tower gear', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    const offTowers = (id: string) =>
+      act(() =>
+        update((d) => {
+          const c = d.cards.find((x) => x.id === id)!;
+          c.source = 'krypt';
+          delete c.sourceNote;
+        }),
+      );
+    const saved = (id: string) => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; source?: string; sourceNote?: string }[]).find((c) => c.id === id)!;
+    step(boxOf('Kori Blade'), 'Shirai Ryu Tower');
+    offTowers('kori');
+    expect([saved('kori').source, saved('kori').sourceNote, lastUndo]).toEqual(['krypt', undefined, null]);
+    step(boxOf('Ryu Kunai'), '');
+    offTowers('kunai');
+    expect([saved('kunai').source, saved('kunai').sourceNote, lastUndo]).toEqual(['krypt', undefined, null]);
+  });
+
+  // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=a Tower box blurred because the window lost focus (Chrome does this when you switch to another app
+  // or tab) stays open with what was typed, re-spelling nothing, and is finished as usual once it's left in the page;
+  // fails_when=the window's blur finishes the half-typed name and closes the box, so a name being copied from elsewhere
+  // is saved half typed; why_new=review (Red Team): jsdom fires no blur on switching apps; seam=document.hasFocus mocked;
+  // no_claim=a real browser's order of blur and visibilitychange
+  it('keeps a Tower box open when the window loses focus, and finishes it when it is left', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('fan', 'Frost Fan', 'lin kuei tower')]);
+    pickNewTower(boxOf('Kori Blade'));
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tow' } });
+    vi.mocked(document.hasFocus).mockReturnValue(false);
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect([boxOf('Kori Blade').tagName, (boxOf('Kori Blade') as HTMLInputElement).value, towerOf('Frost Fan'), lastUndo]).toEqual(['INPUT', 'Lin Kuei Tow', 'lin kuei tower', null]);
+    vi.mocked(document.hasFocus).mockReturnValue(true);
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: 'Lin Kuei Tower' } });
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect([boxOf('Kori Blade').tagName, towerOf('Frost Fan'), lastUndo?.label]).toEqual(['SELECT', 'Lin Kuei Tower', 'Respelled 1 other card: Lin Kuei Tower']);
+  });
+
   // Generated on 2026-10-23 (/ship review, Codex design, Tower dropdown)
   // Value: protects=while a tower name is typed in a card's box or Add card's, the box says under it how many other
   // cards finishing it will re-spell, counting only cards spelled another way, and says nothing for a new tower or once
@@ -3680,7 +3727,8 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     const form = towerForm();
     pickNewTower(form.getByLabelText('Tower'));
     fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'lin kuei tower' } });
-    expect(hint()).toBe('Respells 1 other card when you finish');
+    // In Add card it sits above the box, so the box stays in line with the form's other boxes.
+    expect([hint(), screen.getByText(/when you finish$/).nextElementSibling === form.getByPlaceholderText('New tower name')]).toEqual(['Respells 1 other card when you finish', true]);
     fireEvent.blur(form.getByPlaceholderText('New tower name'));
     expect([hint(), towerOf('Jade Fan')]).toEqual([null, 'lin kuei tower']);
   });

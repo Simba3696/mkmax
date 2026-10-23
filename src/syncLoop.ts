@@ -83,9 +83,9 @@ export class SyncLoop {
 
   /**
    * Neither pull nor push until this device runs the newer build; the regular pulls check again. It doesn't look for
-   * the update itself, since finding it reloads the app. The reload waits for pop-ups, the Undo bar and a Tower name
-   * being typed (see appUpdate.ts), but not for the rest of what's half typed on the page, like the Add card form's
-   * name or a card being renamed, and a background sync can land at any moment.
+   * the update itself, since finding it reloads the app. The reload waits for pop-ups, the Undo bar, a Tower name
+   * being typed and a tower held by the arrow keys (see appUpdate.ts), but not for the rest of what's half typed on the
+   * page, like the Add card form's name or a card being renamed, and a background sync can land at any moment.
    */
   private waitForNewerApp() {
     this.deps.onStatus({ kind: 'error', message: NEWER_MESSAGE });

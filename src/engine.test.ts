@@ -2141,11 +2141,11 @@ describe('respellTower', () => {
   it('counts spaces inside a tower name as one', () => {
     const card = (name: string, sourceNote: string): Card => ({ id: name, name, rarityId: 'epic', fusion: 1, guest: false, source: 'tower', sourceNote });
     const rarities = defaultState().rarities;
-    const cards = () => [card('Kori Blade', 'Lin Kuei Tower'), card('Frost Fan', 'lin  kuei tower'), card('Ryu Kunai', 'Lin\tKuei Tower')];
+    const cards = () => [card('Kori Blade', 'Lin Kuei Tower'), card('Frost Fan', 'lin  kuei\u00a0tower'), card('Ryu Kunai', 'Lin\tKuei Tower')];
     const typed = cards();
     const saved = { cards: cards(), rarities };
     unifyTowerSpellings(saved);
-    expect([towerKey(' Lin  Kuei Tower '), [...towerSpellings({ cards: cards(), rarities }).values()], respellTower({ cards: typed, rarities }, 'Lin Kuei Tower'), typed.map((c) => c.sourceNote), saved.cards.map((c) => c.sourceNote)]).toEqual([
+    expect([towerKey(' Lin  Kuei\u00a0Tower '), [...towerSpellings({ cards: cards(), rarities }).values()], respellTower({ cards: typed, rarities }, 'Lin Kuei Tower'), typed.map((c) => c.sourceNote), saved.cards.map((c) => c.sourceNote)]).toEqual([
       'lin kuei tower',
       ['Lin Kuei Tower'],
       2,
