@@ -3120,9 +3120,9 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
 
   // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
   // Value: protects=an Add after a tab switch still joins and is named in the Undo of Add card's re-spell while it shows,
-  // so that Undo never takes out a card it doesn't name; fails_when=what Add card joins lives in the page, which a tab
-  // switch takes down, so the Add comes back unnamed but undone; why_new=review (state machines); seam=none; no_claim=the
-  // real tab bar (the page is taken down and put back as App does)
+  // so that Undo never takes out a card it doesn't name; fails_when=the Add only joins an Undo the page remembers, which
+  // a tab switch takes down, so the Add comes back unnamed but undone; why_new=review (state machines); seam=none;
+  // no_claim=the real tab bar (the page is taken down and put back as App does)
   it("names an Add after a tab switch in the Undo of Add card's re-spell", () => {
     const tree = (show: boolean) => (
       <StoreProvider>
@@ -3158,7 +3158,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   });
 
   // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
-  // Value: protects=an Add only joins the Undo of Add card's re-spell while that Undo shows: a plain Add has no Undo, each
+  // Value: protects=an Add only joins an Undo (here Add card's re-spell) while that Undo shows: a plain Add has no Undo, each
   // Add while it shows is named in the bar and taken out by its Undo, and once it's dismissed an Add gets no Undo of its
   // own; fails_when=every Add gets an Undo, a second Add isn't named though Undo takes it out, or an Add after the bar
   // went joins a re-spell no longer offered; why_new=the bar now names the add; seam=none; no_claim=none beyond protects
