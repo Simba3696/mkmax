@@ -34,11 +34,25 @@ afterEach(() => {
 });
 
 describe('app update reload', () => {
+  // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
+  // Value: protects=a new build found with nothing held up (no pop-up, no Undo bar, or only the bar while the app is
+  // hidden) reloads straight away; fails_when=the at-once branch stops reloading, so the app keeps running the old build
+  // until something on the page changes or it's next opened; why_new=no test called needReload with nothing up, and the
+  // hidden bar case is new; seam=none; no_claim=a real service worker update (registerSW mocked, location.reload stubbed)
+  it('reloads at once with nothing open, or with only the Undo bar while the app is hidden', () => {
+    sw.needReload();
+    expect(reload).toHaveBeenCalledTimes(1);
+    show('data-undo');
+    appShows('hidden');
+    sw.needReload();
+    expect(reload).toHaveBeenCalledTimes(2);
+  });
+
   // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
   // Value: protects=a new build found with the Undo bar up reloads once the bar goes, or as soon as the app is hidden
   // (unseen) with no pop-up open, rather than 8 seconds into the user's return; fails_when=the hidden app still waits
   // for the bar, whose time only counts while the app shows, so the reload lands over Add card typing after return;
-  // why_new=review (Red Team); seam=registerSW mocked, location.reload stubbed; no_claim=a real service worker update
+  // why_new=review (Red Team); seam=none; no_claim=a real service worker update (registerSW mocked, location.reload stubbed)
   it('waits for the Undo bar while the app shows, and reloads unseen once it is hidden', async () => {
     const bar = show('data-undo');
     sw.needReload();
@@ -58,7 +72,7 @@ describe('app update reload', () => {
   // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
   // Value: protects=a pop-up's unsaved work (the pack editor) holds the reload even while the app is hidden;
   // fails_when=the hidden-app shortcut skips pop-ups too and reloads over an open pack editor; why_new=the hidden case is
-  // new; seam=registerSW mocked, location.reload stubbed; no_claim=a real service worker update
+  // new; seam=none; no_claim=a real service worker update (registerSW mocked, location.reload stubbed)
   it('never reloads over an open pop-up, hidden or not', async () => {
     const modal = show('data-modal');
     show('data-undo');
