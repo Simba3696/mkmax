@@ -91,9 +91,14 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, className, plac
   // tower picked on the last tower named turns the list into the plain box, Add card's Enter names the first tower, or a
   // sync names the first or last tower), the one that replaces it takes focus, so a keyboard user doesn't lose their
   // place. After a tap or click focus never moves, so a phone doesn't open its keyboard on the new box. A removed element
-  // gives no blur, so the flag holds until then.
+  // gives no blur, so the flag holds until the one that replaces it is in place; then it says whether that one has focus,
+  // so a key pressed later in another box (this runs on every render) never pulls focus here.
   const focused = useRef(false);
-  const keepFocus = (el: HTMLElement | null) => void (el && (focusList.current || (focused.current && lastInput === 'key')) && el !== document.activeElement && el.focus());
+  const keepFocus = (el: HTMLElement | null) => {
+    if (!el) return;
+    if ((focusList.current || (focused.current && lastInput === 'key')) && el !== document.activeElement) el.focus();
+    focused.current = el === document.activeElement;
+  };
 
   // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
   // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step

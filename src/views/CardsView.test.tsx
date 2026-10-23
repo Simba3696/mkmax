@@ -17,6 +17,9 @@ function Grab({ onRender }: { onRender: (store: ReturnType<typeof useStore>) => 
 beforeEach(() => {
   // The event schedule isn't needed here; keep the test off the network.
   vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));
+  // The Tower controls go by how the user last acted on the whole page (keys or a tap), which outlives a test: start each
+  // one from a tap, whatever the last test pressed.
+  fireEvent.pointerDown(document.body);
 });
 afterEach(() => {
   cleanup();
@@ -3760,6 +3763,27 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     form.getByLabelText('Tower').focus();
     act(() => update((d) => void (d.cards[0].sourceNote = undefined)));
     expect([form.getByLabelText('Tower').tagName, document.activeElement === form.getByLabelText('Tower')]).toEqual(['INPUT', false]);
+  });
+
+  // Generated on 2026-10-23 (/ship review, state machines and browser QA, Tower dropdown)
+  // Value: protects=after a tap turns a card's Tower list into its box, typing in another box (Add card's Name) stays
+  // there and never writes the card's tower; fails_when=the Tower control still counts itself focused after the swap, so
+  // a key elsewhere and the render it causes pull focus into the box and save the next keys as the tower; why_new=review
+  // and QA (headless Chromium: "Sub" left Name "S" and the tower "ub"); seam=none; no_claim=a real phone keyboard
+  it('keeps typing in another box after a tap turns a Tower list into its box', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower')]);
+    fireEvent.pointerDown(boxOf('Kori Blade'));
+    boxOf('Kori Blade').focus();
+    fireEvent.change(boxOf('Kori Blade'), { target: { value: '' } });
+    expect([boxOf('Kori Blade').tagName, towerOf('Kori Blade')]).toEqual(['INPUT', undefined]);
+    const name = towerForm().getByPlaceholderText('e.g. Sub-Zero, Klassic (name, variant)');
+    fireEvent.pointerDown(name);
+    name.focus();
+    for (const text of ['S', 'Su', 'Sub']) {
+      fireEvent.keyDown(document.activeElement!, { key: text.at(-1) });
+      fireEvent.change(document.activeElement!, { target: { value: text } });
+    }
+    expect([document.activeElement === name, (name as HTMLInputElement).value, towerOf('Kori Blade')]).toEqual([true, 'Sub', undefined]);
   });
 
   // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)

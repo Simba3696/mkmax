@@ -263,7 +263,7 @@ Cards also lists cards whose rarity MK Mobile Base gives differently, for exampl
 Cards → Tower gear lists every card tagged as tower gear, grouped by the tower it drops from (the tower in the card's **Tower** list, or the tower name from a pasted list), with the towers listing the most gear first (under **Below kard threshold**, the most pieces below the threshold). Each card shows how many copies it still needs, and you can change its level there. Maxed gear leaves the list like any other card.
 
 - Gear tagged as tower gear with no tower name goes under "Tower not named", at the end. Pick the tower in the card's **Tower** list on Cards (or **Add a new tower…**) to file it, or paste it again with its rarity and tower, like `Kori Blade - Epic - Lin Kuei Tower`. The rarity has to be there (a line with details but no rarity is refused), and it only updates a card of that same rarity.
-- Tower names are grouped ignoring capitals, so "Lin kuei tower" goes under "Lin Kuei Tower".
+- Tower names are grouped ignoring capitals, so "Lin kuei tower" and "Lin Kuei Tower" are one tower, spelled as the Tower list on Cards spells it.
 - "N left" counts cards, not copies.
 - Epic and Rare gear count copies only to F3, unless their goal is Max or they're marked **No kards**.
 - The filter at the top starts on **All tower gear**. **Below kard threshold** lists only gear that still needs copies before Fusion Up Kards can take over (below F3), which is what's worth farming towers for; each tower then says how many of its pieces are below the threshold, and each piece tracked past F3 leads with its copies to F3 ("1 copy to F3 · 8 copies to F10"). Gear marked **No kards**, Realm Klash gear and a rarity with no kards (Uncommon, by default) have no threshold, so they aren't listed there. A piece you raise to the threshold stays listed, and counted, until you change the filter, so you can tap it back. Gear tracked only to F3 is done there instead, so it leaves the list with an Undo.
@@ -594,7 +594,7 @@ The bottom of Settings shows which version you have and the date of that change,
 ### Updates
 
 - An app left open only looks for a new version when you pull to refresh or import a backup from a newer version (or when it's fully closed and reopened). If one is out, the app reloads into it by itself.
-- If a pop-up such as the pack editor is open when a new version is found, the app waits and reloads once you close it, so nothing you've typed is lost. It also waits while the Undo bar is showing (8 seconds while MK Max is showing), so you can still undo a save that closed the pop-up.
+- If a pop-up such as the pack editor is open when a new version is found, the app waits and reloads once you close it, so nothing you've typed is lost. It also waits while the Undo bar is showing (8 seconds while MK Max is showing), so you can still undo a save that closed the pop-up. If you switch away from MK Max meanwhile, it reloads then, while you can't see it, rather than just after you come back; only that Undo is lost.
 - The daily event schedule refresh isn't a new version, so it doesn't reload the app.
 - Updates never change your data, apart from the one-time upgrade of older saves.
 - Settings shows which [version](#version) you have.
