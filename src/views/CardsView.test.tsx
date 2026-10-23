@@ -3060,6 +3060,23 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect([boxOf('Frost Fan').tagName, document.activeElement === boxOf('Frost Fan'), towerOf('Frost Fan')]).toEqual(['INPUT', false, undefined]);
   });
 
+  // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
+  // Value: protects=Enter in a card's new-tower box left empty (opened and not typed in, or typed in and emptied) keeps the
+  // card's tower and leaves focus on the list that replaces the box, so a keyboard user who changes their mind keeps their
+  // place; fails_when=the Enter flag counts only typed text, so the box's blur drops focus to the page; why_new=only Enter
+  // with a typed name (list) and an emptied plain box (no list) were driven; seam=none; no_claim=a real keyboard
+  it("keeps focus on a card's Tower list after Enter in its new-tower box left empty", () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower')]);
+    const enterEmpty = (...typed: string[]) => {
+      pickNewTower(boxOf('Kori Blade'));
+      for (const text of typed) fireEvent.change(boxOf('Kori Blade'), { target: { value: text } });
+      fireEvent.keyDown(boxOf('Kori Blade'), { key: 'Enter' });
+      return [boxOf('Kori Blade').tagName, document.activeElement === boxOf('Kori Blade'), towerOf('Kori Blade')];
+    };
+    expect(enterEmpty()).toEqual(['SELECT', true, 'Lin Kuei Tower']);
+    expect(enterEmpty('W', '')).toEqual(['SELECT', true, 'Lin Kuei Tower']);
+  });
+
   // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
   // Value: protects=an Add after a tab switch still joins and is named in the Undo of Add card's re-spell while it shows,
   // so that Undo never takes out a card it doesn't name; fails_when=what Add card joins lives in the page, which a tab
