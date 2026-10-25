@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const workflow = (name: string) => readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), 'utf8');
-const ci = workflow('ci.yml');
-const deploy = workflow('deploy.yml');
+const here = fileURLToPath(new URL('.', import.meta.url));
+const ci = readFileSync(join(here, '..', '.github', 'workflows', 'ci.yml'), 'utf8');
+const deploy = readFileSync(join(here, '..', '.github', 'workflows', 'deploy.yml'), 'utf8');
 const runs = (yml: string) => [...yml.matchAll(/^\s*- run: (.+)$/gm)].map((m) => m[1].trim());
 const node = (yml: string) => /node-version: (\S+)/.exec(yml)?.[1];
 
