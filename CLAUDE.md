@@ -40,6 +40,7 @@ Key routing rules:
 - Platform: GitHub Pages, built and published by GitHub Actions
 - Production URL: https://simba3696.github.io/mkmax/
 - Deploy workflow: .github/workflows/deploy.yml (on every push to main, and daily at 17:30 UTC)
+- PR CI: .github/workflows/ci.yml (lint, test and build on every pull request)
 - Deploy status command: curl -s "https://api.github.com/repos/Simba3696/mkmax/actions/workflows/deploy.yml/runs?per_page=1" | jq '.workflow_runs[0] | {head_sha, status, conclusion}'
 - Merge method: squash
 - Project type: web app (installable PWA)

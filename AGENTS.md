@@ -13,7 +13,7 @@ npm run lint    # oxlint
 npm run build   # tsc --noEmit, then vite build
 ```
 
-A change is done when `npm run lint`, `npm test` and `npm run build` all pass. CI runs lint and tests before every deploy, and pushing to `main` deploys.
+A change is done when `npm run lint`, `npm test` and `npm run build` all pass. CI runs lint, tests and a build on every pull request, and lint and tests again before every deploy; pushing to `main` deploys.
 
 ## Rules
 
