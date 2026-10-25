@@ -3,9 +3,13 @@ dist
 dev-dist
 *.local
 
-# gstack's local reports, logs and scratch files; only the pre-ship check's config is shared
+# gstack's local reports, logs and scratch files. The pre-ship check's config, .gstack/pregate.json, is shared because
+# it is tracked: gstack's own ignore files hide the folder on machines that run it, so the line below only helps elsewhere.
 .gstack/*
 !.gstack/pregate.json
+
+# Claude Code worktrees: copies of this repo that tests and lint shouldn't read
+.claude/worktrees/
 
 # GBrain machine-local files (ownership token, worktree pin)
 .gbrain-owner.json

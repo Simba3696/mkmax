@@ -57,7 +57,7 @@ describe('.github/workflows/ci.yml', () => {
   // Extended by /ship coverage audit on 2026-10-25 (pr-ci pass 2): no step or job may be allowed to fail or be skipped.
   // Value: protects=a red lint, test or build shows red on the PR; fails_when=a step or the job gets an if:, a
   // continue-on-error or its own shell, so a failing or skipped check still shows a green PR that checked nothing;
-  // why_new=the step list alone passes with a step that can't fail; seam=none; no_claim=branch protection that makes
+  // why_new=the step list alone passes with a step that can't fail; seam=none; no_claim=main's ruleset that makes
   // the check required
   it('runs lint, tests and a build on every pull request', () => {
     const muted = [...jobs, ...steps].filter((x) => x.if !== undefined || (x['continue-on-error'] ?? false) !== false);

@@ -17,6 +17,7 @@ const config = JSON.parse(readFileSync(join(here, '..', '.gstack', 'pregate.json
 const vitestFiles = (dir = root) => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('VITEST')));
   const cli = join(root, 'node_modules', 'vitest', 'vitest.mjs');
+  // vite.config.ts spelled from here, as above, so the pre-ship check maps this test to it.
   const args = ['list', '--filesOnly', '--json', '--root', dir, '--config', join(here, '..', 'vite.config.ts')];
   const out = execFileSync(process.execPath, [cli, ...args], {
     cwd: root,
