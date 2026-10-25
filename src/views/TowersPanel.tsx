@@ -9,7 +9,7 @@ import type { Card } from '../types';
 /** Tower gear with no tower name yet. */
 const NO_TOWER = 'Tower not named';
 
-type GearFilter = 'all' | 'belowThreshold';
+type GearFilter = 'all' | 'belowThreshold' | 'unowned';
 
 /**
  * Cards tagged as tower gear, grouped by the tower they drop from. Maxed cards are pruned, so everything listed
@@ -19,8 +19,8 @@ export default function TowersPanel() {
   const { state, update } = useStore();
   const { ctx } = usePlan();
   const [filter, setFilter] = useState<GearFilter>('all');
-  // Gear whose level was tapped while the filter was on stays listed until it changes, so a piece raised to the kard
-  // threshold doesn't vanish, with no Undo, before it can be tapped back.
+  // Gear whose level was tapped while a filter was on stays listed until it changes, so a piece raised to the kard
+  // threshold (or to F0, owned) doesn't vanish, with no Undo, before it can be tapped back.
   const [tapped, setTapped] = useState<ReadonlySet<string>>(new Set());
   const pickFilter = (v: GearFilter) => (setFilter(v), setTapped(new Set()));
 
@@ -36,8 +36,11 @@ export default function TowersPanel() {
   // Still needs copies before Fusion Up Kards can take over. Gear marked No kards, Realm Klash gear and a rarity with no
   // kards have no threshold to reach, so they never count.
   const belowThreshold = (c: Card) => !isRealmKlashGear(state, c) && copiesToThreshold(c, ctx.rules.get(c.rarityId)!) > 0;
-  const shown = (c: Card) => filter === 'all' || belowThreshold(c) || tapped.has(c.id);
-  const belowCount = gear.filter((c) => belowThreshold(c) || (filter === 'belowThreshold' && tapped.has(c.id))).length;
+  const unowned = (c: Card) => c.fusion === 0;
+  const fits = (c: Card, f: GearFilter) => (f === 'belowThreshold' ? belowThreshold(c) : f === 'unowned' ? unowned(c) : true);
+  const shown = (c: Card) => fits(c, filter) || tapped.has(c.id);
+  // Each filter's count, counting the pieces it keeps listed after a tap while it's the one on.
+  const countFor = (f: GearFilter) => gear.filter((c) => fits(c, f) || (filter === f && tapped.has(c.id))).length;
 
   // Grouped by towerKey: "Lin kuei tower" files with "Lin Kuei Tower". Each tower is spelled as the Tower list on Cards
   // spells it, whatever the filter shows.
@@ -65,13 +68,16 @@ export default function TowersPanel() {
       {total === 0 && <p className="text-muted md:max-w-[80ch]">No tower gear left. Set a card's source to "Tower gear" on Cards and type the tower's name, or paste a list with the tower name (like "Kori Blade - Epic - Lin Kuei Tower - F2").</p>}
       {total > 0 && (
         <div className="flex flex-wrap gap-2 mb-[0.8rem] items-center">
-          <select value={filter} onChange={(e) => pickFilter(e.target.value as GearFilter)} aria-label="Filter by kard threshold">
+          <select value={filter} onChange={(e) => pickFilter(e.target.value as GearFilter)} aria-label="Filter tower gear">
             <option value="all">{`All tower gear (${total})`}</option>
-            <option value="belowThreshold">{`Below kard threshold (${belowCount})`}</option>
+            <option value="belowThreshold">{`Below kard threshold (${countFor('belowThreshold')})`}</option>
+            <option value="unowned">{`Not owned (${countFor('unowned')})`}</option>
           </select>
         </div>
       )}
-      {total > 0 && towers.length === 0 && <p className="text-muted md:max-w-[80ch]">None of your tower gear is below the kard threshold.</p>}
+      {total > 0 && towers.length === 0 && (
+        <p className="text-muted md:max-w-[80ch]">{filter === 'unowned' ? 'You own every piece of your tower gear.' : 'None of your tower gear is below the kard threshold.'}</p>
+      )}
       {/* Towers flow into columns on wide screens; break-inside keeps each tower's card whole. Columns rather than a
           grid so a short tower doesn't leave a gap under itself beside a long one. */}
       <div className="lg:columns-2 2xl:columns-3 lg:gap-[0.8rem]">
@@ -79,7 +85,7 @@ export default function TowersPanel() {
           <section key={tower} className={`${card} break-inside-avoid`}>
             <h2>
               {tower}{' '}
-              <span className="text-muted text-small">{`${cards.length} ${filter === 'all' ? 'left' : 'below threshold'}`}</span>
+              <span className="text-muted text-small">{`${cards.length} ${filter === 'all' ? 'left' : filter === 'unowned' ? 'not owned' : 'below threshold'}`}</span>
             </h2>
             {cards.map((c) => {
               const rule = ctx.rules.get(c.rarityId)!;

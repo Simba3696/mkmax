@@ -2408,7 +2408,7 @@ describe('Tower gear: the kard threshold filter', () => {
         </PlanProvider>
       </StoreProvider>,
     );
-    const filter = screen.getByLabelText('Filter by kard threshold') as HTMLSelectElement;
+    const filter = screen.getByLabelText('Filter tower gear') as HTMLSelectElement;
     const options = () => [...filter.options].map((o) => o.textContent);
     // Names on the tower's card only: the Cards page stays in the document, hidden, and lists the same cards.
     const names = () => {
@@ -2416,7 +2416,7 @@ describe('Tower gear: the kard threshold filter', () => {
       return section ? [...new Set(within(section as HTMLElement).queryAllByText(/^(Kori Blade|Kitana Fan|Kombat Gloves|Noob Mask|Shadow Sash)$/).map((n) => n.textContent))] : [];
     };
     // The whole line, so a copies-to-F3 lead shown with the filter off fails it (the goal's count alone would still match).
-    expect([options(), names().length, copiesLine('8 copies to F10') != null]).toEqual([['All tower gear (5)', 'Below kard threshold (1)'], 5, true]);
+    expect([options(), names().length, copiesLine('8 copies to F10') != null]).toEqual([['All tower gear (5)', 'Below kard threshold (1)', 'Not owned (0)'], 5, true]);
 
     // Under the filter, Kori Blade (tracked to F10) leads with its copies to the kard threshold.
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
@@ -2441,6 +2441,47 @@ describe('Tower gear: the kard threshold filter', () => {
     fireEvent.change(filter, { target: { value: 'all' } });
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
     expect([names(), options()[1], screen.queryByText('None of your tower gear is below the kard threshold.') != null]).toEqual([[], 'Below kard threshold (0)', true]);
+  });
+
+  // Generated on 2026-10-25 (Tower gear filter: Not owned)
+  // Value: protects=Not owned lists only tower gear at no level yet, counted on its option and per tower, keeps a piece
+  // raised to F0 listed until the filter is picked again, and says so when every piece is owned; fails_when=the filter
+  // reads something other than the level, a raised piece vanishes mid-tap, the counts go stale, or the empty message
+  // talks about the kard threshold; why_new=new filter option; seam=none; no_claim=none beyond protects
+  it('lists only tower gear not owned yet, and keeps a piece raised to F0 until the filter changes', () => {
+    const s = defaultState();
+    const tower = (id: string, name: string, rarityId: string, fusion: number, sourceNote: string) => ({ id, name, rarityId, fusion, guest: false, source: 'tower' as const, sourceNote });
+    s.cards = [tower('kori', 'Kori Blade', 'epic', 0, 'Lin Kuei Tower'), tower('fan', 'Kitana Fan', 'epic', 2, 'Lin Kuei Tower'), tower('mask', 'Noob Mask', 'rare', 0, 'Shirai Ryu Tower')];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub="towers" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const filter = screen.getByLabelText('Filter tower gear') as HTMLSelectElement;
+    const options = () => [...filter.options].map((o) => o.textContent);
+    const section = (tower: string) => screen.queryByRole('heading', { name: new RegExp(`^${tower}`) })?.closest('section') as HTMLElement | null;
+    const names = () => ['Lin Kuei Tower', 'Shirai Ryu Tower'].flatMap((t) => (section(t) ? [...new Set(within(section(t)!).queryAllByText(/^(Kori Blade|Kitana Fan|Noob Mask)$/).map((n) => n.textContent))] : []));
+    expect(options()).toEqual(['All tower gear (3)', 'Below kard threshold (3)', 'Not owned (2)']);
+
+    fireEvent.change(filter, { target: { value: 'unowned' } });
+    expect([names(), screen.getAllByText('1 not owned').length]).toEqual([['Kori Blade', 'Noob Mask'], 2]);
+
+    // F0 is owned, but the piece stays listed (and counted) so the tap can be taken back.
+    act(() => within(section('Lin Kuei Tower')!).getByRole('button', { name: 'Raise level' }).click());
+    const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
+    expect([saved().find((c) => c.id === 'kori')?.fusion, names(), options()[2]]).toEqual([1, ['Kori Blade', 'Noob Mask'], 'Not owned (2)']);
+
+    fireEvent.change(filter, { target: { value: 'all' } });
+    fireEvent.change(filter, { target: { value: 'unowned' } });
+    expect([names(), options()[2]]).toEqual([['Noob Mask'], 'Not owned (1)']);
+
+    act(() => within(section('Shirai Ryu Tower')!).getByRole('button', { name: 'Raise level' }).click());
+    fireEvent.change(filter, { target: { value: 'all' } });
+    fireEvent.change(filter, { target: { value: 'unowned' } });
+    expect([names(), options()[2], screen.queryByText('You own every piece of your tower gear.') != null]).toEqual([[], 'Not owned (0)', true]);
   });
 
   // Generated on 2026-10-22 (/ship test coverage audit, Tower gear filter)
@@ -2477,7 +2518,7 @@ describe('Tower gear: the kard threshold filter', () => {
     const headings = () => screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((t) => /Tower/.test(t ?? ''));
     expect(headings()).toEqual(['Shirai Ryu Tower 4 left', 'Lin Kuei Tower 3 left', 'Thunder Tower 2 left']);
 
-    fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
+    fireEvent.change(screen.getByLabelText('Filter tower gear'), { target: { value: 'belowThreshold' } });
     expect(headings()).toEqual(['Thunder Tower 2 below threshold', 'Lin Kuei Tower 1 below threshold']);
     // More than one copy to F3 reads in the plural (Wrath Hammer at F0, tracked to F10).
     expect(copiesLine('3 copies to F3 · 10 copies to F10')).not.toBeNull();
@@ -2502,7 +2543,7 @@ describe('Tower gear: the kard threshold filter', () => {
         </PlanProvider>
       </StoreProvider>,
     );
-    const filter = screen.getByLabelText('Filter by kard threshold') as HTMLSelectElement;
+    const filter = screen.getByLabelText('Filter tower gear') as HTMLSelectElement;
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
     // The tap as the screen had it at F2, landing after a sync took Kori Blade to F3.
     const raise = screen.getByRole('button', { name: 'Raise level' });
@@ -2538,14 +2579,14 @@ describe('Tower gear: the kard threshold filter', () => {
         </PlanProvider>
       </StoreProvider>,
     );
-    fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
+    fireEvent.change(screen.getByLabelText('Filter tower gear'), { target: { value: 'belowThreshold' } });
     // Its goal is F3, so its copies to F3 show once, not twice.
     expect(copiesLine('1 copy to F3')).not.toBeNull();
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
     const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string }[];
     expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }), saved().some((c) => c.id === 'kori'), lastUndo?.label]).toEqual([null, false, expect.stringMatching(/done/)]);
     // That was the only tower gear, so the page says so and nothing else: a filter over nothing would only confuse.
-    expect([screen.queryByLabelText('Filter by kard threshold'), screen.queryByText(/^No tower gear left\./) != null, screen.queryByText('None of your tower gear is below the kard threshold.')]).toEqual([null, true, null]);
+    expect([screen.queryByLabelText('Filter tower gear'), screen.queryByText(/^No tower gear left\./) != null, screen.queryByText('None of your tower gear is below the kard threshold.')]).toEqual([null, true, null]);
 
     act(() => undo());
     expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ })?.textContent, saved().some((c) => c.id === 'kori')]).toEqual(['Lin Kuei Tower 1 below threshold', true]);
@@ -2905,7 +2946,7 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
   // why_new=review (maintainability); seam=none; no_claim=none beyond protects
   it('spells a Tower gear heading the same with the filter on', () => {
     renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower', 4), tower('fan', 'Frost Fan', 'lin kuei tower')], 'towers', (s) => void (s.rarities.find((r) => r.id === 'epic')!.goal = 'max'));
-    fireEvent.change(screen.getByLabelText('Filter by kard threshold'), { target: { value: 'belowThreshold' } });
+    fireEvent.change(screen.getByLabelText('Filter tower gear'), { target: { value: 'belowThreshold' } });
     expect(screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((t) => /tower/i.test(t ?? ''))).toEqual(['Lin Kuei Tower 1 below threshold']);
   });
 
