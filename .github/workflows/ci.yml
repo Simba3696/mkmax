@@ -20,11 +20,15 @@ jobs:
     runs-on: ubuntu-latest
     # A normal run takes a few minutes; a hung one fails here instead of holding the PR check for GitHub's 6 hours.
     timeout-minutes: 15
-    # The deploy builds and tests with the Pages path, so a PR is checked with the same one.
+    # The deploy builds and tests with the Pages path, so a PR is checked with the same one. The deploy reads it from
+    # Pages, so change this too if the repo is renamed or given its own domain.
     env:
       BASE_PATH: /mkmax/
     steps:
+      # The token stays off disk, so install scripts in dependencies can't read it.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22

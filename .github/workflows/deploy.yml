@@ -21,7 +21,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # The token stays off disk, so install scripts in dependencies can't read it.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       # The deployed app's address and path, from GitHub Pages itself. github.event.repository isn't set on the
       # daily scheduled run, so building them from it pointed that run at the wrong site. The event schedule
       # refresh keeps past Realm Klash weeks from the live events.json, and both refreshes fall back to the live

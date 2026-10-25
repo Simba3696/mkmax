@@ -30,6 +30,8 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 const read = (file: string): Workflow => parse(readFileSync(file, 'utf8'));
 const ci = read(join(here, '..', '.github', 'workflows', 'ci.yml'));
 const deploy = read(join(here, '..', '.github', 'workflows', 'deploy.yml'));
+type Pkg = { scripts: Record<string, string> };
+const { scripts } = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8')) as Pkg;
 const jobs = Object.values(ci.jobs);
 const steps = jobs.flatMap((j) => j.steps);
 const isSetupNode = (s: Step) => !!s.uses?.startsWith('actions/setup-node');
@@ -120,5 +122,24 @@ describe('.github/workflows/ci.yml', () => {
   it('keeps the job name main requires', () => {
     const job = ci.jobs.check;
     expect([Object.keys(ci.jobs), job?.name, job?.strategy]).toEqual([['check'], undefined, undefined]);
+  });
+
+  // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 4)
+  // Value: protects=the check really lints, tests and builds; fails_when=a pull request turns the lint, test or build
+  // script in package.json into a no-op, so npm test passes without testing anything; why_new=the step list only
+  // names the scripts; seam=none; no_claim=a pull request that changes this test as well (read those diffs by hand)
+  it('runs the real lint, test and build scripts', () => {
+    expect([scripts.lint, scripts.test, scripts.build]).toEqual(['oxlint', 'vitest run', 'tsc --noEmit && vite build']);
+  });
+
+  // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 4)
+  // Value: protects=the GitHub token isn't left on disk while npm ci runs dependency install scripts, in this workflow
+  // and the deploy (whose token can publish the site); fails_when=a checkout step drops persist-credentials: false;
+  // why_new=checkout keeps the token by default; seam=none; no_claim=what GitHub grants the token
+  it('keeps the token off disk in both workflows', () => {
+    const checkouts = [ci, deploy].flatMap((w) =>
+      Object.values(w.jobs).flatMap((j) => j.steps.filter((s) => s.uses?.startsWith('actions/checkout'))),
+    );
+    expect(checkouts.map((s) => s.with?.['persist-credentials'])).toEqual([false, false]);
   });
 });
