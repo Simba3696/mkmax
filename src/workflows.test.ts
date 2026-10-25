@@ -13,7 +13,14 @@ type Step = {
   if?: unknown;
   'continue-on-error'?: unknown;
 };
-type Job = { steps: Step[]; permissions?: unknown; defaults?: unknown; if?: unknown; 'continue-on-error'?: unknown };
+type Job = {
+  steps: Step[];
+  env?: Record<string, unknown>;
+  permissions?: unknown;
+  defaults?: unknown;
+  if?: unknown;
+  'continue-on-error'?: unknown;
+};
 type Workflow = { on: unknown; permissions?: unknown; defaults?: unknown; jobs: Record<string, Job> };
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -87,5 +94,14 @@ describe('.github/workflows/ci.yml', () => {
       1,
       true,
     ]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, pr-ci run 2 Red Team)
+  // Value: protects=a pull request is built and tested under the /mkmax/ path the site is served from, as the deploy
+  // does; fails_when=BASE_PATH is dropped or changed, so a broken asset, manifest or service worker path passes the PR
+  // and fails after the merge; why_new=the PR job built with "/" while the deploy uses the Pages path; seam=none;
+  // no_claim=that GitHub Pages serves the repo at /mkmax/ (the deploy reads that from Pages itself)
+  it('builds with the base path the site is served from', () => {
+    expect(jobs.map((j) => j.env?.BASE_PATH)).toEqual(['/mkmax/']);
   });
 });

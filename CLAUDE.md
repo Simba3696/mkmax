@@ -5,6 +5,7 @@
 This project uses [gstack](https://github.com/garrytan/gstack), installed globally at `~/.claude/skills/gstack`. The full skill list is in the global `~/.claude/CLAUDE.md`.
 
 - Use `/browse` for all web browsing. Never use `mcp__claude-in-chrome__*` tools.
+- Pull requests run `.github/workflows/ci.yml` (lint, tests and a build), and a ruleset on `main` requires it to pass before a merge.
 - Typical flow: `/office-hours` or `/spec` to shape an idea, `/plan-eng-review` before building, `/review` before landing, `/qa` to test the running app, `/ship` to land. `/investigate` for bugs.
 - Pushing to `main` deploys, so `/ship` and `/land-and-deploy` are deploys. Both need `npm run lint`, `npm test` and `npm run build` to pass first.
 
@@ -40,7 +41,6 @@ Key routing rules:
 - Platform: GitHub Pages, built and published by GitHub Actions
 - Production URL: https://simba3696.github.io/mkmax/
 - Deploy workflow: .github/workflows/deploy.yml (on every push to main, and daily at 17:30 UTC)
-- PR CI: .github/workflows/ci.yml (lint, tests and a build on every pull request)
 - Deploy status command: curl -s "https://api.github.com/repos/Simba3696/mkmax/actions/workflows/deploy.yml/runs?per_page=1" | jq '.workflow_runs[0] | {head_sha, status, conclusion}'
 - Merge method: squash
 - Project type: web app (installable PWA)

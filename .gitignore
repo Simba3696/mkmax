@@ -3,6 +3,10 @@ dist
 dev-dist
 *.local
 
+# gstack's local reports, logs and scratch files; only the pre-ship check's config is shared
+.gstack/*
+!.gstack/pregate.json
+
 # GBrain machine-local files (ownership token, worktree pin)
 .gbrain-owner.json
 .gbrain-source
