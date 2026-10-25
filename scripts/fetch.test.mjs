@@ -182,9 +182,9 @@ describe('download scripts', () => {
   // (STUB_CHANGE only changes the stand-in's answers); no_claim=the 10% allowance
   // Extended by /ship coverage audit on 2026-10-25 (pr-ci run 7): a page count of zero, and cards with no rarity.
   // Value: protects=a catalog answer whose page count is zero (which stopped after page 1 before this branch) or whose
-  // cards lost their rarity tags fails, so the deploy keeps the live catalog instead of shipping a third of it or one
-  // the app can't sort by rarity; fails_when=the page count check stops rejecting zero, or rarity leaves the list of
-  // fields every card must mostly have; why_new=no-art only reaches the image half of that check, and no case had a
+  // cards lost their rarity tags fails, so the deploy keeps the live catalog instead of shipping only the first page of
+  // each category, or cards the app can't sort by rarity; fails_when=the page count check stops rejecting zero, or
+  // rarity leaves the list of fields every card must mostly have; why_new=no-art only reaches the image half of that check, and no case had a
   // page count below 1; seam=none (STUB_CHANGE only changes the stand-in's answers); no_claim=the 10% allowance, or
   // a rarity read from the excerpt instead of the tags
   it("fails without writing when MK Mobile Base's catalog answers change shape", () => {
