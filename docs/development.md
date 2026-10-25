@@ -39,6 +39,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/sync.ts` | GitHub Gist sync: the API calls and which copy wins |
 | `src/syncLoop.ts` | When to pull, push or ask, around requests that can overlap edits and disconnects |
 | `src/catalog.ts`, `src/wiki.ts` | Card art and rarity lookups (MK Mobile Base, MK Mobile wiki) |
+| `src/names.ts` | Matching card names written different ways (`nameKey`, and the site's typos in `SITE_TYPOS`); kept apart from `catalog.ts` so the engine loads without React |
 | `src/events.ts` | Event schedule: shop packs, Elder challenges, Realm Klash seasons |
 | `src/cardList.ts` | The parser for **Paste a list…** and **Paste maxed cards…** |
 | `src/styles.css` | Tailwind theme tokens (`@theme`: colors, radii, text sizes) and the base styles for buttons, inputs and headings |

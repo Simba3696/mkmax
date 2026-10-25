@@ -10,8 +10,6 @@ class FakeGist {
   reads = 0;
   writes = 0;
   fail: Error | null = null;
-  /** Writes are saved, but their answer is lost (a timeout after GitHub saved it). */
-  loseAnswers = false;
   private held: (() => void)[] = [];
   /** Which requests to hold open until release(); finds are Connect's lookup. */
   holding: 'reads' | 'writes' | 'finds' | null = null;
@@ -31,7 +29,6 @@ class FakeGist {
     await this.gate('writes');
     this.writes++;
     this.data = structuredClone(s);
-    if (this.loseAnswers) throw new Error('GitHub didn’t answer within 30 seconds. Check your connection.');
   }
   /** Let held requests finish, and wait for what they do next. */
   async release() {
@@ -462,51 +459,26 @@ describe('sync loop', () => {
     }
   });
 
-  // Generated on 2026-10-25 (/ship review, run 17 pass 3, data migration)
-  // Value: protects=a push or a Keep mine that GitHub saved but whose answer never came (the 30-second limit, or a
-  // dropped connection) counts as agreed on the next sync, so an edit made since is pushed rather than shown as a
-  // conflict with this device's own copy; fails_when=the loop forgets the copy it sent, or counts one the gist doesn't
-  // hold; why_new=review: GitHub requests now give up after 30 seconds, so a saved write can end in an error;
-  // seam=the fake gist saves the write and then throws; no_claim=GitHub
-  it('counts a write GitHub saved but never answered as agreed on the next sync', async () => {
-    const { gist, phone, desktop } = await pair();
-    phone.edit((s) => s.cards.push(card('Raiden')));
-    gist.loseAnswers = true;
-    await phone.loop.syncNow();
-    gist.loseAnswers = false;
-    expect([phone.status.kind, names(gist.data)]).toEqual(['error', ['Scorpion', 'Raiden']]);
-    phone.edit((s) => s.cards.push(card('Jax')));
-    await phone.loop.syncNow();
-    expect([phone.status.kind, names(gist.data)]).toEqual(['idle', ['Scorpion', 'Raiden', 'Jax']]);
-
-    // Keep mine the same way.
-    await desktop.loop.syncNow();
-    desktop.edit((s) => s.cards.push(card('Kitana')));
-    phone.edit((s) => s.cards.push(card('Kano')));
-    await phone.loop.syncNow();
-    await desktop.loop.syncNow();
-    expect(desktop.status.kind).toBe('conflict');
-    gist.loseAnswers = true;
-    await desktop.loop.resolve('mine');
-    gist.loseAnswers = false;
-    desktop.edit((s) => s.cards.push(card('Sonya')));
-    await desktop.loop.syncNow();
-    expect([desktop.status.kind, names(gist.data)]).toEqual(['idle', ['Scorpion', 'Raiden', 'Jax', 'Kitana', 'Sonya']]);
-
-    // A copy whose write never reached the gist isn't counted: the other device's later copy is still a conflict.
-    desktop.edit((s) => s.cards.push(card('Jade')));
-    gist.holding = 'writes';
-    const lost = desktop.loop.syncNow();
+  // Generated on 2026-10-25 (/ship review, run 18, state machines)
+  // Value: protects=a Connect that has found its gist is connected even if another tab saves data from a newer version
+  // during its first sync: that sync then pulls, pushes and agrees nothing, and the store shows the held notice;
+  // fails_when=the first sync goes ahead behind the hold, or Connect claims it didn't connect after saving the settings
+  // (Settings would keep a token that is in use); why_new=review: the hold during Connect's first sync had no test;
+  // seam=the fake gist holds the first sync's read; no_claim=the store's notice (store.test.tsx)
+  it('a Connect whose first sync is out when another tab saves a newer version is connected, and that sync stops', async () => {
+    const gist = new FakeGist();
+    const phone = device(gist);
+    phone.edit((s) => s.cards.push(card('Scorpion')));
+    await phone.loop.connect('token');
+    const laptop = device(gist);
+    laptop.edit((s) => s.cards.push(card('Raiden')));
+    const [before, writes] = [structuredClone(laptop.state), gist.writes];
+    gist.holding = 'reads';
+    const connecting = laptop.loop.connect('token');
     await settle();
-    gist.fail = new TypeError('Failed to fetch');
+    laptop.held = true;
     await gist.release();
-    await lost;
-    gist.fail = null;
-    await phone.loop.syncNow();
-    phone.edit((s) => s.cards.push(card('Mileena')));
-    await phone.loop.syncNow();
-    await desktop.loop.syncNow();
-    expect(desktop.status.kind).toBe('conflict');
+    expect([await connecting, laptop.loop.config?.baseUpdatedAt, laptop.state, gist.writes]).toEqual([true, 0, before, writes]);
   });
 
   // Generated on 2026-10-25 (/ship review, run 17 pass 2, data migration)
@@ -534,9 +506,11 @@ describe('sync loop', () => {
     expect(names(desktop.state)).toEqual(['Scorpion', 'Raiden']);
   });
 
-  // Generated on 2026-10-25 (/ship review, run 17, state machines)
-  // Value: protects=Keep theirs takes the copy the prompt showed even if the gist moved on or a newer build pushed since,
-  // and the next sync then pulls the later copy without asking, or waits and looks for the update; fails_when=Keep
+  // Generated on 2026-10-25 (/ship review, run 17, state machines); extended by /ship review on 2026-10-25 (run 18,
+  // state machines) with a gist copy this build can't read
+  // Value: protects=Keep theirs takes the copy the prompt showed even if the gist moved on, a newer build pushed or a
+  // copy this build can't read arrived since, and the next sync then pulls the later copy without asking, or waits and
+  // looks for the update; fails_when=Keep
   // theirs asks again, pushes, or skips the later copy; why_new=review (state machines): only an unchanged gist was tested;
   // seam=none; no_claim=GitHub
   it('keeping the other copy after the gist changed takes the shown copy, then syncs as usual', async () => {
@@ -562,6 +536,22 @@ describe('sync loop', () => {
     expect(names(desktop.state)).toEqual(['Scorpion', 'Raiden']);
     await desktop.loop.syncNow();
     expect([desktop.status.kind, gist.data!.version, desktop.pushes, desktop.lookedForUpdate]).toEqual(['error', 99, 0, 1]);
+
+    // The gist moved on to a copy this build can't read: Keep theirs still takes the copy shown, and the next sync
+    // waits for an update rather than pushing over it or asking again.
+    ({ gist, phone, desktop } = await pair());
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    phone.edit((s) => s.cards.push(card('Unreadable')));
+    await phone.loop.syncNow();
+    desktop.readable = (s) => !names(s).includes('Unreadable');
+    await desktop.loop.resolve('theirs');
+    const writes = gist.writes;
+    expect([names(desktop.state), desktop.loop.config?.baseUpdatedAt]).toEqual([['Scorpion', 'Raiden'], desktop.state.updatedAt]);
+    await desktop.loop.syncNow();
+    expect([desktop.status.kind, gist.writes - writes, desktop.pushes, desktop.lookedForUpdate]).toEqual(['error', 0, 0, 1]);
   });
 
   // Generated on 2026-10-25 (/ship review, run 17, state machines)

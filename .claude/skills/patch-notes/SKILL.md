@@ -34,7 +34,7 @@ Go through the notes line by line. Every line lands in exactly one bucket.
 | New Realm Klash gear, or a renamed piece | `REALM_KLASH_GEAR` (which pieces get no kards and are always tracked to max; believed final) and `DEFAULT_GEAR_ORDER` in `src/engine.ts`, plus the `listed` names in the `recognises Realm Klash gear by name` test, the list of names in `docs/user-guide.md`, the count of pieces (10) in `AGENTS.md`, `docs/how-it-works.md` and `docs/user-guide.md`, and "the other five" after the default order in `docs/how-it-works.md` and `docs/user-guide.md` | No, unless saved gear order needs fixing |
 | Realm Klash season length changed | `SEASON_DAYS` in `src/engine.ts` | No |
 | A new currency | `defaultState()` in `src/defaults.ts`, `currencyFor` in `src/events.ts` | Yes, added once |
-| MK Mobile Base or its schedule misspells a new card or pack | `SITE_TYPOS` in `src/catalog.ts` (a word the site splits in two, like "Grand Master", is joined in `nameKey` there instead; check the typo is still on the live site first), `SITE_PACK_NAMES` in `src/events.ts` | Only to rename names already saved (see version 9) |
+| MK Mobile Base or its schedule misspells a new card or pack | `SITE_TYPOS` in `src/names.ts` (a word the site splits in two, like "Grand Master", is joined in `nameKey` there instead; check the typo is still on the live site first), `SITE_PACK_NAMES` in `src/events.ts` | Only to rename names already saved (see version 9) |
 
 For anything that needs a migration, use the `save-migration` skill.
 

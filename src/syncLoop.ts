@@ -46,12 +46,6 @@ export class SyncLoop {
   private busy = false;
   /** The gist's copy while a conflict waits for the user. Background syncs hold off so the prompt stays put. */
   private conflict: AppState | null = null;
-  /**
-   * A copy this device sent whose answer never came (it timed out or the connection dropped), so GitHub may have saved
-   * it. The next sync counts it as agreed if the gist holds it; otherwise an edit made since would show this device's
-   * own copy as a conflict.
-   */
-  private unanswered: AppState | null = null;
 
   constructor(
     private deps: SyncDeps,
@@ -130,16 +124,9 @@ export class SyncLoop {
     return !this.sameGist(cfg) || this.deps.held();
   }
 
-  /** Writes a copy to the gist, remembering it until GitHub answers. */
-  private async write(cfg: SyncConfig, s: AppState) {
-    this.unanswered = s;
-    await this.deps.writeRemote(cfg, s);
-    this.unanswered = null;
-  }
-
   /** Pull if the gist moved on, push if only this device did, or report a conflict if both did. */
   async syncNow() {
-    let cfg = this.cfg;
+    const cfg = this.cfg;
     // Nor while held: the regular pulls don't go through the store's pause.
     if (!cfg || this.busy || this.conflict || this.deps.held()) return;
     this.busy = true;
@@ -148,13 +135,6 @@ export class SyncLoop {
     try {
       const remote = await this.deps.readRemote(cfg);
       if (this.stopped(cfg)) return;
-      const sent = this.unanswered;
-      this.unanswered = null;
-      // Only this device makes its stamps, so the gist holding that stamp means it holds that copy.
-      if (sent && remote && stamp(remote) === stamp(sent)) {
-        cfg = { ...cfg, baseUpdatedAt: stamp(sent) };
-        this.setConfig(cfg);
-      }
       const local = this.deps.getState();
       const action = decideSync(remote, local, cfg.baseUpdatedAt);
       if (action === 'newer') {
@@ -169,7 +149,7 @@ export class SyncLoop {
       }
       if (action === 'outdated') {
         const kept = this.restampToKeep(cfg, remote);
-        await this.write(cfg, kept);
+        await this.deps.writeRemote(cfg, kept);
         if (this.stopped(cfg)) return;
         this.setConfig({ ...cfg, baseUpdatedAt: stamp(kept) });
         this.deps.onStatus({ kind: 'error', message: OUTDATED_MESSAGE });
@@ -179,7 +159,7 @@ export class SyncLoop {
         this.deps.applyRemote(remote!);
         this.setConfig({ ...cfg, baseUpdatedAt: stamp(remote) });
       } else if (action === 'push') {
-        await this.write(cfg, local);
+        await this.deps.writeRemote(cfg, local);
         if (this.stopped(cfg)) return;
         this.setConfig({ ...cfg, baseUpdatedAt: stamp(local) });
       } else {
@@ -200,7 +180,10 @@ export class SyncLoop {
     }
   }
 
-  /** Whether it connected: false if another tab saved data from a newer version first or meanwhile. */
+  /**
+   * Whether it connected: false if another tab saved data from a newer version first or while GitHub looked for the
+   * gist. Once the gist is found it's connected, and a hold during the first sync stops that sync like any other.
+   */
   async connect(token: string): Promise<boolean> {
     if (this.deps.held()) return false;
     this.deps.onStatus({ kind: 'syncing' });
@@ -233,7 +216,6 @@ export class SyncLoop {
   disconnect() {
     this.deps.cancelPush();
     this.conflict = null;
-    this.unanswered = null;
     this.setConfig(null);
     this.deps.onStatus({ kind: 'off' });
     this.deps.onSettled();
@@ -276,7 +258,7 @@ export class SyncLoop {
         return;
       }
       const kept = this.restampToKeep(cfg, fresh);
-      await this.write(cfg, kept);
+      await this.deps.writeRemote(cfg, kept);
       if (this.stopped(cfg)) return;
       this.setConfig({ ...cfg, baseUpdatedAt: stamp(kept) });
       this.deps.onStatus({ kind: 'idle', at: this.deps.now() });

@@ -30,10 +30,19 @@ let refreshing: Promise<unknown> | null = null;
 let fetchedAt = 0;
 /** Whether any download has been tried, so coming back fetches nothing the app hasn't needed yet. */
 let tried = false;
-/** Bumped each time a fetch-again brings a catalog that differs from the copy here (or the first that worked). */
+/** Whether a download has failed, so whatever gave up on the catalog then hears when one first works. */
+let failed = false;
+/**
+ * Bumped each time a fetch-again brings a catalog that differs from the copy here, and when the first one that works
+ * comes after a failed download (not on a first download that just works: everything waiting on it gets it anyway).
+ */
 let version = 0;
 const listeners = new Set<() => void>();
-/** A connection that hangs rather than fails gives up after this, so a pull or Find images doesn't wait for good. */
+const bump = () => (version++, listeners.forEach((l) => l()));
+/**
+ * A connection that hangs rather than fails gives up after this, so Find images doesn't wait for good and a hung
+ * fetch-again doesn't hold up the next pull or return.
+ */
 const DOWNLOAD_TIMEOUT_MS = 30 * 1000;
 /** The daily deploy refreshes the catalog; coming back to an app whose copy is older than this fetches it again. */
 const REFRESH_AFTER_MS = 60 * 60 * 1000;
@@ -54,12 +63,20 @@ function download(replace: boolean): Promise<CatalogItem[]> {
     })
     .then((text) => {
       if (good && (!replace || text === goodText)) return good;
+      const changed = good || failed;
       good = (JSON.parse(text) as { items: CatalogItem[] }).items;
       goodText = text;
+      if (changed) bump();
       return good;
     })
     // Only once it's in: a page that isn't the catalog (a wifi sign-in page) doesn't count as a fresh copy.
-    .then((items) => ((fetchedAt = Date.now()), items))
+    .then(
+      (items) => ((fetchedAt = Date.now()), items),
+      (e) => {
+        failed = true;
+        throw e;
+      },
+    )
     .finally(() => clearTimeout(timer));
 }
 
@@ -80,24 +97,14 @@ export function loadCatalog(): Promise<CatalogItem[]> {
  * daily deploy refreshes it with new cards and art, and nothing else reloads it while the app stays open.
  */
 export function refreshCatalog(): Promise<unknown> {
-  const before = good;
   // With no copy yet and the first download already out (a pull while the app is still starting), that one will do.
-  refreshing ??= (!good && loading ? loading : download(true))
-    .then(
-      (items) => {
-        if (items === before) return;
-        version++;
-        listeners.forEach((l) => l());
-      },
-      () => {},
-    )
-    .finally(() => void (refreshing = null));
+  refreshing ??= (!good && loading ? loading : download(true)).catch(() => {}).finally(() => void (refreshing = null));
   return refreshing;
 }
 
 /**
- * Changes each time a fetched-again catalog differs from the copy here (or is the first that worked); an effect that
- * uses the catalog can list it to run again.
+ * Changes each time a fetched-again catalog differs from the copy here, or the first that works comes after a failed
+ * download; an effect that uses the catalog can list it to run again.
  */
 export function useCatalogVersion() {
   return useSyncExternalStore(subscribe, getVersion);

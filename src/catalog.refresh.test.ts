@@ -140,12 +140,13 @@ describe('card catalog fetched again', () => {
 
 describe('card catalog downloads that overlap', () => {
   // Generated on 2026-10-25 (/ship review, run 16, state machines); changed by /ship review on 2026-10-25 (run 16 pass
-  // 3): a pull during the first download now shares it rather than starting a second
+  // 3): a pull during the first download now shares it rather than starting a second; changed by /ship review on
+  // 2026-10-25 (run 18, Red Team): screens are told only when a first copy follows a failed download
   // Value: protects=a pull while the first download is still out waits on that one (no second download on a slow
-  // connection), screens look again once it's in, and if it fails nothing stays cached, so the next lookup downloads
-  // again; fails_when=a pull starts a parallel download, or a failed download stays cached so the catalog never loads
-  // again (Add card names, Find images, the Maxed page's Try again); why_new=review (state machines, testing,
-  // performance); seam=fetch downloads settled by hand; no_claim=none beyond protects
+  // connection), and if it fails nothing stays cached, so the next lookup downloads again, and screens that gave up
+  // then (the art lookup, the Maxed page) are told when it works; fails_when=a pull starts a parallel download, a failed
+  // download stays cached so the catalog never loads again, or a card added offline never gets its art; why_new=review
+  // (state machines, testing, performance, Red Team); seam=fetch downloads settled by hand; no_claim=none beyond protects
   it('shares the first download with a pull, and tries again after it fails', async () => {
     let cat = await fresh();
     let calls = held();
@@ -156,10 +157,13 @@ describe('card catalog downloads that overlap', () => {
     expect(calls).toHaveLength(1);
     calls[0].res(new Response(JSON.stringify({ items: [item('Kori Blade')] })));
     await act(() => pull);
-    expect([(await first).map((i) => i.name), result.current !== before]).toEqual([['Kori Blade'], true]);
+    // Everything waiting on that first download gets it, so there's nothing to tell.
+    expect([(await first).map((i) => i.name), result.current !== before]).toEqual([['Kori Blade'], false]);
 
     cat = await fresh();
     calls = held();
+    const later = renderHook(() => cat.useCatalogVersion());
+    const failedAt = later.result.current;
     const again = cat.loadCatalog().catch(() => 'failed');
     const pull2 = cat.refreshCatalog();
     calls[0].rej(new Error('timeout'));
@@ -168,7 +172,8 @@ describe('card catalog downloads that overlap', () => {
     const retry = cat.loadCatalog();
     expect(calls).toHaveLength(2);
     calls[1].res(new Response(JSON.stringify({ items: [] })));
-    await expect(retry).resolves.toEqual([]);
+    await act(async () => void (await expect(retry).resolves.toEqual([])));
+    expect(later.result.current).not.toBe(failedAt);
   });
 
   // Generated on 2026-10-25 (/ship review, run 16, state machines)
