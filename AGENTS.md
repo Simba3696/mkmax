@@ -13,7 +13,7 @@ npm run lint    # oxlint
 npm run build   # tsc --noEmit, then vite build
 ```
 
-A change is done when `npm run lint`, `npm test` and `npm run build` all pass. CI runs lint, tests and a build on every pull request, and lint, tests and a build again before every deploy. Changes reach `main` only through a pull request whose check passed, squash-merged, and merging deploys.
+A change is done when `npm run lint`, `npm test` and `npm run build` all pass. CI runs lint, tests and a build on every pull request, and lint, tests and a build again before every deploy. Changes reach `main` only as a squash-merged pull request that is up to date with `main` and whose `check` passed (the owner can override on a pull request), and merging deploys.
 
 ## Rules
 

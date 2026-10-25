@@ -99,5 +99,5 @@ Ask about anything the notes leave out. Never guess a number the notes don't giv
   - tests for engine and normalize changes;
   - the docs updated in the same change, including the game-rules list in AGENTS.md when a rule changed;
   - `npm run lint`, `npm test` and `npm run build` all passing.
-- Commit with a Conventional Commits type, then a plain lowercase sentence saying what the user sees, as AGENTS.md describes (for example "fix: give Gold ascension the game's Fusion Up Kard costs …").
+- Commit on a new branch with a Conventional Commits type, then a plain lowercase sentence saying what the user sees, as AGENTS.md describes (for example "fix: give Gold ascension the game's Fusion Up Kard costs …"). `main` takes changes only as a squash-merged pull request whose `check` passed, so open one with `/ship` and land it with `/land-and-deploy`; a push straight to `main` is refused.
 - Give the user the Paste a list block last, with a sentence on where to paste it (Cards → **Paste a list…**).

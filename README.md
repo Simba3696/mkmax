@@ -50,7 +50,7 @@ npm run lint
 npm run build   # installable PWA in dist/
 ```
 
-Built with React 19, TypeScript, Vite, Tailwind CSS v4 and `vite-plugin-pwa`, linted with oxlint and tested with Vitest. Pushes to `main` deploy to GitHub Pages through GitHub Actions.
+Built with React 19, TypeScript, Vite, Tailwind CSS v4 and `vite-plugin-pwa`, linted with oxlint and tested with Vitest. Pull requests merged into `main` deploy to GitHub Pages through GitHub Actions.
 
 ## License
 

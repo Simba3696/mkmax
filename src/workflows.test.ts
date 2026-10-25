@@ -9,6 +9,7 @@ type Step = {
   uses?: string;
   run?: string;
   shell?: unknown;
+  env?: Record<string, unknown>;
   with?: Record<string, unknown>;
   if?: unknown;
   'continue-on-error'?: unknown;
@@ -98,10 +99,21 @@ describe('.github/workflows/ci.yml', () => {
 
   // Generated on 2026-10-25 (/ship review, pr-ci run 2 Red Team)
   // Value: protects=a pull request is built and tested under the /mkmax/ path the site is served from, as the deploy
-  // does; fails_when=BASE_PATH is dropped or changed, so a broken asset, manifest or service worker path passes the PR
-  // and fails after the merge; why_new=the PR job built with "/" while the deploy uses the Pages path; seam=none;
+  // does; fails_when=BASE_PATH is dropped or changed, or a step sets its own, so a broken asset, manifest or service
+  // worker path passes the PR and fails after the merge; why_new=the PR job built with "/" while the deploy uses the Pages path; seam=none;
   // no_claim=that GitHub Pages serves the repo at /mkmax/ (the deploy reads that from Pages itself)
   it('builds with the base path the site is served from', () => {
-    expect(jobs.map((j) => j.env?.BASE_PATH)).toEqual(['/mkmax/']);
+    expect([jobs.map((j) => j.env?.BASE_PATH), steps.filter((s) => s.env?.BASE_PATH !== undefined).length]).toEqual([
+      ['/mkmax/'],
+      0,
+    ]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, pr-ci run 2 pass 3)
+  // Value: protects=pull requests can merge once their check passes; fails_when=the job is renamed, so main's ruleset
+  // waits for a `check` that never reports and every pull request stays blocked; why_new=the ruleset names the job and
+  // nothing in the repo tied the two; seam=none; no_claim=what the live ruleset requires (set on GitHub)
+  it('keeps the job name main requires', () => {
+    expect(Object.keys(ci.jobs)).toEqual(['check']);
   });
 });

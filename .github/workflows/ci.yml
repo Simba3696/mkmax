@@ -1,6 +1,7 @@
 name: CI
 
-# Pushing to main deploys, so a pull request runs the same lint, tests and build first and shows them on the PR.
+# Merging into main deploys, so every pull request runs the deploy's lint, tests and build first; main's ruleset
+# requires this check to pass before a merge.
 on:
   pull_request:
 
@@ -13,6 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # main's ruleset requires a check with this exact name; rename it there too.
   check:
     runs-on: ubuntu-latest
     # A normal run takes a few minutes; a hung one fails here instead of holding the PR check for GitHub's 6 hours.

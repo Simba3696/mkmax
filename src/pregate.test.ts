@@ -16,7 +16,13 @@ const config = JSON.parse(readFileSync(join(here, '..', '.gstack', 'pregate.json
 const vitestFiles = () => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('VITEST')));
   const cli = join(root, 'node_modules', 'vitest', 'vitest.mjs');
-  const out = execFileSync(process.execPath, [cli, 'list', '--filesOnly', '--json'], { cwd: root, env, encoding: 'utf8' });
+  const out = execFileSync(process.execPath, [cli, 'list', '--filesOnly', '--json'], {
+    cwd: root,
+    env,
+    encoding: 'utf8',
+    // The test timeout can't stop a blocking call, so the listing gets its own.
+    timeout: 50_000,
+  });
   return (JSON.parse(out) as { file: string }[]).map((f) => relative(root, f.file).replace(/\\/g, '/')).sort();
 };
 
