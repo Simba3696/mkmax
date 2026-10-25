@@ -9,7 +9,7 @@ import TowersPanel from './TowersPanel';
 import MaxedPanel from './MaxedPanel';
 import { CardsIcon, TowerIcon, TrophyIcon } from '../icons';
 import { findCardImages, wikiUrl } from '../wiki';
-import { catalogPageUrl, findInCatalog, loadCatalog, rarityMismatches, wantsCatalogImage, type CatalogItem } from '../catalog';
+import { catalogPageUrl, findInCatalog, loadCatalog, rarityMismatches, useCatalogVersion, wantsCatalogImage, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
 import { applyRarityFix, initialSource } from '../challenges';
 import { challengeFor, challengeWhen, useEvents } from '../events';
@@ -163,6 +163,8 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
     // own focus restore, which comes just after the window's focus.
     let back: ReturnType<typeof setTimeout> | undefined;
     const returned = () => {
+      // Every card's Tower list listens; only one left open by switching apps has anything to do.
+      if (!blurredAway.current) return;
       clearTimeout(back);
       back = setTimeout(() => {
         const { edit: e, onChange: write } = openEdit.current;
@@ -700,8 +702,9 @@ function CardList() {
   const [imageEditId, setImageEditId] = useState<string | null>(null);
   const [imgStatus, setImgStatus] = useState<{ busy: boolean; msg: string } | null>(null);
   // Cards get their art as soon as they're added, even under the wrong rarity, so the rarity check runs whenever
-  // the catalog is at hand rather than only from Find images.
+  // the catalog is at hand rather than only from Find images. Read again when the catalog is fetched again.
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
+  const catalogVersion = useCatalogVersion();
   useEffect(() => {
     let cancelled = false;
     loadCatalog().then(
@@ -709,7 +712,7 @@ function CardList() {
       () => {}, // offline: Find images tries again
     );
     return () => void (cancelled = true);
-  }, []);
+  }, [catalogVersion]);
   const rarityFixes = useMemo(() => (catalog ? rarityMismatches(state.cards, ctx.rules, catalog) : []), [catalog, state.cards, ctx.rules]);
   const [draft, setDraft] = useState<Omit<Card, 'id'>>({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0, maxLevel: null, guest: false });
   // Counts picks in the Rarity box, so a pasted list follows a new pick but not a sync that removed the picked rarity.

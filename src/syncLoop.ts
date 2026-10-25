@@ -96,8 +96,14 @@ export class SyncLoop {
    */
   private unreadable(remote: AppState | null) {
     if (!remote || this.deps.canRead(remote)) return false;
-    this.deps.onStatus({ kind: 'error', message: UNREADABLE_MESSAGE });
+    this.waitForReadableApp();
     return true;
+  }
+
+  /** Usually a newer build wrote the gist's copy, so look for it. */
+  private waitForReadableApp() {
+    this.deps.onStatus({ kind: 'error', message: UNREADABLE_MESSAGE });
+    this.deps.lookForUpdate();
   }
 
   /** Edits made while a request was out still need pushing. */
@@ -196,7 +202,7 @@ export class SyncLoop {
         this.deps.applyRemote(shown);
       } catch {
         // Left unagreed, so the regular pulls neither push nor ask again while this build can't read it.
-        this.deps.onStatus({ kind: 'error', message: UNREADABLE_MESSAGE });
+        this.waitForReadableApp();
         return;
       }
       this.setConfig({ ...cfg, baseUpdatedAt: stamp(shown) });

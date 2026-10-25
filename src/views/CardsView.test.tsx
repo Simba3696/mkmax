@@ -2448,7 +2448,13 @@ describe('Tower gear: the kard threshold filter', () => {
     const back = JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
     expect([back.find((c) => c.id === 'kori')?.fusion, names(), options()[1], screen.queryByText('1 below threshold') != null]).toEqual([3, ['Kori Blade'], 'Below kard threshold (1)', true]);
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
-    // A fresh pick of the filter drops it: at F3 kards can finish it.
+    // Extended on 2026-10-25 (/ship review, run 15 pass 3, Red Team)
+    // Value: protects=the kept piece's note says why it no longer fits as it is now: raised past F3 it says past, not at;
+    // fails_when=the note says At the kard threshold now for any piece that no longer fits; why_new=review (Red Team);
+    // seam=none; no_claim=none beyond protects
+    act(() => screen.getByRole('button', { name: 'Raise level' }).click());
+    expect([screen.queryByText('· Past the kard threshold now') != null, screen.queryByText('· At the kard threshold now')]).toEqual([true, null]);
+    // A fresh pick of the filter drops it: at F3 or past it, kards can finish it.
     fireEvent.change(filter, { target: { value: 'all' } });
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
     expect([names(), options()[1], screen.queryByText('None of your tower gear is below the kard threshold.') != null]).toEqual([[], 'Below kard threshold (0)', true]);
@@ -2525,6 +2531,13 @@ describe('Tower gear: the kard threshold filter', () => {
     // Value: protects=a piece kept listed after a tap says why (it no longer fits the filter), under Not owned too; fails_when=a kept piece looks like the others, so the heading's count and the rows shown disagree with
     // nothing saying why; why_new=review (Codex design); seam=none; no_claim=how dimmed it looks
     expect([within(section('Lin Kuei Tower')!).queryByText('· Owned now') != null, within(section('Shirai Ryu Tower')!).queryByText('· Owned now')]).toEqual([true, null]);
+    // Extended on 2026-10-25 (/ship review, run 15 pass 3, state machines)
+    // Value: protects=a piece raised to F0 and lowered back is listed and counted as not owned again, without the note;
+    // fails_when=tapping back leaves it uncounted or still labelled Owned now; why_new=review (state machines): only the
+    // Below kard threshold filter checked a tap back; seam=none; no_claim=none beyond protects
+    act(() => within(section('Lin Kuei Tower')!).getByRole('button', { name: 'Lower level' }).click());
+    expect([saved().find((c) => c.id === 'kori')?.fusion, options()[2], section('Lin Kuei Tower')!.querySelector('h2')!.textContent, screen.queryByText('· Owned now')]).toEqual([0, 'Not owned (2)', 'Lin Kuei Tower 1 not owned', null]);
+    act(() => within(section('Lin Kuei Tower')!).getByRole('button', { name: 'Raise level' }).click());
 
     fireEvent.change(filter, { target: { value: 'all' } });
     fireEvent.change(filter, { target: { value: 'unowned' } });
@@ -2605,6 +2618,32 @@ describe('Tower gear: the kard threshold filter', () => {
     });
     const saved = JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
     expect([saved[0].fusion, screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }), filter.options[1].textContent]).toEqual([4, null, 'Below kard threshold (0)']);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 15 pass 3, Red Team)
+  // Value: protects=a tapped piece a sync marks No kards (so it has no threshold) stays listed and says it has no kard
+  // threshold now, not that it reached it; fails_when=the note claims the threshold for any piece that stops fitting;
+  // why_new=review (Red Team); seam=a grabbed update stands in for the sync; no_claim=a real sync
+  it('says a kept piece has no kard threshold once a sync marks it No kards', () => {
+    let update!: ReturnType<typeof useStore>['update'];
+    const s = defaultState();
+    s.rarities.find((r) => r.id === 'epic')!.goal = 'max';
+    s.cards = [{ id: 'kori', name: 'Kori Blade', rarityId: 'epic', fusion: 2, guest: false, source: 'tower', sourceNote: 'Lin Kuei Tower' }];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <CardsView sub="towers" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    fireEvent.change(screen.getByLabelText('Filter tower gear'), { target: { value: 'belowThreshold' } });
+    // F1 to F2: still below the threshold, so no note yet.
+    act(() => screen.getByRole('button', { name: 'Raise level' }).click());
+    expect(screen.queryByText(/^· /)).toBeNull();
+    act(() => update((d) => void (d.cards[0].noKards = true)));
+    expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }) != null, screen.queryByText('· No kard threshold now') != null]).toEqual([true, true]);
   });
 
   // Generated on 2026-10-22 (/ship review, Tower gear filter)

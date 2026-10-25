@@ -95,8 +95,11 @@ export default function TowersPanel() {
               // already shows it as copies to its goal.
               const thr = thresholdLevel(rule);
               const toThr = filter === 'belowThreshold' && thr != null && thr < target && belowThreshold(c) ? copiesToThreshold(c, rule) : 0;
-              // Listed only because it was tapped out of the filter: dimmed and labelled, since the counts leave it out.
+              // Listed only because it was tapped out of the filter: dimmed and labelled with why, since the counts leave it
+              // out. Its details line stays as it is, which dimmed would be too faint to read.
               const kept = !fits(c, filter);
+              const why =
+                filter === 'unowned' ? 'Owned now' : thr != null && c.fusion === thr ? 'At the kard threshold now' : thr != null && c.fusion > thr ? 'Past the kard threshold now' : 'No kard threshold now';
               return (
                 <div key={c.id} className={`${row} items-center`}>
                   <div className={kept ? 'opacity-60' : undefined}>
@@ -105,9 +108,14 @@ export default function TowersPanel() {
                   <div className={grow}>
                     <div className={rowTitle}>
                       <span className={kept ? 'opacity-60' : undefined}>{c.name}</span>
-                      {kept && <span className="text-muted text-small font-normal">{filter === 'unowned' ? ' · Owned now' : ' · At the kard threshold now'}</span>}
+                      {kept && (
+                        <span className="text-muted text-small font-normal">
+                          {' '}
+                          <span className="whitespace-nowrap">· {why}</span>
+                        </span>
+                      )}
                     </div>
-                    <div className={`text-small${kept ? ' opacity-60' : ''}`}>
+                    <div className="text-small">
                       <RarityBadge rule={rule} />
                       <span className="text-muted">
                         {' '}

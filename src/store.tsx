@@ -180,7 +180,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // (the update bar's Reload brings this tab up to date).
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (!holdIfNewer(e.key, e.newValue)) return;
+      // Once held, later saves from the newer tab (one per keystroke there) change nothing here.
+      if (savedByNewerApp() || !holdIfNewer(e.key, e.newValue)) return;
       clearTimeout(pushTimer.current);
       setNewerSave(true);
       clearUndo();

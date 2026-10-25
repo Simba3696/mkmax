@@ -364,12 +364,14 @@ describe('sync loop', () => {
     expect(laptop.pushes).toBe(0);
   });
 
-  it('neither asks nor pushes while this build can’t read the gist’s copy', async () => {
+  it('neither asks nor pushes while this build can’t read the gist’s copy, and looks for a new version', async () => {
     const { gist } = await pair();
     const laptop = device(gist, defaultState(), { token: 'token', gistId: 'g1', baseUpdatedAt: 0 });
     laptop.readable = () => false;
     await laptop.loop.syncNow();
     expect(laptop.status).toEqual({ kind: 'error', message: expect.stringContaining('can’t read') });
+    // Usually a newer build wrote it, and the message says to tap Reload once one is found.
+    expect(laptop.lookedForUpdate).toBe(1);
     // An edit on the fresh data would otherwise make this a conflict, where Keep mine uploads the fresh data.
     laptop.edit((s) => (s.currencies[0].balance = 500));
     const writes = gist.writes;
@@ -392,7 +394,7 @@ describe('sync loop', () => {
     expect(desktop.status.kind).toBe('conflict');
     desktop.readable = () => false;
     await desktop.loop.resolve('theirs');
-    expect(desktop.status.kind).toBe('error');
+    expect([desktop.status.kind, desktop.lookedForUpdate]).toEqual(['error', 1]);
     expect(names(desktop.state)).toEqual(['Scorpion', 'Kitana']);
     expect(names(gist.data)).toEqual(['Scorpion', 'Raiden']);
     // The next sync runs again instead of returning early on a prompt that's gone.

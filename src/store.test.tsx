@@ -82,6 +82,60 @@ describe('update undo labels', () => {
     expect(levels()).toEqual(['Raiden 0']);
   });
 
+  // Generated on 2026-10-25 (/ship review, run 15 pass 3, state machines)
+  // Value: protects=an Undo for a card a change maxed and removed, and one for a change whose first steps were saved
+  // without Undo (a Tower box's typing, then its re-spell), both leave the data as it is when dismissed or dropped by a
+  // replace: the card stays removed (and on the Maxed record), the re-spell stays, and a later Undo does nothing;
+  // fails_when=dismissing or a sync puts back the state from before, or an Undo after the replace restores it;
+  // why_new=review (state machines): these two kinds were only checked with Undo itself; seam=replace stands in for a
+  // sync; no_claim=the Undo bar's look and timer (App)
+  it('keeps a maxed removal and a re-spell when their Undo is dismissed or a replace drops it', () => {
+    let latest: Store | undefined;
+    render(
+      <StoreProvider>
+        <Grab onRender={(store) => (latest = store)} />
+      </StoreProvider>,
+    );
+    const api = () => latest!;
+    const cards = () => api().state.cards.map((c) => `${c.name} ${c.sourceNote ?? ''}`.trim());
+    const tower = (id: string, name: string, sourceNote: string) => ({ id, name, rarityId: 'epic', fusion: 1, guest: false, source: 'tower' as const, sourceNote });
+    const maxRaiden = () => {
+      act(() => void api().update((d) => void d.cards.push({ id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 0, guest: false })));
+      act(() => void api().update((d) => void (d.cards.find((c) => c.id === 'r')!.fusion = 11), 'Raiden to F10'));
+      expect(api().lastUndo?.label).toBe('Raiden to F10 · Raiden is maxed and removed');
+    };
+    const respell = () => {
+      act(() => void api().update((d) => void d.cards.push(tower('a', 'Kori Blade', 'Lin Kuei Tower'), tower('b', 'Kitana Fan', 'Lin Kuei Tower'))));
+      // The box saved its own card as typed, then its finish re-spells the other, with an Undo back to before the typing.
+      act(() => void api().update((d) => void (d.cards.find((c) => c.id === 'a')!.sourceNote = 'Lin kuei Tower')));
+      act(() =>
+        void api().update((d) => void (d.cards.find((c) => c.id === 'b')!.sourceNote = 'Lin kuei Tower'), 'Fixed the spelling', {
+          undoFrom: (prev) => void (prev.cards.find((c) => c.id === 'a')!.sourceNote = 'Lin Kuei Tower'),
+        }),
+      );
+      expect(api().lastUndo?.label).toBe('Fixed the spelling');
+    };
+
+    maxRaiden();
+    act(() => api().dismissUndo());
+    expect([cards(), api().state.maxed?.map((m) => m.name), api().lastUndo]).toEqual([[], ['Raiden'], null]);
+    respell();
+    act(() => api().dismissUndo());
+    act(() => api().undo());
+    expect(cards()).toEqual(['Kori Blade Lin kuei Tower', 'Kitana Fan Lin kuei Tower']);
+
+    act(() => api().replace(defaultState()));
+    maxRaiden();
+    const kept = { ...defaultState(), cards: [tower('s', 'Shadow Sash', 'Thunder Tower')] };
+    act(() => api().replace(kept));
+    act(() => api().undo());
+    expect(cards()).toEqual(['Shadow Sash Thunder Tower']);
+    respell();
+    act(() => api().replace(kept));
+    act(() => api().undo());
+    expect([cards(), api().lastUndo]).toEqual([['Shadow Sash Thunder Tower'], null]);
+  });
+
   // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
   // Value: protects=once the save is replaced (Import, or a sync bringing in another device's data), the Undo from before
   // can't be used in the same moment, before the screen updates: a change carrying on from it gets no Undo of its own,

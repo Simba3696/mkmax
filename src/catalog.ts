@@ -1,6 +1,7 @@
 // Card catalog from MK Mobile Base (mkmobilebase.com): names, rarities and card art for every character, Kameo and
 // piece of equipment. scripts/fetch-catalog.mjs downloads it into public/catalog.json at deploy time, because
 // the site's API doesn't allow requests from other sites.
+import { useSyncExternalStore } from 'react';
 import type { Card, MaxedCard, RarityRule } from './types';
 
 export interface CatalogItem {
@@ -16,19 +17,59 @@ export const catalogPageUrl = (item: CatalogItem) =>
   `https://mkmobilebase.com/en/category/${{ character: 'characters', equipment: 'equipment', kameo: 'kameos' }[item.kind]}/${item.slug}`;
 
 let loaded: Promise<CatalogItem[]> | null = null;
+let fetchedAt = 0;
+/** Bumped each time a fetched-again catalog is in, so screens using it can look again. */
+let version = 0;
+const listeners = new Set<() => void>();
 
-export function loadCatalog(): Promise<CatalogItem[]> {
-  loaded ??= fetch(`${import.meta.env.BASE_URL}catalog.json`)
+export function loadCatalog(fresh = false): Promise<CatalogItem[]> {
+  loaded ??= fetch(`${import.meta.env.BASE_URL}catalog.json`, fresh ? { cache: 'no-cache' } : undefined)
     .then((r) => {
       if (!r.ok) throw new Error(`catalog.json: HTTP ${r.status}`);
       return r.json() as Promise<{ items: CatalogItem[] }>;
     })
-    .then((d) => d.items)
+    .then((d) => ((fetchedAt = Date.now()), d.items))
     .catch((e) => {
       loaded = null; // let the next attempt retry
       throw e;
     });
   return loaded;
+}
+
+/**
+ * Fetch the catalog again (pull to refresh, or coming back after an hour), keeping the current copy if that fails. The
+ * daily deploy refreshes it with new cards and art, and nothing else reloads it while the app stays open.
+ */
+export function refreshCatalog(): Promise<unknown> {
+  const kept = loaded;
+  loaded = null;
+  return loadCatalog(true).then(
+    () => {
+      version++;
+      listeners.forEach((l) => l());
+    },
+    () => void (loaded = kept),
+  );
+}
+
+/** Changes each time the catalog is fetched again; an effect that uses the catalog can list it to run again. */
+export function useCatalogVersion() {
+  return useSyncExternalStore(subscribe, getVersion);
+}
+const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l));
+const getVersion = () => version;
+
+if (typeof document !== 'undefined') {
+  const refreshIfOld = () => {
+    if (document.visibilityState !== 'visible' || !fetchedAt) return;
+    const age = Date.now() - fetchedAt;
+    // A download time later than now means the device clock went back: that counts as old too.
+    if (age >= 0 && age <= 60 * 60 * 1000) return;
+    fetchedAt = Date.now(); // one refresh per return, even if a restore sends two events
+    void refreshCatalog();
+  };
+  document.addEventListener('visibilitychange', refreshIfOld);
+  window.addEventListener('pageshow', (e) => e.persisted && refreshIfOld());
 }
 
 /**

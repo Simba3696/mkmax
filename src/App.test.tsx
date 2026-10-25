@@ -10,9 +10,10 @@ import { PlanProvider } from './planner';
 import { SyncLoop } from './syncLoop';
 import App from './App';
 
-// The service worker module imports vite-plugin-pwa's virtual module, which only exists in a build; it isn't what's tested.
-const appUpdate = vi.hoisted(() => ({ ready: false, apply: vi.fn(), checks: 0 }));
-vi.mock('./appUpdate', () => ({ checkForAppUpdate: () => (appUpdate.checks++, Promise.resolve()), useAppUpdateReady: () => appUpdate.ready, applyAppUpdate: appUpdate.apply }));
+// Mocked so a test can say whether a new version is waiting or a service worker runs, catch Reload and count update
+// checks; appUpdate.test.ts tests the real module.
+const appUpdate = vi.hoisted(() => ({ ready: false, apply: vi.fn(), checks: 0, sw: true }));
+vi.mock('./appUpdate', () => ({ hasServiceWorker: () => appUpdate.sw, checkForAppUpdate: () => (appUpdate.checks++, Promise.resolve()), useAppUpdateReady: () => appUpdate.ready, applyAppUpdate: appUpdate.apply }));
 
 beforeEach(() => {
   // The catalog and the event schedule are fetched at start; neither matters here, so stay offline.
@@ -24,6 +25,7 @@ beforeEach(() => {
   appUpdate.ready = false;
   appUpdate.apply.mockClear();
   appUpdate.checks = 0;
+  appUpdate.sw = true;
 });
 afterEach(() => {
   cleanup();
@@ -36,6 +38,21 @@ afterEach(() => {
 const tab = (name: string) => screen.getByRole('button', { name });
 /** The Tower list's name box option, picked by its label rather than the hidden value behind it. */
 const nameBoxValue = (select: HTMLElement) => [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add a tower or fix its spelling…')!.value;
+const renderApp = () =>
+  render(
+    <StoreProvider>
+      <PlanProvider>
+        <App />
+      </PlanProvider>
+    </StoreProvider>,
+  );
+/** A pull down from the top of the page, as a finger does it. */
+async function pull() {
+  const touch = (y: number) => ({ touches: [{ clientX: 0, clientY: y }] });
+  fireEvent.touchStart(window, touch(0));
+  fireEvent.touchMove(window, touch(200));
+  await act(async () => void fireEvent.touchEnd(window));
+}
 /** Hands the store, as each render sees it, to the test, as any view would use it. */
 function Grab({ onRender }: { onRender: (store: ReturnType<typeof useStore>) => void }) {
   onRender(useStore());
@@ -97,18 +114,39 @@ describe('a new version', () => {
   it('is looked for by pull to refresh, which no longer reloads', async () => {
     const reload = vi.fn();
     vi.stubGlobal('location', { ...location, reload });
-    render(
-      <StoreProvider>
-        <PlanProvider>
-          <App />
-        </PlanProvider>
-      </StoreProvider>,
-    );
-    const touch = (y: number) => ({ touches: [{ clientX: 0, clientY: y }] });
-    fireEvent.touchStart(window, touch(0));
-    fireEvent.touchMove(window, touch(200));
-    await act(async () => void fireEvent.touchEnd(window));
+    renderApp();
+    await pull();
     expect([appUpdate.checks, reload.mock.calls.length]).toEqual([1, 0]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 15 pass 3)
+  // Value: protects=with sync on, pull to refresh still syncs, and looks for a new version without reloading;
+  // fails_when=the sync or the version check is dropped from a pull with sync on, or it reloads; why_new=review
+  // (testing): the pull test only ran with sync off; seam=appUpdate mocked (counting its checks), SyncLoop.syncNow spied,
+  // touches sent by hand; no_claim=real touch timing
+  it('is looked for by pull to refresh with sync on too, which also syncs', async () => {
+    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
+    const syncNow = vi.spyOn(SyncLoop.prototype, 'syncNow').mockResolvedValue();
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...location, reload });
+    renderApp();
+    const before = syncNow.mock.calls.length;
+    await pull();
+    expect([syncNow.mock.calls.length - before, appUpdate.checks, reload.mock.calls.length]).toEqual([1, 1, 0]);
+    syncNow.mockRestore();
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 15 pass 3)
+  // Value: protects=where no service worker runs (a private window, some in-app browsers), pull to refresh reloads, the
+  // only way a new version loads there; fails_when=a pull there never updates the app; why_new=review (Red Team);
+  // seam=appUpdate mocked (no service worker), touches sent by hand; no_claim=which browsers block service workers
+  it('reloads on pull to refresh where there’s no service worker', async () => {
+    appUpdate.sw = false;
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...location, reload });
+    renderApp();
+    await pull();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   // Generated on 2026-10-25 (/ship review, run 15 pass 2)

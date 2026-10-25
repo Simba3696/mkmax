@@ -9,10 +9,9 @@ import type { Pack } from '../types';
 import { ghostBordered } from '../classes';
 import SettingsView from './SettingsView';
 
-// The service worker module imports vite-plugin-pwa's virtual module, which only exists in a build; it isn't what's tested.
-// Update checks are counted, as importing a backup from a newer version looks for the update.
+// Mocked to count update checks, as importing a backup from a newer version looks for the update.
 const appUpdate = vi.hoisted(() => ({ checks: 0 }));
-vi.mock('../appUpdate', () => ({ checkForAppUpdate: () => (appUpdate.checks++, Promise.resolve()), startServiceWorker: () => {} }));
+vi.mock('../appUpdate', () => ({ checkForAppUpdate: () => (appUpdate.checks++, Promise.resolve()) }));
 
 /** Hands the store, as each render sees it, to the test, as any view would use it. */
 function Grab({ onRender }: { onRender: (store: ReturnType<typeof useStore>) => void }) {

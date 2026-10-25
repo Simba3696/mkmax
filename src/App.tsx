@@ -1,14 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { noChange, useStore, type SyncStatus, type UndoEntry } from './store';
-import { btn, hint } from './classes';
+import { btn, hint, hintRule } from './classes';
 import { NEWER_SAVE_MESSAGE } from './sync';
 import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
-import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
+import { catalogImageUpdates, loadCatalog, refreshCatalog, useCatalogVersion, wantsCatalogImage } from './catalog';
 import { endingSoon, moveSeasonEnd, seasonEnd, stretchedWeekEnds } from './engine';
 import { refreshEvents, scheduledSeason, useEvents } from './events';
-import { applyAppUpdate, checkForAppUpdate, useAppUpdateReady } from './appUpdate';
+import { applyAppUpdate, checkForAppUpdate, hasServiceWorker, useAppUpdateReady } from './appUpdate';
 import { usePlan } from './planner';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
@@ -99,8 +99,9 @@ export default function App() {
   const [tab, setTab] = useState<TabId>(() => TABS.find((t) => t.id === location.hash.slice(1))?.id ?? 'plan');
 
   // Give cards MK Mobile Base art automatically: new cards, cards synced in from another device, and cards still
-  // carrying art from the old wiki lookup. Runs again only when that set of cards changes.
+  // carrying art from the old wiki lookup. Runs again when that set of cards changes or the catalog is fetched again.
   const needsArt = state.cards.filter(wantsCatalogImage).map((c) => c.id).join(',');
+  const catalogVersion = useCatalogVersion();
   useEffect(() => {
     if (!needsArt) return;
     let cancelled = false;
@@ -122,7 +123,7 @@ export default function App() {
     );
     return () => void (cancelled = true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsArt]);
+  }, [needsArt, catalogVersion]);
 
   // MK Mobile Base's schedule knows when the Realm Klash season ends, so it replaces the saved date (and the
   // 2-week guess) whenever it covers today, moving that season's items with it.
@@ -196,9 +197,14 @@ export default function App() {
       if (next) go(next.id);
     },
   });
-  // A pull re-reads the event schedule, looks for a new version and, with sync on, checks the gist. It never reloads:
-  // a reload wouldn't switch to a new version (only the bar's Reload does) and would lose whatever is half typed.
-  const refresh = () => Promise.all([sync.connected && sync.syncNow(), refreshEvents(), checkForAppUpdate()]);
+  // A pull re-reads the event schedule and the card catalog, looks for a new version and, with sync on, checks the gist.
+  // It doesn't reload, which wouldn't switch to a new version (only the bar's Reload does) and would lose whatever is half
+  // typed, except where there's no service worker to find one. The spinner doesn't wait for the version check: one found
+  // brings up the bar by itself, and the check has no timeout of its own.
+  const refresh = () =>
+    hasServiceWorker()
+      ? (void checkForAppUpdate(), Promise.all([sync.connected && sync.syncNow(), refreshEvents(), refreshCatalog()]))
+      : Promise.resolve(location.reload());
 
   const syncPill = (extra: string) =>
     sync.status.kind !== 'off' && (
@@ -277,7 +283,7 @@ export default function App() {
         {updateReady && (
           <div className="flex-none bg-hint border-b border-line" role="status">
             <div className="max-w-page md:max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-2 flex items-center gap-3 text-[0.85rem]">
-              <span className="flex-1 border-l-[3px] border-gold pl-[0.6rem]">A new version of MK Max is ready.</span>
+              <span className={`flex-1 ${hintRule}`}>A new version of MK Max is ready.</span>
               <button className={btn.primary} onClick={applyAppUpdate}>
                 Reload
               </button>
