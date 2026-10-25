@@ -140,8 +140,8 @@ describe('.github/workflows/ci.yml', () => {
 
   // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 4)
   // Value: protects=the GitHub token isn't left on disk while npm ci runs dependency install scripts, in this workflow
-  // and the deploy (whose token can publish the site); fails_when=a checkout step drops persist-credentials: false;
-  // why_new=checkout keeps the token by default; seam=none; no_claim=what GitHub grants the token
+  // and the deploy's build job; fails_when=a checkout step drops persist-credentials: false; why_new=checkout keeps
+  // the token by default; seam=none; no_claim=what GitHub grants the token
   it('keeps the token off disk in both workflows', () => {
     const checkouts = [ci, deploy].flatMap((w) =>
       Object.values(w.jobs).flatMap((j) => j.steps.filter((s) => s.uses?.startsWith('actions/checkout'))),
@@ -154,14 +154,25 @@ describe('.github/workflows/deploy.yml', () => {
   // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 5)
   // Value: protects=only the deploy job can publish the site, so the build job, which runs npm ci and the
   // dependencies' install scripts, has a token that can only read and can't get a Pages deploy token; fails_when=pages:
-  // write or id-token: write moves back to the whole workflow or onto the build job, or the build gets another write
-  // permission; why_new=they were set for the whole workflow, so every job had them; seam=none; no_claim=that
-  // configure-pages and deploy-pages work with these (seen on the first deploy after the merge)
+  // write or id-token: write moves back to the whole workflow or onto the build job, the build gets another write
+  // permission, another job is added (with its own permissions), or the deploy job gets a step besides deploy-pages
+  // (a checkout or npm ci would run dependency code with the publishing token); why_new=they were set for the whole
+  // workflow, so every job had them; seam=none; no_claim=that configure-pages and deploy-pages work with these (seen
+  // on the first deploy after the merge)
   it('lets only the deploy job publish', () => {
-    expect([deploy.permissions, deploy.jobs.build?.permissions, deploy.jobs.deploy?.permissions]).toEqual([
+    const deploySteps = deploy.jobs.deploy?.steps.map((s) => s.uses?.split('@')[0] ?? s.run);
+    expect([
+      Object.keys(deploy.jobs),
+      deploy.permissions,
+      deploy.jobs.build?.permissions,
+      deploy.jobs.deploy?.permissions,
+      deploySteps,
+    ]).toEqual([
+      ['build', 'deploy'],
       { contents: 'read' },
       { contents: 'read', pages: 'read' },
       { pages: 'write', 'id-token': 'write' },
+      ['actions/deploy-pages'],
     ]);
   });
 });
