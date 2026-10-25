@@ -3,12 +3,15 @@
   "runner": null,
   "dependencies": {
     "scripts/fetch-catalog.mjs": [
+      "scripts/fetch.test.mjs",
       "scripts/schedule.test.mjs"
     ],
     "scripts/fetch-events.mjs": [
+      "scripts/fetch.test.mjs",
       "scripts/schedule.test.mjs"
     ],
     "package.json": [
+      "scripts/fetch.test.mjs",
       "scripts/schedule.test.mjs",
       "src/App.catalog.test.tsx",
       "src/App.test.tsx",
@@ -44,6 +47,7 @@
       "src/workflows.test.ts"
     ],
     "package-lock.json": [
+      "scripts/fetch.test.mjs",
       "scripts/schedule.test.mjs",
       "src/App.catalog.test.tsx",
       "src/App.test.tsx",
@@ -79,6 +83,7 @@
       "src/workflows.test.ts"
     ],
     "tsconfig.json": [
+      "scripts/fetch.test.mjs",
       "scripts/schedule.test.mjs",
       "src/App.catalog.test.tsx",
       "src/App.test.tsx",
@@ -120,6 +125,7 @@
     "public/catalog.json": [],
     "public/events.json": [],
     "vite.config.ts": [
+      "scripts/fetch.test.mjs",
       "scripts/schedule.test.mjs",
       "src/App.catalog.test.tsx",
       "src/App.test.tsx",
