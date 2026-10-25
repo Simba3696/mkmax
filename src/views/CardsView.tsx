@@ -81,11 +81,11 @@ if (typeof document !== 'undefined') {
 function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintIn, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; respells: (name: string) => number; hintIn?: HTMLElement | null; className?: string; placeholder?: string }) {
   const pick = onPick ?? onChange;
   const hintId = useId();
-  // The name being typed, the tower an emptied box goes back to (the one the card had before Add a tower or fix its spelling… was picked,
+  // The name being typed, the tower an emptied box goes back to (the one the card had before the name box was opened,
   // or, if it opened on one, the name saved when the app was hidden; none in the plain box, which has no list to go back
   // to), and the tower this box last saved. Null while picking from the list, or before the first key in the plain box.
   const [edit, setEdit] = useState<TowerEdit | null>(null);
-  // Enter in a card's new-tower box leaves it (so it's finished) and puts focus on the list that replaces it, rather than
+  // Enter in a card's name box leaves it (so it's finished) and puts focus on the list that replaces it, rather than
   // dropping it to the page.
   const focusList = useRef(false);
   useEffect(() => {
@@ -109,10 +109,10 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
   };
 
   // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
-  // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step
+  // step would save a tower with its own Undo, and stepping past the last tower would open the name box, so a step
   // is held (shown, not saved) until the list is left or Enter is pressed (a held tower is also saved when the app is
-  // hidden): on a card, where each pick saves with Undo, any tower; anywhere, Add a tower or fix its spelling…, which leaving the list
-  // drops. A tap or a click saves at once.
+  // hidden): on a card, where each pick saves with Undo, any tower; anywhere, the name box's option, which leaving the
+  // list drops. A tap or a click saves at once.
   // A key marks the change it makes before it's let go (a pick in a list a key opened is at worst held until it's left).
   const [held, setHeld] = useState<string | null>(null);
   const keyed = useRef(false);
@@ -123,7 +123,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
   // hiding the app never saves a tower the list doesn't show.
   const heldNow = !edit && towers.length && (held === null || held === '' || held === NEW_TOWER || held === typed || towers.includes(held)) ? held : null;
   useEffect(() => void (held !== null && heldNow === null && setHeld(null)), [held, heldNow]);
-  // Leaving the list drops a held Add a tower or fix its spelling…; Enter opens its box.
+  // Leaving the list drops a held name box option; Enter opens the box.
   const settle = (v: string, enter: boolean) => {
     setHeld(null);
     if (v === NEW_TOWER) {
@@ -179,10 +179,10 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
       window.removeEventListener('focus', returned);
       clearTimeout(back);
       const { edit: e, onChange: write, held: h, settle: done } = openEdit.current;
-      // A held step is settled as leaving the list does: a tower is saved with Undo, Add a tower or fix its spelling… is dropped.
+      // A held step is settled as leaving the list does: a tower is saved with Undo, the name box's option is dropped.
       if (e) finishTower(e, write);
       else if (h !== null) done(h, false);
-      // Closed now, not when the page is shown again: a hidden box still marked as being typed in holds an app update.
+      // Closed now, so the page is back to the list when it's shown again.
       setEdit(null);
     };
   }, []);
@@ -192,18 +192,19 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
     // Said before the name is finished, as the re-spell changes cards the user didn't touch.
     const name = edit ? towerName(edit.text) : '';
     const others = name ? respells(name) : 0;
-    const say = `Fixes the spelling on ${others} other card${others === 1 ? '' : 's'} when you finish`;
+    const say = `fixes the spelling on ${others} other card${others === 1 ? '' : 's'} when you finish`;
     const hint =
       others > 0 &&
       (hintIn === undefined ? (
         <span id={hintId} className="text-small text-muted basis-full order-last">
-          {say}
+          {say[0].toUpperCase() + say.slice(1)}
         </span>
       ) : (
         hintIn &&
         createPortal(
+          // Under the form, so it says which box it's about.
           <p id={hintId} className="text-muted text-small md:max-w-[80ch]">
-            {say}
+            Tower: {say}
           </p>,
           hintIn,
         )
@@ -214,10 +215,8 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
           ref={keepFocus}
           className={className}
           aria-describedby={others ? hintId : undefined}
-          // A name being typed holds an app update's reload (appUpdate.ts), which would finish it unseen.
-          data-editing={edit ? '' : undefined}
           value={edit?.text ?? value ?? ''}
-          placeholder={towers.length ? 'New tower name' : placeholder}
+          placeholder={towers.length ? 'Tower name' : placeholder}
           aria-label="Tower"
           autoFocus={!!edit}
           onChange={(e) => {
@@ -235,8 +234,8 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
             if (edit) finishTower(edit, onChange);
             setEdit(null);
           }}
-          // A box with a name open (typed in, or opened from Add a tower or fix its spelling…) turns into the list when it's left while the
-          // list has towers; an untouched plain box doesn't rerender, so a flag set for it would wait and take focus the next
+          // A box with a name open (typed in, or opened from the list) turns into the list when it's left while the list
+          // has towers; an untouched plain box doesn't rerender, so a flag set for it would wait and take focus the next
           // time the list shows, and an emptied plain box stays a box, which the flag would focus again.
           onKeyDown={(e) => {
             // An Enter that confirms a word in an input method (Chinese, Japanese) isn't the user finishing the name.
@@ -264,8 +263,6 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
     <select
       ref={keepFocus}
       className={className}
-      // A held step holds an app update's reload too, which would save it unseen as hiding the app does.
-      data-editing={heldNow !== null ? '' : undefined}
       value={heldNow ?? current}
       aria-label="Tower"
       onChange={(e) => {
@@ -576,8 +573,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         update makes Gold characters ascendable, add "Stage I" (Max A5) or "Stage II" (Max A10), like "Kenshi, Elder God - Gold - Stage I": a card not in your list
         was maxed, so it comes back at the cap below with 5 copies to go.
       </p>
-      {/* A list waiting in the box holds an app update's reload (appUpdate.ts), which would lose it. */}
-      <textarea value={text} onChange={(e) => (setText(e.target.value), setJustAdded(new Set()), remember())} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus data-editing={text.trim() ? '' : undefined} />
+      <textarea value={text} onChange={(e) => (setText(e.target.value), setJustAdded(new Set()), remember())} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
       <div className="text-small text-muted">
         {!state.rarities.length
           ? 'Add a rarity in Settings first: every card needs one.'
@@ -839,7 +835,7 @@ function CardList() {
     });
 
   // The count first, so it still shows when a phone cuts the Undo bar short.
-  const respelledLabel = (tower: string | undefined, n: number) => `Respelled ${n} other card${n === 1 ? '' : 's'}: ${tower}`;
+  const respelledLabel = (tower: string | undefined, n: number) => `Fixed the spelling on ${n} other card${n === 1 ? '' : 's'}: ${tower}`;
   // With `over`, only over that tower: a Tower box left empty doesn't put its old tower back over one a sync brought in.
   // A finished typed name in a new spelling also re-spells the tower on the other cards naming it; that changes cards the
   // user didn't touch, so it has Undo even though typing doesn't. The box saved this card as it was typed, so Undo also
@@ -1233,7 +1229,7 @@ function CardList() {
                   </label>
                 )}
                 {(rule.kind !== 'character' || c.source) && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v, sourceNote: undefined })} />}
-                {c.source === 'tower' && <TowerSelect className="w-[11rem]" placeholder="Tower name" towers={towers} value={c.sourceNote} respells={(t) => towerRespells(state, t, c.id)} onChange={(v, over) => setTower(c.id, v, over)} onPick={(v) => setTower(c.id, v, undefined, v ? `${c.name}: tower set to ${v}` : `${c.name}: tower removed`)} />}
+                {c.source === 'tower' && <TowerSelect className="w-[11rem] md:w-auto md:min-w-[11rem]" placeholder="Tower name" towers={towers} value={c.sourceNote} respells={(t) => towerRespells(state, t, c.id)} onChange={(v, over) => setTower(c.id, v, over)} onPick={(v) => setTower(c.id, v, undefined, v ? `${c.name}: tower set to ${v}` : `${c.name}: tower removed`)} />}
                 <button className={btn.ghost} onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
                   Image
                 </button>

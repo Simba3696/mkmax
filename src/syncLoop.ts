@@ -83,8 +83,7 @@ export class SyncLoop {
 
   /**
    * Neither pull nor push until this device runs the newer build; the regular pulls check again. It doesn't look for
-   * the update itself, since finding it reloads the app. The reload waits for pop-ups, the Undo bar and anything being
-   * typed (see appUpdate.ts), but a background sync can land at any moment.
+   * the update itself: the new-version bar does that (appUpdate.ts). A background sync can land at any moment.
    */
   private waitForNewerApp() {
     this.deps.onStatus({ kind: 'error', message: NEWER_MESSAGE });

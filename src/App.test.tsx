@@ -11,7 +11,8 @@ import { SyncLoop } from './syncLoop';
 import App from './App';
 
 // The service worker module imports vite-plugin-pwa's virtual module, which only exists in a build; it isn't what's tested.
-vi.mock('./appUpdate', () => ({ checkForAppUpdate: () => Promise.resolve() }));
+const appUpdate = vi.hoisted(() => ({ ready: false, apply: vi.fn() }));
+vi.mock('./appUpdate', () => ({ checkForAppUpdate: () => Promise.resolve(), useAppUpdateReady: () => appUpdate.ready, applyAppUpdate: appUpdate.apply }));
 
 beforeEach(() => {
   // The catalog and the event schedule are fetched at start; neither matters here, so stay offline.
@@ -30,6 +31,8 @@ afterEach(() => {
 });
 
 const tab = (name: string) => screen.getByRole('button', { name });
+/** The Tower list's name box option, picked by its label rather than the hidden value behind it. */
+const nameBoxValue = (select: HTMLElement) => [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add a tower or fix its spelling…')!.value;
 /** Hands the store, as each render sees it, to the test, as any view would use it. */
 function Grab({ onRender }: { onRender: (store: ReturnType<typeof useStore>) => void }) {
   onRender(useStore());
@@ -42,6 +45,37 @@ const towers = () => {
   const intro = screen.queryByText(/Tower gear is farmed, not bought/);
   return intro && !intro.closest('[style*="display: none"]') ? intro : null;
 };
+
+describe('a new version', () => {
+  // Generated on 2026-10-25 (/ship review, update approach)
+  // Value: protects=a new version waiting is shown as a bar on the page with Reload, which switches to it, and nothing
+  // shows while none is waiting; fails_when=the bar is missing so a new version is never taken up, or Reload does
+  // nothing; why_new=the app no longer reloads by itself; seam=appUpdate mocked (its ready flag and apply); no_claim=a
+  // real service worker update (appUpdate.test.ts)
+  it('says a new version is ready and reloads into it when Reload is tapped', () => {
+    appUpdate.ready = false;
+    const { unmount } = render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    expect(screen.queryByText('A new version of MK Max is ready.')).toBeNull();
+    unmount();
+    appUpdate.ready = true;
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect([screen.queryByText('A new version of MK Max is ready.') != null, appUpdate.apply.mock.calls.length]).toEqual([true, 1]);
+    appUpdate.ready = false;
+  });
+});
 
 describe('the MK MAX logo', () => {
   // Value: protects=the logo goes to the Plan from another tab and scrolls the Plan to the top; fails_when=home() goes
@@ -542,11 +576,11 @@ describe('the Undo bar', () => {
     fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
     fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
     stalePress('Dismiss', () => {
-      fireEvent.change(form.getByLabelText('Tower'), { target: { value: '\u0000new' } });
-      fireEvent.change(form.getByPlaceholderText('New tower name'), { target: { value: 'Lin Kuei Tower' } });
-      fireEvent.blur(form.getByPlaceholderText('New tower name'));
+      fireEvent.change(form.getByLabelText('Tower'), { target: { value: nameBoxValue(form.getByLabelText('Tower')) } });
+      fireEvent.change(form.getByPlaceholderText('Tower name'), { target: { value: 'Lin Kuei Tower' } });
+      fireEvent.blur(form.getByPlaceholderText('Tower name'));
     });
-    expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Respelled 2 other cards: Lin Kuei Tower') !== null]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', true]);
+    expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Fixed the spelling on 2 other cards: Lin Kuei Tower') !== null]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', true]);
 
     // A re-spell the press makes itself, by finishing a card's Tower box as focus leaves it.
     const box = () => {
@@ -554,10 +588,10 @@ describe('the Undo bar', () => {
       while (r && !r.querySelector('[aria-label=Tower]')) r = r.parentElement;
       return r!.querySelector<HTMLElement>('[aria-label=Tower]')!;
     };
-    fireEvent.change(box(), { target: { value: '\u0000new' } });
+    fireEvent.change(box(), { target: { value: nameBoxValue(box()) } });
     fireEvent.change(box(), { target: { value: 'Lin Kuei tower' } });
     stalePress('Undo', () => fireEvent.blur(box()));
-    expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Respelled 1 other card: Lin Kuei tower') !== null]).toEqual(['Lin Kuei tower', 'Lin Kuei tower', true]);
+    expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Fixed the spelling on 1 other card: Lin Kuei tower') !== null]).toEqual(['Lin Kuei tower', 'Lin Kuei tower', true]);
   });
 
   // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)

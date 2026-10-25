@@ -8,7 +8,7 @@ import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
 import { endingSoon, moveSeasonEnd, seasonEnd, stretchedWeekEnds } from './engine';
 import { refreshEvents, scheduledSeason, useEvents } from './events';
-import { checkForAppUpdate } from './appUpdate';
+import { applyAppUpdate, checkForAppUpdate, useAppUpdateReady } from './appUpdate';
 import { usePlan } from './planner';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
@@ -94,6 +94,8 @@ const DOUBLE_TAP_MS = 500;
 
 export default function App() {
   const { state, update, sync, lastUndo, undo, dismissUndo, newerSave } = useStore();
+  // On every tab, as an update waits for the user rather than reloading over whatever they're doing.
+  const updateReady = useAppUpdateReady();
   // A mistyped or pasted link (#Packs, a docs anchor) opens Plan rather than a blank page with no tab selected.
   const [tab, setTab] = useState<TabId>(() => TABS.find((t) => t.id === location.hash.slice(1))?.id ?? 'plan');
 
@@ -278,6 +280,14 @@ export default function App() {
             <p className={`${hint} mt-0 mb-4 md:max-w-[80ch]`} role="alert">
               {NEWER_SAVE_MESSAGE}
             </p>
+          )}
+          {updateReady && (
+            <div className={`${hint} mt-0 mb-4 md:max-w-[80ch] flex items-center gap-3`} role="status">
+              <span className="flex-1">A new version of MK Max is ready.</span>
+              <button className={btn.primary} onClick={applyAppUpdate}>
+                Reload
+              </button>
+            </div>
           )}
           {tab === 'plan' && <PlanView goto={go} openPack={openPack} />}
           {tab === 'packs' && <PacksView focus={focusPack} onFocused={() => setFocusPack(null)} />}

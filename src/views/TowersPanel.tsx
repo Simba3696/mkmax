@@ -20,7 +20,7 @@ export default function TowersPanel() {
   const { ctx } = usePlan();
   const [filter, setFilter] = useState<GearFilter>('all');
   // Gear whose level was tapped while a filter was on stays listed until it changes, so a piece raised to the kard
-  // threshold (or to F0, owned) doesn't vanish, with no Undo, before it can be tapped back.
+  // threshold (or to F0, owned) doesn't vanish, with no Undo, before it can be tapped back. Counts say what still fits.
   const [tapped, setTapped] = useState<ReadonlySet<string>>(new Set());
   const pickFilter = (v: GearFilter) => (setFilter(v), setTapped(new Set()));
 
@@ -39,8 +39,7 @@ export default function TowersPanel() {
   const unowned = (c: Card) => c.fusion === 0;
   const fits = (c: Card, f: GearFilter) => (f === 'belowThreshold' ? belowThreshold(c) : f === 'unowned' ? unowned(c) : true);
   const shown = (c: Card) => fits(c, filter) || tapped.has(c.id);
-  // Each filter's count, counting the pieces it keeps listed after a tap while it's the one on.
-  const countFor = (f: GearFilter) => gear.filter((c) => fits(c, f) || (filter === f && tapped.has(c.id))).length;
+  const countFor = (f: GearFilter) => gear.filter((c) => fits(c, f)).length;
 
   // Grouped by towerKey: "Lin kuei tower" files with "Lin Kuei Tower". Each tower is spelled as the Tower list on Cards
   // spells it, whatever the filter shows.
@@ -85,7 +84,7 @@ export default function TowersPanel() {
           <section key={tower} className={`${card} break-inside-avoid`}>
             <h2>
               {tower}{' '}
-              <span className="text-muted text-small">{`${cards.length} ${filter === 'all' ? 'left' : filter === 'unowned' ? 'not owned' : 'below threshold'}`}</span>
+              <span className="text-muted text-small">{`${cards.filter((c) => fits(c, filter)).length} ${filter === 'all' ? 'left' : filter === 'unowned' ? 'not owned' : 'below threshold'}`}</span>
             </h2>
             {cards.map((c) => {
               const rule = ctx.rules.get(c.rarityId)!;

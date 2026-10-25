@@ -26,7 +26,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // The app says when a new version is ready and reloads when the user taps Reload (appUpdate.ts), so nothing in
+      // progress is thrown away by an update.
+      registerType: 'prompt',
       includeAssets: ['icon.svg', 'logo-mark.svg', 'apple-touch-icon.png'],
       workbox: {
         // Card art is hotlinked from MK Mobile Base and the MK Mobile wiki; keep a copy so thumbnails work offline.

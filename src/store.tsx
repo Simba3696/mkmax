@@ -175,7 +175,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [loop, newerSave]);
 
   // A tab left open on the older build when another tab, on the newer one, saves: hold from then on, as at startup
-  // (the update itself reloads this tab, but not while a pop-up or the Undo bar is up).
+  // (the update bar's Reload brings this tab up to date).
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (!holdIfNewer(e.key, e.newValue)) return;
