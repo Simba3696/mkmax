@@ -55,7 +55,8 @@ export default function TowersPanel() {
   const rarityOrder = (c: Card) => state.rarities.findIndex((r) => r.id === c.rarityId);
   const towers = [...byTower.values()]
     .map(({ tower, cards }) => ({ tower, cards: cards.sort((a, b) => rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name)) }))
-    // Towers listing the most gear first; the unnamed group last.
+    // Towers listing the most gear first, counting pieces kept after a tap so a tap doesn't move its tower; the unnamed
+    // group last.
     .sort((a, b) => Number(a.tower === NO_TOWER) - Number(b.tower === NO_TOWER) || b.cards.length - a.cards.length || a.tower.localeCompare(b.tower));
   const total = gear.length;
 

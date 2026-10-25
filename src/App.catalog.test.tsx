@@ -2,16 +2,25 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { defaultState } from './defaults';
-import { StoreProvider } from './store';
-import { PlanProvider } from './planner';
-import App from './App';
 
-// Its own file, so catalog.ts starts with no card list downloaded: a test that loaded it would leave it cached.
+// Its own file, and a fresh copy of the app for each test (renderApp), so catalog.ts starts with no card list downloaded:
+// a test that loaded it would leave it cached.
 vi.mock('./appUpdate', () => ({ hasServiceWorker: () => true, checkForAppUpdate: () => Promise.resolve(), useAppUpdateReady: () => false, applyAppUpdate: () => {} }));
 
 beforeEach(() => {
   history.replaceState(null, '', '#packs');
 });
+async function renderApp() {
+  vi.resetModules();
+  const [{ StoreProvider }, { PlanProvider }, { default: App }] = await Promise.all([import('./store'), import('./planner'), import('./App')]);
+  render(
+    <StoreProvider>
+      <PlanProvider>
+        <App />
+      </PlanProvider>
+    </StoreProvider>,
+  );
+}
 afterEach(() => {
   cleanup();
   localStorage.clear();
@@ -34,20 +43,14 @@ it('fetches the card catalog again on pull to refresh, and gives cards the art i
     asked.push(init?.cache);
     return Promise.resolve(new Response(JSON.stringify({ items: asked.length > 1 ? [item] : [] })));
   });
-  render(
-    <StoreProvider>
-      <PlanProvider>
-        <App />
-      </PlanProvider>
-    </StoreProvider>,
-  );
+  await renderApp();
   await waitFor(() => expect(asked.length).toBe(1));
   const touch = (y: number) => ({ touches: [{ clientX: 0, clientY: y }] });
   fireEvent.touchStart(window, touch(0));
   fireEvent.touchMove(window, touch(200));
   await act(async () => void fireEvent.touchEnd(window));
   await waitFor(() => expect(localStorage.getItem('mkmax:v1')).toContain(art));
-  expect(asked).toEqual([undefined, 'no-cache']);
+  expect(asked).toEqual(['no-cache', 'no-cache']);
 });
 
 // Generated on 2026-10-25 (/ship coverage audit, run 16)
@@ -66,13 +69,7 @@ it('shows a rarity the fetched-again catalog lists differently on Cards while it
       ? Promise.resolve(new Response(JSON.stringify({ items: [{ kind: 'equipment', name: 'Kori Blade', rarity, slug: 'kori-blade', image: art }] })))
       : Promise.reject(new Error('offline')),
   );
-  render(
-    <StoreProvider>
-      <PlanProvider>
-        <App />
-      </PlanProvider>
-    </StoreProvider>,
-  );
+  await renderApp();
   // The card gets its art once the catalog is in, so Cards has read it too.
   await waitFor(() => expect(localStorage.getItem('mkmax:v1')).toContain(art));
   expect(screen.queryByText(/MK Mobile Base lists a different rarity/)).toBeNull();

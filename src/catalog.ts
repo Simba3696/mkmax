@@ -22,7 +22,9 @@ let goodText = '';
 /** The first download while there's no catalog yet. */
 let loading: Promise<CatalogItem[]> | null = null;
 let refreshing: Promise<unknown> | null = null;
+/** When the last download that worked finished, and whether any has been tried (the app only reads it when needed). */
 let fetchedAt = 0;
+let tried = false;
 /** Bumped each time a fetched-again catalog differs, so screens using it can look again. */
 let version = 0;
 const listeners = new Set<() => void>();
@@ -31,21 +33,27 @@ const DOWNLOAD_TIMEOUT_MS = 30 * 1000;
 /** The daily deploy refreshes the catalog; coming back to an app whose copy is older than this fetches it again. */
 const REFRESH_AFTER_MS = 60 * 60 * 1000;
 
-function download(fresh: boolean): Promise<CatalogItem[]> {
+/**
+ * Downloads the catalog, past the browser's own copy (after a reload it may hand back one from before the daily deploy).
+ * Only a fetch-again may replace a copy already here: a first download that lands after a pull's is older.
+ */
+function download(replace: boolean): Promise<CatalogItem[]> {
+  tried = true;
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), DOWNLOAD_TIMEOUT_MS);
-  return fetch(`${import.meta.env.BASE_URL}catalog.json`, fresh ? { cache: 'no-cache', signal: abort.signal } : { signal: abort.signal })
+  return fetch(`${import.meta.env.BASE_URL}catalog.json`, { cache: 'no-cache', signal: abort.signal })
     .then((r) => {
       if (!r.ok) throw new Error(`catalog.json: HTTP ${r.status}`);
       return r.text();
     })
     .then((text) => {
-      fetchedAt = Date.now();
-      if (good && text === goodText) return good;
+      if (good && (!replace || text === goodText)) return good;
       good = (JSON.parse(text) as { items: CatalogItem[] }).items;
       goodText = text;
       return good;
     })
+    // Only once it's in: a page that isn't the catalog (a wifi sign-in page) doesn't count as a fresh copy.
+    .then((items) => ((fetchedAt = Date.now()), items))
     .finally(() => clearTimeout(timer));
 }
 
@@ -80,7 +88,10 @@ export function refreshCatalog(): Promise<unknown> {
   return refreshing;
 }
 
-/** Changes each time the catalog is fetched again; an effect that uses the catalog can list it to run again. */
+/**
+ * Changes each time a fetched-again catalog differs from the copy here (or is the first that worked); an effect that
+ * uses the catalog can list it to run again.
+ */
 export function useCatalogVersion() {
   return useSyncExternalStore(subscribe, getVersion);
 }
@@ -88,12 +99,13 @@ const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.del
 const getVersion = () => version;
 
 if (typeof document !== 'undefined') {
+  // Also when every download so far failed (offline at launch), and again after a fetch-again that failed. A restore that
+  // sends two events still starts one download (refreshCatalog shares the one out).
   const refreshIfOld = () => {
-    if (document.visibilityState !== 'visible' || !fetchedAt) return;
+    if (document.visibilityState !== 'visible' || !tried) return;
     const age = Date.now() - fetchedAt;
     // A download time later than now means the device clock went back: that counts as old too.
-    if (age >= 0 && age <= REFRESH_AFTER_MS) return;
-    fetchedAt = Date.now(); // one refresh per return, even if a restore sends two events
+    if (fetchedAt && age >= 0 && age <= REFRESH_AFTER_MS) return;
     void refreshCatalog();
   };
   document.addEventListener('visibilitychange', refreshIfOld);

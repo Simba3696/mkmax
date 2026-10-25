@@ -169,6 +169,71 @@ describe('a new version', () => {
   });
 
   // Generated on 2026-10-25 (/ship review, run 16, testing)
+  // Value: protects=that sync is waited for at most 5 seconds, so a sync that hangs on a weak connection still lets the
+  // reload happen; fails_when=the time limit goes and the pull waits on the sync for good; why_new=review (testing): the
+  // sync in the test above answers at once; seam=appUpdate mocked (no service worker), SyncLoop.syncNow spied to never
+  // answer, fake timers; no_claim=GitHub itself
+  it('reloads after 5 seconds when that sync hangs', async () => {
+    appUpdate.sw = false;
+    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
+    const syncNow = vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(() => new Promise(() => {}));
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...location, reload });
+    renderApp();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    await pull();
+    await act(() => vi.advanceTimersByTimeAsync(4999));
+    expect(reload).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(reload).toHaveBeenCalledTimes(1);
+    syncNow.mockRestore();
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 16, Red Team)
+  // Value: protects=data that sync pulled in is saved in this browser before that reload; fails_when=the reload beats
+  // the save (it waits for the screen to draw), so the page comes back with the old data while the agreed stamp, saved at
+  // once, says this device has the gist's copy, and its next edit pushes the old data over the other device's changes;
+  // why_new=review (Red Team); seam=appUpdate mocked (no service worker), fetch answers as the gist, the reload stubbed to
+  // read the save; no_claim=GitHub itself
+  it('saves what that sync pulled in before reloading', async () => {
+    appUpdate.sw = false;
+    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
+    localStorage.setItem('mkmax:v1', JSON.stringify({ ...defaultState(), updatedAt: 5000 }));
+    // The gist's copy: the one both devices agreed on, until the other device pushes a newer one.
+    let gist = { ...defaultState(), updatedAt: 5000 };
+    vi.stubGlobal('fetch', (url: string) =>
+      String(url).includes('api.github.com')
+        ? Promise.resolve(new Response(JSON.stringify({ id: 'g1', description: null, files: { 'mkmax-data.json': { content: JSON.stringify(gist), raw_url: '' } } })))
+        : Promise.reject(new Error('offline')),
+    );
+    renderApp();
+    // The sync on opening finds nothing new.
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    gist = { ...defaultState(), updatedAt: 9000, cards: [{ id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 1, guest: false }] };
+    let saved: string | null = null;
+    vi.stubGlobal('location', { ...location, reload: () => void (saved = localStorage.getItem('mkmax:v1')) });
+    await pull();
+    await waitFor(() => expect(saved).not.toBeNull());
+    expect(saved).toContain('Raiden');
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 16, state machines)
+  // Value: protects=a tab that opened on data from a newer version ignores the newer tab's later saves (no second look
+  // for the update, the notice stays); fails_when=each save from the newer tab looks for the update again or changes this
+  // tab's state; why_new=review (state machines): only a hold that started from a save was tested; seam=appUpdate mocked
+  // (counting its checks), a StorageEvent dispatched by hand stands in for the other tab; no_claim=a real service worker
+  it('is not looked for again by a tab that opened on a newer save', () => {
+    localStorage.setItem('mkmax:v1', JSON.stringify({ ...defaultState(), version: 99 }));
+    renderApp();
+    const newer = JSON.stringify({ ...defaultState(), version: 99, updatedAt: 1 });
+    act(() => {
+      localStorage.setItem('mkmax:v1', newer);
+      window.dispatchEvent(new StorageEvent('storage', { key: 'mkmax:v1', newValue: newer }));
+    });
+    expect([appUpdate.checks, screen.queryAllByText(/^The data saved in this browser is from a newer version/).length]).toEqual([0, 1]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 16, testing)
   // Value: protects=a pull finishes, and the next one runs, while the version check is still out (it has no time limit
   // of its own); fails_when=the check is awaited again, so a stalled check on a weak connection keeps the spinner up and
   // ignores every later pull; why_new=review (testing): the mocked check always answered at once; seam=appUpdate mocked

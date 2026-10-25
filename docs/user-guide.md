@@ -225,7 +225,7 @@ If another device changes your rarities while the box is open, or while text you
 - **Search** matches the text as typed, in order. (The pack editor's card picker is looser and matches words in any order.) Search and filters reset each time you open Cards.
 - The rarity filter starts on **All rarities**. It also has **All characters** (Diamond and Gold), **All equipment** (Epic, Rare and Uncommon) and **All Kameos** (Diamond and Gold), as well as each single rarity.
 - The source filter starts on **Any source**. It also has **Packs/store** (cards with no source), **Krypt gear**, **Tower gear** and **Elder challenge**.
-- The owned filter starts on **Owned or not**. It also has **Not owned** (cards you have no copy of yet) and **Owned**. A card whose level you tap while it's on stays listed, even once it no longer matches (Not owned to F0, say), so you can tap it back. While it stays, the option you're on still counts it, as do the rarity and source counts, so they match the list; the other owned options count it where it now belongs. Changing the filter or the search tidies the list.
+- The owned filter starts on **Owned or not**. It also has **Not owned** (cards you have no copy of yet) and **Owned**. A card whose level you tap while it's on stays listed, even once it no longer matches (Not owned to F0, say), so you can tap it back. While it stays, the option you're on still counts it, as do the rarity and source counts, so they match the list; the other owned options count it where it now belongs. (Tower gear's filters work the other way: a piece kept there is dimmed, says why, and isn't counted.) Changing the filter or the search tidies the list.
 - Each option in the rarity, source and owned filters shows in parentheses how many cards it would list, given the search and the other filters.
 - **Sort:** rarity (the default), fusion level highest or lowest first, or name. Rarity order is the order in Settings. Gold ascension counts as above F10, so A3 sorts before F9; not-owned cards and Kameos count as lowest. When sorted by fusion, a card moves as you tap + or −. The choice is remembered on each device and isn't synced.
 
@@ -260,7 +260,7 @@ Cards also lists cards whose rarity MK Mobile Base gives differently, for exampl
 
 ### Tower gear
 
-Cards → Tower gear lists every card tagged as tower gear, grouped by the tower it drops from (the tower in the card's **Tower** list, or the tower name from a pasted list), with the towers listing the most gear first (under **Below kard threshold**, the most pieces below the threshold). Each card shows how many copies it still needs, and you can change its level there. Maxed gear leaves the list like any other card.
+Cards → Tower gear lists every card tagged as tower gear, grouped by the tower it drops from (the tower in the card's **Tower** list, or the tower name from a pasted list), with the towers listing the most gear first (under **Below kard threshold**, the most pieces below the threshold; a piece kept listed after a tap still counts here, so a tap doesn't move its tower). Each card shows how many copies it still needs, and you can change its level there. Maxed gear leaves the list like any other card.
 
 - Gear tagged as tower gear with no tower name goes under "Tower not named", at the end. Pick the tower in the card's **Tower** list on Cards (or **Add a tower or fix its spelling…**) to file it, or paste it again with its rarity and tower, like `Kori Blade - Epic - Lin Kuei Tower`. The rarity has to be there (a line with details but no rarity is refused), and it only updates a card of that same rarity.
 - Tower names are grouped ignoring capitals and extra spaces, so "Lin kuei  tower" and "Lin Kuei Tower" are one tower, spelled as the Tower list on Cards spells it.
@@ -604,7 +604,7 @@ The bottom of Settings shows which version you have and the date of that change,
 
 - Adds MK Mobile Base art to cards that have none.
 - Takes the Realm Klash season end from the event schedule.
-- Re-reads the event schedule and the card catalog when you come back after an hour or more, and tries the schedule again when you come back if it couldn't be downloaded.
+- Re-reads the event schedule and the card catalog when you come back after an hour or more, and tries again when you come back if a download failed.
 - Looks for a new version when you come back after half an hour or more (it only brings up the Reload bar).
 - Updates countdowns and the plan every minute, and again when you come back to the app after being away for half a minute or more, so a pack that ended while it was in the background stops being planned.
 - Removes cards already at their goal when it loads.

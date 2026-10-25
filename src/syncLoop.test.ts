@@ -310,6 +310,25 @@ describe('sync loop', () => {
     expect(names(gist.data)).toEqual([]);
   });
 
+  // Generated on 2026-10-25 (/ship review, run 16, state machines + testing)
+  // Value: protects=a sync asked for while one is already out (a pull to refresh during the push after an edit) waits for
+  // it rather than returning at once, so a reload straight after doesn't cut the push off; fails_when=syncNow returns at
+  // once while busy; why_new=review (state machines, testing); seam=the fake gist holds the write open; no_claim=GitHub
+  it('waits for a sync already out rather than skipping it', async () => {
+    const { gist, phone } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    gist.holding = 'writes';
+    const pushing = phone.loop.syncNow();
+    await settle();
+    let done = false;
+    const asked = phone.loop.syncNow().then(() => void (done = true));
+    await settle();
+    expect([done, gist.writes]).toEqual([false, 0]);
+    await gist.release();
+    await Promise.all([pushing, asked]);
+    expect([done, names(gist.data)]).toEqual([true, ['Scorpion', 'Raiden']]);
+  });
+
   it('neither pulls nor pushes data from a newer build, and looks for the new version', async () => {
     const { gist, phone, desktop } = await pair();
     // The desktop, already on a newer build, pushes data saved in a newer version.

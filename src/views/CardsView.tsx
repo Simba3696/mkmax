@@ -702,7 +702,7 @@ function CardList() {
   const [imageEditId, setImageEditId] = useState<string | null>(null);
   const [imgStatus, setImgStatus] = useState<{ busy: boolean; msg: string } | null>(null);
   // Cards get their art as soon as they're added, even under the wrong rarity, so the rarity check runs whenever
-  // the catalog is at hand rather than only from Find images. Read again when the catalog is fetched again.
+  // the catalog is at hand rather than only from Find images. Read again when a catalog fetched again has changed.
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const catalogVersion = useCatalogVersion();
   useEffect(() => {

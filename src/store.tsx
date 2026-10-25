@@ -69,6 +69,12 @@ interface StoreApi {
   discardUnreadable: () => void;
   /** This browser's save is from a newer version of MK Max: it's shown but nothing changes, saves or syncs until a reload. */
   newerSave: boolean;
+  /**
+   * Saves the data as it is now, at once. The usual save runs once the screen has drawn the change, which a reload
+   * straight after (pull to refresh with no service worker) can beat: a sync's pull would then be lost while its agreed
+   * stamp, saved at once, says this device has it.
+   */
+  saveNow: () => void;
 }
 
 const Ctx = createContext<StoreApi | null>(null);
@@ -264,7 +270,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo, unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo, unreadable, discardUnreadable, newerSave, saveNow: () => save(stateRef.current) }}>{children}</Ctx.Provider>
   );
 }
 

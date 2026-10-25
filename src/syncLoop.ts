@@ -39,6 +39,8 @@ export interface SyncDeps {
 export class SyncLoop {
   private cfg: SyncConfig | null;
   private busy = false;
+  /** The sync syncNow started, while it runs. */
+  private running: Promise<void> | null = null;
   /** The gist's copy while a conflict waits for the user. Background syncs hold off so the prompt stays put. */
   private conflict: AppState | null = null;
 
@@ -111,8 +113,21 @@ export class SyncLoop {
     if (this.cfg && stamp(this.deps.getState()) > this.cfg.baseUpdatedAt) this.deps.schedulePush();
   }
 
-  /** Pull if the gist moved on, push if only this device did, or report a conflict if both did. */
-  async syncNow() {
+  /**
+   * Pull if the gist moved on, push if only this device did, or report a conflict if both did. A sync already running
+   * is waited for rather than skipped, so a caller that reloads next (pull to refresh with no service worker) doesn't
+   * cut off its push.
+   */
+  syncNow(): Promise<void> {
+    if (this.busy) return this.running ?? Promise.resolve();
+    const run = this.sync().finally(() => {
+      if (this.running === run) this.running = null;
+    });
+    this.running = run;
+    return run;
+  }
+
+  private async sync() {
     const cfg = this.cfg;
     if (!cfg || this.busy || this.conflict) return;
     this.busy = true;

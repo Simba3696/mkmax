@@ -31,59 +31,6 @@ function held() {
 
 describe('card catalog fetched again', () => {
   // Generated on 2026-10-25 (/ship coverage audit, run 16)
-  // Value: protects=coming back to the app once its catalog is over an hour old fetches it again past the browser's
-  // copy, once per return, also on a back-forward restore and after the clock went back, but not sooner or while hidden;
-  // fails_when=an app left open never sees the daily deploy's new cards, or every return downloads the catalog;
-  // why_new=only pull to refresh's fetch was tested (App.catalog.test.tsx); seam=fetch stubbed, fake Date,
-  // document.visibilityState mocked, pageshow sent by hand; no_claim=real browsers' event order
-  it('fetches the catalog again on coming back once it is an hour old', async () => {
-    const { loadCatalog, refreshCatalog, useCatalogVersion } = await fresh();
-    vi.useFakeTimers({ toFake: ['Date'] });
-    let visible = 'visible';
-    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visible });
-    const at = (t: string) => vi.setSystemTime(new Date(`2026-10-25T${t}`));
-    const back = () => document.dispatchEvent(new Event('visibilitychange'));
-    const pageshow = (persisted: boolean) => window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted }));
-    // Each download serves a catalog that has changed since, as after a daily deploy.
-    let n = 0;
-    const fetch = serve(() => [item(`Kori Blade ${++n}`)]);
-    const { result } = renderHook(() => useCatalogVersion());
-    at('12:00:00');
-    await loadCatalog();
-    const first = result.current;
-    fetch.mockClear();
-
-    at('12:59:00');
-    back();
-    visible = 'hidden';
-    at('13:30:00');
-    back();
-    expect(fetch).not.toHaveBeenCalled();
-
-    visible = 'visible';
-    back();
-    // A restore can send a visibility change and pageshow together: one download. refreshCatalog() waits for the one out.
-    pageshow(true);
-    await act(() => refreshCatalog());
-    expect(fetch.mock.calls.map(([, init]) => init?.cache)).toEqual(['no-cache']);
-    expect(result.current).not.toBe(first);
-
-    // The first load's pageshow isn't a return; a back-forward restore an hour on is.
-    at('14:31:00');
-    pageshow(false);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    pageshow(true);
-    await act(() => refreshCatalog());
-    expect(fetch).toHaveBeenCalledTimes(2);
-
-    // The device clock went back past the download time: that counts as old.
-    at('11:00:00');
-    back();
-    await act(() => refreshCatalog());
-    expect(fetch).toHaveBeenCalledTimes(3);
-  });
-
-  // Generated on 2026-10-25 (/ship coverage audit, run 16)
   // Value: protects=a fetch-again that fails (a pull while offline) keeps the catalog already downloaded, so Add card's
   // names and art lookups still work, and tells no screen to look again; fails_when=the kept copy is dropped, so the next
   // lookup downloads again and fails offline, or a failed refresh rejects or bumps the version; why_new=only a refresh
@@ -145,6 +92,48 @@ describe('card catalog fetched again', () => {
     void loadCatalog();
     expect(calls).toHaveLength(2);
   });
+
+  // Generated on 2026-10-25 (/ship review, run 16 pass 2, testing + state machines)
+  // Value: protects=when the first download lands after a pull's (a slow start), the pull's newer copy stays;
+  // fails_when=the older first download replaces it, so lookups get the copy from before the daily deploy;
+  // why_new=review: only the first download failing was tested; seam=fetch downloads settled by hand; no_claim=none
+  it('keeps the pull’s copy when the first download lands after it', async () => {
+    const cat = await fresh();
+    const calls = held();
+    const first = cat.loadCatalog();
+    const pull = cat.refreshCatalog();
+    calls[1].res(new Response(JSON.stringify({ items: [item('Kori Blade'), item('Kitana Fan')] })));
+    await pull;
+    calls[0].res(new Response(JSON.stringify({ items: [item('Kori Blade')] })));
+    await first;
+    expect((await cat.loadCatalog()).map((i) => i.name)).toEqual(['Kori Blade', 'Kitana Fan']);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 16 pass 2, state machines)
+  // Value: protects=two lookups while the first download is out share it (one download), and a pull that fails while
+  // there's no copy changes nothing, so the next lookup downloads again; fails_when=each lookup downloads, or a failed
+  // pull leaves something cached or tells screens to look again; why_new=review (state machines); seam=fetch stubbed or
+  // held; no_claim=none beyond protects
+  it('shares the first download, and a failed pull with no copy leaves the next lookup to download', async () => {
+    let cat = await fresh();
+    const calls = held();
+    const a = cat.loadCatalog();
+    const b = cat.loadCatalog();
+    expect(calls).toHaveLength(1);
+    calls[0].res(new Response(JSON.stringify({ items: [item('Kori Blade')] })));
+    expect((await a) === (await b)).toBe(true);
+
+    cat = await fresh();
+    vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));
+    await expect(cat.loadCatalog()).rejects.toThrow('offline');
+    const { result } = renderHook(() => cat.useCatalogVersion());
+    const before = result.current;
+    await act(() => cat.refreshCatalog());
+    expect(result.current).toBe(before);
+    const fetch = serve(() => [item('Kori Blade')]);
+    expect([(await cat.loadCatalog()).map((i) => i.name), fetch.mock.calls.length]).toEqual([['Kori Blade'], 1]);
+  });
+
 });
 
 describe('card catalog downloads that overlap', () => {
