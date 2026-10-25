@@ -209,13 +209,14 @@ describe('app update', () => {
     expect(reg.update).toHaveBeenCalledTimes(3);
   });
 
-  // Generated on 2026-10-25 (/ship review, run 18 pass 3, Red Team)
+  // Generated on 2026-10-25 (/ship review, run 18 pass 3, Red Team); extended by /ship review on 2026-10-25 (run 19,
+  // state machines) with a hard-reloaded page and a first visit's later version
   // Value: protects=a copy that was frozen in the background while another copy took the new version (so it never saw it
-  // waiting) shows the bar once its own worker changes under it, and its Reload just reloads; a first visit, which starts
-  // with no worker, doesn't show it when the new worker takes the page over; fails_when=that copy keeps running the old
-  // build with no bar while its notices say to tap Reload, or a first visit shows the bar for the version it just got;
-  // why_new=review (Red Team): only a copy that already had the bar was tested; seam=controllerchange sent by hand;
-  // no_claim=a real frozen tab
+  // waiting), or a page opened with a hard reload that a new version takes over, shows the bar once a worker takes it
+  // over, and its Reload just reloads; a first visit doesn't show it when its own worker takes the page over, only when a
+  // later version does; fails_when=such a page keeps running the old build with no bar while its notices say to tap
+  // Reload, or a first visit shows the bar for the version it just got; why_new=review (Red Team, state machines);
+  // seam=controllerchange sent by hand, registerSW passed in by hand; no_claim=a real frozen tab or hard reload
   it('shows the bar when the worker changes under a copy that missed the update waiting, but not on a first visit', async () => {
     reg.waiting = null;
     const { result } = renderHook(() => app.useAppUpdateReady());
@@ -233,5 +234,38 @@ describe('app update', () => {
     const first = renderHook(() => app.useAppUpdateReady());
     act(() => void sw.dispatchEvent(new Event('controllerchange')));
     expect(first.result.current).toBe(false);
+    act(() => void sw.dispatchEvent(new Event('controllerchange')));
+    expect(first.result.current).toBe(true);
+
+    // A hard reload: no worker runs the page, but one is already active for the site.
+    stop();
+    vi.resetModules();
+    app = await import('./appUpdate');
+    sw.controller = null;
+    stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', Object.assign(reg, { active: worker('activated') }) as unknown as ServiceWorkerRegistration), update)) as never);
+    const reloaded = renderHook(() => app.useAppUpdateReady());
+    act(() => void sw.dispatchEvent(new Event('controllerchange')));
+    expect(reloaded.result.current).toBe(true);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 19, maintainability)
+  // Value: protects=the browser's own look for a new version as the app starts counts, so coming back within half an
+  // hour of starting doesn't look again, and coming back later does; fails_when=every first return after a start looks
+  // again; why_new=review: the half-hour wait only counted from the app's own checks; seam=fake Date,
+  // document.visibilityState mocked; no_claim=how often a browser looks on its own
+  it('counts the start as a look for a new version', async () => {
+    stop();
+    vi.resetModules();
+    app = await import('./appUpdate');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    const back = (minutes: number) => (vi.setSystemTime(new Date(2026, 9, 25, 12, minutes)), document.dispatchEvent(new Event('visibilitychange')));
+    vi.setSystemTime(new Date(2026, 9, 25, 12, 0));
+    reg.waiting = null;
+    stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', reg as unknown as ServiceWorkerRegistration), update)) as never);
+    back(10);
+    expect(reg.update).toHaveBeenCalledTimes(0);
+    back(31);
+    expect(reg.update).toHaveBeenCalledTimes(1);
   });
 });

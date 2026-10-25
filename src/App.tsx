@@ -285,8 +285,8 @@ export default function App() {
         {updateReady && (
           // On wider screens it's the top row, with no phone header above it to clear the status bar.
           <div className="flex-none bg-hint border-b border-line md:pt-[env(safe-area-inset-top)]" role="status">
-            <div className="max-w-page md:max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-2 flex items-center gap-3 text-[0.85rem]">
-              <span className={`flex-1 ${hintRule}`}>A new version of MK Max is ready.</span>
+            <div className="max-w-page md:max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-2 flex items-center gap-3">
+              <span className={`flex-1 text-[0.85rem] ${hintRule}`}>A new version of MK Max is ready.</span>
               <button className={btn.primary} onClick={applyAppUpdate}>
                 Reload
               </button>

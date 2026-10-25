@@ -326,6 +326,8 @@ describe('update undo labels', () => {
     // Value: protects=a push already scheduled by a tap before the other tab's newer save never runs; fails_when=the
     // listener doesn't cancel the push timer, so 1.5 s later the older reading is sent to the gist; why_new=the test read
     // the store before the push delay ran out; seam=none; no_claim=the push itself (SyncLoop.syncNow spied)
+    // Extended by /ship review on 2026-10-25 (run 19, state machines): a replace (Import backup, Load sample data, Erase
+    // everything) during the hold changes, saves and pushes nothing either
     vi.useFakeTimers();
     onTestFinished(() => void vi.useRealTimers());
     localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
@@ -344,6 +346,7 @@ describe('update undo labels', () => {
     pull.mockClear();
     act(() => api().update((d) => void (d.dismissedShopPacks = ['A', 'B']), 'Hid B'));
     act(() => api().undo());
+    act(() => api().replace(defaultState()));
     act(() => void document.dispatchEvent(new Event('visibilitychange')));
     act(() => void vi.advanceTimersByTime(5000));
     expect([api().newerSave, api().lastUndo, api().state.dismissedShopPacks, localStorage.getItem('mkmax:v1'), pull.mock.calls.length]).toEqual([

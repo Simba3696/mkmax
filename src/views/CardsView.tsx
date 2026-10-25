@@ -1,4 +1,4 @@
-import { Activity, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Activity, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
@@ -78,6 +78,27 @@ if (typeof document !== 'undefined') {
  * controls, or in `hintIn` (Add card's notes under its form, where it can't move the form's boxes), so nothing moves
  * sideways or out of line while it comes and goes.
  */
+/**
+ * Each set of towers' options and key lookup, built once and shared by every card's Tower list: a long Tower gear list
+ * then neither rebuilds them per row nor redraws the options on each search keystroke.
+ */
+const towerLists = new WeakMap<string[], { byKey: Map<string, string>; options: ReactElement[] }>();
+function towerList(towers: string[]) {
+  let list = towerLists.get(towers);
+  if (!list) {
+    list = {
+      byKey: new Map(towers.map((t) => [towerKey(t), t])),
+      options: towers.map((t) => (
+        <option key={t} value={t}>
+          {t}
+        </option>
+      )),
+    };
+    towerLists.set(towers, list);
+  }
+  return list;
+}
+
 function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintIn, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; respells: (name: string) => number; hintIn?: HTMLElement | null; className?: string; placeholder?: string }) {
   const pick = onPick ?? onChange;
   const hintId = useId();
@@ -117,8 +138,8 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
   const [held, setHeld] = useState<string | null>(null);
   const keyed = useRef(false);
   const typed = value?.trim();
-  const typedKey = typed && towerKey(typed);
-  const listed = typedKey && towers.find((t) => towerKey(t) === typedKey);
+  const { byKey, options } = towerList(towers);
+  const listed = typed && byKey.get(towerKey(typed));
   const current = listed || typed || '';
   // A step a sync has made stale (its tower removed or re-spelled, or the list gone) is dropped, so leaving the list or
   // hiding the app never saves a tower the list doesn't show.
@@ -289,11 +310,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
       {/* Once a tower is set, picking this takes it off the card, so it says so. */}
       <option value="">{typed ? 'No tower' : 'Choose a tower…'}</option>
       {typed && !listed && <option value={typed}>{typed}</option>}
-      {towers.map((t) => (
-        <option key={t} value={t}>
-          {t}
-        </option>
-      ))}
+      {options}
       <option value={NEW_TOWER}>Add a tower or fix its spelling…</option>
     </select>
   );

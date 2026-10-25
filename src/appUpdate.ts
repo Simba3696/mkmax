@@ -27,11 +27,21 @@ const flagIfWaiting = (r: ServiceWorkerRegistration) => r.waiting && navigator.s
  * looking on return (for tests).
  */
 export function startServiceWorker(register: typeof registerSW) {
+  // A copy frozen in the background while another one took the new version never sees it waiting, only a worker taking
+  // it over; so does a page opened with a hard reload, which no worker runs. Either way it's a new version: say it's
+  // ready (its Reload just reloads). Not when a first visit's own worker takes it over, as no worker was there before.
+  const sw = 'serviceWorker' in navigator ? navigator.serviceWorker : undefined;
+  let hadWorker = !!sw?.controller;
+  const takenOver = () => (hadWorker ? markReady() : void (hadWorker = true));
+  sw?.addEventListener('controllerchange', takenOver);
+  // The browser looks for a new version as the app starts, so a return in the next half hour doesn't look again.
+  checkedAt = Date.now();
   updateSW = register({
     immediate: true,
     onRegisteredSW: (_url, r) => {
       if (!r) return;
       registration = r;
+      if (r.active) hadWorker = true;
       // The library stops reporting new versions after the first one it sees (even one that failed to install), so
       // the app watches for them too.
       r.addEventListener('updatefound', () => {
@@ -53,15 +63,10 @@ export function startServiceWorker(register: typeof registerSW) {
   const restored = (e: PageTransitionEvent) => e.persisted && returned();
   document.addEventListener('visibilitychange', returned);
   window.addEventListener('pageshow', restored);
-  // A copy frozen in the background while another one took the new version never sees it waiting, only its own worker
-  // changing under it: say it's ready then (its Reload just reloads). Not on a first visit, which starts with no worker.
-  const sw = 'serviceWorker' in navigator ? navigator.serviceWorker : undefined;
-  const controlled = !!sw?.controller;
-  if (controlled) sw!.addEventListener('controllerchange', markReady);
   return () => {
     document.removeEventListener('visibilitychange', returned);
     window.removeEventListener('pageshow', restored);
-    if (controlled) sw!.removeEventListener('controllerchange', markReady);
+    sw?.removeEventListener('controllerchange', takenOver);
   };
 }
 

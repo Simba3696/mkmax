@@ -93,8 +93,8 @@ export function loadCatalog(): Promise<CatalogItem[]> {
 }
 
 /**
- * Fetch the catalog again (pull to refresh, or coming back after an hour or after a failed download), keeping the current
- * copy if that fails. The daily deploy refreshes it with new cards and art, and nothing else reloads it while the app
+ * Fetch the catalog again (pull to refresh, or coming back after an hour, or when no download has worked yet), keeping the
+ * current copy if that fails. The daily deploy refreshes it with new cards and art, and nothing else reloads it while the app
  * stays open.
  */
 export function refreshCatalog(): Promise<unknown> {
