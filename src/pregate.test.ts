@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { configDefaults } from 'vitest/config';
+import viteConfig from '../vite.config';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const root = join(here, '..');
@@ -48,7 +50,8 @@ describe('vite.config.ts', () => {
   // Generated on 2026-10-25 (/ship coverage audit, pr-ci pass 1)
   // Value: protects=npm test runs this checkout's tests only, not the copies in Claude Code worktrees nested under
   // .claude/worktrees or in gstack's .gstack scratch, which run stale code twice and break the pre-ship check's lists;
-  // fails_when=either exclude is dropped or misspelled, or a broader one also hides test files in other dot folders;
+  // fails_when=either exclude is dropped or misspelled, a broader one also hides test files in other dot folders, or
+  // anything else is excluded;
   // why_new=the listing test above only sees those copies when one happens to exist, and CI never has one;
   // seam=none; no_claim=which worktrees Claude Code makes (a scratch folder is listed with the real config)
   it('leaves nested worktrees and gstack scratch out of the test run', { timeout: 60_000 }, () => {
@@ -58,7 +61,12 @@ describe('vite.config.ts', () => {
         mkdirSync(join(dir, folder), { recursive: true });
         writeFileSync(join(dir, folder, 'a.test.ts'), "import { it } from 'vitest';\nit('runs', () => {});\n");
       }
-      expect(vitestFiles(dir)).toEqual(['.other/a.test.ts', 'src/a.test.ts']);
+      // The exact list too, so leaving a real test out of the run takes a change here as well as in the config.
+      const exclude = (viteConfig as { test?: { exclude?: string[] } }).test?.exclude;
+      expect([vitestFiles(dir), exclude]).toEqual([
+        ['.other/a.test.ts', 'src/a.test.ts'],
+        [...configDefaults.exclude, '.claude/worktrees/**', '.gstack/**'],
+      ]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
