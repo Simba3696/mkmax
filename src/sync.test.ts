@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defaultState } from './defaults';
-import { decideSync } from './sync';
+import { decideSync, readRemote } from './sync';
 
 const at = (updatedAt?: number) => ({ ...defaultState(), updatedAt });
 /** A copy with a card in it, so it isn't the empty data of a device that has just been set up. */
@@ -60,5 +60,43 @@ describe('decideSync', () => {
     expect(decideSync(newer, at(20), 10)).toBe('newer');
     expect(decideSync(newer, at(40), 30)).toBe('newer');
     expect(decideSync(at(30), at(10), 10)).toBe('pull'); // the same version is fine
+  });
+});
+
+describe('GitHub requests', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** A request that never answers by itself, failing with the abort's reason the way a browser's fetch does. */
+  const hang = (signal?: AbortSignal | null) => new Promise<never>((_, reject) => signal?.addEventListener('abort', () => reject(signal.reason)));
+  const cfg = { token: 't', gistId: 'g1', baseUpdatedAt: 0 };
+  const gist = (content: string) => ({ ok: true, status: 200, json: () => Promise.resolve({ id: 'g1', description: null, files: { 'mkmax-data.json': { content, raw_url: 'raw' } } }) });
+
+  // Generated on 2026-10-25 (/ship review, run 17 pass 2, testing)
+  // Value: protects=a GitHub request that hangs (no answer, or an answer that stops halfway) gives up after 30 seconds
+  // with a plain message, so the sync ends and a pull waiting on it stops spinning; one that answers in time is read as
+  // usual; fails_when=the time limit goes, covers only the start of the answer, or cuts off a request that answered;
+  // why_new=review: the pull stopped capping how long it waits for its sync, and these requests had no limit;
+  // seam=fetch stubbed, fake timers; no_claim=a real connection
+  it('gives up on a request that hangs after 30 seconds', async () => {
+    vi.useFakeTimers();
+    const timedOut = 'GitHub didn’t answer within 30 seconds. Check your connection.';
+    vi.stubGlobal('fetch', (_url: string, init?: RequestInit) => hang(init?.signal));
+    const noAnswer = expect(readRemote(cfg)).rejects.toThrow(timedOut);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await noAnswer;
+
+    vi.stubGlobal('fetch', (_url: string, init?: RequestInit) => Promise.resolve({ ok: true, status: 200, json: () => hang(init?.signal) }));
+    const halfAnswer = expect(readRemote(cfg)).rejects.toThrow(timedOut);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await halfAnswer;
+
+    const saved = JSON.stringify(withCard(5));
+    vi.stubGlobal('fetch', () => new Promise((r) => setTimeout(() => r(gist(saved)), 29_000)));
+    const late = readRemote(cfg);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect((await late)?.updatedAt).toBe(5);
   });
 });

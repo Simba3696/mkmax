@@ -137,7 +137,7 @@ The order is Plan, Packs, Cards, Settings. Swiping doesn't wrap from Settings ba
 
 ### Pull to refresh
 
-Pull down from the top of any page. It re-reads the event schedule and the card catalog (new cards and art from the daily deploy) and checks for a new version of the app; with sync on, it also syncs now. It doesn't reload the page, so nothing you're typing is lost. The spinner only waits for the sync and the schedule; new cards, art and a new version show up by themselves once found. It doesn't work inside a pop-up.
+Pull down from the top of any page. It re-reads the event schedule and the card catalog (new cards and art from the daily deploy) and checks for a new version of the app; with sync on, it also syncs now. It doesn't reload the page, so nothing you're typing is lost. The spinner only waits for the sync and the schedule (a sync GitHub doesn't answer gives up after 30 seconds and says so); new cards, art and a new version show up by themselves once found. It doesn't work inside a pop-up.
 
 It works only on touch screens, and only when the page is scrolled to the top. The ↻ turns gold when you've pulled far enough.
 
@@ -589,7 +589,7 @@ The bottom of Settings shows which version you have and the date of that change,
 
 - **Works offline:** everything you've entered, the plan, and logging purchases.
 - The event schedule falls back to the last copy the app fetched, also when the connection is so slow it hasn't loaded in 4 seconds. Card art you've already seen is kept (up to 500 images, for 90 days).
-- **Needs a connection:** new card art, **Find images** and sync. Sync catches up when you're back online.
+- **Needs a connection:** new card art, **Find images**, the rarity fixes, **Completion** on the Maxed page (all three use MK Mobile Base's card list, which isn't kept for offline use) and sync. Sync catches up when you're back online.
 
 ### Updates
 

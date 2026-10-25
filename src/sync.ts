@@ -33,19 +33,36 @@ export function saveSyncConfig(cfg: SyncConfig | null) {
   }
 }
 
-async function gh<T>(token: string, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(API + path, {
-    ...init,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-    },
+/** A request that hangs rather than fails gives up after this, so a sync, and a pull waiting on it, always ends. */
+const REQUEST_TIMEOUT_MS = 30 * 1000;
+
+/** Runs a request, reading its answer included, with a signal that gives up after REQUEST_TIMEOUT_MS. */
+async function inTime<T>(request: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(new Error('GitHub didn’t answer within 30 seconds. Check your connection.')), REQUEST_TIMEOUT_MS);
+  try {
+    return await request(abort.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function gh<T>(token: string, path: string, init?: RequestInit): Promise<T> {
+  return inTime(async (signal) => {
+    const res = await fetch(API + path, {
+      ...init,
+      signal,
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      },
+    });
+    if (res.status === 401) throw new Error('GitHub rejected the token. Check it has the gist scope and hasn’t expired.');
+    if (!res.ok) throw new Error(`GitHub error ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    return (await res.json()) as T;
   });
-  if (res.status === 401) throw new Error('GitHub rejected the token. Check it has the gist scope and hasn’t expired.');
-  if (!res.ok) throw new Error(`GitHub error ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return res.json() as Promise<T>;
 }
 
 interface Gist {
@@ -74,7 +91,7 @@ export async function readRemote(cfg: SyncConfig): Promise<AppState | null> {
   const gist = await gh<Gist>(cfg.token, `/gists/${cfg.gistId}`);
   const file = gist.files[FILE];
   if (!file) return null;
-  const text = file.truncated || file.content == null ? await (await fetch(file.raw_url)).text() : file.content;
+  const text = file.truncated || file.content == null ? await inTime(async (signal) => (await fetch(file.raw_url, { signal })).text()) : file.content;
   return JSON.parse(text) as AppState;
 }
 

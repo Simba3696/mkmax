@@ -33,7 +33,10 @@ export interface SyncDeps {
   cancelPush: () => void;
   /** Look for a new version of MK Max; finding one only brings up the new-version bar. */
   lookForUpdate: () => void;
-  /** Another tab has saved data from a newer version, so this one must write, apply and report nothing. */
+  /**
+   * Another tab has saved data from a newer version, so this one must start, write, apply and report nothing (a Connect
+   * already waiting on GitHub just goes back to off).
+   */
   held: () => boolean;
   now: () => number;
 }
@@ -124,7 +127,8 @@ export class SyncLoop {
   /** Pull if the gist moved on, push if only this device did, or report a conflict if both did. */
   async syncNow() {
     const cfg = this.cfg;
-    if (!cfg || this.busy || this.conflict) return;
+    // Nor while held: the regular pulls don't go through the store's pause.
+    if (!cfg || this.busy || this.conflict || this.deps.held()) return;
     this.busy = true;
     let ok = false;
     this.deps.onStatus({ kind: 'syncing' });
@@ -182,6 +186,11 @@ export class SyncLoop {
       // The copy a new gist is made from; edits made while GitHub answers come after it and still need pushing.
       const snap = this.deps.getState();
       const { gistId, created } = await this.deps.findOrCreateGist(token, snap);
+      // Another tab saved data from a newer version meanwhile: save no settings for it to sync with.
+      if (this.deps.held()) {
+        this.deps.onStatus({ kind: 'off' });
+        return;
+      }
       // A new gist already holds this device's data; an existing one gets compared on the first sync.
       this.setConfig({ token, gistId, baseUpdatedAt: created ? stamp(snap) : 0 });
       this.deps.onStatus({ kind: 'idle', at: created ? this.deps.now() : null });
@@ -204,7 +213,7 @@ export class SyncLoop {
   async resolve(keep: 'mine' | 'theirs') {
     const cfg = this.cfg;
     const shown = this.conflict;
-    if (!cfg || !shown || this.busy) return;
+    if (!cfg || !shown || this.busy || this.deps.held()) return;
     this.deps.cancelPush();
     this.conflict = null;
     if (keep === 'theirs') {

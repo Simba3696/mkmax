@@ -11,12 +11,13 @@ class FakeGist {
   writes = 0;
   fail: Error | null = null;
   private held: (() => void)[] = [];
-  /** Which requests to hold open until release(). */
-  holding: 'reads' | 'writes' | null = null;
+  /** Which requests to hold open until release(); finds are Connect's lookup. */
+  holding: 'reads' | 'writes' | 'finds' | null = null;
 
-  private async gate(kind: 'reads' | 'writes') {
-    if (this.fail) throw this.fail;
+  /** A request held open fails if `fail` is set by the time it's released. */
+  async gate(kind: 'reads' | 'writes' | 'finds') {
     if (this.holding === kind) await new Promise<void>((r) => this.held.push(r));
+    if (this.fail) throw this.fail;
   }
   async read() {
     this.reads++;
@@ -70,6 +71,7 @@ function device(gist: FakeGist, state: AppState = defaultState(), cfg: SyncConfi
       readRemote: () => gist.read(),
       writeRemote: (_cfg, s) => gist.write(s),
       findOrCreateGist: async (_token, s) => {
+        await gist.gate('finds');
         if (gist.data) return { gistId: 'g1', created: false };
         gist.data = structuredClone(s);
         return { gistId: 'g1', created: true };
@@ -356,12 +358,118 @@ describe('sync loop', () => {
     desktop.edit((s) => s.cards.push(card('Kitana')));
     await desktop.loop.syncNow();
     const before = structuredClone(phone.state);
+    phone.held = false;
     gist.holding = 'reads';
     const pulling = phone.loop.syncNow();
     await settle();
+    phone.held = true;
     await gist.release();
     await pulling;
     expect(phone.state).toEqual(before);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 17 pass 2, state machines and testing)
+  // Value: protects=once another tab saves data from a newer version, an upload already out (a push, an outdated
+  // overwrite, a Keep mine) or a Keep mine's read saves no agreed stamp and puts no status over the held notice, and a
+  // request that fails reports no error over it; fails_when=any of those checks goes back to only checking for
+  // Disconnect, so the held tab marks its older reading agreed or shows "synced" or a network error instead of the
+  // notice; why_new=review: only the first read of a sync had a test; seam=the fake gist holds requests open, the
+  // device's held switch and a status set by hand stand in for the store's hold; no_claim=GitHub
+  it('stops an upload, a Keep mine or a failed request already out when another tab saves data from a newer version', async () => {
+    const notice: SyncStatus = { kind: 'error', message: 'held' };
+    const holdDuring = async (kind: 'reads' | 'writes', d: ReturnType<typeof device>, gist: FakeGist, run: () => Promise<void>, fail?: Error) => {
+      gist.holding = kind;
+      const out = run();
+      await settle();
+      d.held = true;
+      d.status = notice;
+      if (fail) gist.fail = fail;
+      await gist.release();
+      await out;
+    };
+    const conflicted = async () => {
+      const p = await pair();
+      p.phone.edit((s) => s.cards.push(card('Raiden')));
+      await p.phone.loop.syncNow();
+      p.desktop.edit((s) => s.cards.push(card('Kitana')));
+      await p.desktop.loop.syncNow();
+      expect(p.desktop.status.kind).toBe('conflict');
+      return p;
+    };
+
+    const push = await pair();
+    push.phone.edit((s) => s.cards.push(card('Raiden')));
+    let agreed = push.phone.loop.config?.baseUpdatedAt;
+    await holdDuring('writes', push.phone, push.gist, () => push.phone.loop.syncNow());
+    expect([push.phone.loop.config?.baseUpdatedAt, push.phone.status]).toEqual([agreed, notice]);
+
+    const outdated = await pair();
+    outdated.gist.data = { ...structuredClone(outdated.desktop.state), version: 2 } as unknown as AppState;
+    agreed = outdated.phone.loop.config?.baseUpdatedAt;
+    await holdDuring('writes', outdated.phone, outdated.gist, () => outdated.phone.loop.syncNow());
+    expect([outdated.phone.loop.config?.baseUpdatedAt, outdated.phone.status]).toEqual([agreed, notice]);
+
+    const failed = await pair();
+    await holdDuring('reads', failed.phone, failed.gist, () => failed.phone.loop.syncNow(), new TypeError('Failed to fetch'));
+    expect(failed.phone.status).toEqual(notice);
+
+    for (const kind of ['reads', 'writes'] as const) {
+      const { gist, desktop } = await conflicted();
+      const writes = gist.writes;
+      agreed = desktop.loop.config?.baseUpdatedAt;
+      await holdDuring(kind, desktop, gist, () => desktop.loop.resolve('mine'));
+      expect([gist.writes - writes, desktop.loop.config?.baseUpdatedAt, desktop.status]).toEqual([kind === 'reads' ? 0 : 1, agreed, notice]);
+    }
+    const keep = await conflicted();
+    await holdDuring('reads', keep.desktop, keep.gist, () => keep.desktop.loop.resolve('mine'), new TypeError('Failed to fetch'));
+    expect(keep.desktop.status).toEqual(notice);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 17 pass 2, state machines, testing, data migration and maintainability)
+  // Value: protects=a Connect still waiting on GitHub when another tab saves data from a newer version saves no sync
+  // settings and goes back to off, for a gist found or made; fails_when=it saves the settings (shared with the other
+  // tab) and shows synced, or stays on Syncing for good; why_new=review: connect() had no check for the hold;
+  // seam=the fake gist holds Connect's lookup open; no_claim=GitHub
+  it('a Connect still waiting on GitHub when another tab saves data from a newer version saves nothing', async () => {
+    for (const existing of [true, false]) {
+      const gist = new FakeGist();
+      if (existing) await device(gist).loop.connect('token');
+      const laptop = device(gist);
+      laptop.edit((s) => s.cards.push(card('Raiden')));
+      gist.holding = 'finds';
+      const connecting = laptop.loop.connect('token');
+      await settle();
+      expect(laptop.status.kind).toBe('syncing');
+      laptop.held = true;
+      await gist.release();
+      await connecting;
+      expect([laptop.loop.config, laptop.status]).toEqual([null, { kind: 'off' }]);
+    }
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 17 pass 2, data migration)
+  // Value: protects=a tab held by another tab's newer save starts no sync and no Keep mine or theirs, so it never shows
+  // Syncing over the held notice or changes data; fails_when=a regular pull or a prompt button gets past the hold;
+  // why_new=review: syncNow and resolve reported Syncing before looking at the hold; seam=the device's held switch;
+  // no_claim=the store's own pause of its buttons
+  it('a tab held by a newer save starts no sync and no Keep mine or theirs', async () => {
+    const { gist, phone, desktop } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    const notice: SyncStatus = { kind: 'error', message: 'held' };
+    for (const d of [phone, desktop]) [d.held, d.status] = [true, notice];
+    const [reads, writes, before] = [gist.reads, gist.writes, structuredClone(desktop.state)];
+    phone.edit((s) => s.cards.push(card('Jax')));
+    await phone.loop.syncNow();
+    await desktop.loop.syncNow();
+    await desktop.loop.resolve('mine');
+    await desktop.loop.resolve('theirs');
+    expect([gist.reads, gist.writes, desktop.state, desktop.status, phone.status]).toEqual([reads, writes, before, notice, notice]);
+    desktop.held = false;
+    await desktop.loop.resolve('theirs');
+    expect(names(desktop.state)).toEqual(['Scorpion', 'Raiden']);
   });
 
   // Generated on 2026-10-25 (/ship review, run 17, state machines)
