@@ -186,19 +186,23 @@ describe('.github/workflows/deploy.yml', () => {
   // Generated on 2026-10-26 (/ship adversarial review, pr-ci run 7)
   // Value: protects=a deploy that kept an older catalog or event schedule still publishes, then shows as a failed run,
   // so GitHub tells the owner; fails_when=either download step stops reporting its fallback, the build stops passing it
-  // on, or the failing job runs before the deploy or always; why_new=a fallback showed only as a warning on a green
+  // on, the failing job runs before the deploy or always, or it stops failing (no exit 1, or allowed to fail);
+  // why_new=a fallback showed only as a warning on a green
   // run; seam=none; no_claim=that GitHub emails the owner (that's the account's notification settings)
   it('fails the run after publishing when a download fell back', () => {
     const { build, fallback } = deploy.jobs;
     const reports = (s: Step) => !!s.run?.includes('fell_back=true" >> "$GITHUB_OUTPUT"');
     const reporting = build?.steps.filter(reports).map((s) => s.id);
-    const fallbackUses = fallback?.steps.map((s) => s.uses);
-    expect([reporting, build?.outputs?.fell_back, fallback?.needs, fallback?.if, fallbackUses]).toEqual([
+    const failing = (s: Step) => [s.uses, s.run?.trim().endsWith('exit 1'), s['continue-on-error']];
+    const fallbackSteps = fallback?.steps.map(failing);
+    const muted = fallback?.['continue-on-error'];
+    expect([reporting, build?.outputs?.fell_back, fallback?.needs, fallback?.if, fallbackSteps, muted]).toEqual([
       ['catalog', 'events'],
       "${{ steps.catalog.outputs.fell_back == 'true' || steps.events.outputs.fell_back == 'true' }}",
       ['build', 'deploy'],
       "needs.build.outputs.fell_back == 'true'",
-      [undefined],
+      [[undefined, true, undefined]],
+      undefined,
     ]);
   });
 });

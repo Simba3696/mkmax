@@ -90,7 +90,7 @@ const realNow = Date.now;
 let skew = 0;
 Date.now = () => realNow() + skew;
 const live = ['character', 'equipment', 'kameo'].flatMap((kind) =>
-  Array.from({ length: change === 'shrunk' ? 20 : 2 }, () => ({ kind, rarity: 'gold' })),
+  Array.from({ length: { shrunk: 20, 'small-drop': 5 }[change] ?? 2 }, () => ({ kind, rarity: 'gold' })),
 );
 const lastPage = change === 'no-page-count' ? undefined : change === 'zero-pages' ? 0 : change === 'endless' ? 1000 : 2;
 const card = (n) => ({
@@ -109,8 +109,9 @@ globalThis.fetch = async (url, opts = {}) => {
     : String(url).endsWith('/events.json')
       ? { seasons: [] }
       : String(url).endsWith('/catalog.json')
-        ? { items: live }
+        ? { fetchedAt: '2026-10-20T17:30:00.000Z', items: live }
         : schedule;
+  if (change === 'no-live-copy' && String(url).endsWith('/catalog.json')) return { ok: false, status: 404 };
   return { ok: true, status: 200, json: async () => body };
 };
 `,
@@ -120,9 +121,10 @@ globalThis.fetch = async (url, opts = {}) => {
  * Runs a copy of a download script, writing into a scratch public folder, with MK Mobile Base answering (changed as
  * `change` says): its exit code, its errors, the requests it made, and whether it wrote catalog.json.
  */
-function runOnline(script, change = '') {
+function runOnline(script, change = '', localCatalog = null) {
   const root = scratchRepo(script);
   writeFileSync(join(root, 'public', 'events.json'), '{"seasons":[]}\n');
+  if (localCatalog) writeFileSync(join(root, 'public', 'catalog.json'), JSON.stringify(localCatalog));
   const result = spawnSync(process.execPath, ['--import', pathToFileURL(online).href, join(root, 'scripts', script)], {
     encoding: 'utf8',
     timeout: 20_000,
@@ -132,7 +134,9 @@ function runOnline(script, change = '') {
     status: result.status,
     stderr: result.status ? result.stderr : '',
     requests: requestsOf(result.stderr),
-    wroteCatalog: existsSync(join(root, 'public', 'catalog.json')),
+    wroteCatalog: localCatalog
+      ? JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).fetchedAt !== localCatalog.fetchedAt
+      : existsSync(join(root, 'public', 'catalog.json')),
   };
 }
 
@@ -217,5 +221,35 @@ describe('download scripts', () => {
     const changes = ['no-page-count', 'zero-pages', 'endless', 'no-art', 'no-rarity'];
     changes.push('repeated-page', 'duplicate-slugs', 'shrunk', 'slow');
     expect(changes.map(outcome)).toEqual(changes.map((change) => ({ change, status: 1, wroteCatalog: false })));
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 7 pass 4)
+  // Value: protects=the comparison with an earlier catalog uses the newest copy (so committing a fresh catalog.json
+  // resets it after a real removal), lets a small group lose a card or two, and doesn't fail when there's no earlier
+  // copy (a first deploy); fails_when=the local copy stops standing in or being preferred when newer, an unreadable
+  // live copy fails the download, or the allowance for small groups goes; why_new=every earlier case had a readable
+  // live copy and no local one; seam=none (STUB_CHANGE only changes the stand-in's answers); no_claim=the exact
+  // allowance (more than a tenth and more than 3)
+  it('compare a catalog with the newest earlier copy, allowing a small group to lose a few cards', () => {
+    const gold = (count) =>
+      ['character', 'equipment', 'kameo'].flatMap((kind) => Array(count).fill({ kind, rarity: 'gold' }));
+    const local = (fetchedAt, count) => ({ fetchedAt, items: gold(count) });
+    const outcome = (change, localCatalog) => {
+      const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', change, localCatalog);
+      return { status, wroteCatalog };
+    };
+    expect([
+      outcome('no-live-copy'),
+      outcome('no-live-copy', local('2026-10-01T17:30:00.000Z', 20)),
+      outcome('shrunk', local('2026-10-25T17:30:00.000Z', 2)),
+      outcome('', local('2026-10-01T17:30:00.000Z', 20)),
+      outcome('small-drop'),
+    ]).toEqual([
+      { status: 0, wroteCatalog: true },
+      { status: 1, wroteCatalog: false },
+      { status: 0, wroteCatalog: true },
+      { status: 0, wroteCatalog: true },
+      { status: 0, wroteCatalog: true },
+    ]);
   }, 45_000);
 });
