@@ -8,10 +8,10 @@ on:
     - cron: '30 17 * * *'
   workflow_dispatch:
 
+# Each job gets only what it needs: the build, which runs npm ci and so the dependencies' install scripts, can't
+# publish the site; only the deploy job can.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -20,8 +20,12 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # configure-pages reads the site's address and path.
+      pages: read
     steps:
-      # The token stays off disk, so install scripts in dependencies can't read it.
+      # Keeps the token out of .git/config, where install scripts in dependencies could read it.
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -67,6 +71,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

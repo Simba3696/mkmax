@@ -128,8 +128,14 @@ describe('.github/workflows/ci.yml', () => {
   // Value: protects=the check really lints, tests and builds; fails_when=a pull request turns the lint, test or build
   // script in package.json into a no-op, so npm test passes without testing anything; why_new=the step list only
   // names the scripts; seam=none; no_claim=a pull request that changes this test as well (read those diffs by hand)
+  // Extended by /ship adversarial review on 2026-10-25 (pr-ci run 5): lint fails on warnings too, so a missed hook
+  // dependency (a warning in .oxlintrc.json) can't merge green.
   it('runs the real lint, test and build scripts', () => {
-    expect([scripts.lint, scripts.test, scripts.build]).toEqual(['oxlint', 'vitest run', 'tsc --noEmit && vite build']);
+    expect([scripts.lint, scripts.test, scripts.build]).toEqual([
+      'oxlint --deny-warnings',
+      'vitest run',
+      'tsc --noEmit && vite build',
+    ]);
   });
 
   // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 4)
@@ -141,5 +147,21 @@ describe('.github/workflows/ci.yml', () => {
       Object.values(w.jobs).flatMap((j) => j.steps.filter((s) => s.uses?.startsWith('actions/checkout'))),
     );
     expect(checkouts.map((s) => s.with?.['persist-credentials'])).toEqual([false, false]);
+  });
+});
+
+describe('.github/workflows/deploy.yml', () => {
+  // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 5)
+  // Value: protects=only the deploy job can publish the site, so the build job, which runs npm ci and the
+  // dependencies' install scripts, has a token that can only read and can't get a Pages deploy token; fails_when=pages:
+  // write or id-token: write moves back to the whole workflow or onto the build job, or the build gets another write
+  // permission; why_new=they were set for the whole workflow, so every job had them; seam=none; no_claim=that
+  // configure-pages and deploy-pages work with these (seen on the first deploy after the merge)
+  it('lets only the deploy job publish', () => {
+    expect([deploy.permissions, deploy.jobs.build?.permissions, deploy.jobs.deploy?.permissions]).toEqual([
+      { contents: 'read' },
+      { contents: 'read', pages: 'read' },
+      { pages: 'write', 'id-token': 'write' },
+    ]);
   });
 });

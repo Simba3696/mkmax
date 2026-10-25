@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "lint": "oxlint",
+    "lint": "oxlint --deny-warnings",
     "catalog": "node scripts/fetch-catalog.mjs",
     "events": "node scripts/fetch-events.mjs"
   },

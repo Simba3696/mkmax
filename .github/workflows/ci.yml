@@ -25,7 +25,7 @@ jobs:
     env:
       BASE_PATH: /mkmax/
     steps:
-      # The token stays off disk, so install scripts in dependencies can't read it.
+      # Keeps the token out of .git/config, where install scripts in dependencies could read it.
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
