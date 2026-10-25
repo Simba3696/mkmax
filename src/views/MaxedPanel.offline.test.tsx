@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { refreshCatalog } from '../catalog';
 import { defaultState } from '../defaults';
 import { StoreProvider } from '../store';
 import { PlanProvider } from '../planner';
@@ -41,5 +42,13 @@ describe("Cards: the Maxed page when MK Mobile Base's list doesn't load", () => 
     vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ items }))));
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText(/of every card MK Mobile Base lists: 1 of 1 maxed/)).not.toBeNull();
+    // Extended on 2026-10-25 (/ship review, run 16, maintainability)
+    // Value: protects=the Maxed page reads a catalog fetched again while it's open (pull to refresh, or coming back after
+    // an hour), so completion counts the daily deploy's new cards; fails_when=it keeps the copy it read when it opened;
+    // why_new=review (maintainability): App and the card list re-read it, the Maxed page didn't; seam=fetch stubbed,
+    // refreshCatalog called as a pull does; no_claim=none beyond protects
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ items: [...items, { ...items[0], name: 'Kitana Fan', slug: 'fan' }] }))));
+    await act(() => refreshCatalog());
+    expect(await screen.findByText(/of every card MK Mobile Base lists: 1 of 2 maxed/)).not.toBeNull();
   });
 });

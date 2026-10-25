@@ -95,26 +95,30 @@ export default function TowersPanel() {
               // already shows it as copies to its goal.
               const thr = thresholdLevel(rule);
               const toThr = filter === 'belowThreshold' && thr != null && thr < target && belowThreshold(c) ? copiesToThreshold(c, rule) : 0;
-              // Listed only because it was tapped out of the filter: dimmed and labelled with why, since the counts leave it
-              // out. Its details line stays as it is, which dimmed would be too faint to read.
+              // Listed only because it was tapped out of the filter: dimmed and labelled with why on a line of its own (beside
+              // the name it was cut off under the level buttons on a phone), since the counts leave it out. Its details line
+              // stays as it is, which dimmed would be too faint to read. A piece with no threshold to reach (No kards, Realm
+              // Klash gear, a rarity with no kards) says so whatever its level.
               const kept = !fits(c, filter);
               const why =
-                filter === 'unowned' ? 'Owned now' : thr != null && c.fusion === thr ? 'At the kard threshold now' : thr != null && c.fusion > thr ? 'Past the kard threshold now' : 'No kard threshold now';
+                filter === 'unowned'
+                  ? 'Owned now'
+                  : thr == null || c.noKards || isRealmKlashGear(state, c)
+                    ? 'No kard threshold now'
+                    : c.fusion === thr
+                      ? 'At the kard threshold now'
+                      : 'Past the kard threshold now';
               return (
                 <div key={c.id} className={`${row} items-center`}>
-                  <div className={kept ? 'opacity-60' : undefined}>
+                  {/* A flex box, so an initials tile sits on no text line and keeps its size. */}
+                  <div className={kept ? 'flex opacity-60' : 'flex'}>
                     <CardThumb card={c} rule={rule} size={36} />
                   </div>
                   <div className={grow}>
                     <div className={rowTitle}>
                       <span className={kept ? 'opacity-60' : undefined}>{c.name}</span>
-                      {kept && (
-                        <span className="text-muted text-small font-normal">
-                          {' '}
-                          <span className="whitespace-nowrap">· {why}</span>
-                        </span>
-                      )}
                     </div>
+                    {kept && <div className="text-muted text-small">{why}</div>}
                     <div className="text-small">
                       <RarityBadge rule={rule} />
                       <span className="text-muted">

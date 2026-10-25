@@ -12,8 +12,8 @@ import App from './App';
 
 // Mocked so a test can say whether a new version is waiting or a service worker runs, catch Reload and count update
 // checks; appUpdate.test.ts tests the real module.
-const appUpdate = vi.hoisted(() => ({ ready: false, apply: vi.fn(), checks: 0, sw: true }));
-vi.mock('./appUpdate', () => ({ hasServiceWorker: () => appUpdate.sw, checkForAppUpdate: () => (appUpdate.checks++, Promise.resolve()), useAppUpdateReady: () => appUpdate.ready, applyAppUpdate: appUpdate.apply }));
+const appUpdate = vi.hoisted(() => ({ ready: false, apply: vi.fn(), checks: 0, sw: true, check: null as Promise<unknown> | null }));
+vi.mock('./appUpdate', () => ({ hasServiceWorker: () => appUpdate.sw, checkForAppUpdate: () => (appUpdate.checks++, appUpdate.check ?? Promise.resolve()), useAppUpdateReady: () => appUpdate.ready, applyAppUpdate: appUpdate.apply }));
 
 beforeEach(() => {
   // The catalog and the event schedule are fetched at start; neither matters here, so stay offline.
@@ -26,6 +26,7 @@ beforeEach(() => {
   appUpdate.apply.mockClear();
   appUpdate.checks = 0;
   appUpdate.sw = true;
+  appUpdate.check = null;
 });
 afterEach(() => {
   cleanup();
@@ -149,6 +150,38 @@ describe('a new version', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  // Generated on 2026-10-25 (/ship review, run 16, Red Team)
+  // Value: protects=where pull to refresh reloads, with sync on it syncs first, so a change waiting to be pushed goes up
+  // before the reload; fails_when=the reload cancels the waiting push and the edit reaches the gist only on a later start,
+  // maybe as a which-copy question; why_new=review (Red Team); seam=appUpdate mocked (no service worker), SyncLoop.syncNow
+  // spied, touches sent by hand; no_claim=GitHub itself
+  it('syncs before that reload when sync is on', async () => {
+    appUpdate.sw = false;
+    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
+    const order: string[] = [];
+    const syncNow = vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(async () => void order.push('sync'));
+    vi.stubGlobal('location', { ...location, reload: () => order.push('reload') });
+    renderApp();
+    order.length = 0;
+    await pull();
+    expect(order).toEqual(['sync', 'reload']);
+    syncNow.mockRestore();
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 16, testing)
+  // Value: protects=a pull finishes, and the next one runs, while the version check is still out (it has no time limit
+  // of its own); fails_when=the check is awaited again, so a stalled check on a weak connection keeps the spinner up and
+  // ignores every later pull; why_new=review (testing): the mocked check always answered at once; seam=appUpdate mocked
+  // (its check never answers), touches sent by hand; no_claim=real network timing
+  it('lets a pull finish while the version check is still out', async () => {
+    appUpdate.check = new Promise(() => {});
+    renderApp();
+    await pull();
+    await act(() => new Promise((r) => setTimeout(r, 600)));
+    await pull();
+    expect(appUpdate.checks).toBe(2);
+  });
+
   // Generated on 2026-10-25 (/ship review, run 15 pass 2)
   // Value: protects=once another tab saves data from a newer version, this tab looks for that version, and its bar shows
   // beside the notice that nothing is saved; fails_when=nothing looks, so the tab stays on the old build with every tap
@@ -168,6 +201,13 @@ describe('a new version', () => {
       localStorage.setItem('mkmax:v1', newer);
       window.dispatchEvent(new StorageEvent('storage', { key: 'mkmax:v1', newValue: newer }));
     });
+    expect(appUpdate.checks).toBe(1);
+    // Extended on 2026-10-25 (/ship coverage audit, run 16)
+    // Value: protects=once this tab is held, later saves from the newer tab (one per keystroke there) don't look for the
+    // update again; fails_when=the held check before holdIfNewer goes, so every keystroke in the other tab fetches the
+    // service worker again; why_new=the test sent only one save; seam=appUpdate mocked (counting its checks), a
+    // StorageEvent stands in for the other tab; no_claim=a real service worker update
+    act(() => void window.dispatchEvent(new StorageEvent('storage', { key: 'mkmax:v1', newValue: newer })));
     expect(appUpdate.checks).toBe(1);
     appUpdate.ready = true;
     fireEvent.click(tab('Cards'));
@@ -423,7 +463,7 @@ describe('card art from the catalog', () => {
     const catalog = { items: [{ kind: 'character', name: 'Liu Kang, Klassic', rarity: 'diamond', slug: 'liu-kang-klassic', image: 'z.png' }] };
     vi.stubGlobal('fetch', (url: string) =>
       String(url).endsWith('catalog.json')
-        ? new Promise((resolve) => (release = () => resolve({ ok: true, json: () => Promise.resolve(catalog) })))
+        ? new Promise((resolve) => (release = () => resolve(new Response(JSON.stringify(catalog)))))
         : Promise.reject(new Error('offline')),
     );
     const s = defaultState();

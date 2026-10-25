@@ -93,8 +93,8 @@ export function applyAppUpdate() {
 
 /**
  * The browser only looks for a new version when the app starts, so an app left open would keep running the old
- * build. Pull to refresh calls this, and so do coming back to the app after a while, sync or another tab finding data
- * from a newer build, and importing a backup from one; if a new build is out, the app says so (see startServiceWorker).
+ * build. Pull to refresh calls this, and so do coming back to the app after a while, the sync loop finding data from a
+ * newer build or a gist copy it can't read, another tab saving data from a newer build, and importing a backup from one; if a new build is out, the app says so (see startServiceWorker).
  * Once one is waiting there's nothing to look for until the user takes it.
  */
 export function checkForAppUpdate(): Promise<unknown> {

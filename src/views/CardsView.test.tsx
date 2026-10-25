@@ -1524,8 +1524,8 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
       { kind: 'character', name: 'Liu Kang, Klassic', rarity: 'diamond', slug: 'liu-kang-klassic', image: 'z.png' },
     ],
   };
-  const catalogResponse = { ok: true, json: () => Promise.resolve(CATALOG) };
-  beforeEach(() => vi.stubGlobal('fetch', (url: string) => (String(url).endsWith('catalog.json') ? Promise.resolve(catalogResponse) : Promise.reject(new Error('offline')))));
+  const catalogResponse = () => new Response(JSON.stringify(CATALOG));
+  beforeEach(() => vi.stubGlobal('fetch', (url: string) => (String(url).endsWith('catalog.json') ? Promise.resolve(catalogResponse()) : Promise.reject(new Error('offline')))));
   let store!: ReturnType<typeof useStore>;
   /** Cards with the store handed out, and saves counted from the moment it returns. */
   function renderCards(cards: ReturnType<typeof defaultState>['cards']) {
@@ -1553,7 +1553,7 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
   it('keeps an image a sync pasted while Find images was looking', async () => {
     let release: (() => void) | undefined;
     vi.stubGlobal('fetch', (url: string) =>
-      String(url).endsWith('catalog.json') ? new Promise((resolve) => (release = () => resolve(catalogResponse))) : Promise.reject(new Error('offline')),
+      String(url).endsWith('catalog.json') ? new Promise((resolve) => (release = () => resolve(catalogResponse()))) : Promise.reject(new Error('offline')),
     );
     const stamps = renderCards([{ id: 'liu', name: 'Liu Kang, Klassic', rarityId: 'diamond', fusion: 2, guest: false }]);
     fireEvent.click(screen.getByRole('button', { name: 'Find images (1)' }));
@@ -1591,7 +1591,7 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
   it('counts a card a sync gave an image during the wiki lookup as kept, not as one left', async () => {
     let failWiki: (() => void) | undefined;
     vi.stubGlobal('fetch', (url: string) =>
-      String(url).endsWith('catalog.json') ? Promise.resolve(catalogResponse) : new Promise((_, reject) => (failWiki = () => reject(new Error('offline')))),
+      String(url).endsWith('catalog.json') ? Promise.resolve(catalogResponse()) : new Promise((_, reject) => (failWiki = () => reject(new Error('offline')))),
     );
     renderCards([
       { id: 'a', name: 'Nobody, Here', rarityId: 'diamond', fusion: 2, guest: false },
@@ -1615,7 +1615,7 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
   it('says how many cards a sync gave images during the lookup when there are several', async () => {
     let failWiki: (() => void) | undefined;
     vi.stubGlobal('fetch', (url: string) =>
-      String(url).endsWith('catalog.json') ? Promise.resolve(catalogResponse) : new Promise((_, reject) => (failWiki = () => reject(new Error('offline')))),
+      String(url).endsWith('catalog.json') ? Promise.resolve(catalogResponse()) : new Promise((_, reject) => (failWiki = () => reject(new Error('offline')))),
     );
     renderCards([
       { id: 'a', name: 'Nobody, Here', rarityId: 'diamond', fusion: 2, guest: false },
@@ -1637,7 +1637,7 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
   it("leaves a card a sync deleted during the wiki lookup out of Find images' total", async () => {
     let failWiki: (() => void) | undefined;
     vi.stubGlobal('fetch', (url: string) =>
-      String(url).endsWith('catalog.json') ? Promise.resolve(catalogResponse) : new Promise((_, reject) => (failWiki = () => reject(new Error('offline')))),
+      String(url).endsWith('catalog.json') ? Promise.resolve(catalogResponse()) : new Promise((_, reject) => (failWiki = () => reject(new Error('offline')))),
     );
     renderCards([
       { id: 'a', name: 'Nobody, Here', rarityId: 'diamond', fusion: 2, guest: false },
@@ -2441,10 +2441,10 @@ describe('Tower gear: the kard threshold filter', () => {
     // Value: protects=a piece kept listed after a tap says why (it no longer fits the filter), and loses that note when
     // tapped back; fails_when=a kept piece looks like the others, so the heading's count and the rows shown disagree with
     // nothing saying why; why_new=review (Codex design); seam=none; no_claim=how dimmed it looks
-    expect(screen.queryByText('· At the kard threshold now')).not.toBeNull();
+    expect(screen.queryByText('At the kard threshold now')).not.toBeNull();
     // Tapped back to F2, it's still listed and counted again, once.
     act(() => screen.getByRole('button', { name: 'Lower level' }).click());
-    expect(screen.queryByText('· At the kard threshold now')).toBeNull();
+    expect(screen.queryByText('At the kard threshold now')).toBeNull();
     const back = JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
     expect([back.find((c) => c.id === 'kori')?.fusion, names(), options()[1], screen.queryByText('1 below threshold') != null]).toEqual([3, ['Kori Blade'], 'Below kard threshold (1)', true]);
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
@@ -2453,7 +2453,7 @@ describe('Tower gear: the kard threshold filter', () => {
     // fails_when=the note says At the kard threshold now for any piece that no longer fits; why_new=review (Red Team);
     // seam=none; no_claim=none beyond protects
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
-    expect([screen.queryByText('· Past the kard threshold now') != null, screen.queryByText('· At the kard threshold now')]).toEqual([true, null]);
+    expect([screen.queryByText('Past the kard threshold now') != null, screen.queryByText('At the kard threshold now')]).toEqual([true, null]);
     // A fresh pick of the filter drops it: at F3 or past it, kards can finish it.
     fireEvent.change(filter, { target: { value: 'all' } });
     fireEvent.change(filter, { target: { value: 'belowThreshold' } });
@@ -2530,13 +2530,13 @@ describe('Tower gear: the kard threshold filter', () => {
     // Extended on 2026-10-25 (/ship review, run 15 pass 2, design)
     // Value: protects=a piece kept listed after a tap says why (it no longer fits the filter), under Not owned too; fails_when=a kept piece looks like the others, so the heading's count and the rows shown disagree with
     // nothing saying why; why_new=review (Codex design); seam=none; no_claim=how dimmed it looks
-    expect([within(section('Lin Kuei Tower')!).queryByText('· Owned now') != null, within(section('Shirai Ryu Tower')!).queryByText('· Owned now')]).toEqual([true, null]);
+    expect([within(section('Lin Kuei Tower')!).queryByText('Owned now') != null, within(section('Shirai Ryu Tower')!).queryByText('Owned now')]).toEqual([true, null]);
     // Extended on 2026-10-25 (/ship review, run 15 pass 3, state machines)
     // Value: protects=a piece raised to F0 and lowered back is listed and counted as not owned again, without the note;
     // fails_when=tapping back leaves it uncounted or still labelled Owned now; why_new=review (state machines): only the
     // Below kard threshold filter checked a tap back; seam=none; no_claim=none beyond protects
     act(() => within(section('Lin Kuei Tower')!).getByRole('button', { name: 'Lower level' }).click());
-    expect([saved().find((c) => c.id === 'kori')?.fusion, options()[2], section('Lin Kuei Tower')!.querySelector('h2')!.textContent, screen.queryByText('· Owned now')]).toEqual([0, 'Not owned (2)', 'Lin Kuei Tower 1 not owned', null]);
+    expect([saved().find((c) => c.id === 'kori')?.fusion, options()[2], section('Lin Kuei Tower')!.querySelector('h2')!.textContent, screen.queryByText('Owned now')]).toEqual([0, 'Not owned (2)', 'Lin Kuei Tower 1 not owned', null]);
     act(() => within(section('Lin Kuei Tower')!).getByRole('button', { name: 'Raise level' }).click());
 
     fireEvent.change(filter, { target: { value: 'all' } });
@@ -2641,9 +2641,18 @@ describe('Tower gear: the kard threshold filter', () => {
     fireEvent.change(screen.getByLabelText('Filter tower gear'), { target: { value: 'belowThreshold' } });
     // F1 to F2: still below the threshold, so no note yet.
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
-    expect(screen.queryByText(/^· /)).toBeNull();
+    expect(screen.queryByText(/kard threshold now$/)).toBeNull();
     act(() => update((d) => void (d.cards[0].noKards = true)));
-    expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }) != null, screen.queryByText('· No kard threshold now') != null]).toEqual([true, true]);
+    expect([screen.queryByRole('heading', { name: /^Lin Kuei Tower/ }) != null, screen.queryByText('No kard threshold now') != null]).toEqual([true, true]);
+    // Extended on 2026-10-25 (/ship review, run 16, Red Team)
+    // Value: protects=a piece kept at the threshold (F3) that is then marked No kards says it has no threshold, as the
+    // guide says, not that it's at it; fails_when=the level is checked before No kards; why_new=the test above marks it
+    // below the threshold only; seam=a grabbed update stands in for the sync; no_claim=a real sync
+    act(() => update((d) => void (d.cards[0].noKards = false)));
+    act(() => screen.getByRole('button', { name: 'Raise level' }).click());
+    expect(screen.queryByText('At the kard threshold now')).not.toBeNull();
+    act(() => update((d) => void (d.cards[0].noKards = true)));
+    expect([screen.queryByText('At the kard threshold now'), screen.queryByText('No kard threshold now') != null]).toEqual([null, true]);
   });
 
   // Generated on 2026-10-22 (/ship review, Tower gear filter)

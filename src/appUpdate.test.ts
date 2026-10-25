@@ -149,6 +149,20 @@ describe('app update', () => {
     expect(reg.update).toHaveBeenCalledTimes(1);
   });
 
+  // Generated on 2026-10-25 (/ship coverage audit, run 16)
+  // Value: protects=a check that fails (offline) settles quietly, doesn't bring up the bar even with a version waiting,
+  // and a later check still asks; fails_when=the failure handler goes (an unhandled rejection from every pull to refresh,
+  // return to the app and paused sync) or a failed check counts as finding a version; why_new=no test made
+  // registration.update fail; seam=registration.update mocked; no_claim=a real network failure
+  it('a check that fails offline flags nothing and the next check still runs', async () => {
+    const { result } = renderHook(() => app.useAppUpdateReady());
+    reg.update.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await act(() => app.checkForAppUpdate());
+    expect([result.current, reg.update.mock.calls.length]).toEqual([false, 1]);
+    await act(() => app.checkForAppUpdate());
+    expect([result.current, reg.update.mock.calls.length]).toEqual([true, 2]);
+  });
+
   // Generated on 2026-10-25 (/ship review, run 15 pass 2)
   // Value: protects=an app coming back to the screen half an hour or more after it last looked for a new version looks
   // again (also when restored from the back-forward cache with only pageshow), and not sooner or while hidden;
@@ -183,6 +197,16 @@ describe('app update', () => {
   it('says when there’s no service worker to find a new version', () => {
     expect(app.hasServiceWorker()).toBe(true);
     hooks.onRegisterError!(new Error('blocked'));
+    expect(app.hasServiceWorker()).toBe(false);
+  });
+
+  // Generated on 2026-10-25 (/ship coverage audit, run 16)
+  // Value: protects=a browser with no service worker support at all (no navigator.serviceWorker, where the plugin
+  // registers nothing and reports no error) says so too; fails_when=only a failed registration counts, so pull to
+  // refresh there neither reloads nor finds a new version; why_new=the test above covers only a registration error;
+  // seam=navigator.serviceWorker removed by hand; no_claim=which browsers lack it
+  it('says there’s no service worker where the browser has none', () => {
+    delete (navigator as { serviceWorker?: unknown }).serviceWorker;
     expect(app.hasServiceWorker()).toBe(false);
   });
 });

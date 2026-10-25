@@ -16,24 +16,49 @@ export interface CatalogItem {
 export const catalogPageUrl = (item: CatalogItem) =>
   `https://mkmobilebase.com/en/category/${{ character: 'characters', equipment: 'equipment', kameo: 'kameos' }[item.kind]}/${item.slug}`;
 
-let loaded: Promise<CatalogItem[]> | null = null;
+/** The last catalog that downloaded, and its text, so a download of the same file changes nothing. */
+let good: CatalogItem[] | null = null;
+let goodText = '';
+/** The first download while there's no catalog yet. */
+let loading: Promise<CatalogItem[]> | null = null;
+let refreshing: Promise<unknown> | null = null;
 let fetchedAt = 0;
-/** Bumped each time a fetched-again catalog is in, so screens using it can look again. */
+/** Bumped each time a fetched-again catalog differs, so screens using it can look again. */
 let version = 0;
 const listeners = new Set<() => void>();
+/** A connection that hangs rather than fails gives up after this, so a pull or Find images doesn't wait for good. */
+const DOWNLOAD_TIMEOUT_MS = 30 * 1000;
+/** The daily deploy refreshes the catalog; coming back to an app whose copy is older than this fetches it again. */
+const REFRESH_AFTER_MS = 60 * 60 * 1000;
 
-export function loadCatalog(fresh = false): Promise<CatalogItem[]> {
-  loaded ??= fetch(`${import.meta.env.BASE_URL}catalog.json`, fresh ? { cache: 'no-cache' } : undefined)
+function download(fresh: boolean): Promise<CatalogItem[]> {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), DOWNLOAD_TIMEOUT_MS);
+  return fetch(`${import.meta.env.BASE_URL}catalog.json`, fresh ? { cache: 'no-cache', signal: abort.signal } : { signal: abort.signal })
     .then((r) => {
       if (!r.ok) throw new Error(`catalog.json: HTTP ${r.status}`);
-      return r.json() as Promise<{ items: CatalogItem[] }>;
+      return r.text();
     })
-    .then((d) => ((fetchedAt = Date.now()), d.items))
-    .catch((e) => {
-      loaded = null; // let the next attempt retry
+    .then((text) => {
+      fetchedAt = Date.now();
+      if (good && text === goodText) return good;
+      good = (JSON.parse(text) as { items: CatalogItem[] }).items;
+      goodText = text;
+      return good;
+    })
+    .finally(() => clearTimeout(timer));
+}
+
+/** The catalog: the copy already downloaded if there is one (even while it's being fetched again), else a download. */
+export function loadCatalog(): Promise<CatalogItem[]> {
+  if (good) return Promise.resolve(good);
+  if (!loading) {
+    loading = download(false).catch((e) => {
+      loading = null; // let the next attempt retry
       throw e;
     });
-  return loaded;
+  }
+  return loading;
 }
 
 /**
@@ -41,15 +66,18 @@ export function loadCatalog(fresh = false): Promise<CatalogItem[]> {
  * daily deploy refreshes it with new cards and art, and nothing else reloads it while the app stays open.
  */
 export function refreshCatalog(): Promise<unknown> {
-  const kept = loaded;
-  loaded = null;
-  return loadCatalog(true).then(
-    () => {
-      version++;
-      listeners.forEach((l) => l());
-    },
-    () => void (loaded = kept),
-  );
+  const before = good;
+  refreshing ??= download(true)
+    .then(
+      (items) => {
+        if (items === before) return;
+        version++;
+        listeners.forEach((l) => l());
+      },
+      () => {},
+    )
+    .finally(() => void (refreshing = null));
+  return refreshing;
 }
 
 /** Changes each time the catalog is fetched again; an effect that uses the catalog can list it to run again. */
@@ -64,7 +92,7 @@ if (typeof document !== 'undefined') {
     if (document.visibilityState !== 'visible' || !fetchedAt) return;
     const age = Date.now() - fetchedAt;
     // A download time later than now means the device clock went back: that counts as old too.
-    if (age >= 0 && age <= 60 * 60 * 1000) return;
+    if (age >= 0 && age <= REFRESH_AFTER_MS) return;
     fetchedAt = Date.now(); // one refresh per return, even if a restore sends two events
     void refreshCatalog();
   };

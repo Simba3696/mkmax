@@ -90,6 +90,8 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: (sh
 
 /** A second tap on the Cards tab this soon after opening it is the end of a double tap: half a second. */
 const DOUBLE_TAP_MS = 500;
+/** Where pull to refresh reloads, how long it waits for a sync to push a change first. */
+const NO_SW_SYNC_WAIT_MS = 5000;
 
 export default function App() {
   const { state, update, sync, lastUndo, undo, dismissUndo, newerSave } = useStore();
@@ -199,12 +201,17 @@ export default function App() {
   });
   // A pull re-reads the event schedule and the card catalog, looks for a new version and, with sync on, checks the gist.
   // It doesn't reload, which wouldn't switch to a new version (only the bar's Reload does) and would lose whatever is half
-  // typed, except where there's no service worker to find one. The spinner doesn't wait for the version check: one found
-  // brings up the bar by itself, and the check has no timeout of its own.
-  const refresh = () =>
-    hasServiceWorker()
-      ? (void checkForAppUpdate(), Promise.all([sync.connected && sync.syncNow(), refreshEvents(), refreshCatalog()]))
-      : Promise.resolve(location.reload());
+  // typed, except where there's no service worker to find one; there it syncs first (for a few seconds at most), so a
+  // change waiting to be pushed goes up before the reload. The spinner doesn't wait for the version check or the
+  // catalog: what they find shows by itself (the bar, new cards and art), and the check has no timeout of its own.
+  const refresh = () => {
+    if (!hasServiceWorker()) {
+      return Promise.race([Promise.resolve(sync.connected && sync.syncNow()), new Promise((r) => setTimeout(r, NO_SW_SYNC_WAIT_MS))]).then(() => location.reload());
+    }
+    void checkForAppUpdate();
+    void refreshCatalog();
+    return Promise.all([sync.connected && sync.syncNow(), refreshEvents()]);
+  };
 
   const syncPill = (extra: string) =>
     sync.status.kind !== 'off' && (

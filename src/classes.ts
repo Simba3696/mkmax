@@ -33,9 +33,9 @@ export const surface = 'bg-panel border border-line rounded-card';
 export const card = `${surface} p-[0.9rem] mb-[0.8rem]`;
 /** A box inside a card. */
 export const subpanel = 'bg-panel-2 border border-line rounded-panel p-[0.7rem] my-[0.6rem]';
-/** Gold-edged tip or warning. */
-/** The gold rule down the left of a hint's text. */
+/** The gold rule down the left of a hint's text, also used by the new-version bar (App). */
 export const hintRule = 'border-l-[3px] border-gold pl-[0.6rem]';
+/** Gold-edged tip or warning. */
 export const hint = `bg-hint ${hintRule} py-[0.4rem] pr-[0.6rem] rounded-chip text-[0.85rem]`;
 
 /** The red to gold fill of a progress bar: the Plan's pack efficiency and the Maxed page's overall completion. */

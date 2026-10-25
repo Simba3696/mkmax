@@ -136,6 +136,41 @@ describe('update undo labels', () => {
     expect([cards(), api().lastUndo]).toEqual([['Shadow Sash Thunder Tower'], null]);
   });
 
+  // Generated on 2026-10-25 (/ship review, run 16, state machines)
+  // Value: protects=an Undo another change joined (alsoUndo, as Add card's Add does) leaves both changes as they are when
+  // dismissed or dropped by a replace, a later Undo does nothing, and the next joining change gets no Undo of its own;
+  // fails_when=dismissing or a sync puts back the older state the joined entry goes back to, or a later change joins a
+  // gone entry; why_new=review (state machines): joined entries were only checked with Undo itself; seam=replace stands
+  // in for a sync; no_claim=the Undo bar's look and timer (App)
+  it('keeps both changes when a joined Undo is dismissed or a replace drops it', () => {
+    let latest: Store | undefined;
+    render(
+      <StoreProvider>
+        <Grab onRender={(store) => (latest = store)} />
+      </StoreProvider>,
+    );
+    const api = () => latest!;
+    const names = () => api().state.cards.map((c) => c.name);
+    const add = (id: string, name: string, label: string, opts?: { alsoUndo: boolean }) =>
+      act(() => void api().update((d) => void d.cards.push({ id, name, rarityId: 'diamond', fusion: 0, guest: false }), label, opts));
+
+    add('r', 'Raiden', 'added Raiden');
+    add('s', 'Scorpion', 'added Scorpion', { alsoUndo: true });
+    expect(api().lastUndo?.label).toBe('added Scorpion · added Raiden');
+    act(() => api().dismissUndo());
+    act(() => api().undo());
+    add('k', 'Kitana', 'added Kitana', { alsoUndo: true });
+    expect([names(), api().lastUndo]).toEqual([['Raiden', 'Scorpion', 'Kitana'], null]);
+
+    add('j', 'Jax', 'added Jax');
+    add('l', 'Liu Kang', 'added Liu Kang', { alsoUndo: true });
+    const joined = api().lastUndo!;
+    act(() => api().replace({ ...defaultState(), cards: [{ id: 'm', name: 'Mileena', rarityId: 'diamond', fusion: 0, guest: false }] }));
+    act(() => api().undo(joined));
+    act(() => api().undo());
+    expect([names(), api().lastUndo]).toEqual([['Mileena'], null]);
+  });
+
   // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
   // Value: protects=once the save is replaced (Import, or a sync bringing in another device's data), the Undo from before
   // can't be used in the same moment, before the screen updates: a change carrying on from it gets no Undo of its own,
