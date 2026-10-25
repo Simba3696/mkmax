@@ -14,7 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # main's ruleset requires a check with this exact name; rename it there too.
+  # main's ruleset requires a check reported as exactly `check`: changing this key, or adding a `name:` or a matrix,
+  # needs the ruleset changed too.
   check:
     runs-on: ubuntu-latest
     # A normal run takes a few minutes; a hung one fails here instead of holding the PR check for GitHub's 6 hours.
