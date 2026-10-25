@@ -31,6 +31,10 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['icon.svg', 'logo-mark.svg', 'apple-touch-icon.png'],
       workbox: {
+        // Prompt mode leaves this off, so a first visit would run without the service worker (no art or schedule kept
+        // for offline) until the next load. Taking over at once changes nothing for an update, which still waits for
+        // Reload; the plugin reloads (onNeedReload, turned off in appUpdate.ts) only after one has waited.
+        clientsClaim: true,
         // Card art is hotlinked from MK Mobile Base and the MK Mobile wiki; keep a copy so thumbnails work offline.
         runtimeCaching: [
           // The event schedule changes daily: always try the network, fall back to the last copy offline. On a

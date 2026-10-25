@@ -1,5 +1,5 @@
 // Parses a pasted list of cards for bulk adding. Plain TS so it can be tested.
-import { nameKey } from './catalog';
+import { nameKey } from './names';
 import { ascensionCaps, fLevel, levelLabel, maxFusion, recordKey, towerKey } from './engine';
 import type { Card, RarityRule } from './types';
 

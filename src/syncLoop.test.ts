@@ -10,6 +10,8 @@ class FakeGist {
   reads = 0;
   writes = 0;
   fail: Error | null = null;
+  /** Writes are saved, but their answer is lost (a timeout after GitHub saved it). */
+  loseAnswers = false;
   private held: (() => void)[] = [];
   /** Which requests to hold open until release(); finds are Connect's lookup. */
   holding: 'reads' | 'writes' | 'finds' | null = null;
@@ -29,6 +31,7 @@ class FakeGist {
     await this.gate('writes');
     this.writes++;
     this.data = structuredClone(s);
+    if (this.loseAnswers) throw new Error('GitHub didn’t answer within 30 seconds. Check your connection.');
   }
   /** Let held requests finish, and wait for what they do next. */
   async release() {
@@ -379,8 +382,11 @@ describe('sync loop', () => {
     const notice: SyncStatus = { kind: 'error', message: 'held' };
     const holdDuring = async (kind: 'reads' | 'writes', d: ReturnType<typeof device>, gist: FakeGist, run: () => Promise<void>, fail?: Error) => {
       gist.holding = kind;
+      const writes = gist.writes;
       const out = run();
       await settle();
+      // Still out, so the hold lands while it waits.
+      expect([d.status.kind, gist.writes]).toEqual(['syncing', writes]);
       d.held = true;
       d.status = notice;
       if (fail) gist.fail = fail;
@@ -443,9 +449,64 @@ describe('sync loop', () => {
       laptop.held = true;
       if (existing === 'fails') gist.fail = new TypeError('Failed to fetch');
       await gist.release();
-      await connecting;
-      expect([laptop.loop.config, laptop.status]).toEqual([null, { kind: 'off' }]);
+      expect([await connecting, laptop.loop.config, laptop.status]).toEqual([false, null, { kind: 'off' }]);
+      gist.fail = null;
+      // Once held, a Connect doesn't start at all: it doesn't wait on GitHub (held open here) or show Syncing.
+      gist.holding = 'finds';
+      const again = laptop.loop.connect('token');
+      await settle();
+      expect([await Promise.race([again, Promise.resolve('waiting')]), laptop.status]).toEqual([false, { kind: 'off' }]);
+      await gist.release();
+      laptop.held = false;
+      expect(await laptop.loop.connect('token')).toBe(true);
     }
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 17 pass 3, data migration)
+  // Value: protects=a push or a Keep mine that GitHub saved but whose answer never came (the 30-second limit, or a
+  // dropped connection) counts as agreed on the next sync, so an edit made since is pushed rather than shown as a
+  // conflict with this device's own copy; fails_when=the loop forgets the copy it sent, or counts one the gist doesn't
+  // hold; why_new=review: GitHub requests now give up after 30 seconds, so a saved write can end in an error;
+  // seam=the fake gist saves the write and then throws; no_claim=GitHub
+  it('counts a write GitHub saved but never answered as agreed on the next sync', async () => {
+    const { gist, phone, desktop } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    gist.loseAnswers = true;
+    await phone.loop.syncNow();
+    gist.loseAnswers = false;
+    expect([phone.status.kind, names(gist.data)]).toEqual(['error', ['Scorpion', 'Raiden']]);
+    phone.edit((s) => s.cards.push(card('Jax')));
+    await phone.loop.syncNow();
+    expect([phone.status.kind, names(gist.data)]).toEqual(['idle', ['Scorpion', 'Raiden', 'Jax']]);
+
+    // Keep mine the same way.
+    await desktop.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    phone.edit((s) => s.cards.push(card('Kano')));
+    await phone.loop.syncNow();
+    await desktop.loop.syncNow();
+    expect(desktop.status.kind).toBe('conflict');
+    gist.loseAnswers = true;
+    await desktop.loop.resolve('mine');
+    gist.loseAnswers = false;
+    desktop.edit((s) => s.cards.push(card('Sonya')));
+    await desktop.loop.syncNow();
+    expect([desktop.status.kind, names(gist.data)]).toEqual(['idle', ['Scorpion', 'Raiden', 'Jax', 'Kitana', 'Sonya']]);
+
+    // A copy whose write never reached the gist isn't counted: the other device's later copy is still a conflict.
+    desktop.edit((s) => s.cards.push(card('Jade')));
+    gist.holding = 'writes';
+    const lost = desktop.loop.syncNow();
+    await settle();
+    gist.fail = new TypeError('Failed to fetch');
+    await gist.release();
+    await lost;
+    gist.fail = null;
+    await phone.loop.syncNow();
+    phone.edit((s) => s.cards.push(card('Mileena')));
+    await phone.loop.syncNow();
+    await desktop.loop.syncNow();
+    expect(desktop.status.kind).toBe('conflict');
   });
 
   // Generated on 2026-10-25 (/ship review, run 17 pass 2, data migration)

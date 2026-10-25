@@ -1,7 +1,7 @@
 // Kaskets: shop packs that give one random card of a rarity you don't own, or one you haven't maxed once you own
 // them all. The pool leaves out the newest characters and gear from the latest game update (KASKET_EXCLUDED), so
 // the planner works out each Kasket's drops from your cards (engine kasketPool) instead of a saved drop list.
-import { nameKey } from './catalog';
+import { nameKey } from './names';
 import type { Card, RarityRule } from './types';
 
 /** The shop's Kaskets and the rarity each one draws from (MK Mobile Base's event schedule names). */

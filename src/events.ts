@@ -1,7 +1,7 @@
 // MK Mobile Base's event schedule (bundled as public/events.json by scripts/fetch-events.mjs): shop packs,
 // challenges and Realm Klash seasons. Pack drop rates aren't in it; the user still enters those.
 import { useEffect, useState } from 'react';
-import { nameKey } from './catalog';
+import { nameKey } from './names';
 import { REALM_KLASH_CURRENCY, packStatus, toLocalInput } from './engine';
 import { kasketIn } from './kaskets';
 import type { AppState, Card, Pack } from './types';

@@ -39,7 +39,7 @@ const REQUEST_TIMEOUT_MS = 30 * 1000;
 /** Runs a request, reading its answer included, with a signal that gives up after REQUEST_TIMEOUT_MS. */
 async function inTime<T>(request: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(new Error('GitHub didn’t answer within 30 seconds. Check your connection.')), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => abort.abort(new Error(`GitHub didn’t answer within ${REQUEST_TIMEOUT_MS / 1000} seconds. Check your connection.`)), REQUEST_TIMEOUT_MS);
   try {
     return await request(abort.signal);
   } finally {

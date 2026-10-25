@@ -1,4 +1,4 @@
-import { nameKey } from './catalog';
+import { nameKey } from './names';
 import { isKasketExcluded } from './kaskets';
 import type { AppState, Card, DropEntry, MaxedCard, Pack, RarityRule } from './types';
 

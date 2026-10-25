@@ -293,7 +293,7 @@ describe('update undo labels', () => {
     localStorage.setItem('mkmax:v1', raw);
     localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
     const pull = vi.spyOn(SyncLoop.prototype, 'syncNow').mockResolvedValue();
-    const connect = vi.spyOn(SyncLoop.prototype, 'connect').mockResolvedValue();
+    const connect = vi.spyOn(SyncLoop.prototype, 'connect').mockResolvedValue(true);
     let latest: Store | undefined;
     render(
       <StoreProvider>

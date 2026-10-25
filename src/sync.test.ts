@@ -93,6 +93,14 @@ describe('GitHub requests', () => {
     await vi.advanceTimersByTimeAsync(30_000);
     await halfAnswer;
 
+    // A file too big to come inline is downloaded with a second request, which has the same limit.
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) =>
+      url === 'raw' ? hang(init?.signal) : Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ id: 'g1', description: null, files: { 'mkmax-data.json': { truncated: true, raw_url: 'raw' } } }) }),
+    );
+    const bigFile = expect(readRemote(cfg)).rejects.toThrow(timedOut);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await bigFile;
+
     const saved = JSON.stringify(withCard(5));
     vi.stubGlobal('fetch', () => new Promise((r) => setTimeout(() => r(gist(saved)), 29_000)));
     const late = readRemote(cfg);

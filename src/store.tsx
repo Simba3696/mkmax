@@ -47,7 +47,8 @@ export interface UndoEntry {
 interface SyncApi {
   status: SyncStatus;
   connected: boolean;
-  connect: (token: string) => Promise<void>;
+  /** Resolves to whether it connected, so Settings keeps the token when it didn't. */
+  connect: (token: string) => Promise<boolean>;
   disconnect: () => void;
   syncNow: () => Promise<void>;
   resolve: (keep: 'mine' | 'theirs') => Promise<void>;
@@ -252,7 +253,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const sync: SyncApi = {
     status,
     connected,
-    connect: newerSave ? paused : (token) => loop.connect(token.trim()),
+    connect: newerSave ? () => Promise.resolve(false) : (token) => loop.connect(token.trim()),
     disconnect: () => loop.disconnect(),
     syncNow: newerSave ? paused : () => loop.syncNow(),
     resolve: newerSave ? paused : (keep) => loop.resolve(keep),

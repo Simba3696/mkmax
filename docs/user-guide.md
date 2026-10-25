@@ -589,7 +589,7 @@ The bottom of Settings shows which version you have and the date of that change,
 
 - **Works offline:** everything you've entered, the plan, and logging purchases.
 - The event schedule falls back to the last copy the app fetched, also when the connection is so slow it hasn't loaded in 4 seconds. Card art you've already seen is kept (up to 500 images, for 90 days).
-- **Needs a connection:** new card art, **Find images**, the rarity fixes, **Completion** on the Maxed page (all three use MK Mobile Base's card list, which isn't kept for offline use) and sync. Sync catches up when you're back online.
+- **Needs a connection:** new card art, **Find images**, the rarity fixes, **Completion** on the Maxed page (these use MK Mobile Base's card list, which isn't kept for offline use) and sync. Sync catches up when you're back online.
 
 ### Updates
 
