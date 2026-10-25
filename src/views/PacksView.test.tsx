@@ -854,7 +854,7 @@ describe('Packs: the pack editor once another tab saves a newer version', () => 
   // Value: protects=an open pack editor says it can't save and greys out Save once another tab saves data from a newer
   // version, and the newer data stays as it was; fails_when=Save stays enabled and silently does nothing behind the
   // notice the pop-up covers; why_new=Red Team (run 6); seam=a StorageEvent dispatched by hand stands in for the other
-  // tab; no_claim=the update's reload waiting for the pop-up (appUpdate.ts)
+  // tab; no_claim=the new-version bar (App.test.tsx)
   it('says why it can’t save and greys out Save', () => {
     render(
       <StoreProvider>

@@ -4,6 +4,7 @@ import { normalize } from './normalize';
 import { pruneDone } from './engine';
 import { NEWER_SAVE_MESSAGE, findOrCreateGist, loadSyncConfig, readRemote, saveSyncConfig, writeRemote } from './sync';
 import { SyncLoop, type SyncStatus } from './syncLoop';
+import { checkForAppUpdate } from './appUpdate';
 import { discardUnreadable as removeUnreadable, holdIfNewer, load, loadUnreadable, save, savedByNewerApp } from './storage';
 
 export { normalize };
@@ -18,7 +19,16 @@ export type { SyncStatus };
  * nothing is saved, stamped or synced and no Undo is offered, though anything the recipe did outside the draft (like a
  * flag its caller reads) still happened.
  */
-type Update = (recipe: (draft: AppState) => void | typeof noChange, undoLabel?: string | (() => string), opts?: { auto?: boolean; ruleChange?: boolean }) => void;
+type Update = (
+  recipe: (draft: AppState) => void | typeof noChange,
+  undoLabel?: string | (() => string),
+  // `undoFrom` adjusts the state Undo goes back to, for a change whose first steps were saved without Undo (a Tower box
+  // saves as it's typed, then its finish re-spells other cards): Undo then takes back those steps too.
+  // `alsoUndo` carries on from the Undo entry showing, for a change with no Undo of its own (Add card's Add): that Undo
+  // goes back to before it, so it would take this change out too, and its label now says so, this change first. With
+  // no Undo showing, this change's own label is dropped, so it gets an Undo only for cards it removes (maxed or done).
+  opts?: { auto?: boolean; ruleChange?: boolean; undoFrom?: (prev: AppState) => void; alsoUndo?: boolean },
+) => void;
 
 /**
  * What an update recipe returns when there's nothing to change, like a tap on a screen a sync has made out of date. A
@@ -27,17 +37,18 @@ type Update = (recipe: (draft: AppState) => void | typeof noChange, undoLabel?: 
  */
 export const noChange: unique symbol = Symbol('noChange');
 
-/** The most recent undoable change: the state from just before it. */
+/** The most recent undoable change: the state from just before it. Each change is a new entry, which is how the Undo bar
+ * tells two apart (see UndoToast). */
 export interface UndoEntry {
   label: string;
   prev: AppState;
-  at: number;
 }
 
 interface SyncApi {
   status: SyncStatus;
   connected: boolean;
-  connect: (token: string) => Promise<void>;
+  /** Resolves to whether it connected, so Settings keeps the token when it didn't. */
+  connect: (token: string) => Promise<boolean>;
   disconnect: () => void;
   syncNow: () => Promise<void>;
   resolve: (keep: 'mine' | 'theirs') => Promise<void>;
@@ -51,8 +62,9 @@ interface StoreApi {
   replace: (s: AppState) => void;
   sync: SyncApi;
   lastUndo: UndoEntry | null;
-  undo: () => void;
-  dismissUndo: () => void;
+  /** Given the change the Undo bar showed, only while that's still the one to undo (see UndoToast). */
+  undo: (shown?: UndoEntry) => void;
+  dismissUndo: (shown?: UndoEntry) => void;
   /** The saved data as it was when it couldn't be read, until the user discards it. */
   unreadable: string | null;
   discardUnreadable: () => void;
@@ -77,6 +89,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [newerSave, setNewerSave] = useState(savedByNewerApp);
 
   const [lastUndo, setLastUndo] = useState<UndoEntry | null>(null);
+  // The entry showing, set by every change to `lastUndo` as it's made, so a second change in the same tap (Add card's
+  // Enter re-spells, then adds) can carry on from it before the next render (alsoUndo). Never set from a render, which
+  // could read an older `lastUndo` (one with a clear still queued) and bring back an Undo that's going.
+  const shownUndo = useRef(lastUndo);
+  // Cleared at once too, so nothing in the same moment (an Add, or Undo itself) can use an Undo that's going: after a
+  // sync or a replace, it would put back a copy from before the other device's changes.
+  const clearUndo = () => {
+    shownUndo.current = null;
+    setLastUndo(null);
+  };
 
   useEffect(() => save(state), [state]);
 
@@ -97,7 +119,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           applyRemote: (remote) => {
             setLocal(normalize(remote));
             // The snapshot predates the other device's changes; restoring it would silently drop them.
-            setLastUndo(null);
+            clearUndo();
           },
           canRead: (remote) => {
             try {
@@ -117,6 +139,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           onSettled: () => setSettled(true),
           schedulePush: () => schedulePush(),
           cancelPush: () => clearTimeout(pushTimer.current),
+          lookForUpdate: () => void checkForAppUpdate(),
+          held: savedByNewerApp,
           now: () => Date.now(),
         },
         loadSyncConfig(),
@@ -155,14 +179,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [loop, newerSave]);
 
   // A tab left open on the older build when another tab, on the newer one, saves: hold from then on, as at startup
-  // (the update itself reloads this tab, but not while a pop-up or the Undo bar is up).
+  // (the update bar's Reload brings this tab up to date).
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (!holdIfNewer(e.key, e.newValue)) return;
+      // Once held, later saves from the newer tab (one per keystroke there) change nothing here.
+      if (savedByNewerApp() || !holdIfNewer(e.key, e.newValue)) return;
       clearTimeout(pushTimer.current);
       setNewerSave(true);
-      setLastUndo(null);
+      clearUndo();
       if (loop.config) setStatus({ kind: 'error', message: NEWER_SAVE_MESSAGE });
+      void checkForAppUpdate();
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
@@ -183,8 +209,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // A card done at its kard threshold (gear, by default) isn't maxed (it's not on the Maxed page), and nor is a card a
     // Settings rule change removes, so those are only "done".
     const gone = (names: string[], how: string) => names.length > 0 && `${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} ${how} and removed`;
-    const label = [typeof undoLabel === 'function' ? undoLabel() : undoLabel, gone(split.maxed, 'maxed'), gone(split.done, 'done')].filter(Boolean).join(' · ');
-    if (label) setLastUndo({ label, prev, at: Date.now() });
+    const own = typeof undoLabel === 'function' ? undoLabel() : undoLabel;
+    const joined = (opts?.alsoUndo && shownUndo.current) || undefined;
+    // Newest first, so a phone's one-line bar shows what this change did even when the label is cut short.
+    const label = [(!opts?.alsoUndo || joined) && own, gone(split.maxed, 'maxed'), gone(split.done, 'done'), joined?.label].filter(Boolean).join(' · ');
+    if (label) {
+      const base = joined ? joined.prev : opts?.undoFrom ? structuredClone(prev) : prev;
+      if (!joined) opts?.undoFrom?.(base);
+      const entry = { label, prev: base };
+      shownUndo.current = entry;
+      setLastUndo(entry);
+    }
     if (!opts?.auto) schedulePush();
   };
 
@@ -194,23 +229,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     pruneDone(next);
     stateRef.current = next;
     setState(next);
-    setLastUndo(null);
+    clearUndo();
     schedulePush();
   };
 
-  const undo = () => {
-    if (!lastUndo || savedByNewerApp()) return;
+  // The entry showing as of now, not as of the last render: a sync applied a moment ago has cleared it already.
+  const undo = (shown?: UndoEntry) => {
+    const cur = shownUndo.current;
+    if (!cur || (shown && shown !== cur) || savedByNewerApp()) return;
     // A fresh stamp so sync treats the restored copy as this device's newest change.
-    setLocal({ ...lastUndo.prev, updatedAt: loop.nextStamp() });
-    setLastUndo(null);
+    setLocal({ ...cur.prev, updatedAt: loop.nextStamp() });
+    clearUndo();
     schedulePush();
+  };
+
+  // As undo: only the entry showing as of now, so a bar's timer or ✕ for a change since replaced closes nothing.
+  const dismissUndo = (shown?: UndoEntry) => {
+    if (shown && shown !== shownUndo.current) return;
+    clearUndo();
   };
 
   const paused = () => Promise.resolve();
   const sync: SyncApi = {
     status,
     connected,
-    connect: newerSave ? paused : (token) => loop.connect(token.trim()),
+    connect: newerSave ? () => Promise.resolve(false) : (token) => loop.connect(token.trim()),
     disconnect: () => loop.disconnect(),
     syncNow: newerSave ? paused : () => loop.syncNow(),
     resolve: newerSave ? paused : (keep) => loop.resolve(keep),
@@ -223,7 +266,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo: () => setLastUndo(null), unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo, unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
   );
 }
 

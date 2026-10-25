@@ -1,7 +1,7 @@
 // MK Mobile Base's event schedule (bundled as public/events.json by scripts/fetch-events.mjs): shop packs,
 // challenges and Realm Klash seasons. Pack drop rates aren't in it; the user still enters those.
 import { useEffect, useState } from 'react';
-import { nameKey } from './catalog';
+import { nameKey } from './names';
 import { REALM_KLASH_CURRENCY, packStatus, toLocalInput } from './engine';
 import { kasketIn } from './kaskets';
 import type { AppState, Card, Pack } from './types';
@@ -44,6 +44,8 @@ let shown = 0;
 let loadingSince = 0;
 // A download that hangs (a phone back on a patchy connection) gives up after this, so the next return can try again.
 const DOWNLOAD_TIMEOUT_MS = 30 * 1000;
+/** The deploy refreshes the schedule daily; coming back to an app whose copy is older than this fetches it again. */
+const REFRESH_AFTER_MS = 60 * 60 * 1000;
 const listeners = new Set<(e: EventSchedule) => void>();
 
 /** The schedule, fetched once and shared; refreshEvents() fetches it again. */
@@ -108,7 +110,7 @@ if (typeof document !== 'undefined') {
     // Never downloaded (the first one failed or hung), or downloaded over an hour ago. A download time later than now
     // means the device clock went back: that counts as old too.
     const age = Date.now() - fetchedAt;
-    if (fetchedAt && age >= 0 && age <= 60 * 60 * 1000) return;
+    if (fetchedAt && age >= 0 && age <= REFRESH_AFTER_MS) return;
     void refreshEvents();
   };
   document.addEventListener('visibilitychange', refreshIfOld);

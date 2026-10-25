@@ -1,14 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { noChange, useStore, type SyncStatus, type UndoEntry } from './store';
-import { btn, hint } from './classes';
+import { btn, hint, hintRule } from './classes';
 import { NEWER_SAVE_MESSAGE } from './sync';
 import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
-import { catalogImageUpdates, loadCatalog, wantsCatalogImage } from './catalog';
+import { catalogImageUpdates, loadCatalog, refreshCatalog, useCatalogVersion, wantsCatalogImage } from './catalog';
 import { endingSoon, moveSeasonEnd, seasonEnd, stretchedWeekEnds } from './engine';
 import { refreshEvents, scheduledSeason, useEvents } from './events';
-import { checkForAppUpdate } from './appUpdate';
+import { applyAppUpdate, checkForAppUpdate, useAppUpdateReady } from './appUpdate';
 import { usePlan } from './planner';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
@@ -37,26 +37,53 @@ const SYNC_PILL: Record<SyncStatus['kind'], string> = {
   conflict: 'border-red text-error',
 };
 
-function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: () => void; onDismiss: () => void }) {
+function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: (shown: UndoEntry) => void; onDismiss: (shown: UndoEntry) => void }) {
+  // The time only counts while the app is showing: a phone runs an overdue timer the moment it comes back, so a change
+  // made just before (or as) the app went away would lose its Undo unseen. Coming back shows it for the full time.
   useEffect(() => {
-    const t = setTimeout(onDismiss, UNDO_SHOW_MS);
-    return () => clearTimeout(t);
-    // Restart the timer for each new change, not on every render.
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const start = () => {
+      clearTimeout(t);
+      t = document.visibilityState === 'hidden' ? undefined : setTimeout(() => onDismiss(entry), UNDO_SHOW_MS);
+    };
+    // Some browsers restore a page from the back-forward cache with only pageshow, no visibility change.
+    const onPageShow = (e: PageTransitionEvent) => e.persisted && start();
+    start();
+    document.addEventListener('visibilitychange', start);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('visibilitychange', start);
+      window.removeEventListener('pageshow', onPageShow);
+    };
+    // Restart the timer for each new change (each is a new entry), not on every render; the timer only ever closes the
+    // change it was started for.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry.at]);
+  }, [entry]);
+  // Undo and ✕ act on the change the bar showed when pressed. Pressing them can finish a box being typed in (a Tower
+  // name), which may put a new change in the bar before the tap lands; that one is shown, not undone or dropped unseen.
+  // A key press (a click with no pointer, detail 0) acts on the change showing then. A press is used once, so a later
+  // click that came without one (from some accessibility tools) acts on the change showing too.
+  const pressed = useRef<UndoEntry | null>(null);
+  // A press that turns into a scroll never becomes a click, so it doesn't count for the next one.
+  const cancelled = () => void (pressed.current = null);
+  const shown = (e: MouseEvent) => {
+    const p = pressed.current;
+    pressed.current = null;
+    return (e.detail > 0 && p) || entry;
+  };
   return (
     // Above the tab bar on phones; on wider screens, centred over the content beside the rail. Settings' rarity arrows
     // scroll to sit just above it (clearOfUndoBar in classes.ts): raise that margin if this gets taller or moves up.
     <div
       className="fixed left-1/2 -translate-x-1/2 z-[8] bottom-[calc(70px+env(safe-area-inset-bottom))] md:bottom-6 md:left-[calc(50%+44px)] lg:left-[calc(50%+110px)] w-[calc(100%-2rem)] max-w-[480px] flex items-center gap-[0.3rem] bg-panel-2 border border-line rounded-card py-[0.3rem] pr-[0.3rem] pl-[0.9rem] shadow-[0_4px_16px_rgba(0,0,0,0.6)] text-[0.9rem]"
       role="status"
-      data-undo
     >
       <span className="flex-1 min-w-0 truncate">{entry.label}</span>
-      <button className={`${btn.ghost} text-gold font-bold`} onClick={onUndo}>
+      <button className={`${btn.ghost} text-gold font-bold`} onPointerDown={() => void (pressed.current = entry)} onPointerCancel={cancelled} onClick={(e) => onUndo(shown(e))}>
         Undo
       </button>
-      <button className={btn.ghost} onClick={onDismiss} aria-label="Dismiss">
+      <button className={btn.ghost} onPointerDown={() => void (pressed.current = entry)} onPointerCancel={cancelled} onClick={(e) => onDismiss(shown(e))} aria-label="Dismiss">
         ✕
       </button>
     </div>
@@ -68,12 +95,16 @@ const DOUBLE_TAP_MS = 500;
 
 export default function App() {
   const { state, update, sync, lastUndo, undo, dismissUndo, newerSave } = useStore();
+  // On every tab, as an update waits for the user rather than reloading over whatever they're doing.
+  const updateReady = useAppUpdateReady();
   // A mistyped or pasted link (#Packs, a docs anchor) opens Plan rather than a blank page with no tab selected.
   const [tab, setTab] = useState<TabId>(() => TABS.find((t) => t.id === location.hash.slice(1))?.id ?? 'plan');
 
   // Give cards MK Mobile Base art automatically: new cards, cards synced in from another device, and cards still
-  // carrying art from the old wiki lookup. Runs again only when that set of cards changes.
+  // carrying art from the old wiki lookup. Runs again when that set of cards changes, a catalog fetched again has changed,
+  // or the first catalog loads after a failed download (opened offline).
   const needsArt = state.cards.filter(wantsCatalogImage).map((c) => c.id).join(',');
+  const catalogVersion = useCatalogVersion();
   useEffect(() => {
     if (!needsArt) return;
     let cancelled = false;
@@ -95,7 +126,7 @@ export default function App() {
     );
     return () => void (cancelled = true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsArt]);
+  }, [needsArt, catalogVersion]);
 
   // MK Mobile Base's schedule knows when the Realm Klash season ends, so it replaces the saved date (and the
   // 2-week guess) whenever it covers today, moving that season's items with it.
@@ -169,9 +200,15 @@ export default function App() {
       if (next) go(next.id);
     },
   });
-  // With sync on, a pull checks the gist and re-reads the event schedule. Without sync there's nothing remote to
-  // fetch, so reload, which picks up app updates and the schedule too.
-  const refresh = () => (sync.connected ? Promise.all([sync.syncNow(), refreshEvents(), checkForAppUpdate()]) : Promise.resolve(location.reload()));
+  // A pull re-reads the event schedule and the card catalog, looks for a new version and, with sync on, checks the gist.
+  // It never reloads, which wouldn't switch to a new version (only the bar's Reload does) and would lose whatever is half
+  // typed. The spinner doesn't wait for the version check or the catalog: what they find shows by itself (the bar, new
+  // cards and art).
+  const refresh = () => {
+    void checkForAppUpdate();
+    void refreshCatalog();
+    return Promise.all([sync.connected && sync.syncNow(), refreshEvents()]);
+  };
 
   const syncPill = (extra: string) =>
     sync.status.kind !== 'off' && (
@@ -245,20 +282,34 @@ export default function App() {
         <span className="text-muted text-small">Pack planner</span>
         {syncPill('ml-auto')}
       </header>
-      <main data-scroll-root className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch]">
-        <div className="max-w-page md:max-w-[1400px] mx-auto p-4 md:px-6 md:py-6 lg:px-8" ref={pageRef}>
-          {/* On every tab, since nothing a tap does is saved meanwhile. */}
-          {newerSave && (
-            <p className={`${hint} mt-0 mb-4 md:max-w-[80ch]`} role="alert">
-              {NEWER_SAVE_MESSAGE}
-            </p>
-          )}
-          {tab === 'plan' && <PlanView goto={go} openPack={openPack} />}
-          {tab === 'packs' && <PacksView focus={focusPack} onFocused={() => setFocusPack(null)} />}
-          {tab === 'cards' && <CardsView sub={cardsPage} onSub={setCardsPage} />}
-          {tab === 'settings' && <SettingsView />}
-        </div>
-      </main>
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+        {/* A fixed row above the scrolling page rather than in it, so it's seen wherever the page is scrolled to. */}
+        {updateReady && (
+          // On wider screens it's the top row, with no phone header above it to clear the status bar.
+          <div className="flex-none bg-hint border-b border-line md:pt-[env(safe-area-inset-top)]" role="status">
+            <div className="max-w-page md:max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-2 flex items-center gap-3">
+              <span className={`flex-1 text-[0.85rem] ${hintRule}`}>A new version of MK Max is ready.</span>
+              <button className={btn.primary} onClick={applyAppUpdate}>
+                Reload
+              </button>
+            </div>
+          </div>
+        )}
+        <main data-scroll-root className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch]">
+          <div className="max-w-page md:max-w-[1400px] mx-auto p-4 md:px-6 md:py-6 lg:px-8" ref={pageRef}>
+            {/* On every tab, since nothing a tap does is saved meanwhile. */}
+            {newerSave && (
+              <p className={`${hint} mt-0 mb-4 md:max-w-[80ch]`} role="alert">
+                {NEWER_SAVE_MESSAGE}
+              </p>
+            )}
+            {tab === 'plan' && <PlanView goto={go} openPack={openPack} />}
+            {tab === 'packs' && <PacksView focus={focusPack} onFocused={() => setFocusPack(null)} />}
+            {tab === 'cards' && <CardsView sub={cardsPage} onSub={setCardsPage} />}
+            {tab === 'settings' && <SettingsView />}
+          </div>
+        </main>
+      </div>
       {lastUndo && <UndoToast entry={lastUndo} onUndo={undo} onDismiss={dismissUndo} />}
       <nav
         aria-label="Tabs"

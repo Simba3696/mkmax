@@ -7,7 +7,8 @@ import { execSync } from 'node:child_process';
 /**
  * Short commit id and commit date, shown in Settings so you can tell whether a device has picked up the latest deploy.
  * The commit date rather than the build date: the daily schedule refresh rebuilds the same commit, and a date that
- * changed every day would change the bundle with it, making every device download the app again and reload.
+ * changed every day would change the bundle with it, making every device download the app again and show the new-version
+ * bar every day.
  */
 function appVersion() {
   try {
@@ -26,9 +27,15 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // The app says when a new version is ready and reloads when the user taps Reload (appUpdate.ts), so nothing in
+      // progress is thrown away by an update.
+      registerType: 'prompt',
       includeAssets: ['icon.svg', 'logo-mark.svg', 'apple-touch-icon.png'],
       workbox: {
+        // Prompt mode leaves this off, so a first visit would run without the service worker (no art or schedule kept
+        // for offline) until the next load. Taking over at once changes nothing for an update, which still waits for
+        // Reload; the plugin reloads (onNeedReload, turned off in appUpdate.ts) only after one has waited.
+        clientsClaim: true,
         // Card art is hotlinked from MK Mobile Base and the MK Mobile wiki; keep a copy so thumbnails work offline.
         runtimeCaching: [
           // The event schedule changes daily: always try the network, fall back to the last copy offline. On a

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { noChange, useStore } from '../store';
 import { usePlan } from '../planner';
 import { maxedKeys, recordMaxed } from '../engine';
-import { completion, findInCatalog, loadCatalog, type CatalogItem } from '../catalog';
+import { completion, findInCatalog, loadCatalog, useCatalogVersion, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
 import { CardThumb, ConfirmButton, RarityBadge, dayLabel } from '../ui';
 import { actions, barFill, btn, card, field, glyphBtn, grow, row, rowDivider, rowTitle, subpanel } from '../classes';
@@ -52,19 +52,22 @@ export default function MaxedPanel() {
   const { now } = usePlan();
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [catalogFailed, setCatalogFailed] = useState(false);
-  // Bumped by Try again: loadCatalog forgets a failed download, so loading again fetches it again.
+  // Bumped by Try again: loadCatalog forgets a failed download, so loading again fetches it again. Also read again when
+  // a catalog fetched again (pull to refresh, or coming back) has changed, or when the first download that works follows a
+  // failed one.
   const [attempt, setAttempt] = useState(0);
+  const catalogVersion = useCatalogVersion();
   const [q, setQ] = useState('');
   useEffect(() => {
     let cancelled = false;
     loadCatalog().then(
-      (items) => !cancelled && setCatalog(items),
+      (items) => !cancelled && (setCatalog(items), setCatalogFailed(false)),
       () => !cancelled && setCatalogFailed(true),
     );
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [attempt, catalogVersion]);
 
   const maxed = useSame(state.maxed ?? [], (state.maxed ?? []).map((m) => `${m.rarityId}|${m.name}|${m.at ?? ''}`).join('\n'));
   const rarities = useSame(state.rarities, JSON.stringify(state.rarities));

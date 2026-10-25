@@ -2,7 +2,7 @@
 // GitHub, the app state and timers passed in, so tests can run two devices against one fake gist. store.tsx wires it
 // to React.
 import type { AppState } from './types';
-import { NEWER_MESSAGE, OUTDATED_MESSAGE, UNREADABLE_MESSAGE, decideSync, fromNewerApp, sameData, stamp, type SyncConfig } from './sync';
+import { NEWER_MESSAGE, OUTDATED_MESSAGE, UNREADABLE_MESSAGE, decideSync, fromNewerApp, fromOutdatedApp, sameData, stamp, type SyncConfig } from './sync';
 
 export type SyncStatus =
   | { kind: 'off' }
@@ -31,6 +31,13 @@ export interface SyncDeps {
   /** Run a sync a moment from now (the store debounces it), for edits that still need pushing. */
   schedulePush: () => void;
   cancelPush: () => void;
+  /** Look for a new version of MK Max; finding one only brings up the new-version bar. */
+  lookForUpdate: () => void;
+  /**
+   * Another tab has saved data from a newer version, so this one must start, write, apply and report nothing (a Connect
+   * still looking for the gist just goes back to off; one that has found it stays connected and its first sync stops).
+   */
+  held: () => boolean;
   now: () => number;
 }
 
@@ -81,14 +88,10 @@ export class SyncLoop {
     return kept;
   }
 
-  /**
-   * Neither pull nor push until this device runs the newer build; the regular pulls check again. It doesn't look for
-   * the update itself, since finding it reloads the app. The reload waits for pop-ups and the Undo bar (see
-   * appUpdate.ts), but not for what's half typed on the page, like the Add card form or a card being renamed, and a
-   * background sync can land at any moment.
-   */
+  /** Neither pull nor push until this device runs the newer build; the regular pulls check again. */
   private waitForNewerApp() {
     this.deps.onStatus({ kind: 'error', message: NEWER_MESSAGE });
+    this.deps.lookForUpdate();
   }
 
   /**
@@ -98,8 +101,14 @@ export class SyncLoop {
    */
   private unreadable(remote: AppState | null) {
     if (!remote || this.deps.canRead(remote)) return false;
-    this.deps.onStatus({ kind: 'error', message: UNREADABLE_MESSAGE });
+    this.waitForReadableApp();
     return true;
+  }
+
+  /** Usually a newer build wrote the gist's copy, so look for it. */
+  private waitForReadableApp() {
+    this.deps.onStatus({ kind: 'error', message: UNREADABLE_MESSAGE });
+    this.deps.lookForUpdate();
   }
 
   /** Edits made while a request was out still need pushing. */
@@ -107,16 +116,25 @@ export class SyncLoop {
     if (this.cfg && stamp(this.deps.getState()) > this.cfg.baseUpdatedAt) this.deps.schedulePush();
   }
 
+  /**
+   * Whether a sync that was waiting on GitHub should stop there: disconnected or switched meanwhile, or another tab saved
+   * data from a newer version (this one then writes, applies and reports nothing, as at startup).
+   */
+  private stopped(cfg: SyncConfig) {
+    return !this.sameGist(cfg) || this.deps.held();
+  }
+
   /** Pull if the gist moved on, push if only this device did, or report a conflict if both did. */
   async syncNow() {
     const cfg = this.cfg;
-    if (!cfg || this.busy || this.conflict) return;
+    // Nor while held: the regular pulls don't go through the store's pause.
+    if (!cfg || this.busy || this.conflict || this.deps.held()) return;
     this.busy = true;
     let ok = false;
     this.deps.onStatus({ kind: 'syncing' });
     try {
       const remote = await this.deps.readRemote(cfg);
-      if (!this.sameGist(cfg)) return;
+      if (this.stopped(cfg)) return;
       const local = this.deps.getState();
       const action = decideSync(remote, local, cfg.baseUpdatedAt);
       if (action === 'newer') {
@@ -132,7 +150,7 @@ export class SyncLoop {
       if (action === 'outdated') {
         const kept = this.restampToKeep(cfg, remote);
         await this.deps.writeRemote(cfg, kept);
-        if (!this.sameGist(cfg)) return;
+        if (this.stopped(cfg)) return;
         this.setConfig({ ...cfg, baseUpdatedAt: stamp(kept) });
         this.deps.onStatus({ kind: 'error', message: OUTDATED_MESSAGE });
         return;
@@ -142,7 +160,7 @@ export class SyncLoop {
         this.setConfig({ ...cfg, baseUpdatedAt: stamp(remote) });
       } else if (action === 'push') {
         await this.deps.writeRemote(cfg, local);
-        if (!this.sameGist(cfg)) return;
+        if (this.stopped(cfg)) return;
         this.setConfig({ ...cfg, baseUpdatedAt: stamp(local) });
       } else {
         // Same data on both sides (maybe with different stamps), so both stamps count as agreed.
@@ -151,7 +169,7 @@ export class SyncLoop {
       this.deps.onStatus({ kind: 'idle', at: this.deps.now() });
       ok = true;
     } catch (e) {
-      if (this.sameGist(cfg)) this.deps.onStatus({ kind: 'error', message: (e as Error).message });
+      if (!this.stopped(cfg)) this.deps.onStatus({ kind: 'error', message: (e as Error).message });
     } finally {
       this.busy = false;
       // Offline or refused, automatic changes still go ahead rather than wait for the whole session.
@@ -162,18 +180,34 @@ export class SyncLoop {
     }
   }
 
-  async connect(token: string) {
+  /**
+   * Whether it connected: false if another tab saved data from a newer version first or while GitHub looked for the
+   * gist. Once the gist is found it's connected, and a hold during the first sync stops that sync like any other.
+   */
+  async connect(token: string): Promise<boolean> {
+    if (this.deps.held()) return false;
     this.deps.onStatus({ kind: 'syncing' });
     try {
       // The copy a new gist is made from; edits made while GitHub answers come after it and still need pushing.
       const snap = this.deps.getState();
       const { gistId, created } = await this.deps.findOrCreateGist(token, snap);
+      // Another tab saved data from a newer version meanwhile: save no settings for it to sync with.
+      if (this.deps.held()) {
+        this.deps.onStatus({ kind: 'off' });
+        return false;
+      }
       // A new gist already holds this device's data; an existing one gets compared on the first sync.
       this.setConfig({ token, gistId, baseUpdatedAt: created ? stamp(snap) : 0 });
       this.deps.onStatus({ kind: 'idle', at: created ? this.deps.now() : null });
       if (!created) await this.syncNow();
       else this.pushLaterEdits();
+      return true;
     } catch (e) {
+      // As above: one that fails once another tab is ahead just goes back to off.
+      if (this.deps.held()) {
+        this.deps.onStatus({ kind: 'off' });
+        return false;
+      }
       this.deps.onStatus({ kind: 'error', message: (e as Error).message });
       throw e;
     }
@@ -190,7 +224,7 @@ export class SyncLoop {
   async resolve(keep: 'mine' | 'theirs') {
     const cfg = this.cfg;
     const shown = this.conflict;
-    if (!cfg || !shown || this.busy) return;
+    if (!cfg || !shown || this.busy || this.deps.held()) return;
     this.deps.cancelPush();
     this.conflict = null;
     if (keep === 'theirs') {
@@ -198,7 +232,7 @@ export class SyncLoop {
         this.deps.applyRemote(shown);
       } catch {
         // Left unagreed, so the regular pulls neither push nor ask again while this build can't read it.
-        this.deps.onStatus({ kind: 'error', message: UNREADABLE_MESSAGE });
+        this.waitForReadableApp();
         return;
       }
       this.setConfig({ ...cfg, baseUpdatedAt: stamp(shown) });
@@ -212,25 +246,31 @@ export class SyncLoop {
       // Background syncs hold off while the prompt is up, so the other device may have pushed again since. Show
       // that copy instead of overwriting it unseen.
       const fresh = await this.deps.readRemote(cfg);
-      if (!this.sameGist(cfg)) return;
+      if (this.stopped(cfg)) return;
       if (fresh && fromNewerApp(fresh)) {
         this.waitForNewerApp();
         return;
       }
-      if (this.unreadable(fresh)) return;
-      if (fresh && stamp(fresh) !== stamp(shown) && !sameData(fresh, shown)) {
+      // An outdated build's copy is never offered: it's written over, as a sync does, and the user told to update it.
+      const outdated = !!fresh && fromOutdatedApp(fresh);
+      if (!outdated && this.unreadable(fresh)) return;
+      if (fresh && !outdated && stamp(fresh) !== stamp(shown) && !sameData(fresh, shown)) {
         this.conflict = fresh;
         this.deps.onStatus({ kind: 'conflict', remote: fresh });
         return;
       }
       const kept = this.restampToKeep(cfg, fresh);
       await this.deps.writeRemote(cfg, kept);
-      if (!this.sameGist(cfg)) return;
+      if (this.stopped(cfg)) return;
       this.setConfig({ ...cfg, baseUpdatedAt: stamp(kept) });
+      if (outdated) {
+        this.deps.onStatus({ kind: 'error', message: OUTDATED_MESSAGE });
+        return;
+      }
       this.deps.onStatus({ kind: 'idle', at: this.deps.now() });
       ok = true;
     } catch (e) {
-      if (this.sameGist(cfg)) this.deps.onStatus({ kind: 'error', message: (e as Error).message });
+      if (!this.stopped(cfg)) this.deps.onStatus({ kind: 'error', message: (e as Error).message });
     } finally {
       this.busy = false;
       if (ok) this.pushLaterEdits();

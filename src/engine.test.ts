@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addPool, ascensionCaps, respellTower, towerKey, towerName, towerRespells, towerSpellings, unifyTowerSpellings, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -160,7 +160,7 @@ describe('the Maxed record', () => {
   it('loads an older save with an empty record, and keeps only well-formed entries', () => {
     const old = { ...defaultState(), version: 16 } as unknown as AppState;
     delete (old as Partial<AppState>).maxed;
-    expect([normalize(old).version, normalize(old).maxed]).toEqual([17, []]);
+    expect([normalize(old).version, normalize(old).maxed]).toEqual([18, []]);
     const odd = normalize({ ...old, maxed: [{ name: 'Kori Blade', rarityId: 'epic' }, { name: 3 }, null, 'x'] } as unknown as AppState);
     expect(odd.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic' }]);
     // A day that isn't text would break the page, and the same card twice would list twice: one entry, with the day a
@@ -169,6 +169,71 @@ describe('the Maxed record', () => {
     expect(twice.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic', at: '2026-10-01' }]);
     // Loading a save again changes nothing (save-migration: a current save comes out unchanged).
     expect(normalize(structuredClone(twice))).toEqual(twice);
+  });
+
+  // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=version 18 saves every tower gear card's tower in the spelling the Tower list shows (the first shown
+  // card naming it), trimmed, hidden cards too, and leaves other sources and a newer save alone; fails_when=old mixed
+  // spellings survive, so the spelling shown flips when the card it came from leaves the list, or the step runs again on
+  // a current save; why_new=review (Red Team) of mixed spellings in older saves; seam=none; no_claim=none beyond protects
+  it('saves each tower in the spelling the Tower list shows, once', () => {
+    const gear = (id: string, sourceNote: string | undefined, rarityId = 'epic', source: Card['source'] = 'tower') => card(id, 1, { rarityId, source, sourceNote });
+    const old = {
+      ...defaultState(),
+      version: 17,
+      cards: [
+        gear('a', 'lin kuei tower '),
+        gear('b', 'Lin Kuei Tower'),
+        gear('c', 'LIN KUEI TOWER', 'gone'),
+        gear('d', ' Wind Tower', 'gone'),
+        gear('e', 'wind tower', 'gone'),
+        gear('f', 'Shirai Ryu Tower', 'epic', 'krypt'),
+        gear('g', undefined),
+      ],
+    } as unknown as AppState;
+    const out = normalize(old);
+    expect([out.version, out.cards.map((c) => c.sourceNote)]).toEqual([18, ['lin kuei tower', 'lin kuei tower', 'lin kuei tower', 'Wind Tower', 'Wind Tower', 'Shirai Ryu Tower', undefined]]);
+    // A save already at version 18 isn't re-spelled again (a spelling typed since stands).
+    const current = { ...old, version: 18 } as unknown as AppState;
+    expect(normalize(current).cards.map((c) => c.sourceNote)).toEqual(['lin kuei tower ', 'Lin Kuei Tower', 'LIN KUEI TOWER', ' Wind Tower', 'wind tower', 'Shirai Ryu Tower', undefined]);
+  });
+
+  // Generated on 2026-10-23 (/ship review, data migration and Red Team, Tower dropdown)
+  // Value: protects=version 18 takes a tower's spelling from cards that stay, not one removed as done on the same load,
+  // and a hand-edited tower name that isn't text is dropped on every load instead of failing the whole save;
+  // fails_when=the step runs before done cards are removed, so a gone card sets the spelling, or a non-text name throws
+  // and the save is treated as unreadable; why_new=review (data migration, Red Team); seam=none; no_claim=none beyond
+  // protects
+  it('spells a tower from cards that stay, and drops a tower name that is not text', () => {
+    const gear = (id: string, fusion: number, sourceNote: unknown) => card(id, fusion, { rarityId: 'epic', source: 'tower', sourceNote: sourceNote as string });
+    const old = { ...defaultState(), version: 17, cards: [gear('done', 11, 'LIN KUEI TOWER'), gear('kori', 1, 'Lin Kuei Tower'), gear('fan', 1, 'lin kuei tower'), gear('odd', 1, 42)] } as unknown as AppState;
+    const out = normalize(old);
+    expect(out.cards.map((c) => [c.id, c.sourceNote])).toEqual([['kori', 'Lin Kuei Tower'], ['fan', 'Lin Kuei Tower'], ['odd', undefined]]);
+    // Dropped on a current save too, so Tower gear never reads it, on any card, and a card's No kards stays.
+    const krypt = card('krypt', 1, { rarityId: 'epic', source: 'krypt', sourceNote: 7 as unknown as string });
+    // Extended on 2026-10-25 (/ship coverage audit, run 17)
+    // Value: protects=a card with both a No kards that isn't exactly true and a tower name that isn't text loses both;
+    // fails_when=the tower check returns early, so a hand-edited "yes" stays and reads as No kards or looks like a sync
+    // conflict; why_new=each case above has only one of the two; seam=none; no_claim=none beyond protects
+    const both = { ...gear('both', 1, 3), noKards: 'yes' };
+    const current = normalize({ ...defaultState(), cards: [gear('odd', 1, { x: 1 }), krypt, { ...gear('nk', 1, 9), noKards: true }, both] } as unknown as AppState);
+    expect(current.cards.map((c) => ['sourceNote' in c, c.noKards ?? null])).toEqual([[false, null], [false, null], [false, true], [false, null]]);
+  });
+
+  // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
+  // Value: protects=version 18 takes the spelling the Tower list shows even when a hidden card naming that tower comes
+  // first in the save, and leaves a Krypt or challenge card's note alone even when it reads like a tower; fails_when=the
+  // first card in the save sets the spelling, so the list's spelling flips to a hidden card's, or a non-tower note is
+  // trimmed or re-spelled; why_new=the step's test had the shown card first and no non-tower note naming a tower;
+  // seam=none; no_claim=none beyond protects
+  it('keeps the shown spelling over an earlier hidden card, and leaves non-tower notes alone', () => {
+    const gear = (id: string, sourceNote: string, rarityId = 'epic', source: Card['source'] = 'tower') => card(id, 1, { rarityId, source, sourceNote });
+    const old = {
+      ...defaultState(),
+      version: 17,
+      cards: [gear('hidden', 'LIN KUEI TOWER', 'gone'), gear('kori', 'Lin Kuei Tower'), gear('krypt', ' lin kuei tower ', 'epic', 'krypt'), gear('elder', 'lin kuei tower', 'epic', 'challenge')],
+    } as unknown as AppState;
+    expect(normalize(old).cards.map((c) => c.sourceNote)).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', ' lin kuei tower ', 'lin kuei tower']);
   });
 });
 
@@ -2014,5 +2079,97 @@ describe('moveRarity', () => {
     // A sync puts Gold Kameo first, so Diamond and Gold both shift down one place but stay side by side.
     s.rarities = [s.rarities.find((r) => r.id === 'kameo-gold')!, ...s.rarities.filter((r) => r.id !== 'kameo-gold')];
     expect([moveRarity(s, 'diamond', 'gold', 1), s.rarities.slice(0, 3).map((r) => r.id)]).toEqual([true, ['kameo-gold', 'gold', 'diamond']]);
+  });
+});
+
+describe('towerSpellings', () => {
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=the Cards Tower list and Tower gear headings spell a tower the same way: once per tower whatever the
+  // capitals or spaces, as the first tower gear card names it, and only from tower gear; fails_when=the two screens keep
+  // their own spelling rules again, or another source's note is read as a tower; why_new=the rule moved here from two
+  // copies; seam=none; no_claim=none beyond protects
+  it('spells each tower once, as the first tower gear card naming it has it', () => {
+    const card = (name: string, sourceNote: string, source: Card['source'] = 'tower'): Card => ({ id: name, name, rarityId: 'epic', fusion: 1, guest: false, source, sourceNote });
+    // Extended on 2026-10-22 (/ship review, maintainability): a card under a rarity a sync removed is hidden, so it doesn't
+    // spell a tower even when it comes first; fails_when=a caller's copy of that rule is missed and a hidden card decides
+    // the spelling the Tower list, Add card and Paste a list save.
+    const hidden: Card = { ...card('Ghost Blade', 'LIN KUEI TOWER'), rarityId: 'gone' };
+    const cards = [hidden, card('Kori Blade', ' Lin Kuei Tower'), card('Frost Fan', 'lin kuei tower '), card('Ryu Kunai', 'Shirai Ryu Tower'), card('Krypt Axe', 'Krypt', 'krypt'), card('Blank', '  ')];
+    expect([...towerSpellings({ cards, rarities: defaultState().rarities })]).toEqual([
+      ['lin kuei tower', 'Lin Kuei Tower'],
+      ['shirai ryu tower', 'Shirai Ryu Tower'],
+    ]);
+  });
+});
+
+describe('respellTower', () => {
+  // Generated on 2026-10-22 (/ship review, Tower dropdown)
+  // Value: protects=a typed tower name becomes its spelling on every tower gear card naming it another way, however mixed
+  // (typing the spelling already shown still fixes the others), and a tower no card names changes nothing; fails_when=a
+  // retyped spelling only changes some cards, other sources' notes change, or a card already spelled that way (even with a
+  // space at the end) is counted;
+  // why_new=new helper; seam=none; no_claim=none beyond protects
+  it('spells a tower as typed on every card naming it another way', () => {
+    const card = (name: string, sourceNote: string, source: Card['source'] = 'tower'): Card => ({ id: name, name, rarityId: 'epic', fusion: 1, guest: false, source, sourceNote });
+    const cards = () => [card('Kori Blade', 'lin kuei tower'), card('Frost Fan', 'LIN KUEI TOWER '), card('Ryu Kunai', 'Shirai Ryu Tower'), card('Krypt Axe', 'lin kuei tower', 'krypt'), card('Fire Fan', 'Lin Kuei Tower'), card('Wind Fan', 'Lin Kuei Tower ')];
+    const rarities = defaultState().rarities;
+    const fixed = cards();
+    const shown = cards();
+    const unknown = cards();
+    expect([respellTower({ cards: fixed, rarities }, 'Lin Kuei Tower'), respellTower({ cards: shown, rarities }, 'lin kuei tower'), respellTower({ cards: unknown, rarities }, 'Wind Tower')]).toEqual([2, 3, 0]);
+    expect([fixed.map((c) => c.sourceNote), shown.map((c) => c.sourceNote), unknown]).toEqual([
+      ['Lin Kuei Tower', 'Lin Kuei Tower', 'Shirai Ryu Tower', 'lin kuei tower', 'Lin Kuei Tower', 'Lin Kuei Tower '],
+      ['lin kuei tower', 'lin kuei tower', 'Shirai Ryu Tower', 'lin kuei tower', 'lin kuei tower', 'lin kuei tower'],
+      cards(),
+    ]);
+
+    // Extended on 2026-10-22 (/ship review, maintainability): the card the name was typed on (skip) and a card under a
+    // rarity a sync removed are left as they are; fails_when=the hidden-card rule or the typed card's skip is lost when a
+    // caller stops filtering for itself.
+    const typedOn = card('Kori Blade', 'LIN KUEI TOWER');
+    const hidden: Card = { ...card('Ghost Blade', 'lin kuei tower'), rarityId: 'gone' };
+    const mixed = [typedOn, hidden, card('Frost Fan', 'lin kuei tower')];
+    expect([respellTower({ cards: mixed, rarities }, 'Lin Kuei Tower', typedOn), mixed.map((c) => c.sourceNote)]).toEqual([1, ['LIN KUEI TOWER', 'lin kuei tower', 'Lin Kuei Tower']]);
+
+    // Extended on 2026-10-23 (/ship review, Codex design): towerRespells, which the Tower box's hint shows beforehand,
+    // counts what respellTower then changes, skipping the card typed on and hidden cards; fails_when=the hint and the
+    // re-spell go by different rules, so the hint promises a count the Undo bar then contradicts.
+    const counted = [typedOn, hidden, card('Frost Fan', 'lin kuei tower'), card('Fire Fan', 'Lin Kuei Tower'), card('Wind Fan', 'LIN KUEI TOWER')];
+    expect([towerRespells({ cards: counted, rarities }, 'Lin Kuei Tower', typedOn.id), respellTower({ cards: counted, rarities }, 'Lin Kuei Tower', typedOn), towerRespells({ cards: cards(), rarities }, 'Lin Kuei Tower')]).toEqual([2, 2, 2]);
+  });
+
+  // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=a tower typed with two spaces or a non-breaking space inside is the same tower as one typed with
+  // one, as Paste a list reads it: one entry in the Tower list, spelled and saved tidied (one space between words) by
+  // the list and the version 18 step, and a name that differs only in spaces isn't another spelling, so typing it
+  // re-spells (and counts) nothing; fails_when=towerKey only trims and lowercases again, so a stray double space makes a
+  // look-alike second tower, or spaces count as a spelling, so finishing a name re-spells cards invisibly with an Undo;
+  // why_new=review (Red Team, twice); seam=none; no_claim=none beyond protects
+  it('counts spaces inside a tower name as one', () => {
+    const card = (name: string, sourceNote: string): Card => ({ id: name, name, rarityId: 'epic', fusion: 1, guest: false, source: 'tower', sourceNote });
+    const rarities = defaultState().rarities;
+    const cards = () => [card('Kori Blade', 'Lin Kuei Tower'), card('Frost Fan', 'lin  kuei\u00a0tower'), card('Ryu Kunai', 'Lin\tKuei Tower')];
+    const typed = cards();
+    const saved = { cards: cards(), rarities };
+    unifyTowerSpellings(saved);
+    // Extended on 2026-10-25 (/ship coverage audit G5): a tower only cards hidden under a removed rarity name is saved
+    // tidied by the version 18 step too; fails_when=unifyTowerSpellings only trims a hidden card's tower.
+    const hiddenOnly = { cards: [{ ...card('Ghost Blade', ' Ghost  Tower '), rarityId: 'gone' }], rarities };
+    unifyTowerSpellings(hiddenOnly);
+    expect(hiddenOnly.cards[0].sourceNote).toBe('Ghost Tower');
+    const spaced = [card('Fire Fan', 'Lin\u00a0Kuei  Tower')];
+    // Extended by /ship adversarial review on 2026-10-25 (run 19): a phone's curly apostrophe is the same tower as a
+    // straight one; fails_when=towerKey keeps the curly one, so "X’s Tower" typed on a phone and "X's Tower" pasted
+    // from notes become two towers.
+    expect(towerKey('Kitana’s Tower')).toBe(towerKey("kitana's tower"));
+    expect([
+      towerKey(' Lin  Kuei\u00a0Tower '),
+      towerName(' Lin  Kuei\u00a0Tower '),
+      [...towerSpellings({ cards: spaced, rarities }).values()],
+      towerRespells({ cards: spaced, rarities }, 'Lin Kuei Tower'),
+      respellTower({ cards: typed, rarities }, 'Lin Kuei Tower'),
+      typed.map((c) => c.sourceNote),
+      saved.cards.map((c) => c.sourceNote),
+    ]).toEqual(['lin kuei tower', 'Lin Kuei Tower', ['Lin Kuei Tower'], 0, 1, ['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin\tKuei Tower'], ['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin Kuei Tower']]);
   });
 });

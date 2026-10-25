@@ -1,6 +1,8 @@
 // Card catalog from MK Mobile Base (mkmobilebase.com): names, rarities and card art for every character, Kameo and
 // piece of equipment. scripts/fetch-catalog.mjs downloads it into public/catalog.json at deploy time, because
 // the site's API doesn't allow requests from other sites.
+import { useSyncExternalStore } from 'react';
+import { nameKey } from './names';
 import type { Card, MaxedCard, RarityRule } from './types';
 
 export interface CatalogItem {
@@ -15,20 +17,121 @@ export interface CatalogItem {
 export const catalogPageUrl = (item: CatalogItem) =>
   `https://mkmobilebase.com/en/category/${{ character: 'characters', equipment: 'equipment', kameo: 'kameos' }[item.kind]}/${item.slug}`;
 
-let loaded: Promise<CatalogItem[]> | null = null;
+/**
+ * The catalog in use (the newest download: a first download landing after a fetch-again doesn't replace it), and its
+ * text, so a download of the same file changes nothing.
+ */
+let good: CatalogItem[] | null = null;
+let goodText = '';
+/** The first download while there's no catalog yet. */
+let loading: Promise<CatalogItem[]> | null = null;
+let refreshing: Promise<unknown> | null = null;
+/** When the last download that worked finished. */
+let fetchedAt = 0;
+/** Whether any download has been tried, so coming back fetches nothing the app hasn't needed yet. */
+let tried = false;
+/** Whether a download has failed, so whatever gave up on the catalog then hears when one first works. */
+let failed = false;
+/**
+ * Bumped each time a fetch-again brings a catalog that differs from the copy here, and when the first one that works
+ * comes after a failed download (not on a first download that just works: everything waiting on it gets it anyway).
+ */
+let version = 0;
+const listeners = new Set<() => void>();
+const bump = () => (version++, listeners.forEach((l) => l()));
+/**
+ * A connection that hangs rather than fails gives up after this, so Find images doesn't wait for good and a hung
+ * fetch-again doesn't hold up the next pull or return.
+ */
+const DOWNLOAD_TIMEOUT_MS = 30 * 1000;
+/** The daily deploy refreshes the catalog; coming back to an app whose copy is older than this fetches it again. */
+const REFRESH_AFTER_MS = 60 * 60 * 1000;
 
-export function loadCatalog(): Promise<CatalogItem[]> {
-  loaded ??= fetch(`${import.meta.env.BASE_URL}catalog.json`)
+/**
+ * Downloads the catalog. A fetch-again goes past the browser's own copy, which may be from before the daily deploy; the
+ * first download may use a recent one, like any other file. It isn't kept for offline use. Only a fetch-again may
+ * replace a copy already here: a first download that lands after a pull's is older.
+ */
+function download(replace: boolean): Promise<CatalogItem[]> {
+  tried = true;
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(new Error(`MK Mobile Base's card list didn’t download within ${DOWNLOAD_TIMEOUT_MS / 1000} seconds. Check your connection.`)), DOWNLOAD_TIMEOUT_MS);
+  return fetch(`${import.meta.env.BASE_URL}catalog.json`, replace ? { cache: 'no-cache', signal: abort.signal } : { signal: abort.signal })
     .then((r) => {
       if (!r.ok) throw new Error(`catalog.json: HTTP ${r.status}`);
-      return r.json() as Promise<{ items: CatalogItem[] }>;
+      return r.text();
     })
-    .then((d) => d.items)
-    .catch((e) => {
-      loaded = null; // let the next attempt retry
+    .then((text) => {
+      if (good && (!replace || text === goodText)) return good;
+      // Something that isn't a card list (an error page served as JSON, a half-written deploy, an empty list) counts as
+      // a failed download, so the copy here is kept. Entries with no kind or name can't match a card, so they're left out.
+      const items = (JSON.parse(text) as { items?: unknown }).items;
+      const cards = Array.isArray(items) ? items.filter((i): i is CatalogItem => typeof i?.kind === 'string' && typeof i?.name === 'string') : [];
+      if (!cards.length) throw new Error('catalog.json: no card list');
+      const changed = good || failed;
+      good = cards;
+      goodText = text;
+      if (changed) bump();
+      return good;
+    })
+    // Only once it's in: a page that isn't the catalog (a wifi sign-in page) doesn't count as a fresh copy.
+    .then(
+      (items) => ((fetchedAt = Date.now()), items),
+      (e) => {
+        failed = true;
+        throw e;
+      },
+    )
+    .finally(() => clearTimeout(timer));
+}
+
+/** The catalog: the copy already downloaded if there is one (even while it's being fetched again), else a download. */
+export function loadCatalog(): Promise<CatalogItem[]> {
+  if (good) return Promise.resolve(good);
+  if (!loading) {
+    loading = download(false).catch((e) => {
+      loading = null; // let the next attempt retry
+      // A pull's own download may have brought a copy in meanwhile.
+      if (good) return good;
       throw e;
     });
-  return loaded;
+  }
+  return loading;
+}
+
+/**
+ * Fetch the catalog again (pull to refresh, or coming back after an hour, or when no download has worked yet), keeping the
+ * current copy if that fails. The daily deploy refreshes it with new cards and art, and nothing else reloads it while the app
+ * stays open.
+ */
+export function refreshCatalog(): Promise<unknown> {
+  // With no copy yet and the first download already out (a pull while the app is still starting), that one will do.
+  refreshing ??= (!good && loading ? loading : download(true)).catch(() => {}).finally(() => void (refreshing = null));
+  return refreshing;
+}
+
+/**
+ * Changes each time a fetched-again catalog differs from the copy here, or the first that works comes after a failed
+ * download; an effect that uses the catalog can list it to run again.
+ */
+export function useCatalogVersion() {
+  return useSyncExternalStore(subscribe, getVersion);
+}
+const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l));
+const getVersion = () => version;
+
+if (typeof document !== 'undefined') {
+  // Also when no download has worked yet (offline at launch); a fetch-again that failed is tried again once the copy it
+  // kept is an hour old. A restore that sends two events still starts one download (refreshCatalog shares the one out).
+  const refreshIfOld = () => {
+    if (document.visibilityState !== 'visible' || !tried) return;
+    const age = Date.now() - fetchedAt;
+    // A download time later than now means the device clock went back: that counts as old too.
+    if (fetchedAt && age >= 0 && age <= REFRESH_AFTER_MS) return;
+    void refreshCatalog();
+  };
+  document.addEventListener('visibilitychange', refreshIfOld);
+  window.addEventListener('pageshow', (e) => e.persisted && refreshIfOld());
 }
 
 /**
@@ -39,22 +142,6 @@ export function appRarityId(item: CatalogItem, rules: Iterable<RarityRule>): str
   if (!item.rarity) return undefined;
   for (const r of rules) if (r.kind === item.kind && (r.id === item.rarity || r.id === `${item.kind}-${item.rarity}`)) return r.id;
   return undefined;
-}
-
-/**
- * Words MK Mobile Base misspells, mapped to the game's spelling ("Weather Warface" is the game's Weather Warfare; the
- * site fixed it by October 2026, but the committed fallback catalog still has it). A word the site splits in two is
- * joined in nameKey instead ("Sub-Zero, Grand Master" is the game's Grandmaster).
- */
-const SITE_TYPOS: Record<string, string> = { warface: 'warfare' };
-
-/** Order-free word key: "Scorpion, MKII Movie" and "Scorpion MK2 Movie" match; "the"/"of" and possessive 's are ignored. */
-export function nameKey(name: string) {
-  const s = name.toLowerCase().replace(/’/g, "'").replace(/'s\b/g, '').replace(/\bmkii\b/g, 'mk2').replace(/\bgrand[^a-z0-9]*master\b/g, 'grandmaster');
-  const words = s.split(/[^a-z0-9]+/).filter((w) => w && w !== 'the' && w !== 'of').map((w) => SITE_TYPOS[w] ?? w);
-  // The app says "Kold" where MK Mobile Base says "Kold War": one card, so one key (the list, the Maxed record and art).
-  const kold = words.includes('kold');
-  return [...new Set(words.filter((w) => !(kold && w === 'war')))].sort().join(' ');
 }
 
 // The catalog's items by kind and name key, in catalog order. Built once per catalog, so checking a few hundred cards

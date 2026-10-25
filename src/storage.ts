@@ -1,6 +1,5 @@
 // Reading the saved data at startup, keeping a copy of it when it can't be read, and holding one from a newer version
-// (shown, but never saved over). Kept apart from store.tsx,
-// which imports the service worker, so tests can run it against a stubbed localStorage.
+// (shown, but never saved over). Kept apart from store.tsx (React), so tests can run it against a stubbed localStorage.
 import type { AppState } from './types';
 import { defaultState } from './defaults';
 import { normalize } from './normalize';

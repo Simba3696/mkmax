@@ -66,9 +66,9 @@ export default function SettingsView() {
     try {
       const data = JSON.parse(await file.text());
       // This build would save it in its older format and sync that, and the newer build would rerun its one-time
-      // upgrades over it. Looking for the update reloads into it if it's out.
+      // upgrades over it. Looking for the update shows the new-version bar if it's out.
       if (data && fromNewerApp(data)) {
-        setMsg('This backup is from a newer version of MK Max. Pull down to refresh, or close MK Max and open it again, then import it.');
+        setMsg('This backup is from a newer version of MK Max. Tap Reload when MK Max says a new version is ready (or close MK Max and open it again), then import it.');
         void checkForAppUpdate();
         return;
       }

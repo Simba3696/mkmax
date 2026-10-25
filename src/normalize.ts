@@ -1,7 +1,7 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
 import type { AppState, Card, MaxedCard, RarityRule } from './types';
 import { ASCENSION_KARD_COST, ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
-import { REALM_KLASH_CURRENCY, kasketShape, pruneDone, recordKey } from './engine';
+import { REALM_KLASH_CURRENCY, kasketShape, pruneDone, recordKey, unifyTowerSpellings } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
 import { fixPackNames } from './events';
 import { kasketIn } from './kaskets';
@@ -122,7 +122,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 17,
+    version: 18,
     rarities: s.rarities!.map((r) => ({
       ...r,
       // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
@@ -136,11 +136,14 @@ export function normalize(input: unknown): AppState {
     })),
     currencies: s.currencies?.length ? s.currencies : base.currencies,
     // No kards counts only when it's exactly true: any other value (a hand-edited backup's "false", say) is dropped, as
-    // it would otherwise turn the flag on, or differ from a card without it and look like a sync conflict.
+    // it would otherwise turn the flag on, or differ from a card without it and look like a sync conflict. A tower name
+    // that isn't text (a hand-edited number, say) is dropped too, as the Tower list and Tower gear read it as text.
     cards: s.cards!.map((c) => {
-      if (c.noKards === undefined || c.noKards === true) return c;
+      const badNote = c.sourceNote !== undefined && typeof c.sourceNote !== 'string';
+      if ((c.noKards === undefined || c.noKards === true) && !badNote) return c;
       const out = { ...c };
-      delete out.noKards;
+      if (out.noKards !== undefined && out.noKards !== true) delete out.noKards;
+      if (badNote) delete out.sourceNote;
       return out;
     }),
     packs: s.packs!,
@@ -214,5 +217,11 @@ export function normalize(input: unknown): AppState {
   // cards per purchase or a null rarity.
   out.packs = out.packs.map(kasketShape);
   pruneDone(out);
+  // Version 18 saves each tower in one spelling, the one the Tower list shows. Older builds had a free text box, so one
+  // tower could be saved in several capitals, and the spelling shown switched when the card it came from left the list.
+  // Done once: from then on a new spelling typed on a card is saved on every shown card naming it. Cards hidden under a
+  // rarity a sync removed keep the spelling this step gave them, and show the Tower list's spelling if they come back.
+  // After pruneDone, so the spelling comes from cards that stay, as the list shows them.
+  if (version < 18) unifyTowerSpellings(out);
   return out;
 }

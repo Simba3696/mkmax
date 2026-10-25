@@ -37,8 +37,10 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/planner.tsx` | `PlanProvider` and `usePlan()`: the planner context and plan, worked out once and shared by every view |
 | `src/storage.ts` | Reading the save at startup, keeping a copy of one that can't be read, and holding one from a newer version |
 | `src/sync.ts` | GitHub Gist sync: the API calls and which copy wins |
+| `src/appUpdate.ts` | The service worker and the new-version bar: when a new version counts as ready, and Reload switching to it |
 | `src/syncLoop.ts` | When to pull, push or ask, around requests that can overlap edits and disconnects |
 | `src/catalog.ts`, `src/wiki.ts` | Card art and rarity lookups (MK Mobile Base, MK Mobile wiki) |
+| `src/names.ts` | Matching card names written different ways (`nameKey`, and the site's typos in `SITE_TYPOS`); kept apart from `catalog.ts` so the engine loads without React |
 | `src/events.ts` | Event schedule: shop packs, Elder challenges, Realm Klash seasons |
 | `src/cardList.ts` | The parser for **Paste a list…** and **Paste maxed cards…** |
 | `src/styles.css` | Tailwind theme tokens (`@theme`: colors, radii, text sizes) and the base styles for buttons, inputs and headings |
@@ -60,6 +62,8 @@ Pushing to `main` runs `.github/workflows/deploy.yml`, which tests and builds th
 
 The workflow also runs every day at 17:30 UTC to refresh the catalog and the event schedule. If either refresh fails, it warns and deploys the copy that's live again (`PAGES_URL` in the workflow), so check the run's warnings when the app's schedule date stops moving. GitHub turns off a public repo's scheduled workflows after 60 days without commits. The workflow then stops running, even on a push, and the schedule stops updating. To turn it back on, open the repo's **Actions** tab, pick **Deploy to GitHub Pages** and choose **Enable workflow**.
 
+On 2026-10-25 the app stopped updating itself (the service worker moved from `autoUpdate` to `prompt`, with a Reload bar). Builds from before that can't show the bar, and the new worker no longer takes over by itself, so a device on one of them stays on it until every copy of MK Max on it is fully closed and opened again. That deploy also moved saves to version 18, so such a device pauses sync until then.
+
 ## Styling
 
 Styles are [Tailwind CSS](https://tailwindcss.com/) v4 utilities, built by `@tailwindcss/vite` (a dev dependency; nothing ships at runtime). `src/styles.css` defines the theme and removes Tailwind's default palette, so only the app's own colors exist (`bg-panel`, `text-muted`, `border-line`, `text-gold` and so on). It also holds the base look of buttons, inputs, selects and headings.
@@ -72,7 +76,7 @@ Below `md` (768px) the app is the phone layout: a header, the page in a column u
 
 Keep phones unchanged when working on wider screens: put desktop styles behind `md:` and up, and check the phone layout at 390×844.
 
-Only the content area scrolls; the header and tab bar are fixed rows around it, not bars floating over a scrolling page. iPhone Safari can strand floating bars mid-screen when the scroll position jumps during a scroll (as on a tab switch), and this layout avoids that. Code that needs the scrolling area or a pop-up finds it by attribute, not by class: `scrollRoot.ts` looks for `[data-scroll-root]`, and pull to refresh and tab swiping ignore touches inside `[data-modal]`.
+Only the content area scrolls; the header, the tab bar and the new-version bar (while one is ready) are fixed rows around it, not bars floating over a scrolling page. iPhone Safari can strand floating bars mid-screen when the scroll position jumps during a scroll (as on a tab switch), and this layout avoids that. Code that needs the scrolling area or a pop-up finds it by attribute, not by class: `scrollRoot.ts` looks for `[data-scroll-root]`, and pull to refresh and tab swiping ignore touches inside `[data-modal]`.
 
 ## Screenshots
 

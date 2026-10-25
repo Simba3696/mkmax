@@ -2,7 +2,7 @@
 // event, so a Gold Kameo of one of these is tagged as challenge-sourced. From the MK Mobile wiki's Challenge Mode
 // page (2026-09-28), minus challenges that no longer run (see RETIRED_CHALLENGES). MK Mobile Base's event schedule
 // shows when each challenge is on (events.ts).
-import { nameKey } from './catalog';
+import { nameKey } from './names';
 import type { Card, RarityRule } from './types';
 
 const CHALLENGE_CHARACTERS = [

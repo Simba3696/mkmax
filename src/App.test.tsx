@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { loadCatalog } from './catalog';
 import { defaultState } from './defaults';
 import { toLocalInput } from './engine';
 import { refreshEvents } from './events';
@@ -10,13 +9,22 @@ import { PlanProvider } from './planner';
 import { SyncLoop } from './syncLoop';
 import App from './App';
 
-// The service worker module imports vite-plugin-pwa's virtual module, which only exists in a build; it isn't what's tested.
-vi.mock('./appUpdate', () => ({ checkForAppUpdate: () => Promise.resolve() }));
+// Mocked so a test can say whether a new version is waiting, catch Reload and count update checks
+// (appUpdate.test.ts tests the real module).
+const appUpdate = vi.hoisted(() => ({ ready: false, apply: vi.fn(), checks: 0, check: null as Promise<unknown> | null }));
+vi.mock('./appUpdate', () => ({ checkForAppUpdate: () => (appUpdate.checks++, appUpdate.check ?? Promise.resolve()), useAppUpdateReady: () => appUpdate.ready, applyAppUpdate: appUpdate.apply }));
 
 beforeEach(() => {
   // The catalog and the event schedule are fetched at start; neither matters here, so stay offline.
   vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));
   history.replaceState(null, '', '#packs');
+  // jsdom says the page has focus only while an element holds it; a real window has focus whatever holds it, and a Tower
+  // box ignores a blur that comes with the window losing focus.
+  vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+  appUpdate.ready = false;
+  appUpdate.apply.mockClear();
+  appUpdate.checks = 0;
+  appUpdate.check = null;
 });
 afterEach(() => {
   cleanup();
@@ -27,6 +35,23 @@ afterEach(() => {
 });
 
 const tab = (name: string) => screen.getByRole('button', { name });
+/** The Tower list's name box option, picked by its label rather than the hidden value behind it. */
+const nameBoxValue = (select: HTMLElement) => [...(select as HTMLSelectElement).options].find((o) => o.textContent === 'Add a tower or fix its spelling…')!.value;
+const renderApp = () =>
+  render(
+    <StoreProvider>
+      <PlanProvider>
+        <App />
+      </PlanProvider>
+    </StoreProvider>,
+  );
+/** A pull down from the top of the page, as a finger does it. */
+async function pull() {
+  const touch = (y: number) => ({ touches: [{ clientX: 0, clientY: y }] });
+  fireEvent.touchStart(window, touch(0));
+  fireEvent.touchMove(window, touch(200));
+  await act(async () => void fireEvent.touchEnd(window));
+}
 /** Hands the store, as each render sees it, to the test, as any view would use it. */
 function Grab({ onRender }: { onRender: (store: ReturnType<typeof useStore>) => void }) {
   onRender(useStore());
@@ -39,6 +64,160 @@ const towers = () => {
   const intro = screen.queryByText(/Tower gear is farmed, not bought/);
   return intro && !intro.closest('[style*="display: none"]') ? intro : null;
 };
+
+describe('a new version', () => {
+  // Spies on SyncLoop.syncNow end with each test, even one that fails partway.
+  afterEach(() => vi.restoreAllMocks());
+
+  // Generated on 2026-10-25 (/ship review, update approach)
+  // Value: protects=a new version waiting is shown as a bar on the page with Reload, which switches to it, and nothing
+  // shows while none is waiting; fails_when=the bar is missing so a new version is never taken up, or Reload does
+  // nothing; why_new=the app no longer reloads by itself; seam=appUpdate mocked (its ready flag and apply); no_claim=a
+  // real service worker update (appUpdate.test.ts)
+  it('says a new version is ready and reloads into it when Reload is tapped', () => {
+    appUpdate.ready = false;
+    const { unmount } = render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    expect(screen.queryByText('A new version of MK Max is ready.')).toBeNull();
+    unmount();
+    appUpdate.ready = true;
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect([screen.queryByText('A new version of MK Max is ready.') != null, appUpdate.apply.mock.calls.length]).toEqual([true, 1]);
+    // Extended on 2026-10-25 (/ship coverage audit, Tower dropdown)
+    // Value: protects=the bar shows on every page, as the user guide says, not only on the Plan; fails_when=the bar is
+    // moved into one page, so someone on Cards or Settings never sees the update; why_new=the bar was only checked on
+    // the Plan; seam=appUpdate mocked (its ready flag); no_claim=a real service worker update (appUpdate.test.ts)
+    const shown = ['Packs', 'Cards', 'Settings'].map((name) => (fireEvent.click(tab(name)), screen.queryByText('A new version of MK Max is ready.') != null));
+    expect(shown).toEqual([true, true, true]);
+    // Extended on 2026-10-25 (/ship review, run 15 pass 2, design)
+    // Value: protects=the bar sits outside the scrolling page, so it's seen wherever the page is scrolled to;
+    // fails_when=it's put back in the page and scrolls away down a long list; why_new=review (design); seam=none;
+    // no_claim=how it looks (checked in the browser)
+    expect(screen.getByText('A new version of MK Max is ready.').closest('[data-scroll-root]')).toBeNull();
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 15 pass 2)
+  // Value: protects=pull to refresh without sync looks for a new version instead of reloading the page; fails_when=it
+  // reloads, which loses whatever is half typed and, with the new version only switched to by Reload, never loads it;
+  // why_new=review (Red Team); seam=appUpdate mocked (counting its checks), touches sent by hand; no_claim=real touch
+  // timing
+  it('is looked for by pull to refresh, which no longer reloads', async () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...location, reload });
+    renderApp();
+    await pull();
+    expect([appUpdate.checks, reload.mock.calls.length]).toEqual([1, 0]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 15 pass 3)
+  // Value: protects=with sync on, pull to refresh still syncs, and looks for a new version without reloading;
+  // fails_when=the sync or the version check is dropped from a pull with sync on, or it reloads; why_new=review
+  // (testing): the pull test only ran with sync off; seam=appUpdate mocked (counting its checks), SyncLoop.syncNow spied,
+  // touches sent by hand; no_claim=real touch timing
+  it('is looked for by pull to refresh with sync on too, which also syncs', async () => {
+    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
+    const syncNow = vi.spyOn(SyncLoop.prototype, 'syncNow').mockResolvedValue();
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...location, reload });
+    renderApp();
+    const before = syncNow.mock.calls.length;
+    await pull();
+    expect([syncNow.mock.calls.length - before, appUpdate.checks, reload.mock.calls.length]).toEqual([1, 1, 0]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 18, testing)
+  // Value: protects=a sync that finds data from a newer build in the gist looks for that new version straight away, so
+  // its notice ("Reload when MK Max says a new version is ready") gets a bar to point at; fails_when=the store hands the
+  // sync loop a lookForUpdate that does nothing, so the version is only found on a pull or a return half an hour later;
+  // why_new=review (testing): syncLoop.test.ts uses its own stand-in, and nothing checked the store's; seam=fetch
+  // answers GitHub's gist request, appUpdate mocked (counting its checks); no_claim=GitHub
+  it('is looked for when a sync finds data from a newer version in the gist', async () => {
+    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
+    const newer = JSON.stringify({ ...defaultState(), version: 99, updatedAt: 9000 });
+    vi.stubGlobal('fetch', (url: string) =>
+      String(url).endsWith('/gists/g1')
+        ? Promise.resolve(new Response(JSON.stringify({ id: 'g1', description: null, files: { 'mkmax-data.json': { content: newer, raw_url: 'raw' } } })))
+        : Promise.reject(new Error('offline')),
+    );
+    renderApp();
+    await waitFor(() => expect(appUpdate.checks).toBe(1));
+    expect(localStorage.getItem('mkmax:v1')).not.toBe(newer);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 16, state machines)
+  // Value: protects=a tab that opened on data from a newer version ignores the newer tab's later saves (no second look
+  // for the update, the notice stays); fails_when=each save from the newer tab looks for the update again or changes this
+  // tab's state; why_new=review (state machines): only a hold that started from a save was tested; seam=appUpdate mocked
+  // (counting its checks), a StorageEvent dispatched by hand stands in for the other tab; no_claim=a real service worker
+  it('is not looked for again by a tab that opened on a newer save', () => {
+    localStorage.setItem('mkmax:v1', JSON.stringify({ ...defaultState(), version: 99 }));
+    renderApp();
+    const newer = JSON.stringify({ ...defaultState(), version: 99, updatedAt: 1 });
+    act(() => {
+      localStorage.setItem('mkmax:v1', newer);
+      window.dispatchEvent(new StorageEvent('storage', { key: 'mkmax:v1', newValue: newer }));
+    });
+    expect([appUpdate.checks, screen.queryAllByText(/^The data saved in this browser is from a newer version/).length]).toEqual([0, 1]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 16, testing)
+  // Value: protects=a pull finishes, and the next one runs, while the version check is still out (it has no time limit
+  // of its own); fails_when=the check is awaited again, so a stalled check on a weak connection keeps the spinner up and
+  // ignores every later pull; why_new=review (testing): the mocked check always answered at once; seam=appUpdate mocked
+  // (its check never answers), touches sent by hand; no_claim=real network timing
+  it('lets a pull finish while the version check is still out', async () => {
+    appUpdate.check = new Promise(() => {});
+    renderApp();
+    await pull();
+    await act(() => new Promise((r) => setTimeout(r, 600)));
+    await pull();
+    expect(appUpdate.checks).toBe(2);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 15 pass 2)
+  // Value: protects=once another tab saves data from a newer version, this tab looks for that version, and its bar shows
+  // beside the notice that nothing is saved; fails_when=nothing looks, so the tab stays on the old build with every tap
+  // ignored until the user happens to pull, or the notice hides the bar; why_new=review (data migration); seam=appUpdate
+  // mocked (counting its checks, its ready flag), a StorageEvent dispatched by hand stands in for the other tab;
+  // no_claim=a real service worker update
+  it('is looked for when another tab saves data from a newer version, and its bar shows with the notice', () => {
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const newer = JSON.stringify({ ...defaultState(), version: 99 });
+    act(() => {
+      localStorage.setItem('mkmax:v1', newer);
+      window.dispatchEvent(new StorageEvent('storage', { key: 'mkmax:v1', newValue: newer }));
+    });
+    expect(appUpdate.checks).toBe(1);
+    // Extended on 2026-10-25 (/ship coverage audit, run 16)
+    // Value: protects=once this tab is held, later saves from the newer tab (one per keystroke there) don't look for the
+    // update again; fails_when=the held check before holdIfNewer goes, so every keystroke in the other tab fetches the
+    // service worker again; why_new=the test sent only one save; seam=appUpdate mocked (counting its checks), a
+    // StorageEvent stands in for the other tab; no_claim=a real service worker update
+    act(() => void window.dispatchEvent(new StorageEvent('storage', { key: 'mkmax:v1', newValue: newer })));
+    expect(appUpdate.checks).toBe(1);
+    appUpdate.ready = true;
+    fireEvent.click(tab('Cards'));
+    expect([screen.queryByText(/^The data saved in this browser is from a newer version/) != null, screen.queryByRole('button', { name: 'Reload' }) != null]).toEqual([true, true]);
+  });
+});
 
 describe('the MK MAX logo', () => {
   // Value: protects=the logo goes to the Plan from another tab and scrolls the Plan to the top; fails_when=home() goes
@@ -277,47 +456,6 @@ describe('the Cards tab keeping what was typed', () => {
   });
 });
 
-describe('card art from the catalog', () => {
-  // Generated by /ship review fixes on 2026-10-13
-  // Value: protects=the automatic art fill keeps an image a sync pasted on a card while the catalog downloaded;
-  // fails_when=the fill works from the cards as they were when the download started, replacing the pasted image;
-  // why_new=catalog.test.ts covers catalogImageUpdates, not the cards App hands it; seam=fetch holds the catalog until
-  // released, the sync stand-in runs just before App hears the catalog is in; no_claim=a real sync
-  it('keeps an image a sync pasted while the catalog was downloading', async () => {
-    let release: (() => void) | undefined;
-    const catalog = { items: [{ kind: 'character', name: 'Liu Kang, Klassic', rarity: 'diamond', slug: 'liu-kang-klassic', image: 'z.png' }] };
-    vi.stubGlobal('fetch', (url: string) =>
-      String(url).endsWith('catalog.json')
-        ? new Promise((resolve) => (release = () => resolve({ ok: true, json: () => Promise.resolve(catalog) })))
-        : Promise.reject(new Error('offline')),
-    );
-    const s = defaultState();
-    s.cards = [{ id: 'liu', name: 'Liu Kang, Klassic', rarityId: 'diamond', fusion: 2, guest: false }];
-    localStorage.setItem('mkmax:v1', JSON.stringify(s));
-    let update!: ReturnType<typeof useStore>['update'];
-    const pasted = 'https://example.invalid/pasted.png';
-    // Asked for before App asks, so this runs first once the catalog is in: the sync lands before React draws again,
-    // which is when App would otherwise have stopped waiting for a set of cards that changed.
-    const synced = loadCatalog().then(() => update((d) => void Object.assign(d.cards[0], { imageUrl: pasted, wikiTitle: undefined })));
-    render(
-      <StoreProvider>
-        <PlanProvider>
-          <Grab onRender={(store) => (update = store.update)} />
-          <App />
-        </PlanProvider>
-      </StoreProvider>,
-    );
-    expect(release).toBeDefined(); // the catalog was still downloading
-    await act(async () => {
-      release!();
-      await synced;
-      await loadCatalog(); // App's own wait, asked for after the sync's, has run by now
-    });
-    const card = JSON.parse(localStorage.getItem('mkmax:v1')!).cards[0];
-    expect([card.imageUrl, card.imagePage]).toEqual([pasted, undefined]);
-  });
-});
-
 // Last in the file: the schedule this downloads stays loaded for the rest of it.
 describe('the Realm Klash season from the schedule', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -421,5 +559,287 @@ describe('the Realm Klash season from the schedule', () => {
     expect(stamps).not.toHaveBeenCalled();
     const saved = JSON.parse(localStorage.getItem('mkmax:v1')!);
     expect([saved.realmKlashSeasonEnd, saved.updatedAt, saved.packs[0].endsAt]).toEqual([local('2026-01-10T11:00:00Z'), undefined, local('2026-01-31T11:00:00Z')]);
+  });
+});
+
+describe('the Undo bar', () => {
+  let update!: ReturnType<typeof useStore>['update'];
+  const renderApp = () =>
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab onRender={(store) => (update = store.update)} />
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+  const add = (id: string, label: string) => act(() => update((d) => void d.cards.push({ id, name: id, rarityId: 'epic', fusion: 1, guest: false }), label));
+  const ids = () => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string }[]).map((c) => c.id);
+  /** Sets what the page reports for document.visibilityState, then sends the event the app listens for. */
+  const appShows = (state: 'visible' | 'hidden') => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state);
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=the Undo bar's 8 seconds only count while the app is showing, and it gets them in full on coming
+  // back, so a change made as the app went away (a Tower name finished on hiding) keeps its Undo; fails_when=the bar's
+  // timer runs while the app is away and a phone fires it on return; why_new=review (Red Team); seam=fake timers,
+  // document.visibilityState mocked; no_claim=how long a real phone keeps the app
+  it('keeps its time while the app is away, and shows for the full time on return', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    renderApp();
+    add('a', 'Added a');
+    appShows('hidden');
+    act(() => void vi.advanceTimersByTime(20_000));
+    expect(screen.queryByText('Added a')).toBeTruthy();
+    appShows('visible');
+    act(() => void vi.advanceTimersByTime(7_000));
+    expect(screen.queryByText('Added a')).toBeTruthy();
+    act(() => void vi.advanceTimersByTime(1_500));
+    expect(screen.queryByText('Added a')).toBeNull();
+
+    // Extended on 2026-10-22 (/ship test coverage audit, Tower dropdown)
+    // Value: protects=a change made while the app is already away (a Tower name finished as the app is hidden) gets its
+    // full 8 seconds once the app shows; fails_when=the bar only pauses on a hide that comes after it shows, so a change
+    // made while hidden starts counting at once and is gone on return; why_new=the steps above make the change before
+    // hiding; seam=fake timers, document.visibilityState mocked; no_claim=a real phone's event order on hiding
+    appShows('hidden');
+    add('b', 'Added b');
+    act(() => void vi.advanceTimersByTime(20_000));
+    expect(screen.queryByText('Added b')).toBeTruthy();
+    appShows('visible');
+    act(() => void vi.advanceTimersByTime(7_000));
+    expect(screen.queryByText('Added b')).toBeTruthy();
+    act(() => void vi.advanceTimersByTime(1_500));
+    expect(screen.queryByText('Added b')).toBeNull();
+  });
+
+  // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=Undo and ✕ act only on the change the bar showed when pressed: a change made between the press and
+  // the click (a Tower box the press finished) is shown, not undone or dropped unseen; Undo from the keyboard acts on the
+  // change showing; fails_when=the click undoes or dismisses whatever came in after the press; why_new=review (Red Team);
+  // seam=the in-between change made with the store's update, a pointer click sent with detail 1; no_claim=a real tap's
+  // event order
+  it('undoes or dismisses only the change it showed when pressed', () => {
+    renderApp();
+    add('a', 'Added a');
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Undo' }));
+    add('b', 'Added b');
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }), { detail: 1 });
+    expect([ids(), screen.queryByText('Added b') !== null]).toEqual([['a', 'b'], true]);
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Dismiss' }));
+    add('c', 'Added c');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }), { detail: 1 });
+    expect(screen.queryByText('Added c')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect([ids(), screen.queryByText('Added c')]).toEqual([['a', 'b'], null]);
+
+    // Extended by /ship adversarial review on 2026-10-25 (run 19): a press that turned into a scroll (cancelled, so no
+    // click) doesn't count for a later click that came without its own press; fails_when=that click acts on the change
+    // the abandoned press showed, and the store ignores it, so Undo does nothing once.
+    add('d', 'Added d');
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Undo' }));
+    fireEvent.pointerCancel(screen.getByRole('button', { name: 'Undo' }));
+    add('e', 'Added e');
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }), { detail: 1 });
+    expect(ids()).toEqual(['a', 'b', 'd']);
+  });
+
+  // Generated on 2026-10-23 (/ship review, state matrix, Tower dropdown); extended by /ship review on 2026-10-25 (run 18
+  // pass 2, state machines) with a card's Tower box re-spell and a carried-on Add each made after a press on ✕
+  // Value: protects=a press on Undo or ✕ acts only on the change it showed, whatever kind came in before the click: an
+  // Add carried on from the Undo the press showed, a level change that removed a maxed card, a re-spell from Add card's Tower box,
+  // and a re-spell the press itself makes by finishing a card's Tower box, on Undo and on ✕, and an Add carried on from
+  // the Undo a ✕ press showed; that change stays showing with its own label, nothing is undone or closed, and its Undo
+  // then puts back everything it changed; fails_when=a kind of change gets its own way to Undo (its base, or the label
+  // or base of the Undo it carried on from) that the press check misses, so a stale press undoes or closes it unseen;
+  // why_new=review (state machines): only plain changes were pressed stale, and then the card box's re-spell and the
+  // carried-on Add only on Undo; seam=the store's update makes the carried Add and the level change as Add card and a
+  // level tap do, the press's blur is sent by hand between pointerdown and click; no_claim=a real tap's event order
+  it('acts only on the change a press showed, for each kind of change', () => {
+    const gear = (id: string, name: string, sourceNote: string) => ({ id, name, rarityId: 'epic', fusion: 1, guest: false, source: 'tower', sourceNote });
+    localStorage.setItem('mkmax:v1', JSON.stringify({ ...defaultState(), cards: [gear('kori', 'Kori Blade', 'lin kuei tower'), gear('fan', 'Frost Fan', 'lin kuei tower')] }));
+    renderApp();
+    const towerOf = (id: string) => (JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; sourceNote?: string }[]).find((c) => c.id === id)?.sourceNote;
+    const stalePress = (name: 'Undo' | 'Dismiss', newer: () => void) => {
+      fireEvent.pointerDown(screen.getByRole('button', { name }));
+      newer();
+      fireEvent.click(screen.getByRole('button', { name }), { detail: 1 });
+    };
+
+    // An Add that carries on from the Undo the press showed.
+    add('a', 'Added a');
+    stalePress('Undo', () => act(() => update((d) => void d.cards.push({ id: 'b', name: 'b', rarityId: 'epic', fusion: 1, guest: false }), 'Added b', { alsoUndo: true })));
+    expect([ids(), screen.queryByText('Added b · Added a') !== null]).toEqual([['kori', 'fan', 'a', 'b'], true]);
+
+    // A level change that removed a card as maxed.
+    act(() => update((d) => void d.cards.push({ id: 'm', name: 'Mileena', rarityId: 'diamond', fusion: 1, guest: false }), 'Added Mileena'));
+    act(() => update((d) => void (d.cards.find((c) => c.id === 'm')!.fusion = 11), 'Mileena to F10'));
+    expect(screen.queryByText('Mileena to F10 · Mileena is maxed and removed')).toBeTruthy();
+    stalePress('Undo', () => add('d', 'Added d'));
+    expect([ids().includes('m'), screen.queryByText('Added d') !== null]).toEqual([false, true]);
+
+    // A re-spell from Add card's Tower box.
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: 'Cards' }));
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.change(form.getByLabelText('Rarity'), { target: { value: 'epic' } });
+    fireEvent.change(form.getByLabelText('Source'), { target: { value: 'tower' } });
+    stalePress('Dismiss', () => {
+      fireEvent.change(form.getByLabelText('Tower'), { target: { value: nameBoxValue(form.getByLabelText('Tower')) } });
+      fireEvent.change(form.getByPlaceholderText('Tower name'), { target: { value: 'Lin Kuei Tower' } });
+      fireEvent.blur(form.getByPlaceholderText('Tower name'));
+    });
+    expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Fixed the spelling on 2 other cards: Lin Kuei Tower') !== null]).toEqual(['Lin Kuei Tower', 'Lin Kuei Tower', true]);
+
+    // A re-spell the press makes itself, by finishing a card's Tower box as focus leaves it.
+    const box = () => {
+      let r: HTMLElement | null = screen.getAllByTitle('Tap to rename').find((t) => t.textContent === 'Kori Blade')!;
+      while (r && !r.querySelector('[aria-label=Tower]')) r = r.parentElement;
+      return r!.querySelector<HTMLElement>('[aria-label=Tower]')!;
+    };
+    fireEvent.change(box(), { target: { value: nameBoxValue(box()) } });
+    fireEvent.change(box(), { target: { value: 'Lin Kuei tower' } });
+    stalePress('Undo', () => fireEvent.blur(box()));
+    expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Fixed the spelling on 1 other card: Lin Kuei tower') !== null]).toEqual(['Lin Kuei tower', 'Lin Kuei tower', true]);
+
+    // The same on ✕: the re-spell stays showing, and its Undo puts both cards back.
+    fireEvent.change(box(), { target: { value: nameBoxValue(box()) } });
+    fireEvent.change(box(), { target: { value: 'LIN KUEI TOWER' } });
+    stalePress('Dismiss', () => fireEvent.blur(box()));
+    expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Fixed the spelling on 1 other card: LIN KUEI TOWER') !== null]).toEqual(['LIN KUEI TOWER', 'LIN KUEI TOWER', true]);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect([towerOf('kori'), towerOf('fan')]).toEqual(['Lin Kuei tower', 'Lin Kuei tower']);
+
+    // An Add carried on from the Undo a ✕ press showed stays showing with both labels, and its Undo takes both out.
+    add('e', 'Added e');
+    stalePress('Dismiss', () => act(() => update((d) => void d.cards.push({ id: 'f', name: 'f', rarityId: 'epic', fusion: 1, guest: false }), 'Added f', { alsoUndo: true })));
+    expect([ids().slice(-2), screen.queryByText('Added f · Added e') !== null]).toEqual([['e', 'f'], true]);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect([ids().includes('e'), ids().includes('f'), screen.queryByText('Added f · Added e')]).toEqual([false, false, null]);
+  });
+
+  // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
+  // Value: protects=a plain tap or a key press on Undo undoes the change showing, and on ✕ closes the bar keeping it,
+  // also a key press on ✕ after an earlier press that a new change replaced; fails_when=the pressed-entry match fails, so
+  // a real tap does nothing, or a stale press blocks the keyboard; why_new=review (state machines, testing); seam=pointer
+  // clicks sent with detail 1, key clicks with detail 0; no_claim=a real tap's event order
+  it('undoes or closes the change showing on a plain tap or a key press', () => {
+    renderApp();
+    const press = (name: string, detail: number) => {
+      if (detail) fireEvent.pointerDown(screen.getByRole('button', { name }));
+      fireEvent.click(screen.getByRole('button', { name }), { detail });
+    };
+    add('a', 'Added a');
+    press('Undo', 1);
+    expect([ids(), screen.queryByText('Added a')]).toEqual([[], null]);
+    add('b', 'Added b');
+    press('Undo', 0);
+    expect([ids(), screen.queryByText('Added b')]).toEqual([[], null]);
+    add('c', 'Added c');
+    press('Dismiss', 1);
+    expect([ids(), screen.queryByText('Added c')]).toEqual([['c'], null]);
+    add('d', 'Added d');
+    press('Dismiss', 0);
+    expect([ids(), screen.queryByText('Added d')]).toEqual([['c', 'd'], null]);
+    add('e', 'Added e');
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Dismiss' }));
+    add('f', 'Added f');
+    press('Dismiss', 0);
+    expect([ids(), screen.queryByText('Added f')]).toEqual([['c', 'd', 'e', 'f'], null]);
+
+    // A press is used once: after one that a new change made stale, a click with no press before it (as some
+    // accessibility tools send) acts on the change showing.
+    add('g', 'Added g');
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Undo' }));
+    add('h', 'Added h');
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }), { detail: 1 });
+    expect(screen.queryByText('Added h')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }), { detail: 1 });
+    expect([ids(), screen.queryByText('Added h')]).toEqual([['c', 'd', 'e', 'f', 'g'], null]);
+  });
+
+  // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)
+  // Value: protects=the bar goes after 8 seconds, and a change that replaces the one showing gets its own full 8 seconds,
+  // even one made in the same millisecond, and after time away; fails_when=the timer is keyed on the change's time, so a
+  // change made in the same millisecond keeps the old timer, which closes nothing, and the bar never goes; why_new=review
+  // (state machines); seam=fake timers (Date frozen, so two changes share a millisecond), document.visibilityState
+  // mocked; no_claim=none beyond protects
+  it('gives each change its own 8 seconds, even two made in the same millisecond', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    renderApp();
+    const showing = (label: string) => screen.queryByText(label) !== null;
+    add('a', 'Added a');
+    act(() => void vi.advanceTimersByTime(7_900));
+    expect(showing('Added a')).toBe(true);
+    act(() => void vi.advanceTimersByTime(200));
+    expect([showing('Added a'), ids()]).toEqual([false, ['a']]);
+
+    add('b', 'Added b');
+    act(() => void vi.advanceTimersByTime(5_000));
+    add('c', 'Added c');
+    act(() => void vi.advanceTimersByTime(5_000));
+    expect(showing('Added c')).toBe(true);
+    act(() => void vi.advanceTimersByTime(3_100));
+    expect(showing('Added c')).toBe(false);
+
+    add('d', 'Added d');
+    add('e', 'Added e');
+    act(() => void vi.advanceTimersByTime(8_100));
+    expect(showing('Added e')).toBe(false);
+
+    add('f', 'Added f');
+    add('g', 'Added g');
+    appShows('hidden');
+    act(() => void vi.advanceTimersByTime(20_000));
+    appShows('visible');
+    act(() => void vi.advanceTimersByTime(7_000));
+    expect(showing('Added g')).toBe(true);
+    act(() => void vi.advanceTimersByTime(1_500));
+    expect(showing('Added g')).toBe(false);
+
+    // Extended on 2026-10-22 (/ship review, testing): changes saved without Undo while the bar is up (as typing a tower
+    // name makes) leave its 8 seconds alone; fails_when=the timer restarts on every render, so typing keeps the bar up.
+    add('h', 'Added h');
+    for (let i = 0; i < 3; i++) {
+      act(() => void vi.advanceTimersByTime(2_500));
+      act(() => update((d) => void (d.cards[0].name = `a${i}`)));
+    }
+    expect(showing('Added h')).toBe(true);
+    act(() => void vi.advanceTimersByTime(600));
+    expect(showing('Added h')).toBe(false);
+
+    // Extended on 2026-10-22 (/ship review, testing): a change with the same label as the one showing (the same tower
+    // spelling fixed twice) still gets its own 8 seconds; fails_when=the timer is keyed on the label, so the old timer
+    // closes nothing and the bar stays up for good.
+    add('i', 'Added x');
+    act(() => void vi.advanceTimersByTime(5_000));
+    add('j', 'Added x');
+    act(() => void vi.advanceTimersByTime(7_900));
+    expect(showing('Added x')).toBe(true);
+    act(() => void vi.advanceTimersByTime(200));
+    expect(showing('Added x')).toBe(false);
+  });
+
+  // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=a page restored from the back-forward cache with only pageshow (no visibility change) gives the bar
+  // its 8 seconds again, so it doesn't stay up for good; fails_when=only a visibility
+  // change restarts the time paused on hiding; why_new=review (Red Team); seam=fake timers, document.visibilityState
+  // mocked, a pageshow with persisted sent by hand; no_claim=which browsers skip the visibility change
+  it('restarts its time when the page is restored with only pageshow', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    renderApp();
+    add('a', 'Added a');
+    appShows('hidden');
+    act(() => void vi.advanceTimersByTime(20_000));
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    act(() => void window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true })));
+    act(() => void vi.advanceTimersByTime(7_000));
+    expect(screen.queryByText('Added a')).toBeTruthy();
+    act(() => void vi.advanceTimersByTime(1_500));
+    expect(screen.queryByText('Added a')).toBeNull();
   });
 });

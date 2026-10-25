@@ -1,14 +1,15 @@
-import { Activity, useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { createPortal, flushSync } from 'react-dom';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, unmarkMaxed } from '../engine';
+import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerName, towerRespells, towerSpellings, unmarkMaxed } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
 import MaxedPanel from './MaxedPanel';
 import { CardsIcon, TowerIcon, TrophyIcon } from '../icons';
 import { findCardImages, wikiUrl } from '../wiki';
-import { catalogPageUrl, findInCatalog, loadCatalog, rarityMismatches, wantsCatalogImage, type CatalogItem } from '../catalog';
+import { catalogPageUrl, findInCatalog, loadCatalog, rarityMismatches, useCatalogVersion, wantsCatalogImage, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
 import { applyRarityFix, initialSource } from '../challenges';
 import { challengeFor, challengeWhen, useEvents } from '../events';
@@ -34,6 +35,284 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
           {SOURCE_NAMES[v]}
         </option>
       ))}
+    </select>
+  );
+}
+
+/** The Tower list's "Add a tower or fix its spelling…" choice; not a name anyone types. */
+const NEW_TOWER = '\u0000new';
+
+/**
+ * Saves a Tower box's name. With `over`, only over the tower the box last saved, so one a sync brought in since stands;
+ * `respell` marks a finished typed name, which fixes the tower's spelling on other cards too (respellTower), and `was`
+ * is the tower the box goes back to (see TowerEdit), which that fix's Undo puts back. A card's box and Add card's take
+ * the same `over`.
+ */
+type TowerWrite = (v: string | undefined, over?: TowerOver) => void;
+type TowerOver = { saved: string | undefined; respell?: boolean; was?: string };
+// As a rename: what an emptied box goes back to (`was`: the tower the box opened on, or the name saved when the app was
+// hidden if it opened on one; none in the plain box) and the tower the box last saved.
+type TowerEdit = { text: string; was: string | undefined; saved: string | undefined };
+
+/** Leaving a Tower box saves the name tidied (towerName), or the tower it had if it's empty, over the tower the box last saved. */
+const finishTower = (e: TowerEdit, write: TowerWrite) => {
+  const typed = towerName(e.text);
+  write(typed || e.was, { saved: e.saved, respell: !!typed, was: e.was });
+};
+
+// How the user last acted on the page: with keys (Tab, arrows, Enter, typing) or a pointer (a tap or click). It's watched
+// on the whole page, so a tap on a label counts, a key after a click counts as keys, and focus coming back with the app
+// changes nothing.
+let lastInput: 'key' | 'pointer' = 'pointer';
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', () => void (lastInput = 'key'), true);
+  document.addEventListener('pointerdown', () => void (lastInput = 'pointer'), true);
+}
+
+/**
+ * The towers' options and key lookup, built once and shared by every card's Tower list, and kept while the towers stay
+ * the same (each save makes a new list of the same towers): a long Tower gear list then neither rebuilds them per row
+ * nor redraws the options on each save or search keystroke.
+ */
+let towerListNow: { key: string; byKey: Map<string, string>; options: ReactElement[] } | null = null;
+function towerList(towers: string[]) {
+  const key = towers.join('\n');
+  if (towerListNow?.key !== key) {
+    towerListNow = {
+      key,
+      byKey: new Map(towers.map((t) => [towerKey(t), t])),
+      options: towers.map((t) => (
+        <option key={t} value={t}>
+          {t}
+        </option>
+      )),
+    };
+  }
+  return towerListNow;
+}
+
+/**
+ * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
+ * While a name is being typed the box stays a text box until it's left, so it doesn't turn into the list mid-word once
+ * the card saves the first letters; with no towers named yet it's only a text box. A pick from the list goes to onPick
+ * (with Undo, on a card); a typed name saves as it's typed, as a rename does. `respells` counts the other cards a typed
+ * name would re-spell when it's finished, which a line says beforehand: on its own line at the end of a card's row of
+ * controls, or in `hintIn` (Add card's notes under its form, where it can't move the form's boxes), so nothing moves
+ * sideways or out of line while it comes and goes.
+ */
+function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintIn, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; respells: (name: string) => number; hintIn?: HTMLElement | null; className?: string; placeholder?: string }) {
+  const pick = onPick ?? onChange;
+  const hintId = useId();
+  // The name being typed, the tower an emptied box goes back to (the one the card had before the name box was opened,
+  // or, if it opened on one, the name saved when the app was hidden; none in the plain box, which has no list to go back
+  // to), and the tower this box last saved. Null while picking from the list, or before the first key in the plain box.
+  const [edit, setEdit] = useState<TowerEdit | null>(null);
+  // Enter in a card's name box leaves it (so it's finished) and puts focus on the list that replaces it, rather than
+  // dropping it to the page.
+  const focusList = useRef(false);
+  useEffect(() => {
+    focusList.current = false;
+  });
+  // Whether the list or box has focus. When one replaces the other while it does and the user last acted with keys (No
+  // tower picked on the last tower named turns the list into the plain box, Add card's Enter names the first tower, or a
+  // sync names the first tower or takes away the last one), the one that replaces it takes focus, so a keyboard user
+  // doesn't lose their place. After a tap or click focus never moves, so a phone doesn't open its keyboard on the new box.
+  // A removed element gives no blur, so the flag holds until the one that replaces it is in place; then it says whether
+  // that one has focus, so a key pressed later in another box (this runs on every render) never pulls focus here.
+  const focused = useRef(false);
+  // The list or box in place, and whether the box's last blur came from the window losing focus (see its onBlur).
+  const control = useRef<HTMLElement | null>(null);
+  const blurredAway = useRef(false);
+  const keepFocus = (el: HTMLElement | null) => {
+    if (!el) return;
+    control.current = el;
+    if ((focusList.current || (focused.current && lastInput === 'key')) && el !== document.activeElement) el.focus();
+    focused.current = el === document.activeElement;
+  };
+
+  // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
+  // step would save a tower with its own Undo, and stepping past the last tower would open the name box, so a step
+  // is held (shown, not saved) until the list is left or Enter is pressed (a held tower is also saved when the app is
+  // hidden): on a card, where each pick saves with Undo, any tower; anywhere, the name box's option, which leaving the
+  // list drops. A tap or a click saves at once.
+  // A key marks the change it makes before it's let go (a pick in a list a key opened is at worst held until it's left).
+  const [held, setHeld] = useState<string | null>(null);
+  const keyed = useRef(false);
+  const typed = value?.trim();
+  const { byKey, options } = towerList(towers);
+  const listed = typed && byKey.get(towerKey(typed));
+  const current = listed || typed || '';
+  // A step a sync has made stale (its tower removed or re-spelled, or the list gone) is dropped, so leaving the list or
+  // hiding the app never saves a tower the list doesn't show.
+  const heldNow = !edit && towers.length && (held === null || held === '' || held === NEW_TOWER || held === typed || towers.includes(held)) ? held : null;
+  useEffect(() => void (held !== null && heldNow === null && setHeld(null)), [held, heldNow]);
+  // Leaving the list drops a held name box option; Enter opens the box.
+  const settle = (v: string, enter: boolean) => {
+    setHeld(null);
+    if (v === NEW_TOWER) {
+      if (enter) setEdit({ text: '', was: value?.trim() ? value : undefined, saved: value });
+    } else if (v !== current) pick(v || undefined);
+  };
+
+  // Hiding the page (Activity, for Tower gear or Maxed, or a swipe to another tab) may give the box or list no blur, so
+  // in the cleanup a box left open is finished and closed and a held step is settled, as leaving them does.
+  // Hiding the app gives no blur either, and a phone may close it while it's away, so the name is finished then too (and
+  // a tower held by the arrow keys is saved); the box stays open with what was typed, and is finished again when it's
+  // left. It's done at once (flushSync), so the store's save runs before the page can be frozen or closed, not in a later
+  // task that may never come.
+  const openEdit = useRef({ edit, onChange, held: heldNow, settle, value });
+  // Kept up to date in a layout effect, which runs inside flushSync's commit, so the hide's read-back below sees the
+  // tower its save left.
+  useLayoutEffect(() => void (openEdit.current = { edit, onChange, held: heldNow, settle, value }));
+  useEffect(() => {
+    const away = () => {
+      if (document.visibilityState !== 'hidden') return;
+      const { edit: e, onChange: write, held: h, settle: done } = openEdit.current;
+      if (e) {
+        flushSync(() => finishTower(e, write));
+        // A box that opened on a tower goes on from the name it just saved, so finishing it again later (its Undo, or
+        // an emptied box) goes back to that, the spelling every card now has, not to the one before the app was left.
+        // One that opened on none (the plain box, or a card with no tower) still leaves none when it's emptied. If the
+        // save didn't go through (a tower a sync brought in since stands), the box goes on as it was. The save has
+        // rendered by now (flushSync), so the tower this box shows is the one saved.
+        const now = towerName(e.text) || e.was;
+        const saved = openEdit.current.value === now;
+        flushSync(() => setEdit({ ...e, was: saved && e.was !== undefined ? now : e.was, saved: saved ? now : e.saved }));
+      } else if (h !== null && h !== NEW_TOWER) flushSync(() => done(h, false));
+    };
+    document.addEventListener('visibilitychange', away);
+    // A box left open by switching apps is finished and closed on coming back if focus doesn't come back to it (a phone
+    // may hand it to the page), as leaving it does; otherwise nothing would ever finish it. Checked after the browser's
+    // own focus restore, which comes just after the window's focus.
+    let back: ReturnType<typeof setTimeout> | undefined;
+    const returned = () => {
+      // Every card's Tower list listens; only one left open by switching apps has anything to do.
+      if (!blurredAway.current) return;
+      clearTimeout(back);
+      back = setTimeout(() => {
+        const { edit: e, onChange: write } = openEdit.current;
+        if (!blurredAway.current || control.current === document.activeElement) return;
+        blurredAway.current = false;
+        focused.current = false;
+        if (e) finishTower(e, write);
+        setEdit(null);
+      });
+    };
+    window.addEventListener('focus', returned);
+    return () => {
+      document.removeEventListener('visibilitychange', away);
+      window.removeEventListener('focus', returned);
+      clearTimeout(back);
+      const { edit: e, onChange: write, held: h, settle: done } = openEdit.current;
+      // A held step is settled as leaving the list does: a tower is saved with Undo, the name box's option is dropped.
+      if (e) finishTower(e, write);
+      else if (h !== null) done(h, false);
+      // Closed now, so the page is back to the list when it's shown again.
+      setEdit(null);
+    };
+  }, []);
+
+  if (edit || towers.length === 0) {
+    const cur = edit ?? { was: undefined, saved: value };
+    // Said before the name is finished, as the re-spell changes cards the user didn't touch.
+    const name = edit ? towerName(edit.text) : '';
+    const others = name ? respells(name) : 0;
+    const say = `fixes the spelling on ${others} other card${others === 1 ? '' : 's'} when you finish`;
+    const hint =
+      others > 0 &&
+      (hintIn === undefined ? (
+        <span id={hintId} className="text-small text-muted basis-full order-last">
+          {say[0].toUpperCase() + say.slice(1)}
+        </span>
+      ) : (
+        hintIn &&
+        createPortal(
+          // Under the form, so it says which box it's about.
+          <p id={hintId} className="text-muted text-small md:max-w-[80ch]">
+            Tower: {say}
+          </p>,
+          hintIn,
+        )
+      ));
+    return (
+      <>
+        <input
+          ref={keepFocus}
+          className={className}
+          aria-describedby={others ? hintId : undefined}
+          value={edit?.text ?? value ?? ''}
+          placeholder={towers.length ? 'Tower name' : placeholder}
+          aria-label="Tower"
+          autoFocus={!!edit}
+          onChange={(e) => {
+            const text = e.target.value;
+            if (text.trim()) onChange(text);
+            else onChange(cur.was, { saved: cur.saved });
+            setEdit({ text, was: cur.was, saved: text.trim() ? text : cur.was });
+          }}
+          onFocus={() => void (focused.current = true)}
+          onBlur={() => {
+            // Some browsers (Chrome) blur the box when you switch to another app or tab. It stays open then, as hiding
+            // the app finishes it (above), so a name can be copied from elsewhere and finished on return.
+            if (!document.hasFocus()) return void (blurredAway.current = true);
+            focused.current = false;
+            if (edit) finishTower(edit, onChange);
+            setEdit(null);
+          }}
+          // A box with a name open (typed in, or opened from the list) turns into the list when it's left while the list
+          // has towers; an untouched plain box doesn't rerender, so a flag set for it would wait and take focus the next
+          // time the list shows, and an emptied plain box stays a box, which the flag would focus again.
+          onKeyDown={(e) => {
+            // An Enter that confirms a word in an input method (Chinese, Japanese) isn't the user finishing the name.
+            // Safari ends the composition before that Enter's keydown, which then only shows it by keyCode 229.
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return;
+            if (!onEnter) {
+              focusList.current = !!edit && towers.length > 0;
+              return e.currentTarget.blur();
+            }
+            // The name is finished first (so a new spelling is fixed on the other cards), then the form's Enter runs. It's
+            // finished in place rather than by leaving the box, so focus stays here while it's still a text box; if the
+            // form's Enter names the first tower and the list replaces the box, the list takes focus (keepFocus).
+            if (edit) {
+              finishTower(edit, onChange);
+              setEdit(null);
+            }
+            onEnter();
+          }}
+        />
+        {hint}
+      </>
+    );
+  }
+  return (
+    <select
+      ref={keepFocus}
+      className={className}
+      value={heldNow ?? current}
+      aria-label="Tower"
+      onChange={(e) => {
+        const v = e.target.value;
+        if (keyed.current && (v === NEW_TOWER || onPick)) return setHeld(v === current ? null : v);
+        settle(v, true);
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter') return void (keyed.current = true);
+        if (heldNow !== null) return settle(heldNow, true);
+        onEnter?.();
+      }}
+      onKeyUp={() => void (keyed.current = false)}
+      onPointerDown={() => void (keyed.current = false)}
+      onFocus={() => void (focused.current = true)}
+      onBlur={() => {
+        focused.current = false;
+        if (heldNow !== null) settle(heldNow, false);
+      }}
+    >
+      {/* Once a tower is set, picking this takes it off the card, so it says so. */}
+      <option value="">{typed ? 'No tower' : 'Choose a tower…'}</option>
+      {typed && !listed && <option value={typed}>{typed}</option>}
+      {options}
+      <option value={NEW_TOWER}>Add a tower or fix its spelling…</option>
     </select>
   );
 }
@@ -217,14 +496,26 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         const levelOf = (c: (typeof newCards)[number]) => ((c.fusion ?? 0) <= maxFusion(d.rarities.find((r) => r.id === c.rarityId)!) ? (c.fusion ?? 0) : 0);
         // Nor to a card left without its rarity (an older build or an imported file can leave one): it has no rules to
         // check its goal against. Nor one a sync has already updated that way (the same list pasted on another device).
+        // A tower in other capitals is the same tower (towerKey), as the list was read with: one a sync already gave the
+        // card, in the Tower list's spelling, isn't a change.
         const changes = (c: Card, patch: (typeof updates)[number]['patch']) =>
-          Object.entries(patch).some(([k, v]) => (k === 'maxLevel' ? (c.maxLevel ?? null) : c[k as keyof typeof patch]) !== v);
+          Object.entries(patch).some(([k, v]) =>
+            k === 'maxLevel' ? (c.maxLevel ?? null) !== v : k === 'sourceNote' ? towerKey(c.sourceNote ?? '') !== towerKey((v as string | undefined) ?? '') : c[k as keyof typeof patch] !== v,
+          );
         const saving = updates.flatMap((u) =>
           d.cards
             .filter((c) => c.id === u.cardId && d.rarities.some((r) => r.id === c.rarityId) && changes(c, u.patch))
             .map((c) => ({ c, patch: u.patch, line: u.line })),
         );
         if (!cards.length && !saving.length) return noChange;
+        // A pasted tower is saved as the Tower list spells it (one tower however it's typed), so a pasted line can't bring
+        // a second spelling back; a tower no card names yet takes the spelling of the first new card naming it, or failing
+        // that the first updated one.
+        const spellings = towerSpellings(d);
+        const listSpelling = (note: string) => {
+          if (!spellings.has(towerKey(note))) spellings.set(towerKey(note), towerName(note));
+          return spellings.get(towerKey(note))!;
+        };
         const fresh = cards.map(
           (c): Card => ({
             id: newId(),
@@ -233,7 +524,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
             fusion: levelOf(c),
             guest: false,
             source: c.source ?? initialSource(c, d.rarities),
-            ...(c.sourceNote && { sourceNote: c.sourceNote }),
+            ...(c.sourceNote && { sourceNote: listSpelling(c.sourceNote) }),
             ...(c.maxLevel != null && { maxLevel: c.maxLevel }),
           }),
         );
@@ -248,7 +539,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // Stage (a Gold card made ascendable) comes off it, since it has copies to go again.
         recordMaxed(d, fresh.filter((f) => atTopLevel(f, ruleOf(f))));
         unmarkMaxed(d, fresh.filter((f, i) => cards[i].maxLevel !== undefined && !atTopLevel(f, ruleOf(f))));
-        for (const { c, patch } of saving) Object.assign(c, patch);
+        for (const { c, patch } of saving) Object.assign(c, patch.sourceNote ? { ...patch, sourceNote: listSpelling(patch.sourceNote) } : patch);
         added = cards.length;
         updated = saving.length;
         const touched = [...fresh, ...saving.map(({ c }) => c)];
@@ -401,6 +692,16 @@ type CardSort = (typeof CARD_SORTS)[number];
 function CardList() {
   const { state, update } = useStore();
   const { now, ctx } = usePlan();
+  // Each tower your gear names, spelled as the first card naming it has it (towerSpellings), so "lin kuei tower" isn't
+  // offered beside "Lin Kuei Tower". Cards under a rarity a sync removed are hidden everywhere, so they don't count.
+  const { cards: allCards, rarities } = state;
+  const spellings = useMemo(() => towerSpellings({ cards: allCards, rarities }), [allCards, rarities]);
+  // The Tower list, A to Z.
+  const towers = useMemo(() => [...spellings.values()].sort((a, b) => a.localeCompare(b)), [spellings]);
+  // A card's chip names its tower as the Tower list spells it, so one row doesn't show it two ways.
+  const towerLabel = (note: string) => spellings.get(towerKey(note)) ?? note.trim();
+  // Where Add card's Tower box shows its re-spell hint (TowerSelect's hintIn).
+  const [towerHintAt, setTowerHintAt] = useState<HTMLElement | null>(null);
   const events = useEvents();
   const [rarity, setRarity] = useState<string>('all');
   const [q, setQ] = useState('');
@@ -420,8 +721,10 @@ function CardList() {
   const [imageEditId, setImageEditId] = useState<string | null>(null);
   const [imgStatus, setImgStatus] = useState<{ busy: boolean; msg: string } | null>(null);
   // Cards get their art as soon as they're added, even under the wrong rarity, so the rarity check runs whenever
-  // the catalog is at hand rather than only from Find images.
+  // the catalog is at hand rather than only from Find images. Read again when a catalog fetched again has changed, or the
+  // first one loads after a failed download.
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
+  const catalogVersion = useCatalogVersion();
   useEffect(() => {
     let cancelled = false;
     loadCatalog().then(
@@ -429,7 +732,7 @@ function CardList() {
       () => {}, // offline: Find images tries again
     );
     return () => void (cancelled = true);
-  }, []);
+  }, [catalogVersion]);
   const rarityFixes = useMemo(() => (catalog ? rarityMismatches(state.cards, ctx.rules, catalog) : []), [catalog, state.cards, ctx.rules]);
   const [draft, setDraft] = useState<Omit<Card, 'id'>>({ name: '', rarityId: state.rarities[0]?.id ?? '', fusion: 0, maxLevel: null, guest: false });
   // Counts picks in the Rarity box, so a pasted list follows a new pick but not a sync that removed the picked rarity.
@@ -554,6 +857,48 @@ function CardList() {
       Object.assign(c, p);
     });
 
+  // The count first, so it still shows when a phone cuts the Undo bar short.
+  const respelledLabel = (tower: string | undefined, n: number) => `Fixed the spelling on ${n} other card${n === 1 ? '' : 's'}: ${tower}`;
+  // With `over`, only over that tower: a Tower box left empty doesn't put its old tower back over one a sync brought in.
+  // A finished typed name in a new spelling also re-spells the tower on the other cards naming it; that changes cards the
+  // user didn't touch, so it has Undo even though typing doesn't. The box saved this card as it was typed, so Undo also
+  // puts this card back to the tower the box goes back to.
+  const setTower = (id: string, tower: string | undefined, over?: TowerOver, undoLabel?: string) => {
+    let respelled = 0;
+    update(
+      (d) => {
+        const c = d.cards.find((x) => x.id === id);
+        // Nor on a card a sync took off tower gear: its list going away settles a held step or finishes its box.
+        if (!c || c.source !== 'tower' || (over && c.sourceNote !== over.saved)) return noChange;
+        respelled = over?.respell && tower ? respellTower(d, tower, c) : 0;
+        if (c.sourceNote === tower && !respelled) return noChange;
+        c.sourceNote = tower;
+      },
+      () => (respelled ? respelledLabel(tower, respelled) : (undoLabel ?? '')),
+      over?.respell
+        ? {
+            undoFrom: (p) => {
+              const typedOn = respelled ? p.cards.find((x) => x.id === id) : undefined;
+              if (typedOn) typedOn.sourceNote = over.was;
+            },
+          }
+        : undefined,
+    );
+  };
+
+  // Add card's Tower box fixes a tower's spelling on the cards naming it when a name typed there is finished, as a card's
+  // own box does, with Undo; Add then saves the card with that spelling.
+  const respellFromAdd = (tower: string) => {
+    let respelled = 0;
+    update(
+      (d) => {
+        respelled = respellTower(d, tower);
+        return respelled ? undefined : noChange;
+      },
+      () => respelledLabel(tower, respelled),
+    );
+  };
+
   // Saved on the card as it is now. Unticking keeps a card at or past F3 on Max, as when one is entered there (see
   // entryGoal); otherwise a piece tracked only to F3 would be removed as done the moment kards were allowed again.
   const setNoKards = (c: Card, on: boolean) =>
@@ -623,31 +968,40 @@ function CardList() {
   function add() {
     if (!shown.name.trim()) return;
     let added = false;
-    update((d) => {
-      // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
-      // delete it. Its kind and steps come from the rarity as it is now.
-      const rule = d.rarities.find((r) => r.id === shown.rarityId);
-      if (!rule) return noChange;
-      const isEquip = rule.kind === 'equipment';
-      const tower = isEquip && shown.source === 'tower' ? shown.sourceNote?.trim() : undefined;
-      const card: Card = {
-        id: newId(),
-        ...shown,
-        name: shown.name.trim(),
-        // Not a level a sync took off the rarity after the form was drawn either (the form's own clamp is on `shown`).
-        fusion: shown.fusion <= maxFusion(rule) ? shown.fusion : 0,
-        guest: rule.hasGuests && shown.guest,
-        source: isEquip ? shown.source : initialSource(shown, d.rarities),
-        sourceNote: tower || undefined,
-      };
-      // The goal the form showed for it (see formGoal), worked out with the rarity as it is now. A card already at it would
-      // be done at once, so it isn't added (Add is greyed out for it; Enter in the name box comes here too).
-      const saved = { ...card, goal: formGoal(card, rule).goal };
-      // Nor a card on the Maxed record (Add is greyed out for that too).
-      if (isMaxed(saved, rule) || onMaxedRecord(d, saved)) return noChange;
-      d.cards.push(saved);
-      added = true;
-    });
+    // Adding a card has no Undo of its own, but any Undo showing goes back to before it, so would take it out too: the
+    // Add carries on from that Undo (alsoUndo), and the bar names the card first ("Added Ice Fan · …").
+    update(
+      (d) => {
+        // Not under a rarity a sync removed after the form was drawn: the card would be hidden everywhere, with no way to
+        // delete it. Its kind and steps come from the rarity as it is now.
+        const rule = d.rarities.find((r) => r.id === shown.rarityId);
+        if (!rule) return noChange;
+        const isEquip = rule.kind === 'equipment';
+        const typed = isEquip && shown.source === 'tower' ? towerName(shown.sourceNote ?? '') || undefined : undefined;
+        // As the list spells it now (a spelling typed in the box was fixed on the other cards when the box was finished),
+        // so an Add never puts an old spelling back, even one kept from the last card after a fix or a sync.
+        const tower = typed && (towerSpellings(d).get(towerKey(typed)) ?? typed);
+        const card: Card = {
+          id: newId(),
+          ...shown,
+          name: shown.name.trim(),
+          // Not a level a sync took off the rarity after the form was drawn either (the form's own clamp is on `shown`).
+          fusion: shown.fusion <= maxFusion(rule) ? shown.fusion : 0,
+          guest: rule.hasGuests && shown.guest,
+          source: isEquip ? shown.source : initialSource(shown, d.rarities),
+          sourceNote: tower || undefined,
+        };
+        // The goal the form showed for it (see formGoal), worked out with the rarity as it is now. A card already at it would
+        // be done at once, so it isn't added (Add is greyed out for it; Enter in the name box comes here too).
+        const saved = { ...card, goal: formGoal(card, rule).goal };
+        // Nor a card on the Maxed record (Add is greyed out for that too).
+        if (isMaxed(saved, rule) || onMaxedRecord(d, saved)) return noChange;
+        d.cards.push(saved);
+        added = true;
+      },
+      `Added ${shown.name.trim()}`,
+      { alsoUndo: true },
+    );
     // The typed name stays for another try when nothing was added.
     if (added) setDraft({ ...shown, name: '', fusion: 0, guest: false });
   }
@@ -721,13 +1075,25 @@ function CardList() {
           {draftRule?.kind === 'equipment' && shown.source === 'tower' && (
             <label className={field}>
               <span>Tower</span>
-              <input value={shown.sourceNote ?? ''} placeholder="e.g. Lin Kuei Tower" onChange={(e) => setDraft({ ...shown, sourceNote: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
+              <TowerSelect
+                towers={towers}
+                value={shown.sourceNote}
+                onChange={(v, over) => {
+                  setDraft({ ...shown, sourceNote: v });
+                  if (over?.respell && v) respellFromAdd(v);
+                }}
+                onEnter={add}
+                respells={(t) => towerRespells(state, t)}
+                hintIn={towerHintAt}
+              />
             </label>
           )}
           <button className={`${btn.primary} md:-col-end-1`} onClick={add} disabled={!shown.name.trim() || (!!draftRule && isMaxed({ ...(shown as Card), goal: formGoal(shown as Card, draftRule).goal }, draftRule)) || addsMaxed}>
             Add
           </button>
         </div>
+        {/* Add card's Tower hint shows here, among the form's notes, where it can't move the box being typed in. */}
+        <div ref={setTowerHintAt} className="contents" />
         {draft.rarityId && draftRule && draftRule.id !== draft.rarityId && (
           <p className="text-muted text-small">The rarity picked here has since been removed, so this card goes in as {draftRule.label}.</p>
         )}
@@ -840,7 +1206,7 @@ function CardList() {
                         site says {ctx.rules.get(c.keptRarity)?.label ?? c.keptRarity}
                       </Chip>
                     )}
-                    {c.source && <Chip tone="source">{SOURCE_LABELS[c.source]}{c.source === 'tower' && c.sourceNote && `: ${c.sourceNote}`}</Chip>}
+                    {c.source && <Chip tone="source">{SOURCE_LABELS[c.source]}{c.source === 'tower' && c.sourceNote?.trim() && `: ${towerLabel(c.sourceNote)}`}</Chip>}
                     {c.source === 'challenge' && (() => {
                       const ch = challengeFor(c, events, now);
                       return ch && <Chip tone="limited">challenge {challengeWhen(ch, now)}</Chip>;
@@ -886,16 +1252,7 @@ function CardList() {
                   </label>
                 )}
                 {(rule.kind !== 'character' || c.source) && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v, sourceNote: undefined })} />}
-                {c.source === 'tower' && (
-                  <input
-                    className="w-[11rem]"
-                    value={c.sourceNote ?? ''}
-                    placeholder="Tower name"
-                    aria-label="Tower"
-                    onChange={(e) => patch(c.id, { sourceNote: e.target.value || undefined })}
-                    onBlur={(e) => e.target.value !== e.target.value.trim() && patch(c.id, { sourceNote: e.target.value.trim() || undefined })}
-                  />
-                )}
+                {c.source === 'tower' && <TowerSelect className="w-[11rem] md:w-[19rem]" placeholder="Tower name" towers={towers} value={c.sourceNote} respells={(t) => towerRespells(state, t, c.id)} onChange={(v, over) => setTower(c.id, v, over)} onPick={(v) => setTower(c.id, v, undefined, v ? `${c.name}: tower set to ${v}` : `${c.name}: tower removed`)} />}
                 <button className={btn.ghost} onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
                   Image
                 </button>

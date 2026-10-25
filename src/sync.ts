@@ -33,19 +33,36 @@ export function saveSyncConfig(cfg: SyncConfig | null) {
   }
 }
 
-async function gh<T>(token: string, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(API + path, {
-    ...init,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-    },
+/** A request that hangs rather than fails gives up after this, so a sync, and a pull waiting on it, always ends. */
+const REQUEST_TIMEOUT_MS = 30 * 1000;
+
+/** Runs a request, reading its answer included, with a signal that gives up after REQUEST_TIMEOUT_MS. */
+async function inTime<T>(request: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(new Error(`GitHub didn’t answer within ${REQUEST_TIMEOUT_MS / 1000} seconds. Check your connection.`)), REQUEST_TIMEOUT_MS);
+  try {
+    return await request(abort.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function gh<T>(token: string, path: string, init?: RequestInit): Promise<T> {
+  return inTime(async (signal) => {
+    const res = await fetch(API + path, {
+      ...init,
+      signal,
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      },
+    });
+    if (res.status === 401) throw new Error('GitHub rejected the token. Check it has the gist scope and hasn’t expired.');
+    if (!res.ok) throw new Error(`GitHub error ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    return (await res.json()) as T;
   });
-  if (res.status === 401) throw new Error('GitHub rejected the token. Check it has the gist scope and hasn’t expired.');
-  if (!res.ok) throw new Error(`GitHub error ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return res.json() as Promise<T>;
 }
 
 interface Gist {
@@ -74,7 +91,14 @@ export async function readRemote(cfg: SyncConfig): Promise<AppState | null> {
   const gist = await gh<Gist>(cfg.token, `/gists/${cfg.gistId}`);
   const file = gist.files[FILE];
   if (!file) return null;
-  const text = file.truncated || file.content == null ? await (await fetch(file.raw_url)).text() : file.content;
+  // A big file comes by a second request. An error page from it isn't the data: read as a copy with no version, it would
+  // look like an outdated build's and be written over.
+  const raw = async (signal: AbortSignal) => {
+    const res = await fetch(file.raw_url, { signal });
+    if (!res.ok) throw new Error(`GitHub error ${res.status} downloading the synced data`);
+    return res.text();
+  };
+  const text = file.truncated || file.content == null ? await inTime(raw) : file.content;
   return JSON.parse(text) as AppState;
 }
 
@@ -96,7 +120,7 @@ export const sameData = (a: AppState, b: AppState) => canonical({ ...a, updatedA
  * so a copy of one still open on another device raised every level by one when it pulled newer data, then
  * synced that back as version 2. Data saved as version 2 or lower is from one of those builds and never pulled.
  */
-const fromOutdatedApp = (s: AppState) => ((s.version as number | undefined) ?? 1) <= 2;
+export const fromOutdatedApp = (s: AppState) => ((s.version as number | undefined) ?? 1) <= 2;
 
 export const OUTDATED_MESSAGE =
   'Another device synced data from an old version of MK Max, which raises every level by one. This device’s copy was kept and uploaded over it. Close MK Max on your other devices and open it again to update them.';
@@ -110,14 +134,14 @@ const VERSION = defaultState().version;
 export const fromNewerApp = (s: AppState) => ((s.version as number | undefined) ?? 1) > VERSION;
 
 export const NEWER_MESSAGE =
-  'Another device synced data from a newer version of MK Max, so this device won’t sync until it’s updated. Pull down to refresh, or close MK Max and open it again.';
+  'Another device synced data from a newer version of MK Max, so this device won’t sync until it’s updated. Tap Reload when MK Max says a new version is ready, or close MK Max and open it again.';
 
 /** Shown while this device's own save is from a newer version (see savedByNewerApp in storage.ts). */
 export const NEWER_SAVE_MESSAGE =
-  'The data saved in this browser is from a newer version of MK Max. This version only shows it: changes aren’t saved and sync is paused until MK Max updates. Pull down to refresh, or close MK Max and open it again.';
+  'The data saved in this browser is from a newer version of MK Max. This version only shows it: changes aren’t saved and sync is paused until MK Max updates. Tap Reload when MK Max says a new version is ready, or close MK Max and open it again.';
 
 export const UNREADABLE_MESSAGE =
-  'This version of MK Max can’t read the data in your gist, so this device won’t sync until it’s updated. The gist’s copy is left as it is. Pull down to refresh later, or close MK Max and open it again.';
+  'This version of MK Max can’t read the data in your gist, so this device won’t sync until it’s updated. The gist’s copy is left as it is. Tap Reload when MK Max says a new version is ready, or close MK Max and open it again.';
 
 /**
  * What a sync should do, given the gist's copy, this device's copy, and the version both last agreed on.

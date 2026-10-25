@@ -1,12 +1,13 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { registerSW } from 'virtual:pwa-register';
 import { startServiceWorker } from './appUpdate';
 import { StoreProvider } from './store';
 import { PlanProvider } from './planner';
 import App from './App';
 import './styles.css';
 
-startServiceWorker();
+startServiceWorker(registerSW);
 
 // Without sync, localStorage is the only copy of the user's data, and browsers may clear a site's storage when space
 // runs low or (Safari) after a week unused. Asking to keep it protects against that where the browser agrees.

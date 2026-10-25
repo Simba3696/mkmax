@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { appRarityId, catalogImageUpdates, completion, findInCatalog, nameKey, rarityMismatches, type CatalogItem } from './catalog';
+import { appRarityId, catalogImageUpdates, completion, findInCatalog, rarityMismatches, type CatalogItem } from './catalog';
+import { nameKey } from './names';
 import { defaultState } from './defaults';
 import type { Card } from './types';
 

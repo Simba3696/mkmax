@@ -1,4 +1,4 @@
-import { nameKey } from './catalog';
+import { nameKey } from './names';
 import { isKasketExcluded } from './kaskets';
 import type { AppState, Card, DropEntry, MaxedCard, Pack, RarityRule } from './types';
 
@@ -79,6 +79,72 @@ export const atTopLevel = (card: Card, rule: RarityRule) => card.fusion >= targe
 
 /** A card's rarity and name key, whatever its case or word order. cardKey in cardList.ts is this key too. */
 export const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityId}|${nameKey(c.name)}`;
+
+/**
+ * A tower name as it's saved: trimmed, with spaces inside made one, as Paste a list reads them (a name copied from notes
+ * can have two, or a non-breaking one). Saving it tidied means two spellings never differ only in spaces nobody can see.
+ */
+export const towerName = (name: string) => name.trim().replace(/\s+/g, ' ');
+
+/**
+ * One tower however its name was typed, since tower names are typed by hand: "lin  kuei tower " is Lin Kuei Tower, and a
+ * phone's curly apostrophe is a straight one. Tower
+ * gear groups by it, and the Tower list on Cards offers each tower once by it.
+ */
+export const towerKey = (name: string) => towerName(name).toLowerCase().replace(/’/g, "'");
+
+// Cards under a rarity a sync removed are hidden everywhere, so they don't spell a tower and a typed name doesn't
+// re-spell them (only the version 18 step, unifyTowerSpellings, does): the Tower list, chips, Add card, Paste a list
+// and Tower gear all go by the cards that show.
+const shownCards = (s: Pick<AppState, 'cards' | 'rarities'>) => s.cards.filter((c) => s.rarities.some((r) => r.id === c.rarityId));
+
+/** Each tower your tower gear names, by towerKey, spelled as the first card naming it has it. */
+export function towerSpellings(s: Pick<AppState, 'cards' | 'rarities'>) {
+  const byKey = new Map<string, string>();
+  for (const c of shownCards(s)) {
+    const t = c.source === 'tower' ? towerName(c.sourceNote ?? '') : undefined;
+    if (t && !byKey.has(towerKey(t))) byKey.set(towerKey(t), t);
+  }
+  return byKey;
+}
+
+/**
+ * A tower name typed on a card becomes its spelling on every tower gear card naming it some other way, so fixing a
+ * spelling on one card shows everywhere, however mixed it was. `skip` is the card it was typed on. Returns how many cards
+ * it changed.
+ */
+export function respellTower(s: Pick<AppState, 'cards' | 'rarities'>, tower: string, skip?: Card) {
+  let changed = 0;
+  for (const c of shownCards(s)) {
+    if (c === skip || !spelledOtherwise(c, tower)) continue;
+    c.sourceNote = tower;
+    changed++;
+  }
+  return changed;
+}
+
+/** How many cards respellTower would change for a name typed on the card with id `skipId` (none: Add card's box). */
+export const towerRespells = (s: Pick<AppState, 'cards' | 'rarities'>, tower: string, skipId?: string) =>
+  shownCards(s).filter((c) => c.id !== skipId && spelledOtherwise(c, tower)).length;
+
+// Tower gear naming the tower another way. Already spelled that way, give or take spaces (as a Tower box saves it while
+// it's typed, or an older build saved it), is nothing to fix: a re-spell nobody could see would still get an Undo.
+const spelledOtherwise = (c: Card, tower: string) =>
+  c.source === 'tower' && !!c.sourceNote?.trim() && towerName(c.sourceNote) !== tower && towerKey(c.sourceNote) === towerKey(tower);
+
+/**
+ * Saves every tower gear card's tower in the one spelling the Tower list shows (towerSpellings), tidied. A tower only
+ * hidden cards name takes the first of them's spelling. For saves from before one spelling was kept per tower.
+ */
+export function unifyTowerSpellings(s: Pick<AppState, 'cards' | 'rarities'>) {
+  const spelling = towerSpellings(s);
+  for (const c of s.cards) {
+    const t = c.source === 'tower' ? towerName(c.sourceNote ?? '') : undefined;
+    if (!t) continue;
+    if (!spelling.has(towerKey(t))) spelling.set(towerKey(t), t);
+    c.sourceNote = spelling.get(towerKey(t));
+  }
+}
 
 // Each change copies the whole save (store.tsx), so a record is checked against many times (every pasted line, every
 // keystroke in Add card) before it changes: its keys are worked out once per array. That holds because the record is
