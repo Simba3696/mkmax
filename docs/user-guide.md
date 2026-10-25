@@ -155,7 +155,7 @@ Pop-ups (like the pack editor) sit above the rest of the app and scroll on their
 
 ### Undo
 
-After a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action, so a card added from Add card while it shows comes out too; the bar then names the card first. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
+After a purchase, deleting a pack or card, clearing expired packs, or a card being removed for reaching its goal, an **Undo** bar shows for 8 seconds. It puts everything back as it was before that action, so a card added from Add card while it shows comes out too; the bar then names the card first. Each card added that way starts the 8 seconds again, so adding cards one after another keeps the bar up, and one Undo then takes every one of them out as well. For a random pack, that includes the + taps on pulled cards. The bar goes away if a sync brings in changes from another device.
 
 - The bar has **Undo** and ✕ (to close it). They act on the change the bar showed when you pressed them: if pressing one finishes something you were typing (a new tower name) and that puts a new change in the bar, the new one shows instead, for you to undo or close.
 - The 8 seconds only count while MK Max is showing. Switch to another app and back, and the bar shows for the full 8 seconds again.
@@ -256,7 +256,7 @@ With no cards, or none that match, the list says "No cards match."
 
 You usually don't need it: cards MK Mobile Base has get their art by themselves. **Find images (N)** shows only while some card still needs art (none yet, or an image that doesn't load), and looks it up on MK Mobile Base, then the MK Mobile wiki. It never replaces images you pasted unless they fail to load, including one pasted on another device while it looks (the message counts those as kept). "N not found online" means you'll need to paste a URL on those cards. If the wiki can't be reached, the art MK Mobile Base had is still saved, and the message says how many cards weren't looked up on the wiki, so you can try again later. More in [How it works](how-it-works.md#card-images).
 
-Cards also lists cards whose rarity MK Mobile Base gives differently, for example a Kameo added under the wrong tier, or Epic gear that's really Rare. The check runs each time you open Cards, whether or not any card needs art. Each card has its own buttons: **Use the site's** switches that card to the site's rarity, and **Keep mine** keeps yours. With more than one card listed, **Use the site's for all** and **Keep mine for all** do the whole list at once. Both have Undo. A Kameo moved into Gold Kameo is tagged **Elder challenge** if it's on the challenge list (unless it already has a source), and one moved out of it loses that tag. A card you keep isn't listed again (on any synced device) unless MK Mobile Base later gives yet another rarity; instead it shows a **site says** chip, which you can tap to have it checked again. It only compares within the same kind, so a Kameo is never switched to a character rarity.
+Cards also lists cards whose rarity MK Mobile Base gives differently, for example a Kameo added under the wrong tier, or Epic gear that's really Rare. The check runs each time you open Cards, and again while it's open when a pull to refresh or a return brings a changed card catalog (or the first one after it couldn't load), whether or not any card needs art. Each card has its own buttons: **Use the site's** switches that card to the site's rarity, and **Keep mine** keeps yours. With more than one card listed, **Use the site's for all** and **Keep mine for all** do the whole list at once. Both have Undo. A Kameo moved into Gold Kameo is tagged **Elder challenge** if it's on the challenge list (unless it already has a source), and one moved out of it loses that tag. A card you keep isn't listed again (on any synced device) unless MK Mobile Base later gives yet another rarity; instead it shows a **site says** chip, which you can tap to have it checked again. It only compares within the same kind, so a Kameo is never switched to a character rarity.
 
 ### Tower gear
 
@@ -594,7 +594,7 @@ The bottom of Settings shows which version you have and the date of that change,
 ### Updates
 
 - An app left open looks for a new version when you pull to refresh, when you come back to it after half an hour or more, when sync or another tab finds data from a newer version, and when you import a backup from a newer version (and when it's fully closed and reopened). If a new version is out, a bar above every page, which stays put as you scroll, says **A new version of MK Max is ready** with **Reload**. MK Max never reloads by itself, so nothing you're in the middle of (a form, a pasted list, a pull you're logging) is lost; it switches when you tap Reload, or the next time it opens with no copy of it already open.
-- If you have MK Max open in more than one place, tapping Reload in one only reloads that one; the others keep the bar.
+- If you have MK Max open in more than one place, tapping Reload in one only reloads that one; the others keep the bar. A copy that was in the background when you tapped it shows the bar when you come back to it.
 - In a browser that doesn't run MK Max's offline support (a private window, or some apps' built-in browsers), there's no bar: a new version loads the next time MK Max is opened.
 - The daily refresh of the event schedule and the card catalog isn't a new version, so it doesn't bring up the bar.
 - Updates never change your data, apart from the one-time upgrade of older saves.
@@ -604,7 +604,7 @@ The bottom of Settings shows which version you have and the date of that change,
 
 - Adds MK Mobile Base art to cards that have none.
 - Takes the Realm Klash season end from the event schedule.
-- Re-reads the event schedule and the card catalog when you come back after an hour or more, and tries again when you come back if a download failed.
+- Re-reads the event schedule and the card catalog when you come back after an hour or more, and tries again when you come back if no download has worked yet.
 - Looks for a new version when you come back after half an hour or more (it only brings up the Reload bar).
 - Updates countdowns and the plan every minute, and again when you come back to the app after being away for half a minute or more, so a pack that ended while it was in the background stops being planned.
 - Removes cards already at their goal when it loads.

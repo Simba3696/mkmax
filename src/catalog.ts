@@ -114,8 +114,8 @@ const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.del
 const getVersion = () => version;
 
 if (typeof document !== 'undefined') {
-  // Also when every download so far failed (offline at launch), and again after a fetch-again that failed. A restore that
-  // sends two events still starts one download (refreshCatalog shares the one out).
+  // Also when no download has worked yet (offline at launch); a fetch-again that failed is tried again once the copy it
+  // kept is an hour old. A restore that sends two events still starts one download (refreshCatalog shares the one out).
   const refreshIfOld = () => {
     if (document.visibilityState !== 'visible' || !tried) return;
     const age = Date.now() - fetchedAt;

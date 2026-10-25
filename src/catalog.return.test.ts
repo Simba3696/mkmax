@@ -22,8 +22,9 @@ function serve(items: () => CatalogItem[]) {
 // Generated on 2026-10-25 (/ship coverage audit, run 16); changed by /ship review on 2026-10-25 (run 16 pass 2)
 // Value: protects=coming back to the app fetches the catalog again past the browser's copy once it's over an hour old,
 // once per return, also on a back-forward restore and after the clock went back, but not sooner or while hidden; it
-// also tries again after any download that failed (offline at launch, or a wifi sign-in page served instead, which
-// keeps the copy here and tells no screen to look), but never downloads a catalog the app hasn't needed yet;
+// also tries again after a first download that failed (offline at launch), and after a fetch-again that failed (a wifi
+// sign-in page served instead, which keeps the copy here and tells no screen to look) once that copy is over an hour
+// old, but never downloads a catalog the app hasn't needed yet;
 // fails_when=an app left open never sees the daily deploy's new cards, a failed download counts as fresh for an hour,
 // or every return downloads; why_new=pull to refresh's fetch was the only one tested (App.catalog.test.tsx), and the
 // retries are new in this review; seam=fetch stubbed, fake Date, document.visibilityState mocked, pageshow sent by

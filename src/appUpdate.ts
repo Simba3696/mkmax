@@ -53,9 +53,15 @@ export function startServiceWorker(register: typeof registerSW) {
   const restored = (e: PageTransitionEvent) => e.persisted && returned();
   document.addEventListener('visibilitychange', returned);
   window.addEventListener('pageshow', restored);
+  // A copy frozen in the background while another one took the new version never sees it waiting, only its own worker
+  // changing under it: say it's ready then (its Reload just reloads). Not on a first visit, which starts with no worker.
+  const sw = 'serviceWorker' in navigator ? navigator.serviceWorker : undefined;
+  const controlled = !!sw?.controller;
+  if (controlled) sw!.addEventListener('controllerchange', markReady);
   return () => {
     document.removeEventListener('visibilitychange', returned);
     window.removeEventListener('pageshow', restored);
+    if (controlled) sw!.removeEventListener('controllerchange', markReady);
   };
 }
 

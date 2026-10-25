@@ -208,4 +208,30 @@ describe('app update', () => {
     window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }));
     expect(reg.update).toHaveBeenCalledTimes(3);
   });
+
+  // Generated on 2026-10-25 (/ship review, run 18 pass 3, Red Team)
+  // Value: protects=a copy that was frozen in the background while another copy took the new version (so it never saw it
+  // waiting) shows the bar once its own worker changes under it, and its Reload just reloads; a first visit, which starts
+  // with no worker, doesn't show it when the new worker takes the page over; fails_when=that copy keeps running the old
+  // build with no bar while its notices say to tap Reload, or a first visit shows the bar for the version it just got;
+  // why_new=review (Red Team): only a copy that already had the bar was tested; seam=controllerchange sent by hand;
+  // no_claim=a real frozen tab
+  it('shows the bar when the worker changes under a copy that missed the update waiting, but not on a first visit', async () => {
+    reg.waiting = null;
+    const { result } = renderHook(() => app.useAppUpdateReady());
+    expect(result.current).toBe(false);
+    act(() => void sw.dispatchEvent(new Event('controllerchange')));
+    expect(result.current).toBe(true);
+    app.applyAppUpdate();
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    stop();
+    vi.resetModules();
+    app = await import('./appUpdate');
+    sw.controller = null;
+    stop = app.startServiceWorker((() => update) as never);
+    const first = renderHook(() => app.useAppUpdateReady());
+    act(() => void sw.dispatchEvent(new Event('controllerchange')));
+    expect(first.result.current).toBe(false);
+  });
 });

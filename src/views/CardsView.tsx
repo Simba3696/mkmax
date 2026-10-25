@@ -117,7 +117,8 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
   const [held, setHeld] = useState<string | null>(null);
   const keyed = useRef(false);
   const typed = value?.trim();
-  const listed = typed && towers.find((t) => towerKey(t) === towerKey(typed));
+  const typedKey = typed && towerKey(typed);
+  const listed = typedKey && towers.find((t) => towerKey(t) === typedKey);
   const current = listed || typed || '';
   // A step a sync has made stale (its tower removed or re-spelled, or the list gone) is dropped, so leaving the list or
   // hiding the app never saves a tower the list doesn't show.
