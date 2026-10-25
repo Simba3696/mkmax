@@ -37,6 +37,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | `src/planner.tsx` | `PlanProvider` and `usePlan()`: the planner context and plan, worked out once and shared by every view |
 | `src/storage.ts` | Reading the save at startup, keeping a copy of one that can't be read, and holding one from a newer version |
 | `src/sync.ts` | GitHub Gist sync: the API calls and which copy wins |
+| `src/appUpdate.ts` | The service worker and the new-version bar: when a new version counts as ready, and Reload switching to it |
 | `src/syncLoop.ts` | When to pull, push or ask, around requests that can overlap edits and disconnects |
 | `src/catalog.ts`, `src/wiki.ts` | Card art and rarity lookups (MK Mobile Base, MK Mobile wiki) |
 | `src/names.ts` | Matching card names written different ways (`nameKey`, and the site's typos in `SITE_TYPOS`); kept apart from `catalog.ts` so the engine loads without React |
