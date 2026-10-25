@@ -20,7 +20,7 @@ function appVersion() {
 }
 
 export default defineConfig({
-  // GitHub Pages serves the app from /<repo>/; the deploy workflow sets BASE_PATH.
+  // GitHub Pages serves the app from /<repo>/; the deploy and pull request workflows set BASE_PATH.
   base: process.env.BASE_PATH ?? '/',
   define: { __APP_VERSION__: JSON.stringify(appVersion()) },
   plugins: [

@@ -5,9 +5,9 @@
 This project uses [gstack](https://github.com/garrytan/gstack), installed globally at `~/.claude/skills/gstack`. The full skill list is in the global `~/.claude/CLAUDE.md`.
 
 - Use `/browse` for all web browsing. Never use `mcp__claude-in-chrome__*` tools.
-- Pull requests run `.github/workflows/ci.yml` (lint, tests and a build), and a ruleset on `main` requires it to pass before a merge.
+- Pull requests run `.github/workflows/ci.yml` (lint, tests and a build). A ruleset on `main` takes changes only through a pull request whose `check` passed, squash-merged; the owner can override on a pull request, and nobody can push to `main` directly.
 - Typical flow: `/office-hours` or `/spec` to shape an idea, `/plan-eng-review` before building, `/review` before landing, `/qa` to test the running app, `/ship` to land. `/investigate` for bugs.
-- Pushing to `main` deploys, so `/ship` and `/land-and-deploy` are deploys. Both need `npm run lint`, `npm test` and `npm run build` to pass first.
+- Merging into `main` deploys, so `/land-and-deploy` is a deploy. Both need `npm run lint`, `npm test` and `npm run build` to pass first.
 
 ## Skill routing
 
