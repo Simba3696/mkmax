@@ -73,7 +73,8 @@ export function withPastSeasons(seasons, earlier, now) {
   const first = Math.min(...seasons.filter((s) => s.start).map((s) => new Date(s.start).getTime()));
   const kept = new Map();
   for (const s of earlier) {
-    if (!s.start || !s.end || kept.has(s.start)) continue;
+    // A nameless week from an older or hand-edited copy would break the Cards and Plan tabs like a fresh one would.
+    if (!s.start || !s.end || typeof s.name !== 'string' || !s.name.trim() || kept.has(s.start)) continue;
     const end = new Date(s.end).getTime();
     if (end <= first && end >= now.getTime() - KEEP_PAST_SEASONS_MS) kept.set(s.start, s);
   }

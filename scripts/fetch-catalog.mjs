@@ -1,17 +1,24 @@
 // Downloads the MK Mobile Base (mkmobilebase.com) character, equipment and Kameo catalog into public/catalog.json:
 // each item's name, kind, rarity and thumbnail URLs. The site's API doesn't allow cross-site requests, so the
 // app can't call it directly; it reads this file instead. Run by the deploy workflow, or: npm run catalog
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const API = 'https://mkmobilebase.com/api/categories';
 const HEADERS = { Accept: 'application/json', 'User-Agent': 'mkmax catalog (https://github.com/Simba3696/mkmax)' };
 const RARITIES = ['diamond', 'gold', 'silver', 'bronze', 'epic', 'rare', 'uncommon', 'common', 'legendary'];
 /** Far past any real category (4 pages of 100 at most today), so a page count that never ends fails instead. */
 const MAX_PAGES = 50;
+/** The deployed app; the deploy workflow sets PAGES_URL. */
+const LIVE = `${process.env.PAGES_URL ?? 'https://simba3696.github.io/mkmax'}/catalog.json`;
+const FILE = new URL('../public/catalog.json', import.meta.url);
+// The whole download takes seconds. Pages that each answer just inside 30 seconds could otherwise add up past the
+// deploy job's 15 minutes, which would end the job before it falls back to the live copy.
+const DEADLINE = Date.now() + 5 * 60_000;
 
 async function fetchAll(category) {
   const items = [];
   for (let page = 1; ; page++) {
+    if (Date.now() > DEADLINE) throw new Error(`${category} page ${page}: still downloading after 5 minutes`);
     // A stalled download fails after 30 seconds, so the deploy goes on with the live copy instead of waiting.
     const res = await fetch(`${API}/${category}/articles?per_page=100&page=${page}`, {
       headers: HEADERS,
@@ -44,6 +51,10 @@ for (const [category, kind] of [['characters', 'character'], ['equipment', 'equi
   // An empty category means the API has changed; failing keeps the deployed catalog rather than shipping one
   // without card art or rarities.
   if (!items.length) throw new Error(`${category}: no items`);
+  // A site that ignored the page asked for would send page 1 again and again, which every other check here passes.
+  if (new Set(items.map((i) => i.slug)).size !== items.length) {
+    throw new Error(`${category}: the same item came back twice`);
+  }
   for (const item of items) {
     // Kameo titles read "Baraka - Klassic Kameo"; drop the suffix so names match cards like "Baraka, Klassic".
     const name = kind === 'kameo' ? item.title.replace(/\s*Kameo$/i, '') : item.title;
@@ -56,7 +67,39 @@ for (const key of ['image', 'rarity']) {
   const missing = catalog.filter((c) => !c[key]).length;
   if (missing > catalog.length / 10) throw new Error(`catalog: ${missing} of ${catalog.length} items have no ${key}`);
 }
+// A kind and rarity with far fewer cards than the copy that's live now means the site lost them, not that the game
+// removed them, so failing keeps the live catalog. The local copy (the committed one in CI) stands in when the live
+// one can't be read. Cards without a rarity aren't counted, so fewer of those never fails.
+async function earlierCopy() {
+  try {
+    const r = await fetch(LIVE, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch (e) {
+    console.warn(`catalog: couldn't read the live copy (${e.message})`);
+    try {
+      return JSON.parse(readFileSync(FILE, 'utf8'));
+    } catch {
+      return null;
+    }
+  }
+}
+const byKindAndRarity = (items) => {
+  const counts = new Map();
+  for (const { kind, rarity } of items) {
+    if (rarity) counts.set(`${kind} ${rarity}`, (counts.get(`${kind} ${rarity}`) ?? 0) + 1);
+  }
+  return counts;
+};
+const earlier = await earlierCopy();
+if (Array.isArray(earlier?.items)) {
+  const now = byKindAndRarity(catalog);
+  for (const [key, was] of byKindAndRarity(earlier.items)) {
+    const count = now.get(key) ?? 0;
+    if (count < Math.floor(was * 0.9)) throw new Error(`catalog: ${count} ${key} cards, down from ${was}`);
+  }
+}
 catalog.sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
-writeFileSync(new URL('../public/catalog.json', import.meta.url), JSON.stringify({ source: 'https://mkmobilebase.com', fetchedAt: new Date().toISOString(), items: catalog }) + '\n');
+writeFileSync(FILE, JSON.stringify({ source: 'https://mkmobilebase.com', fetchedAt: new Date().toISOString(), items: catalog }) + '\n');
 const count = (k) => catalog.filter((c) => c.kind === k).length;
 console.log(`catalog: ${count('character')} characters, ${count('equipment')} equipment, ${count('kameo')} kameos, ${catalog.filter((c) => !c.rarity).length} without a rarity`);

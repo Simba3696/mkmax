@@ -28,6 +28,8 @@ jobs:
       contents: read
       # configure-pages reads the site's address and path.
       pages: read
+    outputs:
+      fell_back: ${{ steps.catalog.outputs.fell_back == 'true' || steps.events.outputs.fell_back == 'true' }}
     steps:
       # Keeps the token out of .git/config, where install scripts in dependencies could read it.
       - uses: actions/checkout@v4
@@ -52,17 +54,21 @@ jobs:
       # Refresh the MK Mobile Base catalog (names, rarities, card art). If the site is down or its data looks wrong,
       # the script fails and the copy that's live now is deployed again. The committed copy only changes when
       # someone commits it, so it's used only if the live one can't be downloaded either.
-      - run: |
+      - id: catalog
+        run: |
           npm run catalog && exit 0
           echo "::warning::Catalog refresh failed; deploying the live catalog.json again"
+          echo "fell_back=true" >> "$GITHUB_OUTPUT"
           curl -fsS --max-time 60 "$PAGES_URL/catalog.json" -o "$RUNNER_TEMP/catalog.json" &&
             jq -e '.items | length > 0' "$RUNNER_TEMP/catalog.json" > /dev/null &&
             mv "$RUNNER_TEMP/catalog.json" public/catalog.json ||
             echo "::warning::Couldn't download the live catalog.json either; deploying the committed one"
       # Same for MK Mobile Base's event schedule (shop packs, challenges, Realm Klash seasons).
-      - run: |
+      - id: events
+        run: |
           npm run events && exit 0
           echo "::warning::Event schedule refresh failed; deploying the live events.json again"
+          echo "fell_back=true" >> "$GITHUB_OUTPUT"
           curl -fsS --max-time 60 "$PAGES_URL/events.json" -o "$RUNNER_TEMP/events.json" &&
             jq -e '.packs | length > 0' "$RUNNER_TEMP/events.json" > /dev/null &&
             mv "$RUNNER_TEMP/events.json" public/events.json ||
@@ -86,3 +92,16 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # A deploy that kept an older catalog or event schedule still publishes, then fails here, so GitHub emails the owner
+  # instead of a copy that stopped refreshing hiding behind green runs.
+  fallback:
+    needs: [build, deploy]
+    if: needs.build.outputs.fell_back == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - run: |
+          echo "::error::Couldn't refresh the catalog or event schedule from MK Mobile Base; an older copy was deployed"
+          exit 1
