@@ -30,8 +30,9 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 const read = (file: string): Workflow => parse(readFileSync(file, 'utf8'));
 const ci = read(join(here, '..', '.github', 'workflows', 'ci.yml'));
 const deploy = read(join(here, '..', '.github', 'workflows', 'deploy.yml'));
-type Pkg = { scripts: Record<string, string> };
-const { scripts } = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8')) as Pkg;
+type Pkg = { scripts: Record<string, string>; dependencies?: object; devDependencies?: object };
+const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8')) as Pkg;
+const { scripts } = pkg;
 const jobs = Object.values(ci.jobs);
 const steps = jobs.flatMap((j) => j.steps);
 const isSetupNode = (s: Step) => !!s.uses?.startsWith('actions/setup-node');
@@ -173,6 +174,21 @@ describe('.github/workflows/deploy.yml', () => {
       { contents: 'read', pages: 'read' },
       { pages: 'write', 'id-token': 'write' },
       ['actions/deploy-pages'],
+    ]);
+  });
+});
+
+describe('package.json', () => {
+  // Extended by /ship coverage audit on 2026-10-25 (pr-ci run 6 pass 2): the app ships only React, and yaml, which
+  // this file reads the workflows with, is a dev dependency.
+  // Value: protects=AGENTS.md's two runtime dependencies, and a fresh install still having yaml for this test;
+  // fails_when=yaml (or anything else) lands in dependencies (npm install without -D), or yaml leaves devDependencies;
+  // why_new=nothing read the dependency lists, and knip already installs yaml, so the import above keeps working
+  // without it listed; seam=none; no_claim=what the bundle contains (Vite leaves out what the app doesn't import)
+  it('keeps two runtime dependencies, with yaml for these tests only', () => {
+    expect([Object.keys(pkg.dependencies ?? {}).sort(), 'yaml' in (pkg.devDependencies ?? {})]).toEqual([
+      ['react', 'react-dom'],
+      true,
     ]);
   });
 });
