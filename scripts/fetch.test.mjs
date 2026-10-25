@@ -70,8 +70,8 @@ function runOffline(script, output) {
 
 // Loaded in place of the real fetch when MK Mobile Base answers: every catalog category has two pages of cards with
 // art, the schedule has one pack and one current season, and the live events.json has no past weeks. Each request is
-// noted as above. STUB_CHANGE makes the catalog answer the way a changed API might: no page count, a page count that
-// never ends, or no art.
+// noted as above. STUB_CHANGE makes the catalog answer the way a changed API might: no page count, a page count of
+// zero, a page count that never ends, no art, or no rarity tags.
 const online = join(dir, 'online.mjs');
 writeFileSync(
   online,
@@ -84,8 +84,13 @@ const schedule = {
   ],
 };
 const change = process.env.STUB_CHANGE;
-const lastPage = change === 'no-page-count' ? undefined : change === 'endless' ? 1000 : 2;
-const card = (n) => ({ title: 'Card ' + n, slug: 'card-' + n, tags: [{ slug: 'gold' }], image_url: change === 'no-art' ? undefined : 'https://img.test/' + n });
+const lastPage = change === 'no-page-count' ? undefined : change === 'zero-pages' ? 0 : change === 'endless' ? 1000 : 2;
+const card = (n) => ({
+  title: 'Card ' + n,
+  slug: 'card-' + n,
+  tags: change === 'no-rarity' ? [] : [{ slug: 'gold' }],
+  image_url: change === 'no-art' ? undefined : 'https://img.test/' + n,
+});
 globalThis.fetch = async (url, opts = {}) => {
   note(url, opts);
   const page = /[?&]page=(\\d+)/.exec(String(url));
@@ -174,16 +179,25 @@ describe('download scripts', () => {
   // Value: protects=a catalog answer in a changed shape fails the script, so the deploy keeps the live catalog instead
   // of shipping part of it, running until the job's limit, or shipping cards without art; fails_when=the page count
   // check or the art check is dropped or loosened; why_new=the script only failed on an empty category; seam=none
-  // (STUB_CHANGE only changes the stand-in's answers); no_claim=the rarity check, which works the same way as the art one
+  // (STUB_CHANGE only changes the stand-in's answers); no_claim=the 10% allowance
+  // Extended by /ship coverage audit on 2026-10-25 (pr-ci run 7): a page count of zero, and cards with no rarity.
+  // Value: protects=a catalog answer whose page count is zero (which stopped after page 1 before this branch) or whose
+  // cards lost their rarity tags fails, so the deploy keeps the live catalog instead of shipping a third of it or one
+  // the app can't sort by rarity; fails_when=the page count check stops rejecting zero, or rarity leaves the list of
+  // fields every card must mostly have; why_new=no-art only reaches the image half of that check, and no case had a
+  // page count below 1; seam=none (STUB_CHANGE only changes the stand-in's answers); no_claim=the 10% allowance, or
+  // a rarity read from the excerpt instead of the tags
   it("fails without writing when MK Mobile Base's catalog answers change shape", () => {
     const outcome = (change) => {
       const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
       return { change, status, wroteCatalog };
     };
-    expect(['no-page-count', 'endless', 'no-art'].map(outcome)).toEqual([
+    expect(['no-page-count', 'zero-pages', 'endless', 'no-art', 'no-rarity'].map(outcome)).toEqual([
       { change: 'no-page-count', status: 1, wroteCatalog: false },
+      { change: 'zero-pages', status: 1, wroteCatalog: false },
       { change: 'endless', status: 1, wroteCatalog: false },
       { change: 'no-art', status: 1, wroteCatalog: false },
+      { change: 'no-rarity', status: 1, wroteCatalog: false },
     ]);
   }, 45_000);
 });
