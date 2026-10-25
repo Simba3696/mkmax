@@ -67,22 +67,27 @@ for (const key of ['image', 'rarity']) {
   const missing = catalog.filter((c) => !c[key]).length;
   if (missing > catalog.length / 10) throw new Error(`catalog: ${missing} of ${catalog.length} items have no ${key}`);
 }
-// A kind and rarity with far fewer cards than the copy that's live now means the site lost them, not that the game
-// removed them, so failing keeps the live catalog. The local copy (the committed one in CI) stands in when the live
-// one can't be read. Cards without a rarity aren't counted, so fewer of those never fails.
-async function earlierCopy() {
+// A kind and rarity with far fewer cards than the newest earlier copy means the site lost them, not that the game
+// removed them, so failing keeps the live catalog. That's the live copy, or the local one (the committed one in CI)
+// when it's newer or the live one can't be read, so committing a fresh catalog.json resets the comparison after a
+// real removal. Cards without a rarity aren't counted, so fewer of those never fails.
+async function copy(load, what) {
   try {
+    const c = await load();
+    return Array.isArray(c?.items) ? c : null;
+  } catch (e) {
+    console.warn(`catalog: couldn't read the ${what} copy (${e.message})`);
+    return null;
+  }
+}
+async function earlierCopy() {
+  const live = await copy(async () => {
     const r = await fetch(LIVE, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return await r.json();
-  } catch (e) {
-    console.warn(`catalog: couldn't read the live copy (${e.message})`);
-    try {
-      return JSON.parse(readFileSync(FILE, 'utf8'));
-    } catch {
-      return null;
-    }
-  }
+    return r.json();
+  }, 'live');
+  const local = await copy(() => JSON.parse(readFileSync(FILE, 'utf8')), 'local');
+  return [live, local].filter(Boolean).sort((a, b) => String(b.fetchedAt).localeCompare(String(a.fetchedAt)))[0];
 }
 const byKindAndRarity = (items) => {
   const counts = new Map();
@@ -92,11 +97,12 @@ const byKindAndRarity = (items) => {
   return counts;
 };
 const earlier = await earlierCopy();
-if (Array.isArray(earlier?.items)) {
+if (earlier) {
   const now = byKindAndRarity(catalog);
   for (const [key, was] of byKindAndRarity(earlier.items)) {
     const count = now.get(key) ?? 0;
-    if (count < Math.floor(was * 0.9)) throw new Error(`catalog: ${count} ${key} cards, down from ${was}`);
+    // More than a tenth and more than 3, so the site fixing a card or two in a small group doesn't fail every deploy.
+    if (was - count > Math.max(3, was / 10)) throw new Error(`catalog: ${count} ${key} cards, down from ${was}`);
   }
 }
 catalog.sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
