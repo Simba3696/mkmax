@@ -238,15 +238,18 @@ describe('card catalog downloads that overlap', () => {
     expect([result.current !== before, (await loadCatalog()).map((i) => i.name), fetch.mock.calls.length]).toEqual([true, ['Kori Blade'], 1]);
   });
 
-  // Generated on 2026-10-25 (/ship review, run 18 pass 2, state machines)
+  // Generated on 2026-10-25 (/ship review, run 18 pass 2, state machines); extended by /ship review on 2026-10-25 (run
+  // 19 pass 3, state machines) with a pull whose download fails
   // Value: protects=after a first download failed, a pull and a lookup each start a download; when the lookup's lands
   // first, screens are told, and the pull's (fetched past the browser's copy) then replaces it and tells them again if
-  // it differs, but not if it's the same file; fails_when=the copy the lookup brought in blocks the pull's newer one, so
-  // lookups keep the copy from before the daily deploy, or the same file landing twice reruns every screen's catalog
-  // work; why_new=review (state machines): the two only overlapped with the pull's landing first; seam=fetch downloads
-  // settled by hand; no_claim=none beyond protects
+  // it differs, but not if it's the same file, and if the pull's fails the lookup's copy stays and screens aren't told
+  // again; fails_when=the copy the lookup brought in blocks the pull's newer one, so lookups keep the copy from before
+  // the daily deploy, the same file landing twice reruns every screen's catalog work, or a failed pull drops the copy or
+  // tells screens again; why_new=review (state machines): the two only overlapped with the pull's landing first;
+  // seam=fetch downloads settled by hand; no_claim=none beyond protects
   it('takes a pull’s copy landing after a retried first download, and tells screens only when it differs', async () => {
-    for (const same of [false, true]) {
+    for (const pulled of ['differs', 'same', 'fails'] as const) {
+      const same = pulled === 'same';
       const cat = await fresh();
       const calls = held();
       const failed = cat.loadCatalog().catch(() => 'failed');
@@ -261,9 +264,13 @@ describe('card catalog downloads that overlap', () => {
       calls[2].res(new Response(JSON.stringify({ items: a })));
       await act(() => lookup);
       expect(result.current).toBe(before + 1);
-      calls[1].res(new Response(JSON.stringify({ items: same ? a : [item('Kori Blade'), item('Kitana Fan')] })));
+      if (pulled === 'fails') calls[1].rej(new TypeError('Failed to fetch'));
+      else calls[1].res(new Response(JSON.stringify({ items: same ? a : [item('Kori Blade'), item('Kitana Fan')] })));
       await act(() => pull);
-      expect([(await cat.loadCatalog()).map((i) => i.name), result.current]).toEqual(same ? [['Kori Blade'], before + 1] : [['Kori Blade', 'Kitana Fan'], before + 2]);
+      // The copy here answers the next lookup without another download.
+      const after = cat.loadCatalog();
+      expect(calls).toHaveLength(3);
+      expect([(await after).map((i) => i.name), result.current]).toEqual(pulled === 'differs' ? [['Kori Blade', 'Kitana Fan'], before + 2] : [['Kori Blade'], before + 1]);
     }
   });
 });

@@ -70,14 +70,16 @@ if (typeof document !== 'undefined') {
 }
 
 /**
- * Each set of towers' options and key lookup, built once and shared by every card's Tower list: a long Tower gear list
- * then neither rebuilds them per row nor redraws the options on each search keystroke.
+ * The towers' options and key lookup, built once and shared by every card's Tower list, and kept while the towers stay
+ * the same (each save makes a new list of the same towers): a long Tower gear list then neither rebuilds them per row
+ * nor redraws the options on each save or search keystroke.
  */
-const towerLists = new WeakMap<string[], { byKey: Map<string, string>; options: ReactElement[] }>();
+let towerListNow: { key: string; byKey: Map<string, string>; options: ReactElement[] } | null = null;
 function towerList(towers: string[]) {
-  let list = towerLists.get(towers);
-  if (!list) {
-    list = {
+  const key = towers.join('\n');
+  if (towerListNow?.key !== key) {
+    towerListNow = {
+      key,
       byKey: new Map(towers.map((t) => [towerKey(t), t])),
       options: towers.map((t) => (
         <option key={t} value={t}>
@@ -85,9 +87,8 @@ function towerList(towers: string[]) {
         </option>
       )),
     };
-    towerLists.set(towers, list);
   }
-  return list;
+  return towerListNow;
 }
 
 /**

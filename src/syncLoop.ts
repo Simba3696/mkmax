@@ -2,7 +2,7 @@
 // GitHub, the app state and timers passed in, so tests can run two devices against one fake gist. store.tsx wires it
 // to React.
 import type { AppState } from './types';
-import { NEWER_MESSAGE, OUTDATED_MESSAGE, UNREADABLE_MESSAGE, decideSync, fromNewerApp, sameData, stamp, type SyncConfig } from './sync';
+import { NEWER_MESSAGE, OUTDATED_MESSAGE, UNREADABLE_MESSAGE, decideSync, fromNewerApp, fromOutdatedApp, sameData, stamp, type SyncConfig } from './sync';
 
 export type SyncStatus =
   | { kind: 'off' }
@@ -251,8 +251,10 @@ export class SyncLoop {
         this.waitForNewerApp();
         return;
       }
-      if (this.unreadable(fresh)) return;
-      if (fresh && stamp(fresh) !== stamp(shown) && !sameData(fresh, shown)) {
+      // An outdated build's copy is never offered: it's written over, as a sync does, and the user told to update it.
+      const outdated = !!fresh && fromOutdatedApp(fresh);
+      if (!outdated && this.unreadable(fresh)) return;
+      if (fresh && !outdated && stamp(fresh) !== stamp(shown) && !sameData(fresh, shown)) {
         this.conflict = fresh;
         this.deps.onStatus({ kind: 'conflict', remote: fresh });
         return;
@@ -261,6 +263,10 @@ export class SyncLoop {
       await this.deps.writeRemote(cfg, kept);
       if (this.stopped(cfg)) return;
       this.setConfig({ ...cfg, baseUpdatedAt: stamp(kept) });
+      if (outdated) {
+        this.deps.onStatus({ kind: 'error', message: OUTDATED_MESSAGE });
+        return;
+      }
       this.deps.onStatus({ kind: 'idle', at: this.deps.now() });
       ok = true;
     } catch (e) {

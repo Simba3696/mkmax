@@ -92,9 +92,9 @@ describe('app update', () => {
   });
 
   // Generated on 2026-10-25 (/ship review, run 15 pass 2)
-  // Value: protects=Reload on a page the old version didn't control (a hard reload, or the first visit) reloads once the
-  // new version is active; fails_when=the first tap only switches other copies and this page stays put; why_new=review
-  // (Red Team); seam=registerSW passed in by hand, the waiting worker's statechange sent by hand; no_claim=a real worker
+  // Value: protects=Reload on a page the old version didn't control (a hard reload) reloads once the new version is
+  // active; fails_when=the first tap only switches other copies and this page stays put; why_new=review (Red Team);
+  // seam=registerSW passed in by hand, the waiting worker's statechange sent by hand; no_claim=a real worker
   it('reloads a page the old version didn’t control once the new one is active', () => {
     sw.controller = null;
     app.applyAppUpdate();
@@ -103,14 +103,22 @@ describe('app update', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  // Generated on 2026-10-25 (/ship review, run 15 pass 3)
-  // Value: protects=Reload still reloads when the version it asked to take over is replaced by a newer one first;
-  // fails_when=the tap seems to do nothing; why_new=review (state machines); seam=the waiting worker's statechange sent
-  // by hand; no_claim=a real worker
+  // Generated on 2026-10-25 (/ship review, run 15 pass 3); extended by /ship review on 2026-10-25 (run 19 pass 3, state
+  // machines) with a page the old version didn't control
+  // Value: protects=Reload still reloads when the version it asked to take over is replaced by a newer one first, on a
+  // page the old version controlled or on one it didn't (a hard reload); fails_when=the tap seems to do nothing;
+  // why_new=review (state machines); seam=the waiting worker's statechange sent by hand; no_claim=a real worker
   it('reloads when the waiting version is replaced before it takes over', () => {
     app.applyAppUpdate();
     becomes(waiting, 'redundant');
     expect(reload).toHaveBeenCalledTimes(1);
+    const next = worker('installed');
+    reg.waiting = next;
+    sw.controller = null;
+    app.applyAppUpdate();
+    expect([update.mock.calls.length, reload.mock.calls.length]).toEqual([2, 1]);
+    becomes(next, 'redundant');
+    expect(reload).toHaveBeenCalledTimes(2);
   });
 
   // Generated on 2026-10-25 (/ship review, run 15 pass 3); changed by /ship review on 2026-10-25 (run 19 pass 2, state

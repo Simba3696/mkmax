@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState } from './defaults';
-import type { SyncConfig } from './sync';
+import { OUTDATED_MESSAGE, type SyncConfig } from './sync';
 import { SyncLoop, type SyncStatus } from './syncLoop';
 import type { AppState } from './types';
 
@@ -481,11 +481,13 @@ describe('sync loop', () => {
     expect([await connecting, laptop.loop.config?.baseUpdatedAt, laptop.state, gist.writes]).toEqual([true, 0, before, writes]);
   });
 
-  // Generated on 2026-10-25 (/ship review, run 17 pass 2, data migration)
+  // Generated on 2026-10-25 (/ship review, run 17 pass 2, data migration); extended by /ship review on 2026-10-25 (run
+  // 19 pass 3, state machines) with Disconnect pressed while held
   // Value: protects=a tab held by another tab's newer save starts no sync and no Keep mine or theirs, so it never shows
-  // Syncing over the held notice or changes data; fails_when=a regular pull or a prompt button gets past the hold;
-  // why_new=review: syncNow and resolve reported Syncing before looking at the hold; seam=the device's held switch;
-  // no_claim=the store's own pause of its buttons
+  // Syncing over the held notice or changes data, and Disconnect still turns sync off there without a request;
+  // fails_when=a regular pull or a prompt button gets past the hold, or Disconnect is ignored or reaches GitHub while
+  // held; why_new=review: syncNow and resolve reported Syncing before looking at the hold; seam=the device's held
+  // switch; no_claim=the store's own pause of its buttons
   it('a tab held by a newer save starts no sync and no Keep mine or theirs', async () => {
     const { gist, phone, desktop } = await pair();
     phone.edit((s) => s.cards.push(card('Raiden')));
@@ -504,15 +506,20 @@ describe('sync loop', () => {
     desktop.held = false;
     await desktop.loop.resolve('theirs');
     expect(names(desktop.state)).toEqual(['Scorpion', 'Raiden']);
+    // Disconnect pressed while held still drops the settings and shows off, and asks GitHub nothing.
+    desktop.held = true;
+    desktop.loop.disconnect();
+    expect([desktop.loop.config, desktop.status, gist.reads, gist.writes]).toEqual([null, { kind: 'off' }, reads, writes]);
   });
 
   // Generated on 2026-10-25 (/ship review, run 17, state machines); extended by /ship review on 2026-10-25 (run 18,
-  // state machines) with a gist copy this build can't read
-  // Value: protects=Keep theirs takes the copy the prompt showed even if the gist moved on, a newer build pushed or a
-  // copy this build can't read arrived since, and the next sync then pulls the later copy without asking, or waits and
-  // looks for the update; fails_when=Keep
-  // theirs asks again, pushes, or skips the later copy; why_new=review (state machines): only an unchanged gist was tested;
-  // seam=none; no_claim=GitHub
+  // state machines) with a gist copy this build can't read; extended by /ship review on 2026-10-25 (run 19 pass 3, state
+  // machines) with a copy an outdated build pushed
+  // Value: protects=Keep theirs takes the copy the prompt showed even if the gist moved on, a newer build pushed, a copy
+  // this build can't read arrived or an outdated build pushed since, and the next sync then pulls the later copy without
+  // asking, waits and looks for the update, or uploads over the outdated copy and says so; fails_when=Keep theirs asks
+  // again, pushes, skips the later copy, or the next sync pulls the outdated copy; why_new=review (state machines): only
+  // an unchanged gist was tested; seam=none; no_claim=GitHub
   it('keeping the other copy after the gist changed takes the shown copy, then syncs as usual', async () => {
     let { gist, phone, desktop } = await pair();
     phone.edit((s) => s.cards.push(card('Raiden')));
@@ -552,6 +559,19 @@ describe('sync loop', () => {
     expect([names(desktop.state), desktop.loop.config?.baseUpdatedAt]).toEqual([['Scorpion', 'Raiden'], desktop.state.updatedAt]);
     await desktop.loop.syncNow();
     expect([desktop.status.kind, gist.writes - writes, desktop.pushes, desktop.lookedForUpdate]).toEqual(['error', 0, 0, 1]);
+
+    // An outdated build pushed meanwhile: Keep theirs still takes the copy shown, and the next sync uploads it over the
+    // outdated copy and says so, rather than pulling it.
+    ({ gist, phone, desktop } = await pair());
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    gist.data = { ...structuredClone(gist.data!), cards: [card('Scorpion'), card('Jade')], version: 2, updatedAt: tick() } as unknown as AppState;
+    await desktop.loop.resolve('theirs');
+    expect(names(desktop.state)).toEqual(['Scorpion', 'Raiden']);
+    await desktop.loop.syncNow();
+    expect([desktop.status, names(gist.data), gist.data!.version]).toEqual([{ kind: 'error', message: OUTDATED_MESSAGE }, ['Scorpion', 'Raiden'], desktop.state.version]);
   });
 
   // Generated on 2026-10-25 (/ship review, run 17, state machines)
@@ -578,12 +598,14 @@ describe('sync loop', () => {
     ]);
   });
 
-  // Generated on 2026-10-25 (/ship review, run 18 pass 2, state machines)
-  // Value: protects=a Keep mine whose request fails (offline) shows the error, writes nothing and agrees nothing, and
-  // the next sync asks again rather than pushing this device's copy or pulling the gist's; fails_when=a failed Keep mine
-  // marks this copy agreed (so the next sync pushes over the other device's changes) or keeps the prompt it dropped, so
-  // every later sync stops early and the error stays up; why_new=review (state machines): Keep mine was never tested
-  // with a request that fails; seam=the fake gist's fail switch stands in for the network; no_claim=GitHub
+  // Generated on 2026-10-25 (/ship review, run 18 pass 2, state machines); extended by /ship review on 2026-10-25 (run
+  // 19 pass 3, state machines) with an upload that fails after the read went through
+  // Value: protects=a Keep mine whose read or upload fails (offline) shows the error, writes nothing and agrees nothing,
+  // and the next sync asks again rather than pushing this device's copy or pulling the gist's; fails_when=a failed Keep
+  // mine marks this copy agreed (so the next sync pushes over the other device's changes) or keeps the prompt it
+  // dropped, so every later sync stops early and the error stays up; why_new=review (state machines): Keep mine was
+  // never tested with a request that fails; seam=the fake gist's fail switch stands in for the network, and holding its
+  // writes lets the read through first; no_claim=GitHub
   it('a Keep mine whose request fails shows the error, and the next sync asks again', async () => {
     const { gist, phone, desktop } = await pair();
     phone.edit((s) => s.cards.push(card('Raiden')));
@@ -594,6 +616,19 @@ describe('sync loop', () => {
     const [before, writes, agreed] = [structuredClone(gist.data), gist.writes, desktop.loop.config?.baseUpdatedAt];
     gist.fail = new TypeError('Failed to fetch');
     await desktop.loop.resolve('mine');
+    expect([desktop.status, gist.data, gist.writes, desktop.loop.config?.baseUpdatedAt]).toEqual([{ kind: 'error', message: 'Failed to fetch' }, before, writes, agreed]);
+    gist.fail = null;
+    await desktop.loop.syncNow();
+    expect([desktop.status.kind, gist.data, gist.writes, names(desktop.state)]).toEqual(['conflict', before, writes, ['Scorpion', 'Kitana']]);
+
+    // The read goes through and the upload fails.
+    gist.holding = 'writes';
+    const keeping = desktop.loop.resolve('mine');
+    await settle();
+    expect(desktop.status.kind).toBe('syncing');
+    gist.fail = new TypeError('Failed to fetch');
+    await gist.release();
+    await keeping;
     expect([desktop.status, gist.data, gist.writes, desktop.loop.config?.baseUpdatedAt]).toEqual([{ kind: 'error', message: 'Failed to fetch' }, before, writes, agreed]);
     gist.fail = null;
     await desktop.loop.syncNow();
@@ -660,6 +695,26 @@ describe('sync loop', () => {
     expect(desktop.status.kind).toBe('error');
     expect(gist.data!.version).toBe(99);
     expect(names(desktop.state)).toEqual(['Scorpion', 'Kitana']);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 19 pass 3, state machines)
+  // Value: protects=Keep mine when an outdated build pushed while the prompt was open uploads this device's copy over
+  // it at the current version, agrees on that copy's stamp, and says another device is on an outdated build, as a sync
+  // does; fails_when=Keep mine offers the outdated copy as a new which-copy prompt (where Keep theirs would pull data
+  // that raises every level by one), shows synced without the warning, or leaves the agreed stamp behind;
+  // why_new=review (state machines): Keep mine was only tested with a gist copy from this build or a newer one;
+  // seam=the gist's copy is set by hand to one saved as version 2; no_claim=GitHub
+  it('keeping this device’s copy uploads over data an outdated build pushed while the prompt was open, and says so', async () => {
+    const { gist, phone, desktop } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    expect(desktop.status.kind).toBe('conflict');
+    gist.data = { ...structuredClone(desktop.state), version: 2, updatedAt: tick() } as unknown as AppState;
+    await desktop.loop.resolve('mine');
+    expect(desktop.status).toEqual({ kind: 'error', message: OUTDATED_MESSAGE });
+    expect([gist.data, gist.data!.version, desktop.loop.config?.baseUpdatedAt]).toEqual([desktop.state, defaultState().version, gist.data!.updatedAt]);
   });
 
   it('overwrites data from an outdated build, stamped so the other device takes it once updated', async () => {
