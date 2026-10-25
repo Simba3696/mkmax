@@ -30,6 +30,32 @@ function held() {
 }
 
 describe('card catalog fetched again', () => {
+  // Generated on 2026-10-25 (/ship adversarial review, run 19, Claude and Codex)
+  // Value: protects=a download that answers with JSON but no card list (an error served as JSON, a half-written deploy)
+  // counts as failed: a fetch-again keeps the copy here and tells no screen, and a first download rejects so the next
+  // lookup tries again; fails_when=the working catalog is swapped for nothing, so art lookups and the rarity check throw
+  // or find nothing for the rest of the session; why_new=adversarial review: the only outside data with no shape check;
+  // seam=fetch stubbed; no_claim=none beyond protects
+  it('treats a download with no card list as failed, keeping the copy it has', async () => {
+    const { loadCatalog, refreshCatalog, useCatalogVersion } = await fresh();
+    let body: unknown = { items: [item('Kori Blade')] };
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify(body))));
+    const kept = await loadCatalog();
+    const { result } = renderHook(() => useCatalogVersion());
+    const before = result.current;
+    for (const bad of [{}, { items: 'none' }, []]) {
+      body = bad;
+      await act(() => refreshCatalog());
+      expect([await loadCatalog(), result.current]).toEqual([kept, before]);
+    }
+
+    const first = await fresh();
+    body = {};
+    await expect(first.loadCatalog()).rejects.toThrow('no card list');
+    body = { items: [item('Kori Blade')] };
+    expect((await first.loadCatalog()).map((i) => i.name)).toEqual(['Kori Blade']);
+  });
+
   // Generated on 2026-10-25 (/ship coverage audit, run 16)
   // Value: protects=a fetch-again that fails (a pull while offline) keeps the catalog already downloaded, so Add card's
   // names and art lookups still work, and tells no screen to look again; fails_when=the kept copy is dropped, so the next

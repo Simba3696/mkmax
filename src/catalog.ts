@@ -63,8 +63,12 @@ function download(replace: boolean): Promise<CatalogItem[]> {
     })
     .then((text) => {
       if (good && (!replace || text === goodText)) return good;
+      // Something that isn't a card list (an error page served as JSON, a half-written deploy) counts as a failed
+      // download, so the copy here is kept.
+      const items = (JSON.parse(text) as { items?: unknown }).items;
+      if (!Array.isArray(items)) throw new Error('catalog.json: no card list');
       const changed = good || failed;
-      good = (JSON.parse(text) as { items: CatalogItem[] }).items;
+      good = items as CatalogItem[];
       goodText = text;
       if (changed) bump();
       return good;
