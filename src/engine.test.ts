@@ -2147,6 +2147,11 @@ describe('respellTower', () => {
     const typed = cards();
     const saved = { cards: cards(), rarities };
     unifyTowerSpellings(saved);
+    // Extended on 2026-10-25 (/ship coverage audit G5): a tower only cards hidden under a removed rarity name is saved
+    // tidied by the version 18 step too; fails_when=unifyTowerSpellings only trims a hidden card's tower.
+    const hiddenOnly = { cards: [{ ...card('Ghost Blade', ' Ghost  Tower '), rarityId: 'gone' }], rarities };
+    unifyTowerSpellings(hiddenOnly);
+    expect(hiddenOnly.cards[0].sourceNote).toBe('Ghost Tower');
     const spaced = [card('Fire Fan', 'Lin\u00a0Kuei  Tower')];
     expect([
       towerKey(' Lin  Kuei\u00a0Tower '),

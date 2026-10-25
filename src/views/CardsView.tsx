@@ -39,7 +39,7 @@ function SourceSelect({ kind, value, onChange }: { kind: RarityRule['kind']; val
   );
 }
 
-/** The Tower list's "Add or rename a tower…" choice; not a name anyone types. */
+/** The Tower list's "Add a tower or fix its spelling…" choice; not a name anyone types. */
 const NEW_TOWER = '\u0000new';
 
 /**
@@ -81,7 +81,7 @@ if (typeof document !== 'undefined') {
 function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintIn, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; respells: (name: string) => number; hintIn?: HTMLElement | null; className?: string; placeholder?: string }) {
   const pick = onPick ?? onChange;
   const hintId = useId();
-  // The name being typed, the tower an emptied box goes back to (the one the card had before Add or rename a tower… was picked,
+  // The name being typed, the tower an emptied box goes back to (the one the card had before Add a tower or fix its spelling… was picked,
   // or, if it opened on one, the name saved when the app was hidden; none in the plain box, which has no list to go back
   // to), and the tower this box last saved. Null while picking from the list, or before the first key in the plain box.
   const [edit, setEdit] = useState<TowerEdit | null>(null);
@@ -111,7 +111,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
   // A closed list steps through its towers with the arrow keys (and letters) on a computer, changing with each key. Each
   // step would save a tower with its own Undo, and stepping past the last tower would open the new-tower box, so a step
   // is held (shown, not saved) until the list is left or Enter is pressed (a held tower is also saved when the app is
-  // hidden): on a card, where each pick saves with Undo, any tower; anywhere, Add or rename a tower…, which leaving the list
+  // hidden): on a card, where each pick saves with Undo, any tower; anywhere, Add a tower or fix its spelling…, which leaving the list
   // drops. A tap or a click saves at once.
   // A key marks the change it makes before it's let go (a pick in a list a key opened is at worst held until it's left).
   const [held, setHeld] = useState<string | null>(null);
@@ -123,7 +123,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
   // hiding the app never saves a tower the list doesn't show.
   const heldNow = !edit && towers.length && (held === null || held === '' || held === NEW_TOWER || held === typed || towers.includes(held)) ? held : null;
   useEffect(() => void (held !== null && heldNow === null && setHeld(null)), [held, heldNow]);
-  // Leaving the list drops a held Add or rename a tower…; Enter opens its box.
+  // Leaving the list drops a held Add a tower or fix its spelling…; Enter opens its box.
   const settle = (v: string, enter: boolean) => {
     setHeld(null);
     if (v === NEW_TOWER) {
@@ -179,7 +179,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
       window.removeEventListener('focus', returned);
       clearTimeout(back);
       const { edit: e, onChange: write, held: h, settle: done } = openEdit.current;
-      // A held step is settled as leaving the list does: a tower is saved with Undo, Add or rename a tower… is dropped.
+      // A held step is settled as leaving the list does: a tower is saved with Undo, Add a tower or fix its spelling… is dropped.
       if (e) finishTower(e, write);
       else if (h !== null) done(h, false);
       // Closed now, not when the page is shown again: a hidden box still marked as being typed in holds an app update.
@@ -192,7 +192,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
     // Said before the name is finished, as the re-spell changes cards the user didn't touch.
     const name = edit ? towerName(edit.text) : '';
     const others = name ? respells(name) : 0;
-    const say = `Renames the tower on ${others} other card${others === 1 ? '' : 's'} when you finish`;
+    const say = `Fixes the spelling on ${others} other card${others === 1 ? '' : 's'} when you finish`;
     const hint =
       others > 0 &&
       (hintIn === undefined ? (
@@ -235,12 +235,13 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
             if (edit) finishTower(edit, onChange);
             setEdit(null);
           }}
-          // A box with a name open (typed in, or opened from Add or rename a tower…) turns into the list when it's left while the
+          // A box with a name open (typed in, or opened from Add a tower or fix its spelling…) turns into the list when it's left while the
           // list has towers; an untouched plain box doesn't rerender, so a flag set for it would wait and take focus the next
           // time the list shows, and an emptied plain box stays a box, which the flag would focus again.
           onKeyDown={(e) => {
             // An Enter that confirms a word in an input method (Chinese, Japanese) isn't the user finishing the name.
-            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            // Safari ends the composition before that Enter's keydown, which then only shows it by keyCode 229.
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return;
             if (!onEnter) {
               focusList.current = !!edit && towers.length > 0;
               return e.currentTarget.blur();
@@ -293,7 +294,7 @@ function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintI
           {t}
         </option>
       ))}
-      <option value={NEW_TOWER}>Add or rename a tower…</option>
+      <option value={NEW_TOWER}>Add a tower or fix its spelling…</option>
     </select>
   );
 }
@@ -575,7 +576,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         update makes Gold characters ascendable, add "Stage I" (Max A5) or "Stage II" (Max A10), like "Kenshi, Elder God - Gold - Stage I": a card not in your list
         was maxed, so it comes back at the cap below with 5 copies to go.
       </p>
-      <textarea value={text} onChange={(e) => (setText(e.target.value), setJustAdded(new Set()), remember())} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus />
+      {/* A list waiting in the box holds an app update's reload (appUpdate.ts), which would lose it. */}
+      <textarea value={text} onChange={(e) => (setText(e.target.value), setJustAdded(new Set()), remember())} placeholder={'Gold Kameo\nJade, Lizard\nKori Blade - Epic - Lin Kuei Tower - F2'} autoFocus data-editing={text.trim() ? '' : undefined} />
       <div className="text-small text-muted">
         {!state.rarities.length
           ? 'Add a rarity in Settings first: every card needs one.'

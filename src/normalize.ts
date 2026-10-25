@@ -219,7 +219,8 @@ export function normalize(input: unknown): AppState {
   pruneDone(out);
   // Version 18 saves each tower in one spelling, the one the Tower list shows. Older builds had a free text box, so one
   // tower could be saved in several capitals, and the spelling shown switched when the card it came from left the list.
-  // Done once: from then on a tower keeps one spelling (a new spelling typed on a card is saved on every card naming it).
+  // Done once: from then on a new spelling typed on a card is saved on every shown card naming it. Cards hidden under a
+  // rarity a sync removed keep the spelling this step gave them, and show the Tower list's spelling if they come back.
   // After pruneDone, so the spelling comes from cards that stay, as the list shows them.
   if (version < 18) unifyTowerSpellings(out);
   return out;

@@ -34,6 +34,33 @@ afterEach(() => {
 });
 
 describe('app update reload', () => {
+  // Generated on 2026-10-25 (/ship review, Red Team, Tower dropdown)
+  // Value: protects=the reload waits while a text box has focus (Add card's name, a rename), since the Undo bar's paused
+  // time can put it seconds after coming back, mid-word, and reloads once, after focus leaves the box; a checkbox
+  // with focus holds nothing; fails_when=only marked controls hold the reload, so a half-typed card name is lost, or
+  // leaving the box never reloads, or a second check reloads twice; why_new=review (Red Team); seam=none;
+  // no_claim=a real service worker update (registerSW mocked, location.reload stubbed)
+  it('waits while a text box has focus, and reloads once after it is left', async () => {
+    const box = document.createElement('input');
+    document.body.append(box);
+    box.focus();
+    sw.needReload();
+    expect(reload).not.toHaveBeenCalled();
+    box.blur();
+    document.dispatchEvent(new FocusEvent('focusout'));
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    reload.mockClear();
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    document.body.append(check);
+    check.focus();
+    sw.needReload();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)
   // Value: protects=a new build found with no pop-up and no Undo bar up reloads straight away; fails_when=the at-once
   // branch stops reloading, so the app keeps running the old build until something on the page changes or it's next
