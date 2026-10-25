@@ -16,16 +16,20 @@ export interface CatalogItem {
 export const catalogPageUrl = (item: CatalogItem) =>
   `https://mkmobilebase.com/en/category/${{ character: 'characters', equipment: 'equipment', kameo: 'kameos' }[item.kind]}/${item.slug}`;
 
-/** The last catalog that downloaded, and its text, so a download of the same file changes nothing. */
+/**
+ * The catalog in use (the newest download: a first download landing after a fetch-again doesn't replace it), and its
+ * text, so a download of the same file changes nothing.
+ */
 let good: CatalogItem[] | null = null;
 let goodText = '';
 /** The first download while there's no catalog yet. */
 let loading: Promise<CatalogItem[]> | null = null;
 let refreshing: Promise<unknown> | null = null;
-/** When the last download that worked finished, and whether any has been tried (the app only reads it when needed). */
+/** When the last download that worked finished. */
 let fetchedAt = 0;
+/** Whether any download has been tried, so coming back fetches nothing the app hasn't needed yet. */
 let tried = false;
-/** Bumped each time a fetched-again catalog differs, so screens using it can look again. */
+/** Bumped each time a fetch-again brings a catalog that differs from the copy here (or the first that worked). */
 let version = 0;
 const listeners = new Set<() => void>();
 /** A connection that hangs rather than fails gives up after this, so a pull or Find images doesn't wait for good. */
@@ -75,7 +79,8 @@ export function loadCatalog(): Promise<CatalogItem[]> {
  */
 export function refreshCatalog(): Promise<unknown> {
   const before = good;
-  refreshing ??= download(true)
+  // With no copy yet and the first download already out (a pull while the app is still starting), that one will do.
+  refreshing ??= (!good && loading ? loading : download(true))
     .then(
       (items) => {
         if (items === before) return;

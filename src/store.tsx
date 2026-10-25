@@ -69,12 +69,6 @@ interface StoreApi {
   discardUnreadable: () => void;
   /** This browser's save is from a newer version of MK Max: it's shown but nothing changes, saves or syncs until a reload. */
   newerSave: boolean;
-  /**
-   * Saves the data as it is now, at once. The usual save runs once the screen has drawn the change, which a reload
-   * straight after (pull to refresh with no service worker) can beat: a sync's pull would then be lost while its agreed
-   * stamp, saved at once, says this device has it.
-   */
-  saveNow: () => void;
 }
 
 const Ctx = createContext<StoreApi | null>(null);
@@ -122,7 +116,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           findOrCreateGist,
           getState: () => stateRef.current,
           applyRemote: (remote) => {
-            setLocal(normalize(remote));
+            const next = normalize(remote);
+            setLocal(next);
+            // Saved at once, not when the screen next draws: the loop saves the agreed stamp straight after, and a reload
+            // (or the app being closed) in between would leave the old data with a stamp saying this device has the gist's.
+            save(next);
             // The snapshot predates the other device's changes; restoring it would silently drop them.
             clearUndo();
           },
@@ -137,6 +135,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           },
           setLocal,
           saveConfig: (cfg) => {
+            // Held for a newer version's save: the sync settings belong to that version too (a sync already out when the
+            // hold began still finishes here, and its stamp must not say this browser has data it didn't save).
+            if (savedByNewerApp()) return;
             saveSyncConfig(cfg);
             setConnected(!!cfg);
           },
@@ -270,7 +271,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo, unreadable, discardUnreadable, newerSave, saveNow: () => save(stateRef.current) }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ state, update, replace, sync, lastUndo, undo, dismissUndo, unreadable, discardUnreadable, newerSave }}>{children}</Ctx.Provider>
   );
 }
 

@@ -310,6 +310,63 @@ describe('sync loop', () => {
     expect(names(gist.data)).toEqual([]);
   });
 
+  // Generated on 2026-10-25 (/ship review, run 16 pass 3, state machines + testing + Red Team)
+  // Value: protects=a sync asked for while Keep mine is uploading, or while Connect is still finding the gist, waits for
+  // that rather than returning at once, so a reload straight after doesn't cut it off (the choice to be asked again, or
+  // the device left disconnected); fails_when=only syncs that syncNow started are waited for; why_new=review: only a
+  // sync's own push was tested; seam=the fake gist holds the write or read open; no_claim=GitHub
+  it('waits for a Keep mine upload or a Connect already out', async () => {
+    const { gist, phone, desktop } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    expect(desktop.status.kind).toBe('conflict');
+    gist.holding = 'writes';
+    const keeping = desktop.loop.resolve('mine');
+    await settle();
+    let done = false;
+    const asked = desktop.loop.syncNow().then(() => void (done = true));
+    await settle();
+    expect(done).toBe(false);
+    await gist.release();
+    await Promise.all([keeping, asked]);
+    expect([done, names(gist.data)]).toEqual([true, ['Scorpion', 'Kitana']]);
+
+    const laptop = device(gist);
+    gist.holding = 'reads';
+    const connecting = laptop.loop.connect('token');
+    await settle();
+    let synced = false;
+    const pulled = laptop.loop.syncNow().then(() => void (synced = true));
+    await settle();
+    expect(synced).toBe(false);
+    await gist.release();
+    await Promise.all([connecting, pulled]);
+    expect([synced, names(laptop.state)]).toEqual([true, ['Scorpion', 'Kitana']]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 16 pass 3, state machines)
+  // Value: protects=Keep mine on a gist copy this build can't read uploads nothing, leaves both copies as they are, says
+  // so and looks for a new version once, and asks again once a build can read it; fails_when=Keep mine uploads this
+  // device's copy over data it can't read, or never asks again; why_new=review (state machines): only Keep theirs was
+  // tested with an unreadable copy; seam=the device's readable switch stands in for normalize; no_claim=none
+  it('keeping this device’s copy uploads nothing and looks for a new version when the gist can’t be read', async () => {
+    const { gist, phone, desktop } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    const writes = gist.writes;
+    desktop.readable = () => false;
+    await desktop.loop.resolve('mine');
+    expect([desktop.status.kind, desktop.lookedForUpdate, gist.writes]).toEqual(['error', 1, writes]);
+    expect([names(desktop.state), names(gist.data)]).toEqual([['Scorpion', 'Kitana'], ['Scorpion', 'Raiden']]);
+    desktop.readable = () => true;
+    await desktop.loop.syncNow();
+    expect(desktop.status.kind).toBe('conflict');
+  });
+
   // Generated on 2026-10-25 (/ship review, run 16, state machines + testing)
   // Value: protects=a sync asked for while one is already out (a pull to refresh during the push after an edit) waits for
   // it rather than returning at once, so a reload straight after doesn't cut the push off; fails_when=syncNow returns at

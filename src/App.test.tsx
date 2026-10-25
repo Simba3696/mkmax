@@ -68,6 +68,9 @@ const towers = () => {
 };
 
 describe('a new version', () => {
+  // Spies on SyncLoop.syncNow end with each test, even one that fails partway.
+  afterEach(() => vi.restoreAllMocks());
+
   // Generated on 2026-10-25 (/ship review, update approach)
   // Value: protects=a new version waiting is shown as a bar on the page with Reload, which switches to it, and nothing
   // shows while none is waiting; fails_when=the bar is missing so a new version is never taken up, or Reload does
@@ -134,7 +137,6 @@ describe('a new version', () => {
     const before = syncNow.mock.calls.length;
     await pull();
     expect([syncNow.mock.calls.length - before, appUpdate.checks, reload.mock.calls.length]).toEqual([1, 1, 0]);
-    syncNow.mockRestore();
   });
 
   // Generated on 2026-10-25 (/ship review, run 15 pass 3)
@@ -159,13 +161,29 @@ describe('a new version', () => {
     appUpdate.sw = false;
     localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
     const order: string[] = [];
-    const syncNow = vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(async () => void order.push('sync'));
+    vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(async () => void order.push('sync'));
     vi.stubGlobal('location', { ...location, reload: () => order.push('reload') });
     renderApp();
     order.length = 0;
     await pull();
     expect(order).toEqual(['sync', 'reload']);
-    syncNow.mockRestore();
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 16 pass 3, Red Team)
+  // Value: protects=where a service worker runs, a pull's spinner waits for sync at most 5 seconds too, so a sync stuck
+  // on a hanging connection doesn't keep it up and ignore later pulls; fails_when=the pull waits on the sync for good;
+  // why_new=review (Red Team): syncNow now waits for a sync already out, and GitHub's requests have no time limit;
+  // seam=appUpdate mocked, SyncLoop.syncNow spied to never answer, fake timers, touches sent by hand; no_claim=GitHub
+  it('lets a pull finish after 5 seconds when its sync hangs', async () => {
+    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
+    const syncNow = vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(() => new Promise(() => {}));
+    renderApp();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const before = syncNow.mock.calls.length;
+    await pull();
+    await act(() => vi.advanceTimersByTimeAsync(5600));
+    await pull();
+    expect(syncNow.mock.calls.length - before).toBe(2);
   });
 
   // Generated on 2026-10-25 (/ship review, run 16, testing)
@@ -176,7 +194,7 @@ describe('a new version', () => {
   it('reloads after 5 seconds when that sync hangs', async () => {
     appUpdate.sw = false;
     localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
-    const syncNow = vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(() => new Promise(() => {}));
+    vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(() => new Promise(() => {}));
     const reload = vi.fn();
     vi.stubGlobal('location', { ...location, reload });
     renderApp();
@@ -186,7 +204,6 @@ describe('a new version', () => {
     expect(reload).not.toHaveBeenCalled();
     await act(() => vi.advanceTimersByTimeAsync(1));
     expect(reload).toHaveBeenCalledTimes(1);
-    syncNow.mockRestore();
   });
 
   // Generated on 2026-10-25 (/ship review, run 16, Red Team)

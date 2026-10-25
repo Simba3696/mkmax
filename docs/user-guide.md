@@ -137,7 +137,7 @@ The order is Plan, Packs, Cards, Settings. Swiping doesn't wrap from Settings ba
 
 ### Pull to refresh
 
-Pull down from the top of any page. It re-reads the event schedule and the card catalog (new cards and art from the daily deploy) and checks for a new version of the app; with sync on, it also syncs now. It doesn't reload the page, so nothing you're typing is lost (except in a browser with no offline support, where reloading is the only way to update). The spinner only waits for the sync and the schedule; new cards, art and a new version show up by themselves once found. It doesn't work inside a pop-up.
+Pull down from the top of any page. It re-reads the event schedule and the card catalog (new cards and art from the daily deploy) and checks for a new version of the app; with sync on, it also syncs now. It doesn't reload the page, so nothing you're typing is lost (except in a browser with no offline support, where reloading is the only way to update). The spinner only waits for the sync (5 seconds at most) and the schedule; new cards, art and a new version show up by themselves once found. It doesn't work inside a pop-up.
 
 It works only on touch screens, and only when the page is scrolled to the top. The ↻ turns gold when you've pulled far enough.
 
@@ -595,7 +595,7 @@ The bottom of Settings shows which version you have and the date of that change,
 
 - An app left open looks for a new version when you pull to refresh, when you come back to it after half an hour or more, when sync or another tab finds data from a newer version, and when you import a backup from a newer version (and when it's fully closed and reopened). If a new version is out, a bar above every page, which stays put as you scroll, says **A new version of MK Max is ready** with **Reload**. MK Max never reloads by itself, so nothing you're in the middle of (a form, a pasted list, a pull you're logging) is lost; it switches when you tap Reload, or the next time it opens with no copy of it already open.
 - If you have MK Max open in more than one place, tapping Reload in one only reloads that one; the others keep the bar.
-- In a browser that doesn't run MK Max's offline support (a private window, or some apps' built-in browsers), there's no bar: pull to refresh reloads the page instead (after a sync pushes anything waiting), which loads a new version. There, a message that says to tap Reload when MK Max says a new version is ready means pull to refresh.
+- In a browser that doesn't run MK Max's offline support (a private window, or some apps' built-in browsers), there's no bar: pull to refresh reloads the page instead (after a sync, or a Connect or Keep mine already under way, finishes, for 5 seconds at most), which loads a new version. There, a message that says to tap Reload when MK Max says a new version is ready means pull to refresh.
 - The daily refresh of the event schedule and the card catalog isn't a new version, so it doesn't bring up the bar.
 - Updates never change your data, apart from the one-time upgrade of older saves.
 - Settings shows which [version](#version) you have.

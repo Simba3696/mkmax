@@ -113,18 +113,22 @@ export class SyncLoop {
     if (this.cfg && stamp(this.deps.getState()) > this.cfg.baseUpdatedAt) this.deps.schedulePush();
   }
 
+  /** Keeps `run` as the work to wait for until it ends. */
+  private track(run: Promise<void>) {
+    this.running = run;
+    const done = () => void (this.running === run && (this.running = null));
+    run.then(done, done);
+    return run;
+  }
+
   /**
-   * Pull if the gist moved on, push if only this device did, or report a conflict if both did. A sync already running
-   * is waited for rather than skipped, so a caller that reloads next (pull to refresh with no service worker) doesn't
-   * cut off its push.
+   * Pull if the gist moved on, push if only this device did, or report a conflict if both did. Sync work already out (a
+   * sync, Connect or Keep mine) is waited for rather than skipped, so a caller that reloads next (pull to refresh with no
+   * service worker) doesn't cut it off.
    */
   syncNow(): Promise<void> {
-    if (this.busy) return this.running ?? Promise.resolve();
-    const run = this.sync().finally(() => {
-      if (this.running === run) this.running = null;
-    });
-    this.running = run;
-    return run;
+    if (this.running) return this.running;
+    return this.track(this.sync());
   }
 
   private async sync() {
@@ -181,7 +185,11 @@ export class SyncLoop {
     }
   }
 
-  async connect(token: string) {
+  connect(token: string): Promise<void> {
+    return this.track(this.connectNow(token));
+  }
+
+  private async connectNow(token: string) {
     this.deps.onStatus({ kind: 'syncing' });
     try {
       // The copy a new gist is made from; edits made while GitHub answers come after it and still need pushing.
@@ -190,7 +198,7 @@ export class SyncLoop {
       // A new gist already holds this device's data; an existing one gets compared on the first sync.
       this.setConfig({ token, gistId, baseUpdatedAt: created ? stamp(snap) : 0 });
       this.deps.onStatus({ kind: 'idle', at: created ? this.deps.now() : null });
-      if (!created) await this.syncNow();
+      if (!created) await this.sync();
       else this.pushLaterEdits();
     } catch (e) {
       this.deps.onStatus({ kind: 'error', message: (e as Error).message });
@@ -206,7 +214,12 @@ export class SyncLoop {
     this.deps.onSettled();
   }
 
-  async resolve(keep: 'mine' | 'theirs') {
+  resolve(keep: 'mine' | 'theirs'): Promise<void> {
+    if (this.running) return this.running;
+    return this.track(this.resolveNow(keep));
+  }
+
+  private async resolveNow(keep: 'mine' | 'theirs') {
     const cfg = this.cfg;
     const shown = this.conflict;
     if (!cfg || !shown || this.busy) return;

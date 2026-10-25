@@ -33,6 +33,13 @@ export default defineConfig({
       workbox: {
         // Card art is hotlinked from MK Mobile Base and the MK Mobile wiki; keep a copy so thumbnails work offline.
         runtimeCaching: [
+          // The card catalog changes daily too, and is read whenever a card needs art or Cards opens: the last copy keeps
+          // the art lookup, rarity check and Maxed completion working offline.
+          {
+            urlPattern: /\/catalog\.json$/,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'catalog', networkTimeoutSeconds: 4, expiration: { maxEntries: 1 } },
+          },
           // The event schedule changes daily: always try the network, fall back to the last copy offline. On a
           // connection that hangs rather than fails, the last copy is used after 4 seconds instead of leaving the
           // shop list, challenge dates and season end missing until the request gives up.

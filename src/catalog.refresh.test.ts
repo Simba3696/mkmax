@@ -93,18 +93,20 @@ describe('card catalog fetched again', () => {
     expect(calls).toHaveLength(2);
   });
 
-  // Generated on 2026-10-25 (/ship review, run 16 pass 2, testing + state machines)
-  // Value: protects=when the first download lands after a pull's (a slow start), the pull's newer copy stays;
-  // fails_when=the older first download replaces it, so lookups get the copy from before the daily deploy;
-  // why_new=review: only the first download failing was tested; seam=fetch downloads settled by hand; no_claim=none
+  // Generated on 2026-10-25 (/ship review, run 16 pass 2, testing + state machines); changed by /ship review on
+  // 2026-10-25 (run 16 pass 3): a pull during the first download now shares it, so the two only overlap when a lookup
+  // starts the first download while a pull's is out
+  // Value: protects=when the first download lands after a pull's, the pull's newer copy stays; fails_when=the older first
+  // download replaces it, so lookups get the copy from before the daily deploy; why_new=review: only the first download
+  // failing was tested; seam=fetch downloads settled by hand; no_claim=none
   it('keeps the pull’s copy when the first download lands after it', async () => {
     const cat = await fresh();
     const calls = held();
-    const first = cat.loadCatalog();
     const pull = cat.refreshCatalog();
-    calls[1].res(new Response(JSON.stringify({ items: [item('Kori Blade'), item('Kitana Fan')] })));
+    const first = cat.loadCatalog();
+    calls[0].res(new Response(JSON.stringify({ items: [item('Kori Blade'), item('Kitana Fan')] })));
     await pull;
-    calls[0].res(new Response(JSON.stringify({ items: [item('Kori Blade')] })));
+    calls[1].res(new Response(JSON.stringify({ items: [item('Kori Blade')] })));
     await first;
     expect((await cat.loadCatalog()).map((i) => i.name)).toEqual(['Kori Blade', 'Kitana Fan']);
   });
@@ -137,34 +139,35 @@ describe('card catalog fetched again', () => {
 });
 
 describe('card catalog downloads that overlap', () => {
-  // Generated on 2026-10-25 (/ship review, run 16, state machines)
-  // Value: protects=a pull while the first download is still out keeps whichever copy arrives, and if both fail the next
-  // lookup downloads again; fails_when=the first download's failure drops the pull's copy, or a failed download stays
-  // cached so the catalog never loads again (Add card names, Find images, the Maxed page's Try again); why_new=review
-  // (state machines, testing); seam=fetch downloads settled by hand in either order; no_claim=none beyond protects
-  it('keeps the copy that arrives, and tries again after both fail', async () => {
+  // Generated on 2026-10-25 (/ship review, run 16, state machines); changed by /ship review on 2026-10-25 (run 16 pass
+  // 3): a pull during the first download now shares it rather than starting a second
+  // Value: protects=a pull while the first download is still out waits on that one (no second download on a slow
+  // connection), screens look again once it's in, and if it fails nothing stays cached, so the next lookup downloads
+  // again; fails_when=a pull starts a parallel download, or a failed download stays cached so the catalog never loads
+  // again (Add card names, Find images, the Maxed page's Try again); why_new=review (state machines, testing,
+  // performance); seam=fetch downloads settled by hand; no_claim=none beyond protects
+  it('shares the first download with a pull, and tries again after it fails', async () => {
     let cat = await fresh();
     let calls = held();
-    const first = cat.loadCatalog().catch(() => 'failed');
+    const { result } = renderHook(() => cat.useCatalogVersion());
+    const before = result.current;
+    const first = cat.loadCatalog();
     const pull = cat.refreshCatalog();
-    calls[0].rej(new Error('timeout'));
-    expect(await first).toBe('failed');
-    calls[1].res(new Response(JSON.stringify({ items: [item('Kori Blade')] })));
-    await pull;
-    expect((await cat.loadCatalog()).map((i) => i.name)).toEqual(['Kori Blade']);
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(1);
+    calls[0].res(new Response(JSON.stringify({ items: [item('Kori Blade')] })));
+    await act(() => pull);
+    expect([(await first).map((i) => i.name), result.current !== before]).toEqual([['Kori Blade'], true]);
 
     cat = await fresh();
     calls = held();
     const again = cat.loadCatalog().catch(() => 'failed');
     const pull2 = cat.refreshCatalog();
     calls[0].rej(new Error('timeout'));
-    await again;
-    calls[1].rej(new Error('timeout'));
+    expect(await again).toBe('failed');
     await pull2;
     const retry = cat.loadCatalog();
-    expect(calls).toHaveLength(3);
-    calls[2].res(new Response(JSON.stringify({ items: [] })));
+    expect(calls).toHaveLength(2);
+    calls[1].res(new Response(JSON.stringify({ items: [] })));
     await expect(retry).resolves.toEqual([]);
   });
 
