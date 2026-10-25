@@ -9,8 +9,12 @@ type Worker = EventTarget & { state: string };
 let app: typeof import('./appUpdate');
 let stop: () => void;
 let hooks: Hooks;
-/** The browser's service worker container: the worker running this page (null on one it doesn't control). */
-let sw: EventTarget & { controller: object | null };
+/**
+ * The browser's service worker container: the worker running this page (null on one it doesn't control), and the
+ * registration the site already had when the page started (none on a first visit).
+ */
+let sw: EventTarget & { controller: object | null; getRegistration: () => Promise<unknown> };
+let existing: unknown;
 let waiting: Worker;
 let reg: EventTarget & { waiting: Worker | null; installing: Worker | null; update: ReturnType<typeof vi.fn> };
 const update = vi.fn((_reload?: boolean) => Promise.resolve());
@@ -24,7 +28,8 @@ beforeEach(async () => {
   reload.mockClear();
   update.mockClear();
   vi.stubGlobal('location', { reload });
-  sw = Object.assign(new EventTarget(), { controller: {} as object | null });
+  existing = undefined;
+  sw = Object.assign(new EventTarget(), { controller: {} as object | null, getRegistration: () => Promise.resolve(existing) });
   Object.defineProperty(navigator, 'serviceWorker', { configurable: true, get: () => sw });
   waiting = worker('installed');
   reg = Object.assign(new EventTarget(), { waiting: waiting as Worker | null, installing: null as Worker | null, update: vi.fn(() => Promise.resolve()) });
@@ -136,7 +141,9 @@ describe('app update', () => {
       app = await import('./appUpdate');
       sw.controller = controller;
       reg.waiting = null;
-      stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', Object.assign(reg, { active }) as unknown as ServiceWorkerRegistration), update)) as never);
+      existing = active ? Object.assign(reg, { active }) : undefined;
+      stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', reg as unknown as ServiceWorkerRegistration), update)) as never);
+      await act(async () => {});
       const { result } = renderHook(() => app.useAppUpdateReady());
       const w = worker('installing');
       reg.installing = w;
@@ -164,7 +171,9 @@ describe('app update', () => {
       app = await import('./appUpdate');
       sw.controller = controlled ? {} : null;
       reg.waiting = waiting;
-      stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', Object.assign(reg, { active }) as unknown as ServiceWorkerRegistration), update)) as never);
+      existing = active ? Object.assign(reg, { active }) : undefined;
+      stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', reg as unknown as ServiceWorkerRegistration), update)) as never);
+      await act(async () => {});
       return renderHook(() => app.useAppUpdateReady()).result.current;
     };
     // A hard reload already runs the newest files, so the bar it gets is harmless: Reload switches and reloads.
@@ -246,8 +255,10 @@ describe('app update', () => {
     vi.resetModules();
     app = await import('./appUpdate');
     sw.controller = null;
-    // As the plugin does: registered before its first worker takes the page over, while that one is still installing.
-    stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', Object.assign(reg, { active: null, installing: worker('installing') }) as unknown as ServiceWorkerRegistration), update)) as never);
+    // As the plugin does: registered before its first worker takes the page over, here one so quick to install that the
+    // registration comes back with it already active. The site had no worker before, so it still isn't a new version.
+    stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', Object.assign(reg, { active: worker('activated'), installing: null }) as unknown as ServiceWorkerRegistration), update)) as never);
+    await act(async () => {});
     const first = renderHook(() => app.useAppUpdateReady());
     act(() => void sw.dispatchEvent(new Event('controllerchange')));
     expect(first.result.current).toBe(false);
@@ -259,7 +270,9 @@ describe('app update', () => {
     vi.resetModules();
     app = await import('./appUpdate');
     sw.controller = null;
-    stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', Object.assign(reg, { active: worker('activated') }) as unknown as ServiceWorkerRegistration), update)) as never);
+    existing = Object.assign(reg, { active: worker('activated') });
+    stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', reg as unknown as ServiceWorkerRegistration), update)) as never);
+    await act(async () => {});
     const reloaded = renderHook(() => app.useAppUpdateReady());
     act(() => void sw.dispatchEvent(new Event('controllerchange')));
     expect(reloaded.result.current).toBe(true);

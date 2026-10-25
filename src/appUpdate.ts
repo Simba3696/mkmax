@@ -16,7 +16,7 @@ function markReady() {
 }
 
 /**
- * A worker ran the site before this page did: the page started under one, or one was active when it registered (a hard
+ * A worker ran the site before this page did: the page started under one, or the site already had one active (a hard
  * reload runs no worker but has one). Then a version waiting or taking the page over is a newer one, not the first install.
  */
 let hadWorker = false;
@@ -40,6 +40,16 @@ export function startServiceWorker(register: typeof registerSW) {
   hadWorker = !!sw?.controller;
   const takenOver = () => (hadWorker ? markReady() : void (hadWorker = true));
   sw?.addEventListener('controllerchange', takenOver);
+  // A worker the site already had (a hard reload runs none but has one). Asked before this page registers, so a first
+  // visit's own worker never counts, however fast it installs.
+  void sw?.getRegistration().then(
+    (r) => {
+      if (!r?.active) return;
+      hadWorker = true;
+      if (registration) flagIfWaiting(registration);
+    },
+    () => {},
+  );
   // The browser looks for a new version as the app starts, so a return in the next half hour doesn't look again.
   checkedAt = Date.now();
   updateSW = register({
@@ -47,7 +57,6 @@ export function startServiceWorker(register: typeof registerSW) {
     onRegisteredSW: (_url, r) => {
       if (!r) return;
       registration = r;
-      if (r.active) hadWorker = true;
       // The library stops reporting new versions after the first one it sees (even one that failed to install), so
       // the app watches for them too.
       r.addEventListener('updatefound', () => {

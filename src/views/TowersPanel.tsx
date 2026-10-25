@@ -44,20 +44,22 @@ export default function TowersPanel() {
   // Grouped by towerKey: "Lin kuei tower" files with "Lin Kuei Tower". Each tower is spelled as the Tower list on Cards
   // spells it, whatever the filter shows.
   const spelling = towerSpellings(state);
-  const byTower = new Map<string, { tower: string; cards: Card[] }>();
+  const byTower = new Map<string, { tower: string; named: boolean; cards: Card[] }>();
   for (const c of gear) {
     if (!shown(c)) continue;
-    const t = c.sourceNote?.trim() || NO_TOWER;
-    const group = byTower.get(towerKey(t)) ?? { tower: spelling.get(towerKey(t)) ?? t, cards: [] };
+    const t = c.sourceNote?.trim();
+    // Gear with no tower gets a key no named tower has, even one typed as "Tower not named".
+    const key = t ? towerKey(t) : '';
+    const group = byTower.get(key) ?? { tower: t ? (spelling.get(key) ?? t) : NO_TOWER, named: !!t, cards: [] };
     group.cards.push(c);
-    byTower.set(towerKey(t), group);
+    byTower.set(key, group);
   }
   const rarityOrder = (c: Card) => state.rarities.findIndex((r) => r.id === c.rarityId);
   const towers = [...byTower.values()]
-    .map(({ tower, cards }) => ({ tower, cards: cards.sort((a, b) => rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name)) }))
+    .map(({ tower, named, cards }) => ({ tower, named, cards: cards.sort((a, b) => rarityOrder(a) - rarityOrder(b) || a.name.localeCompare(b.name)) }))
     // Towers listing the most gear first, counting pieces kept after a tap so a tap doesn't move its tower; the unnamed
     // group last.
-    .sort((a, b) => Number(a.tower === NO_TOWER) - Number(b.tower === NO_TOWER) || b.cards.length - a.cards.length || a.tower.localeCompare(b.tower));
+    .sort((a, b) => Number(!a.named) - Number(!b.named) || b.cards.length - a.cards.length || a.tower.localeCompare(b.tower));
   const total = gear.length;
 
   return (
@@ -81,8 +83,8 @@ export default function TowersPanel() {
       {/* Towers flow into columns on wide screens; break-inside keeps each tower's card whole. Columns rather than a
           grid so a short tower doesn't leave a gap under itself beside a long one. */}
       <div className="lg:columns-2 2xl:columns-3 lg:gap-[0.8rem]">
-        {towers.map(({ tower, cards }) => (
-          <section key={tower} className={`${card} break-inside-avoid`}>
+        {towers.map(({ tower, named, cards }) => (
+          <section key={named ? `tower:${tower}` : "none"} className={`${card} break-inside-avoid`}>
             <h2>
               {tower}{' '}
               <span className="text-muted text-small">{`${cards.filter((c) => fits(c, filter)).length} ${filter === 'all' ? 'left' : filter === 'unowned' ? 'not owned' : 'below threshold'}`}</span>

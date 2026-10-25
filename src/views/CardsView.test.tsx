@@ -3080,14 +3080,16 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect([(form.getByLabelText('Tower') as HTMLSelectElement).value, towerOf('Ryu Chain')]).toEqual(['', undefined]);
   });
 
-  // Generated on 2026-10-22 (/ship coverage audit, Tower dropdown)
+  // Generated on 2026-10-22 (/ship coverage audit, Tower dropdown); extended by /ship adversarial review on 2026-10-25
+  // (run 19) with a tower typed as "Tower not named"
   // Value: protects=tower gear with no tower (or only spaces) is listed under Tower not named on Tower gear, after the
-  // named towers even when it has more gear; fails_when=the heading lookup by the Tower list's spelling loses its
-  // fallback, so the unnamed group has no name, or it sorts in among the towers; why_new=the Tower gear tests all name a
-  // tower; seam=none; no_claim=none beyond protects
+  // named towers even when it has more gear, and a tower someone typed as "Tower not named" stays a tower of its own;
+  // fails_when=the heading lookup by the Tower list's spelling loses its fallback, so the unnamed group has no name, it
+  // sorts in among the towers, or that typed tower merges into it; why_new=the Tower gear tests all name a tower, and
+  // review (adversarial) found the typed name merging; seam=none; no_claim=none beyond protects
   it('lists tower gear with no tower under Tower not named, last', () => {
-    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('fan', 'Frost Fan'), tower('mask', 'Ryu Mask', '  ')], 'towers');
-    expect(screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((t) => /tower/i.test(t ?? ''))).toEqual(['Lin Kuei Tower 1 left', 'Tower not named 2 left']);
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('fan', 'Frost Fan'), tower('mask', 'Ryu Mask', '  '), tower('hook', 'Hook Swords', 'tower NOT named')], 'towers');
+    expect(screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((t) => /tower/i.test(t ?? ''))).toEqual(['Lin Kuei Tower 1 left', 'tower NOT named 1 left', 'Tower not named 2 left']);
   });
   // Generated on 2026-10-22 (/ship review, Tower dropdown)
   // Value: protects=a tower gear card's source chip names its tower as the Tower list spells it, so a card saved as
