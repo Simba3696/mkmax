@@ -48,6 +48,8 @@ function device(gist: FakeGist, state: AppState = defaultState(), cfg: SyncConfi
     state,
     status: { kind: 'off' } as SyncStatus,
     pushes: 0,
+    /** How many times it looked for a new version of the app. */
+    lookedForUpdate: 0,
     settled: false,
     /** Whether this device's build can load a copy; the store's normalize throws on one it can't. */
     readable: (_s: AppState) => true,
@@ -82,6 +84,7 @@ function device(gist: FakeGist, state: AppState = defaultState(), cfg: SyncConfi
       onSettled: () => (d.settled = true),
       schedulePush: () => d.pushes++,
       cancelPush: () => {},
+      lookForUpdate: () => void d.lookedForUpdate++,
       now: () => clock + skew,
     },
     cfg,
@@ -307,7 +310,7 @@ describe('sync loop', () => {
     expect(names(gist.data)).toEqual([]);
   });
 
-  it('neither pulls nor pushes data from a newer build', async () => {
+  it('neither pulls nor pushes data from a newer build, and looks for the new version', async () => {
     const { gist, phone, desktop } = await pair();
     // The desktop, already on a newer build, pushes data saved in a newer version.
     desktop.edit((s) => s.cards.push(card('Kitana')));
@@ -319,6 +322,9 @@ describe('sync loop', () => {
     expect(names(gist.data)).toEqual(['Scorpion', 'Kitana']);
     expect(gist.data!.version).toBe(99);
     expect(phone.pushes).toBe(0);
+    // Finding it only brings up the new-version bar, so nothing in progress is lost; a sync that found nothing newer
+    // doesn't look.
+    expect([phone.lookedForUpdate, desktop.lookedForUpdate]).toEqual([1, 0]);
   });
 
   it('keeping this device’s copy doesn’t overwrite data a newer build pushed while the prompt was open', async () => {

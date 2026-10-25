@@ -76,7 +76,6 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: (sh
     <div
       className="fixed left-1/2 -translate-x-1/2 z-[8] bottom-[calc(70px+env(safe-area-inset-bottom))] md:bottom-6 md:left-[calc(50%+44px)] lg:left-[calc(50%+110px)] w-[calc(100%-2rem)] max-w-[480px] flex items-center gap-[0.3rem] bg-panel-2 border border-line rounded-card py-[0.3rem] pr-[0.3rem] pl-[0.9rem] shadow-[0_4px_16px_rgba(0,0,0,0.6)] text-[0.9rem]"
       role="status"
-      data-undo
     >
       <span className="flex-1 min-w-0 truncate">{entry.label}</span>
       <button className={`${btn.ghost} text-gold font-bold`} onPointerDown={() => void (pressed.current = entry)} onClick={(e) => onUndo(shown(e))}>
@@ -197,9 +196,9 @@ export default function App() {
       if (next) go(next.id);
     },
   });
-  // With sync on, a pull checks the gist and re-reads the event schedule. Without sync there's nothing remote to
-  // fetch, so reload, which picks up app updates and the schedule too.
-  const refresh = () => (sync.connected ? Promise.all([sync.syncNow(), refreshEvents(), checkForAppUpdate()]) : Promise.resolve(location.reload()));
+  // A pull re-reads the event schedule, looks for a new version and, with sync on, checks the gist. It never reloads:
+  // a reload wouldn't switch to a new version (only the bar's Reload does) and would lose whatever is half typed.
+  const refresh = () => Promise.all([sync.connected && sync.syncNow(), refreshEvents(), checkForAppUpdate()]);
 
   const syncPill = (extra: string) =>
     sync.status.kind !== 'off' && (
@@ -273,28 +272,33 @@ export default function App() {
         <span className="text-muted text-small">Pack planner</span>
         {syncPill('ml-auto')}
       </header>
-      <main data-scroll-root className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch]">
-        <div className="max-w-page md:max-w-[1400px] mx-auto p-4 md:px-6 md:py-6 lg:px-8" ref={pageRef}>
-          {/* On every tab, since nothing a tap does is saved meanwhile. */}
-          {newerSave && (
-            <p className={`${hint} mt-0 mb-4 md:max-w-[80ch]`} role="alert">
-              {NEWER_SAVE_MESSAGE}
-            </p>
-          )}
-          {updateReady && (
-            <div className={`${hint} mt-0 mb-4 md:max-w-[80ch] flex items-center gap-3`} role="status">
-              <span className="flex-1">A new version of MK Max is ready.</span>
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+        {/* A fixed row above the scrolling page rather than in it, so it's seen wherever the page is scrolled to. */}
+        {updateReady && (
+          <div className="flex-none bg-hint border-b border-line" role="status">
+            <div className="max-w-page md:max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-2 flex items-center gap-3 text-[0.85rem]">
+              <span className="flex-1 border-l-[3px] border-gold pl-[0.6rem]">A new version of MK Max is ready.</span>
               <button className={btn.primary} onClick={applyAppUpdate}>
                 Reload
               </button>
             </div>
-          )}
-          {tab === 'plan' && <PlanView goto={go} openPack={openPack} />}
-          {tab === 'packs' && <PacksView focus={focusPack} onFocused={() => setFocusPack(null)} />}
-          {tab === 'cards' && <CardsView sub={cardsPage} onSub={setCardsPage} />}
-          {tab === 'settings' && <SettingsView />}
-        </div>
-      </main>
+          </div>
+        )}
+        <main data-scroll-root className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch]">
+          <div className="max-w-page md:max-w-[1400px] mx-auto p-4 md:px-6 md:py-6 lg:px-8" ref={pageRef}>
+            {/* On every tab, since nothing a tap does is saved meanwhile. */}
+            {newerSave && (
+              <p className={`${hint} mt-0 mb-4 md:max-w-[80ch]`} role="alert">
+                {NEWER_SAVE_MESSAGE}
+              </p>
+            )}
+            {tab === 'plan' && <PlanView goto={go} openPack={openPack} />}
+            {tab === 'packs' && <PacksView focus={focusPack} onFocused={() => setFocusPack(null)} />}
+            {tab === 'cards' && <CardsView sub={cardsPage} onSub={setCardsPage} />}
+            {tab === 'settings' && <SettingsView />}
+          </div>
+        </main>
+      </div>
       {lastUndo && <UndoToast entry={lastUndo} onUndo={undo} onDismiss={dismissUndo} />}
       <nav
         aria-label="Tabs"

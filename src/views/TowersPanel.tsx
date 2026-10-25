@@ -95,12 +95,19 @@ export default function TowersPanel() {
               // already shows it as copies to its goal.
               const thr = thresholdLevel(rule);
               const toThr = filter === 'belowThreshold' && thr != null && thr < target && belowThreshold(c) ? copiesToThreshold(c, rule) : 0;
+              // Listed only because it was tapped out of the filter: dimmed and labelled, since the counts leave it out.
+              const kept = !fits(c, filter);
               return (
                 <div key={c.id} className={`${row} items-center`}>
-                  <CardThumb card={c} rule={rule} size={36} />
+                  <div className={kept ? 'opacity-60' : undefined}>
+                    <CardThumb card={c} rule={rule} size={36} />
+                  </div>
                   <div className={grow}>
-                    <div className={rowTitle}>{c.name}</div>
-                    <div className="text-small">
+                    <div className={rowTitle}>
+                      <span className={kept ? 'opacity-60' : undefined}>{c.name}</span>
+                      {kept && <span className="text-muted text-small font-normal">{filter === 'unowned' ? ' · Owned now' : ' · At the kard threshold now'}</span>}
+                    </div>
+                    <div className={`text-small${kept ? ' opacity-60' : ''}`}>
                       <RarityBadge rule={rule} />
                       <span className="text-muted">
                         {' '}

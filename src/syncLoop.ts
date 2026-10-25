@@ -31,6 +31,8 @@ export interface SyncDeps {
   /** Run a sync a moment from now (the store debounces it), for edits that still need pushing. */
   schedulePush: () => void;
   cancelPush: () => void;
+  /** Look for a new version of MK Max; finding one only brings up the new-version bar. */
+  lookForUpdate: () => void;
   now: () => number;
 }
 
@@ -81,12 +83,10 @@ export class SyncLoop {
     return kept;
   }
 
-  /**
-   * Neither pull nor push until this device runs the newer build; the regular pulls check again. It doesn't look for
-   * the update itself: the new-version bar does that (appUpdate.ts). A background sync can land at any moment.
-   */
+  /** Neither pull nor push until this device runs the newer build; the regular pulls check again. */
   private waitForNewerApp() {
     this.deps.onStatus({ kind: 'error', message: NEWER_MESSAGE });
+    this.deps.lookForUpdate();
   }
 
   /**

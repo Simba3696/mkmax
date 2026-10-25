@@ -4,6 +4,7 @@ import { normalize } from './normalize';
 import { pruneDone } from './engine';
 import { NEWER_SAVE_MESSAGE, findOrCreateGist, loadSyncConfig, readRemote, saveSyncConfig, writeRemote } from './sync';
 import { SyncLoop, type SyncStatus } from './syncLoop';
+import { checkForAppUpdate } from './appUpdate';
 import { discardUnreadable as removeUnreadable, holdIfNewer, load, loadUnreadable, save, savedByNewerApp } from './storage';
 
 export { normalize };
@@ -137,6 +138,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           onSettled: () => setSettled(true),
           schedulePush: () => schedulePush(),
           cancelPush: () => clearTimeout(pushTimer.current),
+          lookForUpdate: () => void checkForAppUpdate(),
           now: () => Date.now(),
         },
         loadSyncConfig(),
@@ -183,6 +185,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setNewerSave(true);
       clearUndo();
       if (loop.config) setStatus({ kind: 'error', message: NEWER_SAVE_MESSAGE });
+      void checkForAppUpdate();
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);

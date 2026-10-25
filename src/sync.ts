@@ -110,14 +110,14 @@ const VERSION = defaultState().version;
 export const fromNewerApp = (s: AppState) => ((s.version as number | undefined) ?? 1) > VERSION;
 
 export const NEWER_MESSAGE =
-  'Another device synced data from a newer version of MK Max, so this device won’t sync until it’s updated. Pull down to refresh, or close MK Max and open it again.';
+  'Another device synced data from a newer version of MK Max, so this device won’t sync until it’s updated. Tap Reload when MK Max says a new version is ready, or close MK Max and open it again.';
 
 /** Shown while this device's own save is from a newer version (see savedByNewerApp in storage.ts). */
 export const NEWER_SAVE_MESSAGE =
   'The data saved in this browser is from a newer version of MK Max. This version only shows it: changes aren’t saved and sync is paused until MK Max updates. Pull down to refresh and tap Reload when MK Max says a new version is ready, or close MK Max and open it again.';
 
 export const UNREADABLE_MESSAGE =
-  'This version of MK Max can’t read the data in your gist, so this device won’t sync until it’s updated. The gist’s copy is left as it is. Pull down to refresh later, or close MK Max and open it again.';
+  'This version of MK Max can’t read the data in your gist, so this device won’t sync until it’s updated. The gist’s copy is left as it is. Tap Reload when MK Max says a new version is ready, or close MK Max and open it again.';
 
 /**
  * What a sync should do, given the gist's copy, this device's copy, and the version both last agreed on.

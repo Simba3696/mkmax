@@ -11,8 +11,8 @@ import { SyncLoop } from './syncLoop';
 import App from './App';
 
 // The service worker module imports vite-plugin-pwa's virtual module, which only exists in a build; it isn't what's tested.
-const appUpdate = vi.hoisted(() => ({ ready: false, apply: vi.fn() }));
-vi.mock('./appUpdate', () => ({ checkForAppUpdate: () => Promise.resolve(), useAppUpdateReady: () => appUpdate.ready, applyAppUpdate: appUpdate.apply }));
+const appUpdate = vi.hoisted(() => ({ ready: false, apply: vi.fn(), checks: 0 }));
+vi.mock('./appUpdate', () => ({ checkForAppUpdate: () => (appUpdate.checks++, Promise.resolve()), useAppUpdateReady: () => appUpdate.ready, applyAppUpdate: appUpdate.apply }));
 
 beforeEach(() => {
   // The catalog and the event schedule are fetched at start; neither matters here, so stay offline.
@@ -21,6 +21,9 @@ beforeEach(() => {
   // jsdom says the page has focus only while an element holds it; a real window has focus whatever holds it, and a Tower
   // box ignores a blur that comes with the window losing focus.
   vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+  appUpdate.ready = false;
+  appUpdate.apply.mockClear();
+  appUpdate.checks = 0;
 });
 afterEach(() => {
   cleanup();
@@ -73,7 +76,64 @@ describe('a new version', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
     expect([screen.queryByText('A new version of MK Max is ready.') != null, appUpdate.apply.mock.calls.length]).toEqual([true, 1]);
-    appUpdate.ready = false;
+    // Extended on 2026-10-25 (/ship coverage audit, Tower dropdown)
+    // Value: protects=the bar shows on every page, as the user guide says, not only on the Plan; fails_when=the bar is
+    // moved into one page, so someone on Cards or Settings never sees the update; why_new=the bar was only checked on
+    // the Plan; seam=appUpdate mocked (its ready flag); no_claim=a real service worker update (appUpdate.test.ts)
+    const shown = ['Packs', 'Cards', 'Settings'].map((name) => (fireEvent.click(tab(name)), screen.queryByText('A new version of MK Max is ready.') != null));
+    expect(shown).toEqual([true, true, true]);
+    // Extended on 2026-10-25 (/ship review, run 15 pass 2, design)
+    // Value: protects=the bar sits outside the scrolling page, so it's seen wherever the page is scrolled to;
+    // fails_when=it's put back in the page and scrolls away down a long list; why_new=review (design); seam=none;
+    // no_claim=how it looks (checked in the browser)
+    expect(screen.getByText('A new version of MK Max is ready.').closest('[data-scroll-root]')).toBeNull();
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 15 pass 2)
+  // Value: protects=pull to refresh without sync looks for a new version instead of reloading the page; fails_when=it
+  // reloads, which loses whatever is half typed and, with the new version only switched to by Reload, never loads it;
+  // why_new=review (Red Team); seam=appUpdate mocked (counting its checks), touches sent by hand; no_claim=real touch
+  // timing
+  it('is looked for by pull to refresh, which no longer reloads', async () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...location, reload });
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const touch = (y: number) => ({ touches: [{ clientX: 0, clientY: y }] });
+    fireEvent.touchStart(window, touch(0));
+    fireEvent.touchMove(window, touch(200));
+    await act(async () => void fireEvent.touchEnd(window));
+    expect([appUpdate.checks, reload.mock.calls.length]).toEqual([1, 0]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 15 pass 2)
+  // Value: protects=once another tab saves data from a newer version, this tab looks for that version, and its bar shows
+  // beside the notice that nothing is saved; fails_when=nothing looks, so the tab stays on the old build with every tap
+  // ignored until the user happens to pull, or the notice hides the bar; why_new=review (data migration); seam=appUpdate
+  // mocked (counting its checks, its ready flag), a StorageEvent dispatched by hand stands in for the other tab;
+  // no_claim=a real service worker update
+  it('is looked for when another tab saves data from a newer version, and its bar shows with the notice', () => {
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <App />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const newer = JSON.stringify({ ...defaultState(), version: 99 });
+    act(() => {
+      localStorage.setItem('mkmax:v1', newer);
+      window.dispatchEvent(new StorageEvent('storage', { key: 'mkmax:v1', newValue: newer }));
+    });
+    expect(appUpdate.checks).toBe(1);
+    appUpdate.ready = true;
+    fireEvent.click(tab('Cards'));
+    expect([screen.queryByText(/^The data saved in this browser is from a newer version/) != null, screen.queryByRole('button', { name: 'Reload' }) != null]).toEqual([true, true]);
   });
 });
 
@@ -698,7 +758,7 @@ describe('the Undo bar', () => {
 
   // Generated on 2026-10-22 (/ship review, Red Team, Tower dropdown)
   // Value: protects=a page restored from the back-forward cache with only pageshow (no visibility change) gives the bar
-  // its 8 seconds again, so it doesn't stay up for good (holding an app update's reload); fails_when=only a visibility
+  // its 8 seconds again, so it doesn't stay up for good; fails_when=only a visibility
   // change restarts the time paused on hiding; why_new=review (Red Team); seam=fake timers, document.visibilityState
   // mocked, a pageshow with persisted sent by hand; no_claim=which browsers skip the visibility change
   it('restarts its time when the page is restored with only pageshow', () => {

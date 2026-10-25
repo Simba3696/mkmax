@@ -10,7 +10,9 @@ import { ghostBordered } from '../classes';
 import SettingsView from './SettingsView';
 
 // The service worker module imports vite-plugin-pwa's virtual module, which only exists in a build; it isn't what's tested.
-vi.mock('../appUpdate', () => ({ checkForAppUpdate: () => Promise.resolve(), startServiceWorker: () => {} }));
+// Update checks are counted, as importing a backup from a newer version looks for the update.
+const appUpdate = vi.hoisted(() => ({ checks: 0 }));
+vi.mock('../appUpdate', () => ({ checkForAppUpdate: () => (appUpdate.checks++, Promise.resolve()), startServiceWorker: () => {} }));
 
 /** Hands the store, as each render sees it, to the test, as any view would use it. */
 function Grab({ onRender }: { onRender: (store: ReturnType<typeof useStore>) => void }) {
@@ -775,6 +777,30 @@ describe('Settings backups and sync with a save from a newer version', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Export backup' }));
     expect([await file!.text(), (screen.getByRole('button', { name: 'Sync now' }) as HTMLButtonElement).disabled]).toEqual([raw, true]);
+  });
+});
+
+describe('Import backup with a backup from a newer version', () => {
+  // Generated on 2026-10-25 (/ship coverage audit, Tower dropdown)
+  // Value: protects=Import backup refuses a backup from a newer version, keeps the save as it was, says to tap Reload,
+  // and looks for the update so the new-version bar can show; fails_when=the newer check is dropped (the backup is saved
+  // in this build's older format), or the update check goes, so no bar ever offers Reload; why_new=no test imported a
+  // file; seam=none; no_claim=the bar itself (App.test.tsx) and a real update check (checkForAppUpdate mocked)
+  it('refuses it, keeps the save, and looks for the update', async () => {
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <SettingsView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const before = appUpdate.checks;
+    const backup = { ...defaultState(), version: 99, dismissedShopPacks: ['From the backup'] };
+    const file = new File([JSON.stringify(backup)], 'mkmax-backup.json', { type: 'application/json' });
+    fireEvent.change(document.querySelector('input[type=file]')!, { target: { files: [file] } });
+    expect(await screen.findByText(/^This backup is from a newer version of MK Max\. Tap Reload when/)).toBeTruthy();
+    const saved = JSON.parse(localStorage.getItem('mkmax:v1')!);
+    expect([saved.dismissedShopPacks, saved.version < 99, appUpdate.checks - before]).toEqual([[], true, 1]);
   });
 });
 

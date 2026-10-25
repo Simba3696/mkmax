@@ -2437,8 +2437,14 @@ describe('Tower gear: the kard threshold filter', () => {
     // count gear you own; fails_when=the counts include pieces kept listed after a tap; why_new=the Not owned test taps a
     // piece still below the threshold, so both counts agree anyway; seam=none; no_claim=none beyond protects
     expect(options()[2]).toBe('Not owned (0)');
+    // Extended on 2026-10-25 (/ship review, run 15 pass 2, design)
+    // Value: protects=a piece kept listed after a tap says why (it no longer fits the filter), and loses that note when
+    // tapped back; fails_when=a kept piece looks like the others, so the heading's count and the rows shown disagree with
+    // nothing saying why; why_new=review (Codex design); seam=none; no_claim=how dimmed it looks
+    expect(screen.queryByText('· At the kard threshold now')).not.toBeNull();
     // Tapped back to F2, it's still listed and counted again, once.
     act(() => screen.getByRole('button', { name: 'Lower level' }).click());
+    expect(screen.queryByText('· At the kard threshold now')).toBeNull();
     const back = JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
     expect([back.find((c) => c.id === 'kori')?.fusion, names(), options()[1], screen.queryByText('1 below threshold') != null]).toEqual([3, ['Kori Blade'], 'Below kard threshold (1)', true]);
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
@@ -2515,6 +2521,10 @@ describe('Tower gear: the kard threshold filter', () => {
     act(() => within(section('Lin Kuei Tower')!).getByRole('button', { name: 'Raise level' }).click());
     const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; fusion: number }[];
     expect([saved().find((c) => c.id === 'kori')?.fusion, names(), options()[2], section('Lin Kuei Tower')!.querySelector('h2')!.textContent]).toEqual([1, ['Kori Blade', 'Noob Mask'], 'Not owned (1)', 'Lin Kuei Tower 0 not owned']);
+    // Extended on 2026-10-25 (/ship review, run 15 pass 2, design)
+    // Value: protects=a piece kept listed after a tap says why (it no longer fits the filter), under Not owned too; fails_when=a kept piece looks like the others, so the heading's count and the rows shown disagree with
+    // nothing saying why; why_new=review (Codex design); seam=none; no_claim=how dimmed it looks
+    expect([within(section('Lin Kuei Tower')!).queryByText('· Owned now') != null, within(section('Shirai Ryu Tower')!).queryByText('· Owned now')]).toEqual([true, null]);
 
     fireEvent.change(filter, { target: { value: 'all' } });
     fireEvent.change(filter, { target: { value: 'unowned' } });

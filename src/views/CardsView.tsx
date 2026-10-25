@@ -1229,7 +1229,7 @@ function CardList() {
                   </label>
                 )}
                 {(rule.kind !== 'character' || c.source) && <SourceSelect kind={rule.kind} value={c.source} onChange={(v) => patch(c.id, { source: v, sourceNote: undefined })} />}
-                {c.source === 'tower' && <TowerSelect className="w-[11rem] md:w-auto md:min-w-[11rem]" placeholder="Tower name" towers={towers} value={c.sourceNote} respells={(t) => towerRespells(state, t, c.id)} onChange={(v, over) => setTower(c.id, v, over)} onPick={(v) => setTower(c.id, v, undefined, v ? `${c.name}: tower set to ${v}` : `${c.name}: tower removed`)} />}
+                {c.source === 'tower' && <TowerSelect className="w-[11rem] md:w-[19rem]" placeholder="Tower name" towers={towers} value={c.sourceNote} respells={(t) => towerRespells(state, t, c.id)} onChange={(v, over) => setTower(c.id, v, over)} onPick={(v) => setTower(c.id, v, undefined, v ? `${c.name}: tower set to ${v}` : `${c.name}: tower removed`)} />}
                 <button className={btn.ghost} onClick={() => setImageEditId(imageEditId === c.id ? null : c.id)}>
                   Image
                 </button>
