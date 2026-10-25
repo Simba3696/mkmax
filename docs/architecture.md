@@ -34,7 +34,7 @@ flowchart TB
   Store["store.tsx, planner.tsx, storage.ts, syncLoop.ts<br/>(state, undo, shared plan, persistence, sync loop)"]
   Engine["engine.ts<br/>(pure: scoring, planner, kard plan, forecasts, purchases, pack saving)"]
   Data["normalize.ts, defaults.ts, challenges.ts, kaskets.ts, names.ts, types.ts<br/>(save shape, migrations and built-in game data)"]
-  Ext["events.ts, catalog.ts, wiki.ts, sync.ts<br/>(external data)"]
+  Ext["events.ts, catalog.ts, wiki.ts, sync.ts, appUpdate.ts<br/>(external data, app updates)"]
   Views --> Store
   Views --> Engine
   Views --> Ext
