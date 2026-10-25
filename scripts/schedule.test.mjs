@@ -46,6 +46,25 @@ describe('event schedule script', () => {
     ]);
   });
 
+  // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 6)
+  // Value: protects=a schedule whose packs, challenges or seasons lose their names fails, so the deploy keeps the live
+  // copy rather than one that breaks the Cards and Plan tabs, which read every name; fails_when=the name check is
+  // dropped or misses one of the three lists; why_new=parseSchedule only checked sections and counts; seam=none;
+  // no_claim=what the app does with a nameless entry in a copy it already has
+  it('fails rather than writing an entry with no name', () => {
+    const kold = [week('Kold', '30 September 2026, 16:00 UTC', '7 October 2026, 16:00 UTC')];
+    const nameless = (edit) => {
+      const schedule = api({ packs: [pack], current: kold, upcoming: [] });
+      edit(schedule);
+      return () => parseSchedule(schedule);
+    };
+    const dates = { Start: '30 September 2026, 16:00 UTC', End: '7 October 2026, 16:00 UTC' };
+    expect(nameless(() => {})).not.toThrow();
+    expect(nameless((s) => (s.pages[0].sections[0].records = [{ ...pack, name: '' }]))).toThrow(/no name/);
+    expect(nameless((s) => (s.pages[1].sections[0].records = [record(undefined, dates)]))).toThrow(/no name/);
+    expect(nameless((s) => (s.pages[2].sections[0].records = [week('', dates.Start, dates.End)]))).toThrow(/no name/);
+  });
+
   it("keeps the season's earlier weeks after the site drops them, so an extended season is still one season", () => {
     // Captured during Kold's first week: Kold, then (added late) a second Kold week.
     const before = parseSchedule(

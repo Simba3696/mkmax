@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -9,13 +9,25 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'mkmax-fetch-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
+// Starts both stand-ins for fetch below: a request counts as limited only when its signal came from
+// AbortSignal.timeout, so a signal that never fires doesn't pass for a time limit.
+const trackTimeouts = `const timed = new WeakSet();
+const timeout = AbortSignal.timeout.bind(AbortSignal);
+AbortSignal.timeout = (ms) => {
+  const signal = timeout(ms);
+  timed.add(signal);
+  return signal;
+};
+const note = (url, opts) => process.stderr.write('REQUEST ' + JSON.stringify({ url: String(url), limited: timed.has(opts.signal) }) + '\\n');
+`;
+
 // Loaded before the script in place of the real fetch: it notes whether each request has a time limit, then fails
 // the way an unreachable MK Mobile Base would, so nothing goes over the network.
 const stub = join(dir, 'offline.mjs');
 writeFileSync(
   stub,
-  `globalThis.fetch = async (url, opts = {}) => {
-  process.stderr.write('REQUEST ' + JSON.stringify({ url: String(url), limited: opts.signal instanceof AbortSignal }) + '\\n');
+  `${trackTimeouts}globalThis.fetch = async (url, opts = {}) => {
+  note(url, opts);
   throw new Error('offline');
 };
 `,
@@ -30,6 +42,13 @@ function scratchRepo(script) {
   return root;
 }
 
+/** The requests a run noted on stderr. */
+const requestsOf = (stderr) =>
+  stderr
+    .split('\n')
+    .filter((line) => line.startsWith('REQUEST '))
+    .map((line) => JSON.parse(line.slice('REQUEST '.length)));
+
 /**
  * Runs a copy of a download script offline, with the committed file it writes seeded into its public folder: its exit
  * code, the requests it made, and whether that file is untouched.
@@ -40,23 +59,23 @@ function runOffline(script, output) {
   copyFileSync(output, seeded);
   const before = readFileSync(seeded);
   const copy = join(root, 'scripts', basename(script));
+  // PAGES_URL as the deploy sets it, so the deploy's own test run (which has it set) runs the same way.
   const result = spawnSync(process.execPath, ['--import', pathToFileURL(stub).href, copy], {
     encoding: 'utf8',
     timeout: 20_000,
+    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax' },
   });
-  const requests = result.stderr
-    .split('\n')
-    .filter((line) => line.startsWith('REQUEST '))
-    .map((line) => JSON.parse(line.slice('REQUEST '.length)));
-  return { status: result.status, requests, unchanged: readFileSync(seeded).equals(before) };
+  return { status: result.status, requests: requestsOf(result.stderr), unchanged: readFileSync(seeded).equals(before) };
 }
 
-// Loaded in place of the real fetch when MK Mobile Base answers: every catalog category has two pages, the schedule has
-// one pack and one current season, and the live events.json has no past weeks. Each request is noted as above.
+// Loaded in place of the real fetch when MK Mobile Base answers: every catalog category has two pages of cards with
+// art, the schedule has one pack and one current season, and the live events.json has no past weeks. Each request is
+// noted as above. STUB_CHANGE makes the catalog answer the way a changed API might: no page count, a page count that
+// never ends, or no art.
 const online = join(dir, 'online.mjs');
 writeFileSync(
   online,
-  `const when = { fields: [{ label: 'Start', value: '1 October 2026, 16:00 UTC' }, { label: 'End', value: 'Permanent' }] };
+  `${trackTimeouts}const when = { fields: [{ label: 'Start', value: '1 October 2026, 16:00 UTC' }, { label: 'End', value: 'Permanent' }] };
 const schedule = {
   pages: [
     { id: 'packs', sections: [{ title: 'Available Packs', records: [{ name: 'Pack', ...when }] }] },
@@ -64,11 +83,14 @@ const schedule = {
     { id: 'realm_wars', sections: [{ title: 'Current Season', records: [{ name: 'Week', ...when }] }, { title: 'Upcoming Seasons', records: [] }] },
   ],
 };
+const change = process.env.STUB_CHANGE;
+const lastPage = change === 'no-page-count' ? undefined : change === 'endless' ? 1000 : 2;
+const card = (n) => ({ title: 'Card ' + n, slug: 'card-' + n, tags: [{ slug: 'gold' }], image_url: change === 'no-art' ? undefined : 'https://img.test/' + n });
 globalThis.fetch = async (url, opts = {}) => {
-  process.stderr.write('REQUEST ' + JSON.stringify({ url: String(url), limited: opts.signal instanceof AbortSignal }) + '\\n');
+  note(url, opts);
   const page = /[?&]page=(\\d+)/.exec(String(url));
   const body = page
-    ? { data: [{ title: 'Card ' + page[1], slug: 'card-' + page[1], tags: [{ slug: 'gold' }] }], meta: { last_page: 2 } }
+    ? { data: [card(page[1])], meta: { last_page: lastPage } }
     : String(url).endsWith('/events.json')
       ? { seasons: [] }
       : schedule;
@@ -77,20 +99,24 @@ globalThis.fetch = async (url, opts = {}) => {
 `,
 );
 
-/** Runs a copy of a download script, writing into a scratch public folder, with MK Mobile Base answering. */
-function runOnline(script) {
+/**
+ * Runs a copy of a download script, writing into a scratch public folder, with MK Mobile Base answering (changed as
+ * `change` says): its exit code, its errors, the requests it made, and whether it wrote catalog.json.
+ */
+function runOnline(script, change = '') {
   const root = scratchRepo(script);
   writeFileSync(join(root, 'public', 'events.json'), '{"seasons":[]}\n');
   const result = spawnSync(process.execPath, ['--import', pathToFileURL(online).href, join(root, 'scripts', script)], {
     encoding: 'utf8',
     timeout: 20_000,
-    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax' },
+    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax', STUB_CHANGE: change },
   });
-  const requests = result.stderr
-    .split('\n')
-    .filter((line) => line.startsWith('REQUEST '))
-    .map((line) => JSON.parse(line.slice('REQUEST '.length)));
-  return { status: result.status, stderr: result.status ? result.stderr : '', requests };
+  return {
+    status: result.status,
+    stderr: result.status ? result.stderr : '',
+    requests: requestsOf(result.stderr),
+    wroteCatalog: existsSync(join(root, 'public', 'catalog.json')),
+  };
 }
 
 describe('download scripts', () => {
@@ -133,12 +159,31 @@ describe('download scripts', () => {
         status: 0,
         stderr: '',
         requests: ['https://mkmobilebase.com/api/events/schedule', 'https://live.test/mkmax/events.json'].map(limited),
+        wroteCatalog: false,
       },
       {
         status: 0,
         stderr: '',
         requests: ['characters', 'equipment', 'kameos'].flatMap((c) => [page(c, 1), page(c, 2)]).map(limited),
+        wroteCatalog: true,
       },
+    ]);
+  }, 45_000);
+
+  // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 6)
+  // Value: protects=a catalog answer in a changed shape fails the script, so the deploy keeps the live catalog instead
+  // of shipping part of it, running until the job's limit, or shipping cards without art; fails_when=the page count
+  // check or the art check is dropped or loosened; why_new=the script only failed on an empty category; seam=none
+  // (STUB_CHANGE only changes the stand-in's answers); no_claim=the rarity check, which works the same way as the art one
+  it("fails without writing when MK Mobile Base's catalog answers change shape", () => {
+    const outcome = (change) => {
+      const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
+      return { change, status, wroteCatalog };
+    };
+    expect(['no-page-count', 'endless', 'no-art'].map(outcome)).toEqual([
+      { change: 'no-page-count', status: 1, wroteCatalog: false },
+      { change: 'endless', status: 1, wroteCatalog: false },
+      { change: 'no-art', status: 1, wroteCatalog: false },
     ]);
   }, 45_000);
 });
