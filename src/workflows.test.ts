@@ -6,6 +6,7 @@ import { parse } from 'yaml';
 
 // Read as YAML, the way GitHub reads them, so comments, quoting and step names don't change what's checked.
 type Step = {
+  id?: string;
   uses?: string;
   run?: string;
   shell?: unknown;
@@ -22,6 +23,8 @@ type Job = {
   permissions?: unknown;
   defaults?: unknown;
   if?: unknown;
+  needs?: unknown;
+  outputs?: Record<string, unknown>;
   'continue-on-error'?: unknown;
 };
 type Workflow = { on: unknown; permissions?: unknown; defaults?: unknown; jobs: Record<string, Job> };
@@ -156,7 +159,8 @@ describe('.github/workflows/deploy.yml', () => {
   // Value: protects=only the deploy job can publish the site, so the build job, which runs npm ci and the
   // dependencies' install scripts, has a token that can only read and can't get a Pages deploy token; fails_when=pages:
   // write or id-token: write moves back to the whole workflow or onto the build job, the build gets another write
-  // permission, another job is added (with its own permissions), or the deploy job gets a step besides deploy-pages
+  // permission, another job is added or the fallback job gets any permission, or the deploy job gets a step besides
+  // deploy-pages
   // (a checkout or npm ci would run dependency code with the publishing token); why_new=they were set for the whole
   // workflow, so every job had them; seam=none; no_claim=that configure-pages and deploy-pages work with these (seen
   // on the first deploy after the merge)
@@ -167,13 +171,34 @@ describe('.github/workflows/deploy.yml', () => {
       deploy.permissions,
       deploy.jobs.build?.permissions,
       deploy.jobs.deploy?.permissions,
+      deploy.jobs.fallback?.permissions,
       deploySteps,
     ]).toEqual([
-      ['build', 'deploy'],
+      ['build', 'deploy', 'fallback'],
       { contents: 'read' },
       { contents: 'read', pages: 'read' },
       { pages: 'write', 'id-token': 'write' },
+      {},
       ['actions/deploy-pages'],
+    ]);
+  });
+
+  // Generated on 2026-10-26 (/ship adversarial review, pr-ci run 7)
+  // Value: protects=a deploy that kept an older catalog or event schedule still publishes, then shows as a failed run,
+  // so GitHub tells the owner; fails_when=either download step stops reporting its fallback, the build stops passing it
+  // on, or the failing job runs before the deploy or always; why_new=a fallback showed only as a warning on a green
+  // run; seam=none; no_claim=that GitHub emails the owner (that's the account's notification settings)
+  it('fails the run after publishing when a download fell back', () => {
+    const { build, fallback } = deploy.jobs;
+    const reports = (s: Step) => !!s.run?.includes('fell_back=true" >> "$GITHUB_OUTPUT"');
+    const reporting = build?.steps.filter(reports).map((s) => s.id);
+    const fallbackUses = fallback?.steps.map((s) => s.uses);
+    expect([reporting, build?.outputs?.fell_back, fallback?.needs, fallback?.if, fallbackUses]).toEqual([
+      ['catalog', 'events'],
+      "${{ steps.catalog.outputs.fell_back == 'true' || steps.events.outputs.fell_back == 'true' }}",
+      ['build', 'deploy'],
+      "needs.build.outputs.fell_back == 'true'",
+      [undefined],
     ]);
   });
 });

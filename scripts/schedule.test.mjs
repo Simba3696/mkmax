@@ -105,4 +105,15 @@ describe('event schedule script', () => {
     ];
     expect(withPastSeasons(current, earlier, now)).toEqual([w('2026-09-30T16:00:00.000Z', '2026-10-07T16:00:00.000Z'), ...current]);
   });
+
+  // Generated on 2026-10-26 (/ship adversarial review, pr-ci run 7)
+  // Value: protects=a nameless week in an older or hand-edited copy isn't carried into the new events.json, where it
+  // would break the Cards and Plan tabs; fails_when=the name check on carried-over weeks is dropped; why_new=only fresh
+  // entries were checked for names; seam=none; no_claim=weeks the site lists now (parseSchedule checks those)
+  it("doesn't keep a past week with no name", () => {
+    const w = (start, end, name) => ({ name, start, end });
+    const current = [w('2026-10-07T16:00:00.000Z', '2026-10-14T16:00:00.000Z', 'Kold')];
+    const earlier = [w('2026-09-23T16:00:00.000Z', '2026-09-30T16:00:00.000Z', ''), w('2026-09-30T16:00:00.000Z', '2026-10-07T16:00:00.000Z')];
+    expect(withPastSeasons(current, earlier, new Date('2026-10-08T00:00:00Z'))).toEqual(current);
+  });
 });

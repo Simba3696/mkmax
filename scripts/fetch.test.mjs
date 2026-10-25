@@ -69,9 +69,11 @@ function runOffline(script, output) {
 }
 
 // Loaded in place of the real fetch when MK Mobile Base answers: every catalog category has two pages of cards with
-// art, the schedule has one pack and one current season, and the live events.json has no past weeks. Each request is
-// noted as above. STUB_CHANGE makes the catalog answer the way a changed API might: no page count, a page count of
-// zero, a page count that never ends, no art, or no rarity tags.
+// art, the schedule has one pack and one current season, the live events.json has no past weeks, and the live
+// catalog.json has as many cards of each kind as the download. Each request is noted as above. STUB_CHANGE makes the
+// catalog answer the way a changed or failing API might: no page count, a page count of zero, a page count that never
+// ends, no art, no rarity tags, page 1 whatever page is asked for, the same card twice, far fewer cards than the live
+// copy, or pages slow enough that the download runs out of time (the stand-in moves the clock on a minute per request).
 const online = join(dir, 'online.mjs');
 writeFileSync(
   online,
@@ -84,21 +86,31 @@ const schedule = {
   ],
 };
 const change = process.env.STUB_CHANGE;
+const realNow = Date.now;
+let skew = 0;
+Date.now = () => realNow() + skew;
+const live = ['character', 'equipment', 'kameo'].flatMap((kind) =>
+  Array.from({ length: change === 'shrunk' ? 20 : 2 }, () => ({ kind, rarity: 'gold' })),
+);
 const lastPage = change === 'no-page-count' ? undefined : change === 'zero-pages' ? 0 : change === 'endless' ? 1000 : 2;
 const card = (n) => ({
   title: 'Card ' + n,
-  slug: 'card-' + n,
+  slug: change === 'duplicate-slugs' ? 'card' : 'card-' + n,
   tags: change === 'no-rarity' ? [] : [{ slug: 'gold' }],
   image_url: change === 'no-art' ? undefined : 'https://img.test/' + n,
 });
 globalThis.fetch = async (url, opts = {}) => {
   note(url, opts);
+  if (change === 'slow') skew += 61_000;
   const page = /[?&]page=(\\d+)/.exec(String(url));
+  const current = page && (change === 'repeated-page' ? 1 : Number(page[1]));
   const body = page
-    ? { data: [card(page[1])], meta: { last_page: lastPage } }
+    ? { data: [card(current)], meta: { last_page: lastPage, current_page: current } }
     : String(url).endsWith('/events.json')
       ? { seasons: [] }
-      : schedule;
+      : String(url).endsWith('/catalog.json')
+        ? { items: live }
+        : schedule;
   return { ok: true, status: 200, json: async () => body };
 };
 `,
@@ -169,7 +181,10 @@ describe('download scripts', () => {
       {
         status: 0,
         stderr: '',
-        requests: ['characters', 'equipment', 'kameos'].flatMap((c) => [page(c, 1), page(c, 2)]).map(limited),
+        requests: [
+          ...['characters', 'equipment', 'kameos'].flatMap((c) => [page(c, 1), page(c, 2)]),
+          'https://live.test/mkmax/catalog.json',
+        ].map(limited),
         wroteCatalog: true,
       },
     ]);
@@ -184,20 +199,23 @@ describe('download scripts', () => {
   // Value: protects=a catalog answer whose page count is zero (which stopped after page 1 before this branch) or whose
   // cards lost their rarity tags fails, so the deploy keeps the live catalog instead of shipping only the first page of
   // each category, or cards the app can't sort by rarity; fails_when=the page count check stops rejecting zero, or
-  // rarity leaves the list of fields every card must mostly have; why_new=no-art only reaches the image half of that check, and no case had a
-  // page count below 1; seam=none (STUB_CHANGE only changes the stand-in's answers); no_claim=the 10% allowance, or
-  // a rarity read from the excerpt instead of the tags
-  it("fails without writing when MK Mobile Base's catalog answers change shape", () => {
+  // rarity leaves the list of fields every card must mostly have; why_new=no-art only reaches the image half of that
+  // check, and no case had a page count below 1; seam=none (STUB_CHANGE only changes the stand-in's answers);
+  // no_claim=the 10% allowance, or a rarity read from the excerpt instead of the tags
+  // Extended by /ship adversarial review on 2026-10-26 (pr-ci run 7): pages the site didn't send, repeated cards, a
+  // catalog far smaller than the live one, and a download still going after 5 minutes.
+  // Value: protects=a site that ignores the page asked for, repeats cards, loses a kind and rarity's cards, or answers
+  // so slowly the deploy job would end first fails the script, so the deploy keeps the live catalog; fails_when=the
+  // repeat check, the comparison with the live copy or the overall deadline is dropped;
+  // why_new=each of these passed every earlier check; seam=none (STUB_CHANGE only changes the stand-in's answers and
+  // clock); no_claim=the 90% and 5-minute values, or a live copy that can't be read (the committed one is used)
+  it("fail without writing when MK Mobile Base's catalog answers look wrong or come too slowly", () => {
     const outcome = (change) => {
       const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
       return { change, status, wroteCatalog };
     };
-    expect(['no-page-count', 'zero-pages', 'endless', 'no-art', 'no-rarity'].map(outcome)).toEqual([
-      { change: 'no-page-count', status: 1, wroteCatalog: false },
-      { change: 'zero-pages', status: 1, wroteCatalog: false },
-      { change: 'endless', status: 1, wroteCatalog: false },
-      { change: 'no-art', status: 1, wroteCatalog: false },
-      { change: 'no-rarity', status: 1, wroteCatalog: false },
-    ]);
+    const changes = ['no-page-count', 'zero-pages', 'endless', 'no-art', 'no-rarity'];
+    changes.push('repeated-page', 'duplicate-slugs', 'shrunk', 'slow');
+    expect(changes.map(outcome)).toEqual(changes.map((change) => ({ change, status: 1, wroteCatalog: false })));
   }, 45_000);
 });
