@@ -15,15 +15,11 @@ npx knip          # unused files, exports and dependencies (a dev tool; not run 
 
 ## Linting
 
-`npm run lint` runs [oxlint](https://oxc.rs/docs/guide/usage/linter) with `.oxlintrc.json`, and the deploy workflow runs it before the tests. It's oxlint rather than ESLint because typescript-eslint doesn't support TypeScript 7 yet. The config turns on the correctness rules plus `rules-of-hooks` and `exhaustive-deps`. It turns off `react/refs`, because the app uses the "latest ref" pattern (a ref updated during render so effects see the newest callback) on purpose, and `react/set-state-in-effect`.
+`npm run lint` runs [oxlint](https://oxc.rs/docs/guide/usage/linter) with `.oxlintrc.json`, and both workflows run it before the tests: `ci.yml` on every pull request and `deploy.yml` before every deploy. It's oxlint rather than ESLint because typescript-eslint doesn't support TypeScript 7 yet. The config turns on the correctness rules plus `rules-of-hooks` and `exhaustive-deps`. It turns off `react/refs`, because the app uses the "latest ref" pattern (a ref updated during render so effects see the newest callback) on purpose, and `react/set-state-in-effect`.
 
 ## Tests
 
 Planning, scoring and saved-data logic is tested in plain `*.test.ts` files next to the code, mostly `src/engine.test.ts`. Screens are tested in `*.test.tsx` files with [Testing Library](https://testing-library.com/docs/react-testing-library/intro/) in jsdom: each starts with `// @vitest-environment jsdom`, so the logic tests keep running in Node. A screen test renders the real `StoreProvider` and `PlanProvider` with a save seeded in `localStorage`, stubs `fetch` so the catalog and event schedule stay offline, and clears `localStorage` afterwards. Testing Library and jsdom are dev dependencies; nothing of them ships. jsdom needs Node 22.22 or newer (24.15 or newer on Node 24), so update Node if the screen tests fail to start. Each test opens with a `// Value:` comment saying what it protects and what would make it fail.
-
-## Follow-ups
-
-Work found while shipping a change, but left for later, is tracked in [TODOS.md](../TODOS.md), with what, why and a priority for each item.
 
 ## Project layout
 
@@ -62,7 +58,7 @@ The saved state carries a `version`. When the shape or meaning of saved data cha
 
 ## Hosting
 
-Every pull request runs `.github/workflows/ci.yml`: lint, tests and a build, the same checks a change needs before it's merged, shown on the PR. Pushing to `main` runs `.github/workflows/deploy.yml`, which tests and builds the app, then publishes it to GitHub Pages at `https://<user>.github.io/<repo>/`. In the repo settings, set **Pages → Source** to **GitHub Actions** first. On the free plan, Pages needs a public repo.
+Every pull request runs `.github/workflows/ci.yml`: lint, tests and a build, the same checks a change needs before it's merged, shown on the PR. Pushing to `main` runs `.github/workflows/deploy.yml`, which lints, tests and builds the app, then publishes it to GitHub Pages at `https://<user>.github.io/<repo>/`. In the repo settings, set **Pages → Source** to **GitHub Actions** first. On the free plan, Pages needs a public repo.
 
 The workflow also runs every day at 17:30 UTC to refresh the catalog and the event schedule. If either refresh fails, it warns and deploys the copy that's live again (`PAGES_URL` in the workflow), so check the run's warnings when the app's schedule date stops moving. GitHub turns off a public repo's scheduled workflows after 60 days without commits. The workflow then stops running, even on a push, and the schedule stops updating. To turn it back on, open the repo's **Actions** tab, pick **Deploy to GitHub Pages** and choose **Enable workflow**.
 
