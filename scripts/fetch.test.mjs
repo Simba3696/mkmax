@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -21,10 +21,26 @@ writeFileSync(
 `,
 );
 
-/** Runs a download script offline: its exit code, the requests it made, and whether the file it writes is untouched. */
+/** A copy of a download script and schedule.mjs beside an empty public folder, so runs never write the repo's files. */
+function scratchRepo(script) {
+  const root = mkdtempSync(join(dir, 'repo-'));
+  mkdirSync(join(root, 'scripts'));
+  mkdirSync(join(root, 'public'));
+  for (const file of [script, 'schedule.mjs']) copyFileSync(join(here, file), join(root, 'scripts', file));
+  return root;
+}
+
+/**
+ * Runs a copy of a download script offline, with the committed file it writes seeded into its public folder: its exit
+ * code, the requests it made, and whether that file is untouched.
+ */
 function runOffline(script, output) {
-  const before = readFileSync(output);
-  const result = spawnSync(process.execPath, ['--import', pathToFileURL(stub).href, script], {
+  const root = scratchRepo(basename(script));
+  const seeded = join(root, 'public', basename(output));
+  copyFileSync(output, seeded);
+  const before = readFileSync(seeded);
+  const copy = join(root, 'scripts', basename(script));
+  const result = spawnSync(process.execPath, ['--import', pathToFileURL(stub).href, copy], {
     encoding: 'utf8',
     timeout: 20_000,
   });
@@ -32,7 +48,7 @@ function runOffline(script, output) {
     .split('\n')
     .filter((line) => line.startsWith('REQUEST '))
     .map((line) => JSON.parse(line.slice('REQUEST '.length)));
-  return { status: result.status, requests, unchanged: readFileSync(output).equals(before) };
+  return { status: result.status, requests, unchanged: readFileSync(seeded).equals(before) };
 }
 
 // Loaded in place of the real fetch when MK Mobile Base answers: every catalog category has two pages, the schedule has
@@ -63,10 +79,7 @@ globalThis.fetch = async (url, opts = {}) => {
 
 /** Runs a copy of a download script, writing into a scratch public folder, with MK Mobile Base answering. */
 function runOnline(script) {
-  const root = mkdtempSync(join(dir, 'repo-'));
-  mkdirSync(join(root, 'scripts'));
-  mkdirSync(join(root, 'public'));
-  for (const file of [script, 'schedule.mjs']) copyFileSync(join(here, file), join(root, 'scripts', file));
+  const root = scratchRepo(script);
   writeFileSync(join(root, 'public', 'events.json'), '{"seasons":[]}\n');
   const result = spawnSync(process.execPath, ['--import', pathToFileURL(online).href, join(root, 'scripts', script)], {
     encoding: 'utf8',
