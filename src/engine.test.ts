@@ -211,8 +211,13 @@ describe('the Maxed record', () => {
     expect(out.cards.map((c) => [c.id, c.sourceNote])).toEqual([['kori', 'Lin Kuei Tower'], ['fan', 'Lin Kuei Tower'], ['odd', undefined]]);
     // Dropped on a current save too, so Tower gear never reads it, on any card, and a card's No kards stays.
     const krypt = card('krypt', 1, { rarityId: 'epic', source: 'krypt', sourceNote: 7 as unknown as string });
-    const current = normalize({ ...defaultState(), cards: [gear('odd', 1, { x: 1 }), krypt, { ...gear('nk', 1, 9), noKards: true }] } as unknown as AppState);
-    expect(current.cards.map((c) => ['sourceNote' in c, c.noKards ?? null])).toEqual([[false, null], [false, null], [false, true]]);
+    // Extended on 2026-10-25 (/ship coverage audit, run 17)
+    // Value: protects=a card with both a No kards that isn't exactly true and a tower name that isn't text loses both;
+    // fails_when=the tower check returns early, so a hand-edited "yes" stays and reads as No kards or looks like a sync
+    // conflict; why_new=each case above has only one of the two; seam=none; no_claim=none beyond protects
+    const both = { ...gear('both', 1, 3), noKards: 'yes' };
+    const current = normalize({ ...defaultState(), cards: [gear('odd', 1, { x: 1 }), krypt, { ...gear('nk', 1, 9), noKards: true }, both] } as unknown as AppState);
+    expect(current.cards.map((c) => ['sourceNote' in c, c.noKards ?? null])).toEqual([[false, null], [false, null], [false, true], [false, null]]);
   });
 
   // Generated on 2026-10-23 (/ship coverage audit, Tower dropdown)

@@ -33,14 +33,14 @@ export interface SyncDeps {
   cancelPush: () => void;
   /** Look for a new version of MK Max; finding one only brings up the new-version bar. */
   lookForUpdate: () => void;
+  /** Another tab has saved data from a newer version, so this one must write, apply and report nothing. */
+  held: () => boolean;
   now: () => number;
 }
 
 export class SyncLoop {
   private cfg: SyncConfig | null;
   private busy = false;
-  /** The sync syncNow started, while it runs. */
-  private running: Promise<void> | null = null;
   /** The gist's copy while a conflict waits for the user. Background syncs hold off so the prompt stays put. */
   private conflict: AppState | null = null;
 
@@ -113,25 +113,16 @@ export class SyncLoop {
     if (this.cfg && stamp(this.deps.getState()) > this.cfg.baseUpdatedAt) this.deps.schedulePush();
   }
 
-  /** Keeps `run` as the work to wait for until it ends. */
-  private track(run: Promise<void>) {
-    this.running = run;
-    const done = () => void (this.running === run && (this.running = null));
-    run.then(done, done);
-    return run;
-  }
-
   /**
-   * Pull if the gist moved on, push if only this device did, or report a conflict if both did. Sync work already out (a
-   * sync, Connect or Keep mine) is waited for rather than skipped, so a caller that reloads next (pull to refresh with no
-   * service worker) doesn't cut it off.
+   * Whether a sync that was waiting on GitHub should stop there: disconnected or switched meanwhile, or another tab saved
+   * data from a newer version (this one then writes, applies and reports nothing, as at startup).
    */
-  syncNow(): Promise<void> {
-    if (this.running) return this.running;
-    return this.track(this.sync());
+  private stopped(cfg: SyncConfig) {
+    return !this.sameGist(cfg) || this.deps.held();
   }
 
-  private async sync() {
+  /** Pull if the gist moved on, push if only this device did, or report a conflict if both did. */
+  async syncNow() {
     const cfg = this.cfg;
     if (!cfg || this.busy || this.conflict) return;
     this.busy = true;
@@ -139,7 +130,7 @@ export class SyncLoop {
     this.deps.onStatus({ kind: 'syncing' });
     try {
       const remote = await this.deps.readRemote(cfg);
-      if (!this.sameGist(cfg)) return;
+      if (this.stopped(cfg)) return;
       const local = this.deps.getState();
       const action = decideSync(remote, local, cfg.baseUpdatedAt);
       if (action === 'newer') {
@@ -155,7 +146,7 @@ export class SyncLoop {
       if (action === 'outdated') {
         const kept = this.restampToKeep(cfg, remote);
         await this.deps.writeRemote(cfg, kept);
-        if (!this.sameGist(cfg)) return;
+        if (this.stopped(cfg)) return;
         this.setConfig({ ...cfg, baseUpdatedAt: stamp(kept) });
         this.deps.onStatus({ kind: 'error', message: OUTDATED_MESSAGE });
         return;
@@ -165,7 +156,7 @@ export class SyncLoop {
         this.setConfig({ ...cfg, baseUpdatedAt: stamp(remote) });
       } else if (action === 'push') {
         await this.deps.writeRemote(cfg, local);
-        if (!this.sameGist(cfg)) return;
+        if (this.stopped(cfg)) return;
         this.setConfig({ ...cfg, baseUpdatedAt: stamp(local) });
       } else {
         // Same data on both sides (maybe with different stamps), so both stamps count as agreed.
@@ -174,7 +165,7 @@ export class SyncLoop {
       this.deps.onStatus({ kind: 'idle', at: this.deps.now() });
       ok = true;
     } catch (e) {
-      if (this.sameGist(cfg)) this.deps.onStatus({ kind: 'error', message: (e as Error).message });
+      if (!this.stopped(cfg)) this.deps.onStatus({ kind: 'error', message: (e as Error).message });
     } finally {
       this.busy = false;
       // Offline or refused, automatic changes still go ahead rather than wait for the whole session.
@@ -185,11 +176,7 @@ export class SyncLoop {
     }
   }
 
-  connect(token: string): Promise<void> {
-    return this.track(this.connectNow(token));
-  }
-
-  private async connectNow(token: string) {
+  async connect(token: string) {
     this.deps.onStatus({ kind: 'syncing' });
     try {
       // The copy a new gist is made from; edits made while GitHub answers come after it and still need pushing.
@@ -198,7 +185,7 @@ export class SyncLoop {
       // A new gist already holds this device's data; an existing one gets compared on the first sync.
       this.setConfig({ token, gistId, baseUpdatedAt: created ? stamp(snap) : 0 });
       this.deps.onStatus({ kind: 'idle', at: created ? this.deps.now() : null });
-      if (!created) await this.sync();
+      if (!created) await this.syncNow();
       else this.pushLaterEdits();
     } catch (e) {
       this.deps.onStatus({ kind: 'error', message: (e as Error).message });
@@ -214,12 +201,7 @@ export class SyncLoop {
     this.deps.onSettled();
   }
 
-  resolve(keep: 'mine' | 'theirs'): Promise<void> {
-    if (this.running) return this.running;
-    return this.track(this.resolveNow(keep));
-  }
-
-  private async resolveNow(keep: 'mine' | 'theirs') {
+  async resolve(keep: 'mine' | 'theirs') {
     const cfg = this.cfg;
     const shown = this.conflict;
     if (!cfg || !shown || this.busy) return;
@@ -244,7 +226,7 @@ export class SyncLoop {
       // Background syncs hold off while the prompt is up, so the other device may have pushed again since. Show
       // that copy instead of overwriting it unseen.
       const fresh = await this.deps.readRemote(cfg);
-      if (!this.sameGist(cfg)) return;
+      if (this.stopped(cfg)) return;
       if (fresh && fromNewerApp(fresh)) {
         this.waitForNewerApp();
         return;
@@ -257,12 +239,12 @@ export class SyncLoop {
       }
       const kept = this.restampToKeep(cfg, fresh);
       await this.deps.writeRemote(cfg, kept);
-      if (!this.sameGist(cfg)) return;
+      if (this.stopped(cfg)) return;
       this.setConfig({ ...cfg, baseUpdatedAt: stamp(kept) });
       this.deps.onStatus({ kind: 'idle', at: this.deps.now() });
       ok = true;
     } catch (e) {
-      if (this.sameGist(cfg)) this.deps.onStatus({ kind: 'error', message: (e as Error).message });
+      if (!this.stopped(cfg)) this.deps.onStatus({ kind: 'error', message: (e as Error).message });
     } finally {
       this.busy = false;
       if (ok) this.pushLaterEdits();

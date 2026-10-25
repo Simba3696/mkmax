@@ -5,7 +5,7 @@ import { defaultState } from './defaults';
 
 // Its own file, and a fresh copy of the app for each test (renderApp), so catalog.ts starts with no card list downloaded:
 // a test that loaded it would leave it cached.
-vi.mock('./appUpdate', () => ({ hasServiceWorker: () => true, checkForAppUpdate: () => Promise.resolve(), useAppUpdateReady: () => false, applyAppUpdate: () => {} }));
+vi.mock('./appUpdate', () => ({ checkForAppUpdate: () => Promise.resolve(), useAppUpdateReady: () => false, applyAppUpdate: () => {} }));
 
 beforeEach(() => {
   history.replaceState(null, '', '#packs');
@@ -50,7 +50,7 @@ it('fetches the card catalog again on pull to refresh, and gives cards the art i
   fireEvent.touchMove(window, touch(200));
   await act(async () => void fireEvent.touchEnd(window));
   await waitFor(() => expect(localStorage.getItem('mkmax:v1')).toContain(art));
-  expect(asked).toEqual(['no-cache', 'no-cache']);
+  expect(asked).toEqual([undefined, 'no-cache']);
 });
 
 // Generated on 2026-10-25 (/ship coverage audit, run 16)

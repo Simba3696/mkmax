@@ -50,6 +50,8 @@ function device(gist: FakeGist, state: AppState = defaultState(), cfg: SyncConfi
     pushes: 0,
     /** How many times it looked for a new version of the app. */
     lookedForUpdate: 0,
+    /** Another tab saved data from a newer version (the store holds the save then). */
+    held: false,
     settled: false,
     /** Whether this device's build can load a copy; the store's normalize throws on one it can't. */
     readable: (_s: AppState) => true,
@@ -85,6 +87,7 @@ function device(gist: FakeGist, state: AppState = defaultState(), cfg: SyncConfi
       schedulePush: () => d.pushes++,
       cancelPush: () => {},
       lookForUpdate: () => void d.lookedForUpdate++,
+      held: () => d.held,
       now: () => clock + skew,
     },
     cfg,
@@ -310,42 +313,6 @@ describe('sync loop', () => {
     expect(names(gist.data)).toEqual([]);
   });
 
-  // Generated on 2026-10-25 (/ship review, run 16 pass 3, state machines + testing + Red Team)
-  // Value: protects=a sync asked for while Keep mine is uploading, or while Connect is still finding the gist, waits for
-  // that rather than returning at once, so a reload straight after doesn't cut it off (the choice to be asked again, or
-  // the device left disconnected); fails_when=only syncs that syncNow started are waited for; why_new=review: only a
-  // sync's own push was tested; seam=the fake gist holds the write or read open; no_claim=GitHub
-  it('waits for a Keep mine upload or a Connect already out', async () => {
-    const { gist, phone, desktop } = await pair();
-    phone.edit((s) => s.cards.push(card('Raiden')));
-    await phone.loop.syncNow();
-    desktop.edit((s) => s.cards.push(card('Kitana')));
-    await desktop.loop.syncNow();
-    expect(desktop.status.kind).toBe('conflict');
-    gist.holding = 'writes';
-    const keeping = desktop.loop.resolve('mine');
-    await settle();
-    let done = false;
-    const asked = desktop.loop.syncNow().then(() => void (done = true));
-    await settle();
-    expect(done).toBe(false);
-    await gist.release();
-    await Promise.all([keeping, asked]);
-    expect([done, names(gist.data)]).toEqual([true, ['Scorpion', 'Kitana']]);
-
-    const laptop = device(gist);
-    gist.holding = 'reads';
-    const connecting = laptop.loop.connect('token');
-    await settle();
-    let synced = false;
-    const pulled = laptop.loop.syncNow().then(() => void (synced = true));
-    await settle();
-    expect(synced).toBe(false);
-    await gist.release();
-    await Promise.all([connecting, pulled]);
-    expect([synced, names(laptop.state)]).toEqual([true, ['Scorpion', 'Kitana']]);
-  });
-
   // Generated on 2026-10-25 (/ship review, run 16 pass 3, state machines)
   // Value: protects=Keep mine on a gist copy this build can't read uploads nothing, leaves both copies as they are, says
   // so and looks for a new version once, and asks again once a build can read it; fails_when=Keep mine uploads this
@@ -367,23 +334,88 @@ describe('sync loop', () => {
     expect(desktop.status.kind).toBe('conflict');
   });
 
-  // Generated on 2026-10-25 (/ship review, run 16, state machines + testing)
-  // Value: protects=a sync asked for while one is already out (a pull to refresh during the push after an edit) waits for
-  // it rather than returning at once, so a reload straight after doesn't cut the push off; fails_when=syncNow returns at
-  // once while busy; why_new=review (state machines, testing); seam=the fake gist holds the write open; no_claim=GitHub
-  it('waits for a sync already out rather than skipping it', async () => {
-    const { gist, phone } = await pair();
+  // Generated on 2026-10-25 (/ship review, run 17, Red Team)
+  // Value: protects=a sync already waiting on GitHub when another tab saves data from a newer version writes, applies
+  // and reports nothing once GitHub answers, whether it was about to push or pull; fails_when=it pushes this tab's older
+  // reading (dropping fields this build doesn't know) or swaps the screen to the gist's copy behind the hold;
+  // why_new=review (Red Team): only syncs started after the hold were stopped; seam=the fake gist holds the read open,
+  // the device's held switch stands in for the store's hold; no_claim=GitHub
+  it('stops a sync already out when another tab saves data from a newer version', async () => {
+    const { gist, phone, desktop } = await pair();
     phone.edit((s) => s.cards.push(card('Raiden')));
-    gist.holding = 'writes';
+    const writes = gist.writes;
+    const agreed = phone.loop.config?.baseUpdatedAt;
+    gist.holding = 'reads';
     const pushing = phone.loop.syncNow();
     await settle();
-    let done = false;
-    const asked = phone.loop.syncNow().then(() => void (done = true));
-    await settle();
-    expect([done, gist.writes]).toEqual([false, 0]);
+    phone.held = true;
     await gist.release();
-    await Promise.all([pushing, asked]);
-    expect([done, names(gist.data)]).toEqual([true, ['Scorpion', 'Raiden']]);
+    await pushing;
+    expect([gist.writes, names(gist.data), phone.loop.config?.baseUpdatedAt]).toEqual([writes, ['Scorpion'], agreed]);
+
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    const before = structuredClone(phone.state);
+    gist.holding = 'reads';
+    const pulling = phone.loop.syncNow();
+    await settle();
+    await gist.release();
+    await pulling;
+    expect(phone.state).toEqual(before);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 17, state machines)
+  // Value: protects=Keep theirs takes the copy the prompt showed even if the gist moved on or a newer build pushed since,
+  // and the next sync then pulls the later copy without asking, or waits and looks for the update; fails_when=Keep
+  // theirs asks again, pushes, or skips the later copy; why_new=review (state machines): only an unchanged gist was tested;
+  // seam=none; no_claim=GitHub
+  it('keeping the other copy after the gist changed takes the shown copy, then syncs as usual', async () => {
+    let { gist, phone, desktop } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    phone.edit((s) => s.cards.push(card('Jade')));
+    await phone.loop.syncNow();
+    await desktop.loop.resolve('theirs');
+    expect(names(desktop.state)).toEqual(['Scorpion', 'Raiden']);
+    await desktop.loop.syncNow();
+    expect([desktop.status.kind, names(desktop.state)]).toEqual(['idle', ['Scorpion', 'Raiden', 'Jade']]);
+
+    ({ gist, phone, desktop } = await pair());
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    gist.data = { ...structuredClone(gist.data!), version: 99, updatedAt: tick() } as unknown as AppState;
+    await desktop.loop.resolve('theirs');
+    expect(names(desktop.state)).toEqual(['Scorpion', 'Raiden']);
+    await desktop.loop.syncNow();
+    expect([desktop.status.kind, gist.data!.version, desktop.pushes, desktop.lookedForUpdate]).toEqual(['error', 99, 0, 1]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 17, state machines)
+  // Value: protects=Disconnect with the which-copy prompt up drops the prompt and the connection and changes neither copy,
+  // also when the gist moved on meanwhile; fails_when=Disconnect keeps the prompt or writes a copy on the way out;
+  // why_new=review (state machines): Disconnect was never tested with the prompt up; seam=none; no_claim=GitHub
+  it('Disconnect with the which-copy prompt up drops it and changes no data', async () => {
+    const { gist, phone, desktop } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    phone.edit((s) => s.cards.push(card('Jade')));
+    await phone.loop.syncNow();
+    const writes = gist.writes;
+    desktop.loop.disconnect();
+    await desktop.loop.resolve('mine');
+    expect([desktop.loop.config, desktop.status.kind, names(desktop.state), names(gist.data), gist.writes]).toEqual([
+      null,
+      'off',
+      ['Scorpion', 'Kitana'],
+      ['Scorpion', 'Raiden', 'Jade'],
+      writes,
+    ]);
   });
 
   it('neither pulls nor pushes data from a newer build, and looks for the new version', async () => {

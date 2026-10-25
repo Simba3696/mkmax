@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 
-type Hooks = { onNeedRefresh?: () => void; onNeedReload?: () => void; onRegisterError?: (e: unknown) => void; onRegisteredSW?: (url: string, r: ServiceWorkerRegistration) => void };
+type Hooks = { onNeedRefresh?: () => void; onNeedReload?: () => void; onRegisteredSW?: (url: string, r: ServiceWorkerRegistration) => void };
 type Worker = EventTarget & { state: string };
 
 // A fresh copy of the module for each test, since it keeps what it found for the page.
@@ -136,6 +136,25 @@ describe('app update', () => {
     expect(result.current).toBe(true);
   });
 
+  // Generated on 2026-10-25 (/ship coverage audit, run 17)
+  // Value: protects=a copy opened while a new version is already installed and waiting (another copy found it) shows the
+  // bar at once, and a page loaded past the service worker (a hard reload, no controller) doesn't; fails_when=the check
+  // at registration goes, so a copy opened then shows no bar until a pull or its next check half an hour on, or a hard
+  // reload offers the version it already runs; why_new=every other test registers with nothing waiting; seam=registerSW
+  // passed in by hand; no_claim=whether the plugin also reports a version waiting from before (its own waiting event)
+  it('shows a version already waiting when the app opens, unless the page has no controller', async () => {
+    const open = async (controlled: boolean) => {
+      stop();
+      vi.resetModules();
+      app = await import('./appUpdate');
+      sw.controller = controlled ? {} : null;
+      reg.waiting = waiting;
+      stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', reg as unknown as ServiceWorkerRegistration), update)) as never);
+      return renderHook(() => app.useAppUpdateReady()).result.current;
+    };
+    expect([await open(false), await open(true)]).toEqual([false, true]);
+  });
+
   // Generated on 2026-10-25 (/ship review, run 15 pass 3)
   // Value: protects=a check that finds a version waiting brings up the bar, and once one is waiting no more checks are
   // made; fails_when=the bar waits on the library's events alone, or every paused sync and every save from a newer tab
@@ -188,25 +207,5 @@ describe('app update', () => {
     at(61);
     window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }));
     expect(reg.update).toHaveBeenCalledTimes(3);
-  });
-
-  // Generated on 2026-10-25 (/ship review, run 15 pass 3)
-  // Value: protects=a browser where the service worker can't run says so, so pull to refresh reloads there instead;
-  // fails_when=pull to refresh never loads a new version in a private window or an in-app browser; why_new=review (Red
-  // Team); seam=registerSW's onRegisterError called by hand; no_claim=which browsers block it
-  it('says when there’s no service worker to find a new version', () => {
-    expect(app.hasServiceWorker()).toBe(true);
-    hooks.onRegisterError!(new Error('blocked'));
-    expect(app.hasServiceWorker()).toBe(false);
-  });
-
-  // Generated on 2026-10-25 (/ship coverage audit, run 16)
-  // Value: protects=a browser with no service worker support at all (no navigator.serviceWorker, where the plugin
-  // registers nothing and reports no error) says so too; fails_when=only a failed registration counts, so pull to
-  // refresh there neither reloads nor finds a new version; why_new=the test above covers only a registration error;
-  // seam=navigator.serviceWorker removed by hand; no_claim=which browsers lack it
-  it('says there’s no service worker where the browser has none', () => {
-    delete (navigator as { serviceWorker?: unknown }).serviceWorker;
-    expect(app.hasServiceWorker()).toBe(false);
   });
 });

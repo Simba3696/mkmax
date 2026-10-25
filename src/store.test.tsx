@@ -356,39 +356,48 @@ describe('update undo labels', () => {
     expect(api().sync.status).toEqual({ kind: 'error', message: NEWER_SAVE_MESSAGE });
   });
 
-  // Value: protects=a page restored from the back-forward cache downloads synced changes, as a return to the app does;
-  // fails_when=only visibilitychange starts a pull, or the first load's pageshow pulls again; why_new=review (Red Team);
-  // seam=SyncLoop.syncNow spied; no_claim=the download itself (syncLoop tests)
-  // Generated on 2026-10-25 (/ship review, run 16 pass 3, data migration)
-  // Value: protects=a sync already out when another tab first saves data from a newer version can't save its agreed
-  // stamp once it lands, since this tab saves nothing then; fails_when=the shared sync settings say this browser has the
-  // gist's copy while its save doesn't, so the newer version's tab, reopened, never pulls it; why_new=review (data
-  // migration); seam=fetch answers as the gist, held open by hand; no_claim=GitHub itself
-  it('saves no agreed stamp for a sync that lands after another tab saved a newer version', async () => {
+  // Generated on 2026-10-25 (/ship review, run 16 pass 3, data migration); changed by /ship review on 2026-10-25
+  // (run 17): the loop now stops such a sync, and the test checks GitHub really answered it
+  // Value: protects=a sync already out when another tab first saves data from a newer version stops once GitHub
+  // answers: it neither applies the gist's copy nor saves an agreed stamp, and the held notice stays; fails_when=the
+  // shared sync settings say this browser has the gist's copy while its save doesn't, so the newer version's tab,
+  // reopened, never pulls it, or the screen swaps to the gist's copy behind the hold; why_new=review (data migration,
+  // Red Team); seam=fetch answers as the gist, held open by hand; no_claim=GitHub itself
+  it('stops a sync that lands after another tab saved a newer version', async () => {
     localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
     localStorage.setItem('mkmax:v1', JSON.stringify({ ...defaultState(), updatedAt: 5000 }));
-    let answer!: () => void;
+    let answer: (() => void) | undefined;
     const theirs = { ...defaultState(), updatedAt: 9000, cards: [{ id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 1, guest: false }] };
     vi.stubGlobal('fetch', () =>
       new Promise<Response>((r) => (answer = () => r(new Response(JSON.stringify({ id: 'g1', description: null, files: { 'mkmax-data.json': { content: JSON.stringify(theirs), raw_url: '' } } }))))),
     );
     onTestFinished(() => void vi.unstubAllGlobals());
+    let latest: Store | undefined;
     render(
       <StoreProvider>
-        <Grab onRender={() => {}} />
+        <Grab onRender={(store) => (latest = store)} />
       </StoreProvider>,
     );
     // The sync on opening is out; the other tab saves a newer version's data meanwhile.
+    expect(answer).toBeDefined();
     const newer = JSON.stringify({ ...defaultState(), version: 99 });
     localStorage.setItem('mkmax:v1', newer);
     act(() => void window.dispatchEvent(new StorageEvent('storage', { key: 'mkmax:v1', newValue: newer })));
     await act(async () => {
-      answer();
+      answer!();
       await new Promise((r) => setTimeout(r, 0));
     });
-    expect([JSON.parse(localStorage.getItem('mkmax:sync')!).baseUpdatedAt, localStorage.getItem('mkmax:v1')]).toEqual([5000, newer]);
+    expect([
+      JSON.parse(localStorage.getItem('mkmax:sync')!).baseUpdatedAt,
+      localStorage.getItem('mkmax:v1'),
+      latest!.state.cards.map((c) => c.name),
+      latest!.sync.status,
+    ]).toEqual([5000, newer, [], { kind: 'error', message: NEWER_SAVE_MESSAGE }]);
   });
 
+  // Value: protects=a page restored from the back-forward cache downloads synced changes, as a return to the app does;
+  // fails_when=only visibilitychange starts a pull, or the first load's pageshow pulls again; why_new=review (Red Team);
+  // seam=SyncLoop.syncNow spied; no_claim=the download itself (syncLoop tests)
   it('pulls synced changes on a back-forward restore, but not on the first load', () => {
     const sync = vi.spyOn(SyncLoop.prototype, 'syncNow').mockResolvedValue();
     render(

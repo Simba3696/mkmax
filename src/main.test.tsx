@@ -20,4 +20,6 @@ it('registers the service worker, asks to keep storage and draws the app', async
   expect(pwa.options.map((o) => o.immediate)).toEqual([true]);
   expect(persist).toHaveBeenCalledTimes(1);
   expect(screen.getAllByRole('button', { name: 'MK MAX, go to the Plan' }).length).toBeGreaterThan(0);
-});
+  // Importing the whole app cold took over the default 5 s in 1 of 2 full parallel runs (5.2 s, 2026-10-25), so it gets
+  // longer; the assertions don't depend on time.
+}, 20000);

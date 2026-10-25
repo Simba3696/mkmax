@@ -3,7 +3,6 @@ import type { registerSW } from 'virtual:pwa-register';
 
 let registration: ServiceWorkerRegistration | undefined;
 let updateSW: ((reloadPage?: boolean) => Promise<void>) | undefined;
-let registerFailed = false;
 let ready = false;
 let checkedAt = 0;
 const listeners = new Set<() => void>();
@@ -41,7 +40,6 @@ export function startServiceWorker(register: typeof registerSW) {
       });
       flagIfWaiting(r);
     },
-    onRegisterError: () => void (registerFailed = true),
     onNeedRefresh: markReady,
     // Only the copy whose Reload was tapped reloads (applyAppUpdate). Without this the library reloads every open copy
     // once any one of them switches; the others keep their bar, and their Reload then just reloads.
@@ -59,14 +57,6 @@ export function startServiceWorker(register: typeof registerSW) {
     document.removeEventListener('visibilitychange', returned);
     window.removeEventListener('pageshow', restored);
   };
-}
-
-/**
- * Whether this page can find and switch to a new version without a reload. Not in browsers that don't run service
- * workers for the site (a private window, some in-app browsers), where only a reload loads a new version.
- */
-export function hasServiceWorker() {
-  return 'serviceWorker' in navigator && !registerFailed;
 }
 
 const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l));
@@ -94,8 +84,9 @@ export function applyAppUpdate() {
 /**
  * The browser only looks for a new version when the app starts, so an app left open would keep running the old
  * build. Pull to refresh calls this, and so do coming back to the app after a while, the sync loop finding data from a
- * newer build or a gist copy it can't read, another tab saving data from a newer build, and importing a backup from one; if a new build is out, the app says so (see startServiceWorker).
- * Once one is waiting there's nothing to look for until the user takes it.
+ * newer build or a gist copy it can't read, another tab saving data from a newer build, and importing a backup from
+ * one; if a new build is out, the app says so (see startServiceWorker). Once one is waiting there's nothing to look for
+ * until the user takes it.
  */
 export function checkForAppUpdate(): Promise<unknown> {
   const r = registration;

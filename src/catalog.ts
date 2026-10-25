@@ -38,14 +38,15 @@ const DOWNLOAD_TIMEOUT_MS = 30 * 1000;
 const REFRESH_AFTER_MS = 60 * 60 * 1000;
 
 /**
- * Downloads the catalog, past the browser's own copy (after a reload it may hand back one from before the daily deploy).
- * Only a fetch-again may replace a copy already here: a first download that lands after a pull's is older.
+ * Downloads the catalog. A fetch-again goes past the browser's own copy, which may be from before the daily deploy; the
+ * first download may use it, so the app still has a catalog offline. Only a fetch-again may replace a copy already
+ * here: a first download that lands after a pull's is older.
  */
 function download(replace: boolean): Promise<CatalogItem[]> {
   tried = true;
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), DOWNLOAD_TIMEOUT_MS);
-  return fetch(`${import.meta.env.BASE_URL}catalog.json`, { cache: 'no-cache', signal: abort.signal })
+  return fetch(`${import.meta.env.BASE_URL}catalog.json`, replace ? { cache: 'no-cache', signal: abort.signal } : { signal: abort.signal })
     .then((r) => {
       if (!r.ok) throw new Error(`catalog.json: HTTP ${r.status}`);
       return r.text();

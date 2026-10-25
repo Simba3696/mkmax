@@ -8,7 +8,7 @@ import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, refreshCatalog, useCatalogVersion, wantsCatalogImage } from './catalog';
 import { endingSoon, moveSeasonEnd, seasonEnd, stretchedWeekEnds } from './engine';
 import { refreshEvents, scheduledSeason, useEvents } from './events';
-import { applyAppUpdate, checkForAppUpdate, hasServiceWorker, useAppUpdateReady } from './appUpdate';
+import { applyAppUpdate, checkForAppUpdate, useAppUpdateReady } from './appUpdate';
 import { usePlan } from './planner';
 import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
@@ -90,8 +90,6 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: (sh
 
 /** A second tap on the Cards tab this soon after opening it is the end of a double tap: half a second. */
 const DOUBLE_TAP_MS = 500;
-/** How long pull to refresh waits for sync: GitHub's requests have no time limit of their own. */
-const PULL_SYNC_WAIT_MS = 5000;
 
 export default function App() {
   const { state, update, sync, lastUndo, undo, dismissUndo, newerSave } = useStore();
@@ -200,17 +198,13 @@ export default function App() {
     },
   });
   // A pull re-reads the event schedule and the card catalog, looks for a new version and, with sync on, checks the gist.
-  // It doesn't reload, which wouldn't switch to a new version (only the bar's Reload does) and would lose whatever is
-  // half typed, except where there's no service worker to find one. There it first lets sync work already out (a sync,
-  // Connect or Keep mine) or a sync of its own finish, so a change waiting to be pushed goes up before the reload.
-  // GitHub's requests have no time limit, so the spinner waits for sync for a few seconds at most. It doesn't wait for
-  // the version check or the catalog: what they find shows by itself (the bar, new cards and art).
-  const syncFor = (wanted: boolean) => Promise.race([Promise.resolve(wanted && sync.syncNow()), new Promise((r) => setTimeout(r, PULL_SYNC_WAIT_MS))]);
+  // It never reloads, which wouldn't switch to a new version (only the bar's Reload does) and would lose whatever is half
+  // typed. The spinner doesn't wait for the version check or the catalog: what they find shows by itself (the bar, new
+  // cards and art).
   const refresh = () => {
-    if (!hasServiceWorker()) return syncFor(true).then(() => location.reload());
     void checkForAppUpdate();
     void refreshCatalog();
-    return Promise.all([syncFor(sync.connected), refreshEvents()]);
+    return Promise.all([sync.connected && sync.syncNow(), refreshEvents()]);
   };
 
   const syncPill = (extra: string) =>

@@ -10,10 +10,10 @@ import { PlanProvider } from './planner';
 import { SyncLoop } from './syncLoop';
 import App from './App';
 
-// Mocked so a test can say whether a new version is waiting or a service worker runs, catch Reload and count update
-// checks; appUpdate.test.ts tests the real module.
-const appUpdate = vi.hoisted(() => ({ ready: false, apply: vi.fn(), checks: 0, sw: true, check: null as Promise<unknown> | null }));
-vi.mock('./appUpdate', () => ({ hasServiceWorker: () => appUpdate.sw, checkForAppUpdate: () => (appUpdate.checks++, appUpdate.check ?? Promise.resolve()), useAppUpdateReady: () => appUpdate.ready, applyAppUpdate: appUpdate.apply }));
+// Mocked so a test can say whether a new version is waiting, catch Reload and count update checks
+// (appUpdate.test.ts tests the real module).
+const appUpdate = vi.hoisted(() => ({ ready: false, apply: vi.fn(), checks: 0, check: null as Promise<unknown> | null }));
+vi.mock('./appUpdate', () => ({ checkForAppUpdate: () => (appUpdate.checks++, appUpdate.check ?? Promise.resolve()), useAppUpdateReady: () => appUpdate.ready, applyAppUpdate: appUpdate.apply }));
 
 beforeEach(() => {
   // The catalog and the event schedule are fetched at start; neither matters here, so stay offline.
@@ -25,7 +25,6 @@ beforeEach(() => {
   appUpdate.ready = false;
   appUpdate.apply.mockClear();
   appUpdate.checks = 0;
-  appUpdate.sw = true;
   appUpdate.check = null;
 });
 afterEach(() => {
@@ -137,101 +136,6 @@ describe('a new version', () => {
     const before = syncNow.mock.calls.length;
     await pull();
     expect([syncNow.mock.calls.length - before, appUpdate.checks, reload.mock.calls.length]).toEqual([1, 1, 0]);
-  });
-
-  // Generated on 2026-10-25 (/ship review, run 15 pass 3)
-  // Value: protects=where no service worker runs (a private window, some in-app browsers), pull to refresh reloads, the
-  // only way a new version loads there; fails_when=a pull there never updates the app; why_new=review (Red Team);
-  // seam=appUpdate mocked (no service worker), touches sent by hand; no_claim=which browsers block service workers
-  it('reloads on pull to refresh where there’s no service worker', async () => {
-    appUpdate.sw = false;
-    const reload = vi.fn();
-    vi.stubGlobal('location', { ...location, reload });
-    renderApp();
-    await pull();
-    expect(reload).toHaveBeenCalledTimes(1);
-  });
-
-  // Generated on 2026-10-25 (/ship review, run 16, Red Team)
-  // Value: protects=where pull to refresh reloads, with sync on it syncs first, so a change waiting to be pushed goes up
-  // before the reload; fails_when=the reload cancels the waiting push and the edit reaches the gist only on a later start,
-  // maybe as a which-copy question; why_new=review (Red Team); seam=appUpdate mocked (no service worker), SyncLoop.syncNow
-  // spied, touches sent by hand; no_claim=GitHub itself
-  it('syncs before that reload when sync is on', async () => {
-    appUpdate.sw = false;
-    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
-    const order: string[] = [];
-    vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(async () => void order.push('sync'));
-    vi.stubGlobal('location', { ...location, reload: () => order.push('reload') });
-    renderApp();
-    order.length = 0;
-    await pull();
-    expect(order).toEqual(['sync', 'reload']);
-  });
-
-  // Generated on 2026-10-25 (/ship review, run 16 pass 3, Red Team)
-  // Value: protects=where a service worker runs, a pull's spinner waits for sync at most 5 seconds too, so a sync stuck
-  // on a hanging connection doesn't keep it up and ignore later pulls; fails_when=the pull waits on the sync for good;
-  // why_new=review (Red Team): syncNow now waits for a sync already out, and GitHub's requests have no time limit;
-  // seam=appUpdate mocked, SyncLoop.syncNow spied to never answer, fake timers, touches sent by hand; no_claim=GitHub
-  it('lets a pull finish after 5 seconds when its sync hangs', async () => {
-    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
-    const syncNow = vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(() => new Promise(() => {}));
-    renderApp();
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    const before = syncNow.mock.calls.length;
-    await pull();
-    await act(() => vi.advanceTimersByTimeAsync(5600));
-    await pull();
-    expect(syncNow.mock.calls.length - before).toBe(2);
-  });
-
-  // Generated on 2026-10-25 (/ship review, run 16, testing)
-  // Value: protects=that sync is waited for at most 5 seconds, so a sync that hangs on a weak connection still lets the
-  // reload happen; fails_when=the time limit goes and the pull waits on the sync for good; why_new=review (testing): the
-  // sync in the test above answers at once; seam=appUpdate mocked (no service worker), SyncLoop.syncNow spied to never
-  // answer, fake timers; no_claim=GitHub itself
-  it('reloads after 5 seconds when that sync hangs', async () => {
-    appUpdate.sw = false;
-    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
-    vi.spyOn(SyncLoop.prototype, 'syncNow').mockImplementation(() => new Promise(() => {}));
-    const reload = vi.fn();
-    vi.stubGlobal('location', { ...location, reload });
-    renderApp();
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    await pull();
-    await act(() => vi.advanceTimersByTimeAsync(4999));
-    expect(reload).not.toHaveBeenCalled();
-    await act(() => vi.advanceTimersByTimeAsync(1));
-    expect(reload).toHaveBeenCalledTimes(1);
-  });
-
-  // Generated on 2026-10-25 (/ship review, run 16, Red Team)
-  // Value: protects=data that sync pulled in is saved in this browser before that reload; fails_when=the reload beats
-  // the save (it waits for the screen to draw), so the page comes back with the old data while the agreed stamp, saved at
-  // once, says this device has the gist's copy, and its next edit pushes the old data over the other device's changes;
-  // why_new=review (Red Team); seam=appUpdate mocked (no service worker), fetch answers as the gist, the reload stubbed to
-  // read the save; no_claim=GitHub itself
-  it('saves what that sync pulled in before reloading', async () => {
-    appUpdate.sw = false;
-    localStorage.setItem('mkmax:sync', JSON.stringify({ token: 't', gistId: 'g1', baseUpdatedAt: 5000 }));
-    localStorage.setItem('mkmax:v1', JSON.stringify({ ...defaultState(), updatedAt: 5000 }));
-    // The gist's copy: the one both devices agreed on, until the other device pushes a newer one.
-    let gist = { ...defaultState(), updatedAt: 5000 };
-    vi.stubGlobal('fetch', (url: string) =>
-      String(url).includes('api.github.com')
-        ? Promise.resolve(new Response(JSON.stringify({ id: 'g1', description: null, files: { 'mkmax-data.json': { content: JSON.stringify(gist), raw_url: '' } } })))
-        : Promise.reject(new Error('offline')),
-    );
-    renderApp();
-    // The sync on opening finds nothing new.
-    await act(() => new Promise((r) => setTimeout(r, 0)));
-    gist = { ...defaultState(), updatedAt: 9000, cards: [{ id: 'r', name: 'Raiden', rarityId: 'diamond', fusion: 1, guest: false }] };
-    let saved: string | null = null;
-    vi.stubGlobal('location', { ...location, reload: () => void (saved = localStorage.getItem('mkmax:v1')) });
-    await pull();
-    await waitFor(() => expect(saved).not.toBeNull());
-    expect(saved).toContain('Raiden');
   });
 
   // Generated on 2026-10-25 (/ship review, run 16, state machines)

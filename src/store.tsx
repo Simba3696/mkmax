@@ -116,11 +116,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           findOrCreateGist,
           getState: () => stateRef.current,
           applyRemote: (remote) => {
-            const next = normalize(remote);
-            setLocal(next);
-            // Saved at once, not when the screen next draws: the loop saves the agreed stamp straight after, and a reload
-            // (or the app being closed) in between would leave the old data with a stamp saying this device has the gist's.
-            save(next);
+            setLocal(normalize(remote));
             // The snapshot predates the other device's changes; restoring it would silently drop them.
             clearUndo();
           },
@@ -135,9 +131,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           },
           setLocal,
           saveConfig: (cfg) => {
-            // Held for a newer version's save: the sync settings belong to that version too (a sync already out when the
-            // hold began still finishes here, and its stamp must not say this browser has data it didn't save).
-            if (savedByNewerApp()) return;
             saveSyncConfig(cfg);
             setConnected(!!cfg);
           },
@@ -146,6 +139,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           schedulePush: () => schedulePush(),
           cancelPush: () => clearTimeout(pushTimer.current),
           lookForUpdate: () => void checkForAppUpdate(),
+          held: savedByNewerApp,
           now: () => Date.now(),
         },
         loadSyncConfig(),
