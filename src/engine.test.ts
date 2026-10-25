@@ -2158,6 +2158,10 @@ describe('respellTower', () => {
     unifyTowerSpellings(hiddenOnly);
     expect(hiddenOnly.cards[0].sourceNote).toBe('Ghost Tower');
     const spaced = [card('Fire Fan', 'Lin\u00a0Kuei  Tower')];
+    // Extended by /ship adversarial review on 2026-10-25 (run 19): a phone's curly apostrophe is the same tower as a
+    // straight one; fails_when=towerKey keeps the curly one, so "X’s Tower" typed on a phone and "X's Tower" pasted
+    // from notes become two towers.
+    expect(towerKey('Kitana’s Tower')).toBe(towerKey("kitana's tower"));
     expect([
       towerKey(' Lin  Kuei\u00a0Tower '),
       towerName(' Lin  Kuei\u00a0Tower '),

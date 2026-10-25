@@ -87,10 +87,11 @@ export const recordKey = (c: { rarityId: string; name: string }) => `${c.rarityI
 export const towerName = (name: string) => name.trim().replace(/\s+/g, ' ');
 
 /**
- * One tower however its name was typed, since tower names are typed by hand: "lin  kuei tower " is Lin Kuei Tower. Tower
+ * One tower however its name was typed, since tower names are typed by hand: "lin  kuei tower " is Lin Kuei Tower, and a
+ * phone's curly apostrophe is a straight one. Tower
  * gear groups by it, and the Tower list on Cards offers each tower once by it.
  */
-export const towerKey = (name: string) => towerName(name).toLowerCase();
+export const towerKey = (name: string) => towerName(name).toLowerCase().replace(/’/g, "'");
 
 // Cards under a rarity a sync removed are hidden everywhere, so they don't spell a tower and a typed name doesn't
 // re-spell them (only the version 18 step, unifyTowerSpellings, does): the Tower list, chips, Add card, Paste a list

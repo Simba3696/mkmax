@@ -65,6 +65,8 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: (sh
   // A key press (a click with no pointer, detail 0) acts on the change showing then. A press is used once, so a later
   // click that came without one (from some accessibility tools) acts on the change showing too.
   const pressed = useRef<UndoEntry | null>(null);
+  // A press that turns into a scroll never becomes a click, so it doesn't count for the next one.
+  const cancelled = () => void (pressed.current = null);
   const shown = (e: MouseEvent) => {
     const p = pressed.current;
     pressed.current = null;
@@ -78,10 +80,10 @@ function UndoToast({ entry, onUndo, onDismiss }: { entry: UndoEntry; onUndo: (sh
       role="status"
     >
       <span className="flex-1 min-w-0 truncate">{entry.label}</span>
-      <button className={`${btn.ghost} text-gold font-bold`} onPointerDown={() => void (pressed.current = entry)} onClick={(e) => onUndo(shown(e))}>
+      <button className={`${btn.ghost} text-gold font-bold`} onPointerDown={() => void (pressed.current = entry)} onPointerCancel={cancelled} onClick={(e) => onUndo(shown(e))}>
         Undo
       </button>
-      <button className={btn.ghost} onPointerDown={() => void (pressed.current = entry)} onClick={(e) => onDismiss(shown(e))} aria-label="Dismiss">
+      <button className={btn.ghost} onPointerDown={() => void (pressed.current = entry)} onPointerCancel={cancelled} onClick={(e) => onDismiss(shown(e))} aria-label="Dismiss">
         ✕
       </button>
     </div>

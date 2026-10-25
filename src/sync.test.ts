@@ -107,4 +107,15 @@ describe('GitHub requests', () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect((await late)?.updatedAt).toBe(5);
   });
+
+  // Generated on 2026-10-25 (/ship adversarial review, run 19)
+  // Value: protects=a synced file big enough to come by a second request, which then answers with an error, fails as an
+  // error instead of being read as data; fails_when=a JSON error body is taken as a copy with no version, which the sync
+  // loop treats as an outdated build's and writes over, losing the other device's edits unseen; why_new=review
+  // (adversarial): only the API request checked its status; seam=fetch stubbed; no_claim=GitHub's own error bodies
+  it('fails on an error while downloading a big synced file, rather than reading the error as data', async () => {
+    const big = { ok: true, status: 200, json: () => Promise.resolve({ id: 'g1', description: null, files: { 'mkmax-data.json': { truncated: true, raw_url: 'raw' } } }) };
+    vi.stubGlobal('fetch', (url: string) => Promise.resolve(url === 'raw' ? new Response(JSON.stringify({ message: 'Server Error' }), { status: 502 }) : big));
+    await expect(readRemote(cfg)).rejects.toThrow('GitHub error 502');
+  });
 });

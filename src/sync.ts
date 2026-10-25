@@ -91,7 +91,14 @@ export async function readRemote(cfg: SyncConfig): Promise<AppState | null> {
   const gist = await gh<Gist>(cfg.token, `/gists/${cfg.gistId}`);
   const file = gist.files[FILE];
   if (!file) return null;
-  const text = file.truncated || file.content == null ? await inTime(async (signal) => (await fetch(file.raw_url, { signal })).text()) : file.content;
+  // A big file comes by a second request. An error page from it isn't the data: read as a copy with no version, it would
+  // look like an outdated build's and be written over.
+  const raw = async (signal: AbortSignal) => {
+    const res = await fetch(file.raw_url, { signal });
+    if (!res.ok) throw new Error(`GitHub error ${res.status} downloading the synced data`);
+    return res.text();
+  };
+  const text = file.truncated || file.content == null ? await inTime(raw) : file.content;
   return JSON.parse(text) as AppState;
 }
 

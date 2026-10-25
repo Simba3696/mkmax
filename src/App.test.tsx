@@ -637,6 +637,16 @@ describe('the Undo bar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect([ids(), screen.queryByText('Added c')]).toEqual([['a', 'b'], null]);
+
+    // Extended by /ship adversarial review on 2026-10-25 (run 19): a press that turned into a scroll (cancelled, so no
+    // click) doesn't count for a later click that came without its own press; fails_when=that click acts on the change
+    // the abandoned press showed, and the store ignores it, so Undo does nothing once.
+    add('d', 'Added d');
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Undo' }));
+    fireEvent.pointerCancel(screen.getByRole('button', { name: 'Undo' }));
+    add('e', 'Added e');
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }), { detail: 1 });
+    expect(ids()).toEqual(['a', 'b', 'd']);
   });
 
   // Generated on 2026-10-23 (/ship review, state matrix, Tower dropdown); extended by /ship review on 2026-10-25 (run 18
