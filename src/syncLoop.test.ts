@@ -431,7 +431,7 @@ describe('sync loop', () => {
   // tab) and shows synced, or stays on Syncing for good; why_new=review: connect() had no check for the hold;
   // seam=the fake gist holds Connect's lookup open; no_claim=GitHub
   it('a Connect still waiting on GitHub when another tab saves data from a newer version saves nothing', async () => {
-    for (const existing of [true, false]) {
+    for (const existing of [true, false, 'fails'] as const) {
       const gist = new FakeGist();
       if (existing) await device(gist).loop.connect('token');
       const laptop = device(gist);
@@ -441,6 +441,7 @@ describe('sync loop', () => {
       await settle();
       expect(laptop.status.kind).toBe('syncing');
       laptop.held = true;
+      if (existing === 'fails') gist.fail = new TypeError('Failed to fetch');
       await gist.release();
       await connecting;
       expect([laptop.loop.config, laptop.status]).toEqual([null, { kind: 'off' }]);

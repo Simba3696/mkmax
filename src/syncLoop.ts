@@ -197,6 +197,11 @@ export class SyncLoop {
       if (!created) await this.syncNow();
       else this.pushLaterEdits();
     } catch (e) {
+      // As above: one that fails once another tab is ahead just goes back to off.
+      if (this.deps.held()) {
+        this.deps.onStatus({ kind: 'off' });
+        return;
+      }
       this.deps.onStatus({ kind: 'error', message: (e as Error).message });
       throw e;
     }
