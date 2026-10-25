@@ -31,8 +31,8 @@ function held() {
 
 describe('card catalog fetched again', () => {
   // Generated on 2026-10-25 (/ship adversarial review, run 19, Claude and Codex)
-  // Value: protects=a download that answers with JSON but no card list (an error served as JSON, a half-written deploy)
-  // counts as failed: a fetch-again keeps the copy here and tells no screen, and a first download rejects so the next
+  // Value: protects=a download that answers with JSON but no card list (an error served as JSON, a half-written deploy,
+  // an empty list, only entries with no kind or name) counts as failed, and stray entries in a good list are left out: a fetch-again keeps the copy here and tells no screen, and a first download rejects so the next
   // lookup tries again; fails_when=the working catalog is swapped for nothing, so art lookups and the rarity check throw
   // or find nothing for the rest of the session; why_new=adversarial review: the only outside data with no shape check;
   // seam=fetch stubbed; no_claim=none beyond protects
@@ -43,7 +43,7 @@ describe('card catalog fetched again', () => {
     const kept = await loadCatalog();
     const { result } = renderHook(() => useCatalogVersion());
     const before = result.current;
-    for (const bad of [{}, { items: 'none' }, []]) {
+    for (const bad of [{}, { items: 'none' }, [], { items: [] }, { items: [null, { name: 'No kind' }] }]) {
       body = bad;
       await act(() => refreshCatalog());
       expect([await loadCatalog(), result.current]).toEqual([kept, before]);
@@ -52,7 +52,8 @@ describe('card catalog fetched again', () => {
     const first = await fresh();
     body = {};
     await expect(first.loadCatalog()).rejects.toThrow('no card list');
-    body = { items: [item('Kori Blade')] };
+    // Entries with no kind or name are left out; the rest are kept.
+    body = { items: [item('Kori Blade'), { name: 'No kind' }, null] };
     expect((await first.loadCatalog()).map((i) => i.name)).toEqual(['Kori Blade']);
   });
 
@@ -244,8 +245,8 @@ describe('card catalog downloads that overlap', () => {
     await pull2;
     const retry = cat.loadCatalog();
     expect(calls).toHaveLength(2);
-    calls[1].res(new Response(JSON.stringify({ items: [] })));
-    await act(async () => void (await expect(retry).resolves.toEqual([])));
+    calls[1].res(new Response(JSON.stringify({ items: [item('Kori Blade')] })));
+    await act(async () => void expect((await retry).map((i) => i.name)).toEqual(['Kori Blade']));
     expect(later.result.current).not.toBe(failedAt);
   });
 

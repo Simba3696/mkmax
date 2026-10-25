@@ -63,12 +63,13 @@ function download(replace: boolean): Promise<CatalogItem[]> {
     })
     .then((text) => {
       if (good && (!replace || text === goodText)) return good;
-      // Something that isn't a card list (an error page served as JSON, a half-written deploy) counts as a failed
-      // download, so the copy here is kept.
+      // Something that isn't a card list (an error page served as JSON, a half-written deploy, an empty list) counts as
+      // a failed download, so the copy here is kept. Entries with no kind or name can't match a card, so they're left out.
       const items = (JSON.parse(text) as { items?: unknown }).items;
-      if (!Array.isArray(items)) throw new Error('catalog.json: no card list');
+      const cards = Array.isArray(items) ? items.filter((i): i is CatalogItem => typeof i?.kind === 'string' && typeof i?.name === 'string') : [];
+      if (!cards.length) throw new Error('catalog.json: no card list');
       const changed = good || failed;
-      good = items as CatalogItem[];
+      good = cards;
       goodText = text;
       if (changed) bump();
       return good;
