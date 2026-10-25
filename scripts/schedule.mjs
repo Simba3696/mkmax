@@ -25,8 +25,9 @@ const field = (record, label) => record.fields?.find((f) => f.label === label)?.
 
 /**
  * Shop packs, challenges and Realm Klash seasons from the API response. Throws when a page or section is missing,
- * or there are no packs or no current season: the site has changed its format, and writing empty lists would
- * deploy an empty schedule. The deploy then keeps the copy that's live instead.
+ * there are no packs or no current season, or an entry has no name: the site has changed its format, and writing
+ * empty lists would deploy an empty schedule, while a nameless entry breaks the Cards and Plan tabs, which read every
+ * name. The deploy then keeps the copy that's live instead.
  */
 export function parseSchedule(schedule) {
   const section = (pageId, title) => {
@@ -55,6 +56,9 @@ export function parseSchedule(schedule) {
   const seasonPage = schedule.pages?.find((p) => p.sections?.some((s) => s.title === 'Current Season'))?.id ?? 'realm_wars';
   const seasons = timed(seasonPage, ['Current Season', 'Upcoming Seasons'], 'Rewards Type');
   if (!packs.length) throw new Error('events: no shop packs');
+  for (const entry of [...packs, ...challenges, ...seasons]) {
+    if (typeof entry.name !== 'string' || !entry.name.trim()) throw new Error('events: an entry has no name');
+  }
   if (!section(seasonPage, 'Current Season').length) throw new Error('events: no current Realm Klash season');
   return { packs, challenges, seasons };
 }

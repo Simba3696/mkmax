@@ -75,7 +75,8 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Past deploy-pages' own 10-minute wait, so a slow Pages rollout fails with its message rather than this limit's.
+    timeout-minutes: 15
     permissions:
       pages: write
       id-token: write

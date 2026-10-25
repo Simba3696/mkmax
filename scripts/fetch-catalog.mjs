@@ -6,6 +6,8 @@ import { writeFileSync } from 'node:fs';
 const API = 'https://mkmobilebase.com/api/categories';
 const HEADERS = { Accept: 'application/json', 'User-Agent': 'mkmax catalog (https://github.com/Simba3696/mkmax)' };
 const RARITIES = ['diamond', 'gold', 'silver', 'bronze', 'epic', 'rare', 'uncommon', 'common', 'legendary'];
+/** Far past any real category (4 pages of 100 at most today), so a page count that never ends fails instead. */
+const MAX_PAGES = 50;
 
 async function fetchAll(category) {
   const items = [];
@@ -17,8 +19,14 @@ async function fetchAll(category) {
     });
     if (!res.ok) throw new Error(`${category} page ${page}: HTTP ${res.status}`);
     const { data, meta } = await res.json();
+    // Without a usable page count the loop would stop early (and ship part of the catalog) or never stop (and run
+    // until the deploy's time limit), so either way the deploy keeps the live copy instead.
+    const last = meta?.last_page;
+    if (!Array.isArray(data) || !Number.isInteger(last) || last < 1 || last > MAX_PAGES) {
+      throw new Error(`${category} page ${page}: unexpected page data`);
+    }
     items.push(...data);
-    if (page >= meta.last_page) return items;
+    if (page >= last) return items;
   }
 }
 
@@ -41,6 +49,12 @@ for (const [category, kind] of [['characters', 'character'], ['equipment', 'equi
     const name = kind === 'kameo' ? item.title.replace(/\s*Kameo$/i, '') : item.title;
     catalog.push({ kind, name, rarity: rarityOf(item), slug: item.slug, image: item.image_thumb_2x_url ?? item.image_url });
   }
+}
+// Every card has art and a rarity today, so more than a few without means the API renamed those fields; failing keeps
+// the deployed catalog rather than shipping one without them.
+for (const key of ['image', 'rarity']) {
+  const missing = catalog.filter((c) => !c[key]).length;
+  if (missing > catalog.length / 10) throw new Error(`catalog: ${missing} of ${catalog.length} items have no ${key}`);
 }
 catalog.sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
 writeFileSync(new URL('../public/catalog.json', import.meta.url), JSON.stringify({ source: 'https://mkmobilebase.com', fetchedAt: new Date().toISOString(), items: catalog }) + '\n');
