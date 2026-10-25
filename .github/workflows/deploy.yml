@@ -8,8 +8,9 @@ on:
     - cron: '30 17 * * *'
   workflow_dispatch:
 
-# Each job gets only what it needs: the build, which runs npm ci and so the dependencies' install scripts, can't
-# publish the site; only the deploy job can.
+# Each job gets only what it needs: the build, which runs npm ci and so the dependencies' install scripts, gets no
+# token that can publish; only the deploy job has one. The deploy still publishes whatever the build uploads, so this
+# keeps the publishing token away from dependency code; it doesn't check what the build made.
 permissions:
   contents: read
 
@@ -20,6 +21,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # A deploy takes about a minute; a hung one fails here instead of after GitHub's 6 hours, and the next run
+    # starts over.
+    timeout-minutes: 15
     permissions:
       contents: read
       # configure-pages reads the site's address and path.
@@ -71,6 +75,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       pages: write
       id-token: write

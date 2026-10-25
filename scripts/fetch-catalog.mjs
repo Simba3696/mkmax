@@ -10,7 +10,11 @@ const RARITIES = ['diamond', 'gold', 'silver', 'bronze', 'epic', 'rare', 'uncomm
 async function fetchAll(category) {
   const items = [];
   for (let page = 1; ; page++) {
-    const res = await fetch(`${API}/${category}/articles?per_page=100&page=${page}`, { headers: HEADERS });
+    // A stalled download fails after 30 seconds, so the deploy goes on with the live copy instead of waiting.
+    const res = await fetch(`${API}/${category}/articles?per_page=100&page=${page}`, {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(30_000),
+    });
     if (!res.ok) throw new Error(`${category} page ${page}: HTTP ${res.status}`);
     const { data, meta } = await res.json();
     items.push(...data);

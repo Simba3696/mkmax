@@ -10,7 +10,8 @@ const HEADERS = { Accept: 'application/json', 'User-Agent': 'mkmax events (https
 const LIVE = `${process.env.PAGES_URL ?? 'https://simba3696.github.io/mkmax'}/events.json`;
 const FILE = new URL('../public/events.json', import.meta.url);
 
-const res = await fetch(API, { headers: HEADERS });
+// A stalled download fails after 30 seconds, so the deploy goes on with the live copy instead of waiting.
+const res = await fetch(API, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
 if (!res.ok) throw new Error(`events: HTTP ${res.status}`);
 const schedule = await res.json();
 const { packs, challenges, seasons } = parseSchedule(schedule);
