@@ -18,7 +18,7 @@ jobs:
   # needs the ruleset changed too.
   check:
     runs-on: ubuntu-latest
-    # A normal run takes a few minutes; a hung one fails here instead of holding the PR check for GitHub's 6 hours.
+    # A normal run takes about a minute; a hung one fails here instead of holding the PR check for GitHub's 6 hours.
     timeout-minutes: 15
     # The deploy builds and tests with the Pages path, so a PR is checked with the same one. The deploy reads it from
     # Pages, so change this too if the repo is renamed or given its own domain.
