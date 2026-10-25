@@ -35,7 +35,7 @@ export interface SyncDeps {
   lookForUpdate: () => void;
   /**
    * Another tab has saved data from a newer version, so this one must start, write, apply and report nothing (a Connect
-   * already waiting on GitHub just goes back to off).
+   * still looking for the gist just goes back to off; one that has found it stays connected and its first sync stops).
    */
   held: () => boolean;
   now: () => number;

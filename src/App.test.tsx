@@ -639,15 +639,17 @@ describe('the Undo bar', () => {
     expect([ids(), screen.queryByText('Added c')]).toEqual([['a', 'b'], null]);
   });
 
-  // Generated on 2026-10-23 (/ship review, state matrix, Tower dropdown)
+  // Generated on 2026-10-23 (/ship review, state matrix, Tower dropdown); extended by /ship review on 2026-10-25 (run 18
+  // pass 2, state machines) with a card's Tower box re-spell and a carried-on Add each made after a press on ✕
   // Value: protects=a press on Undo or ✕ acts only on the change it showed, whatever kind came in before the click: an
   // Add carried on from the Undo the press showed, a level change that removed a maxed card, a re-spell from Add card's Tower box,
-  // and a re-spell the press itself makes by finishing a card's Tower box; that change stays showing and nothing is
-  // undone or closed; fails_when=a kind of change gets its own way to Undo (its base, or the label of the Undo it carried
-  // on from) that the press check misses, so a stale press undoes or closes it unseen; why_new=review (state machines):
-  // only plain changes were pressed stale; seam=the store's update makes the carried Add and the level change as Add
-  // card and a level tap do, the press's blur is sent by hand between pointerdown and click; no_claim=a real tap's
-  // event order
+  // and a re-spell the press itself makes by finishing a card's Tower box, on Undo and on ✕, and an Add carried on from
+  // the Undo a ✕ press showed; that change stays showing with its own label, nothing is undone or closed, and its Undo
+  // then puts back everything it changed; fails_when=a kind of change gets its own way to Undo (its base, or the label
+  // or base of the Undo it carried on from) that the press check misses, so a stale press undoes or closes it unseen;
+  // why_new=review (state machines): only plain changes were pressed stale, and then the card box's re-spell and the
+  // carried-on Add only on Undo; seam=the store's update makes the carried Add and the level change as Add card and a
+  // level tap do, the press's blur is sent by hand between pointerdown and click; no_claim=a real tap's event order
   it('acts only on the change a press showed, for each kind of change', () => {
     const gear = (id: string, name: string, sourceNote: string) => ({ id, name, rarityId: 'epic', fusion: 1, guest: false, source: 'tower', sourceNote });
     localStorage.setItem('mkmax:v1', JSON.stringify({ ...defaultState(), cards: [gear('kori', 'Kori Blade', 'lin kuei tower'), gear('fan', 'Frost Fan', 'lin kuei tower')] }));
@@ -693,6 +695,21 @@ describe('the Undo bar', () => {
     fireEvent.change(box(), { target: { value: 'Lin Kuei tower' } });
     stalePress('Undo', () => fireEvent.blur(box()));
     expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Fixed the spelling on 1 other card: Lin Kuei tower') !== null]).toEqual(['Lin Kuei tower', 'Lin Kuei tower', true]);
+
+    // The same on ✕: the re-spell stays showing, and its Undo puts both cards back.
+    fireEvent.change(box(), { target: { value: nameBoxValue(box()) } });
+    fireEvent.change(box(), { target: { value: 'LIN KUEI TOWER' } });
+    stalePress('Dismiss', () => fireEvent.blur(box()));
+    expect([towerOf('kori'), towerOf('fan'), screen.queryByText('Fixed the spelling on 1 other card: LIN KUEI TOWER') !== null]).toEqual(['LIN KUEI TOWER', 'LIN KUEI TOWER', true]);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect([towerOf('kori'), towerOf('fan')]).toEqual(['Lin Kuei tower', 'Lin Kuei tower']);
+
+    // An Add carried on from the Undo a ✕ press showed stays showing with both labels, and its Undo takes both out.
+    add('e', 'Added e');
+    stalePress('Dismiss', () => act(() => update((d) => void d.cards.push({ id: 'f', name: 'f', rarityId: 'epic', fusion: 1, guest: false }), 'Added f', { alsoUndo: true })));
+    expect([ids().slice(-2), screen.queryByText('Added f · Added e') !== null]).toEqual([['e', 'f'], true]);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect([ids().includes('e'), ids().includes('f'), screen.queryByText('Added f · Added e')]).toEqual([false, false, null]);
   });
 
   // Generated on 2026-10-22 (/ship review, state matrix, Tower dropdown)

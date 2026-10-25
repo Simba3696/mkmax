@@ -53,7 +53,8 @@ export default function MaxedPanel() {
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [catalogFailed, setCatalogFailed] = useState(false);
   // Bumped by Try again: loadCatalog forgets a failed download, so loading again fetches it again. Also read again when
-  // a catalog fetched again (pull to refresh, or coming back after an hour) has changed, or is the first that worked.
+  // a catalog fetched again (pull to refresh, or coming back) has changed, or when the first download that works follows a
+  // failed one.
   const [attempt, setAttempt] = useState(0);
   const catalogVersion = useCatalogVersion();
   const [q, setQ] = useState('');

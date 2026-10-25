@@ -3770,14 +3770,16 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     expect([towerOf('Kori Blade'), boxOf('Kori Blade').tagName]).toEqual(['Wind Tower', 'SELECT']);
   });
 
-  // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown)
-  // Value: protects=a tower step held by the keys, or a held No tower, is dropped when a sync takes the card off tower
-  // gear and its list goes away: nothing is saved on the card and no Undo shows; fails_when=the list's cleanup settles
-  // the held step as a page switch does, writing a tower onto a Krypt card with a stray "tower set to" Undo;
-  // why_new=review (state machines): the page-switch settle also runs when the list unmounts; seam=a sync made with the
-  // store's update; no_claim=none beyond protects
+  // Generated on 2026-10-23 (/ship review, state machines, Tower dropdown); extended by /ship review on 2026-10-25 (run
+  // 18 pass 2, state machines) with a held Add a tower or fix its spelling…
+  // Value: protects=a tower step held by the keys, a held No tower, or a held Add a tower or fix its spelling… is dropped
+  // when a sync takes the card off tower gear and its list goes away: nothing is saved on the card and no Undo shows;
+  // fails_when=the list's cleanup settles the held step as a page switch does, writing a tower (or the name box's option
+  // itself) onto a Krypt card with a stray "tower set to" Undo; why_new=review (state machines): the page-switch settle
+  // also runs when the list unmounts, and the name box's option was then untested; seam=a sync made with the store's
+  // update; no_claim=none beyond protects
   it('drops a held step when a sync takes the card off tower gear', () => {
-    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower'), tower('fan', 'Frost Fan', 'Lin Kuei Tower')]);
     const offTowers = (id: string) =>
       act(() =>
         update((d) => {
@@ -3793,6 +3795,64 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     step(boxOf('Ryu Kunai'), '');
     offTowers('kunai');
     expect([saved('kunai').source, saved('kunai').sourceNote, lastUndo]).toEqual(['krypt', undefined, null]);
+    step(boxOf('Frost Fan'), newTowerValue(boxOf('Frost Fan')));
+    offTowers('fan');
+    expect([saved('fan').source, saved('fan').sourceNote, lastUndo]).toEqual(['krypt', undefined, null]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 18 pass 2, state machines)
+  // Value: protects=a step held by the keys settles as leaving the list says even when a sync changes the card's tower
+  // meanwhile: a held No tower can't drop out of the list, so leaving takes the synced tower off with the usual "tower
+  // removed" Undo, which brings the synced tower back; a held Add a tower or fix its spelling… is dropped on leaving, so
+  // the synced tower stands, no Undo shows and the list stays a list; fails_when=a sync drops a held No tower, so leaving
+  // saves nothing the list showed, or leaving saves the name box's option as a tower or opens the box; why_new=review
+  // (state machines): held steps were only tested against a sync that took their option out of the list or the card off
+  // tower gear; seam=a sync made with the store's update, keyDown, change and keyUp in a closed list's order; no_claim=a
+  // real sync
+  it("settles a held No tower or name box option as usual when a sync changes the card's tower", () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    const sync = (to: string) => act(() => update((d) => void (d.cards.find((c) => c.id === 'kori')!.sourceNote = to)));
+    step(boxOf('Kori Blade'), '');
+    sync('Thunder Tower');
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect([towerOf('Kori Blade'), lastUndo?.label]).toEqual([undefined, 'Kori Blade: tower removed']);
+    act(() => undo());
+    expect(towerOf('Kori Blade')).toBe('Thunder Tower');
+
+    step(boxOf('Kori Blade'), newTowerValue(boxOf('Kori Blade')));
+    sync('Wind Tower');
+    fireEvent.blur(boxOf('Kori Blade'));
+    expect([towerOf('Kori Blade'), lastUndo, boxOf('Kori Blade').tagName]).toEqual(['Wind Tower', null, 'SELECT']);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 18 pass 2, state machines)
+  // Value: protects=a card's emptied name box, finished as its list goes away because a sync took the card off tower
+  // gear or removed it, saves nothing: no tower goes back on a Krypt card, no other card's tower changes and no Undo
+  // shows; fails_when=the finish skips its checks that the card is still there, still tower gear and still on the tower
+  // the box last saved, so the tower the box opened on is written onto a Krypt card, or a removed card makes the finish
+  // throw; why_new=review (state machines): an open box was only tested against a sync that changed its tower or removed
+  // the card with a name typed; seam=a sync made with the store's update, SyncLoop.nextStamp spied to count saves;
+  // no_claim=a real sync
+  it('saves nothing from an emptied name box when a sync takes the card off tower gear or removes it', () => {
+    renderPage([tower('kori', 'Kori Blade', 'Lin Kuei Tower'), tower('fan', 'Frost Fan', 'lin kuei tower'), tower('kunai', 'Ryu Kunai', 'Shirai Ryu Tower')]);
+    const cards = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards as { id: string; source?: string; sourceNote?: string }[];
+    emptiedBox(boxOf('Kori Blade'), () => boxOf('Kori Blade'));
+    let stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    act(() =>
+      update((d) => {
+        const c = d.cards.find((x) => x.id === 'kori')!;
+        c.source = 'krypt';
+        delete c.sourceNote;
+      }),
+    );
+    const kori = cards().find((c) => c.id === 'kori')!;
+    expect([kori.source, kori.sourceNote, towerOf('Frost Fan'), towerOf('Ryu Kunai'), lastUndo, stamps.mock.calls.length]).toEqual(['krypt', undefined, 'lin kuei tower', 'Shirai Ryu Tower', null, 1]);
+
+    emptiedBox(boxOf('Ryu Kunai'), () => boxOf('Ryu Kunai'));
+    stamps.mockRestore();
+    stamps = vi.spyOn(SyncLoop.prototype, 'nextStamp');
+    act(() => update((d) => void (d.cards = d.cards.filter((c) => c.id !== 'kunai'))));
+    expect([cards().map((c) => c.id), towerOf('Frost Fan'), lastUndo, stamps.mock.calls.length]).toEqual([['kori', 'fan'], 'lin kuei tower', null, 1]);
   });
 
   // Generated on 2026-10-23 (/ship review, Red Team, Tower dropdown)

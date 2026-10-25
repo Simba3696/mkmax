@@ -578,6 +578,59 @@ describe('sync loop', () => {
     ]);
   });
 
+  // Generated on 2026-10-25 (/ship review, run 18 pass 2, state machines)
+  // Value: protects=a Keep mine whose request fails (offline) shows the error, writes nothing and agrees nothing, and
+  // the next sync asks again rather than pushing this device's copy or pulling the gist's; fails_when=a failed Keep mine
+  // marks this copy agreed (so the next sync pushes over the other device's changes) or keeps the prompt it dropped, so
+  // every later sync stops early and the error stays up; why_new=review (state machines): Keep mine was never tested
+  // with a request that fails; seam=the fake gist's fail switch stands in for the network; no_claim=GitHub
+  it('a Keep mine whose request fails shows the error, and the next sync asks again', async () => {
+    const { gist, phone, desktop } = await pair();
+    phone.edit((s) => s.cards.push(card('Raiden')));
+    await phone.loop.syncNow();
+    desktop.edit((s) => s.cards.push(card('Kitana')));
+    await desktop.loop.syncNow();
+    expect(desktop.status.kind).toBe('conflict');
+    const [before, writes, agreed] = [structuredClone(gist.data), gist.writes, desktop.loop.config?.baseUpdatedAt];
+    gist.fail = new TypeError('Failed to fetch');
+    await desktop.loop.resolve('mine');
+    expect([desktop.status, gist.data, gist.writes, desktop.loop.config?.baseUpdatedAt]).toEqual([{ kind: 'error', message: 'Failed to fetch' }, before, writes, agreed]);
+    gist.fail = null;
+    await desktop.loop.syncNow();
+    expect([desktop.status.kind, gist.data, gist.writes, names(desktop.state)]).toEqual(['conflict', before, writes, ['Scorpion', 'Kitana']]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 18 pass 2, state machines)
+  // Value: protects=Disconnect while a Keep mine is waiting on GitHub leaves sync off with no settings, and a Keep mine
+  // whose read was still out writes nothing once it comes back; one whose upload was already sent can't be called back,
+  // so that write lands, but it agrees nothing and shows nothing over off; fails_when=the Keep mine carries on after its
+  // read as if still connected, uploading this device's copy, or saves the agreed stamp (bringing the settings back) or
+  // shows synced after Disconnect; why_new=review (state machines): Disconnect was only tested during a plain sync or
+  // with the prompt up; seam=the fake gist holds the read or the write open; no_claim=GitHub
+  it('Disconnect while a Keep mine is out leaves sync off, and a Keep mine still reading writes nothing', async () => {
+    for (const kind of ['reads', 'writes'] as const) {
+      const { gist, phone, desktop } = await pair();
+      phone.edit((s) => s.cards.push(card('Raiden')));
+      await phone.loop.syncNow();
+      desktop.edit((s) => s.cards.push(card('Kitana')));
+      await desktop.loop.syncNow();
+      expect(desktop.status.kind).toBe('conflict');
+      const writes = gist.writes;
+      gist.holding = kind;
+      const out = desktop.loop.resolve('mine');
+      await settle();
+      desktop.loop.disconnect();
+      await gist.release();
+      await out;
+      expect([desktop.loop.config, desktop.status, gist.writes - writes, names(gist.data)]).toEqual([
+        null,
+        { kind: 'off' },
+        kind === 'reads' ? 0 : 1,
+        kind === 'reads' ? ['Scorpion', 'Raiden'] : ['Scorpion', 'Kitana'],
+      ]);
+    }
+  });
+
   it('neither pulls nor pushes data from a newer build, and looks for the new version', async () => {
     const { gist, phone, desktop } = await pair();
     // The desktop, already on a newer build, pushes data saved in a newer version.

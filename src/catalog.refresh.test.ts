@@ -78,8 +78,8 @@ describe('card catalog fetched again', () => {
   });
 
   // Generated on 2026-10-25 (/ship review, run 16, Red Team)
-  // Value: protects=a catalog download that hangs gives up after 30 seconds, so a pull or Find images doesn't wait on it
-  // for good and the next attempt downloads again; fails_when=the download has no time limit; why_new=review (Red Team);
+  // Value: protects=a catalog download that hangs gives up after 30 seconds, so Find images doesn't wait on it for good
+  // and the next attempt downloads again; fails_when=the download has no time limit; why_new=review (Red Team);
   // seam=fetch held open by hand (it settles on its abort signal), fake timers; no_claim=how long real browsers wait
   it('gives up on a download that hangs, and the next attempt tries again', async () => {
     const { loadCatalog } = await fresh();
@@ -91,6 +91,32 @@ describe('card catalog fetched again', () => {
     expect(await first).toBe('AbortError');
     void loadCatalog();
     expect(calls).toHaveLength(2);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 18 pass 2, state machines)
+  // Value: protects=a fetch-again that hangs (a pull or a return after an hour on a connection that stalls) gives up
+  // after 30 seconds, keeping the copy already downloaded and telling no screen to look again, and the next pull or
+  // return downloads again; fails_when=the fetch-again has no time limit, so it never ends and every later pull or
+  // return shares the hung one and never fetches again, or giving up drops the copy or bumps the version;
+  // why_new=review (state machines): only a first download that hangs was tested; seam=fetch held open by hand (it
+  // settles on its abort signal, as a browser's does), fake timers; no_claim=how long real browsers wait
+  it('gives up on a fetch-again that hangs, keeping the copy it has, and the next one tries again', async () => {
+    const { loadCatalog, refreshCatalog, useCatalogVersion } = await fresh();
+    const calls = held();
+    const first = loadCatalog();
+    calls[0].res(new Response(JSON.stringify({ items: [item('Kori Blade')] })));
+    const copy = await first;
+    const { result } = renderHook(() => useCatalogVersion());
+    const before = result.current;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const pull = refreshCatalog();
+    expect(calls).toHaveLength(2);
+    calls[1].init!.signal!.addEventListener('abort', () => calls[1].rej(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+    vi.advanceTimersByTime(30 * 1000);
+    await act(() => expect(pull).resolves.toBeUndefined());
+    expect([(await loadCatalog()) === copy, result.current, calls.length]).toEqual([true, before, 2]);
+    void refreshCatalog();
+    expect(calls).toHaveLength(3);
   });
 
   // Generated on 2026-10-25 (/ship review, run 16 pass 2, testing + state machines); changed by /ship review on
@@ -189,5 +215,34 @@ describe('card catalog downloads that overlap', () => {
     const fetch = serve(() => [item('Kori Blade')]);
     await act(() => refreshCatalog());
     expect([result.current !== before, (await loadCatalog()).map((i) => i.name), fetch.mock.calls.length]).toEqual([true, ['Kori Blade'], 1]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, run 18 pass 2, state machines)
+  // Value: protects=after a first download failed, a pull and a lookup each start a download; when the lookup's lands
+  // first, screens are told, and the pull's (fetched past the browser's copy) then replaces it and tells them again if
+  // it differs, but not if it's the same file; fails_when=the copy the lookup brought in blocks the pull's newer one, so
+  // lookups keep the copy from before the daily deploy, or the same file landing twice reruns every screen's catalog
+  // work; why_new=review (state machines): the two only overlapped with the pull's landing first; seam=fetch downloads
+  // settled by hand; no_claim=none beyond protects
+  it('takes a pull’s copy landing after a retried first download, and tells screens only when it differs', async () => {
+    for (const same of [false, true]) {
+      const cat = await fresh();
+      const calls = held();
+      const failed = cat.loadCatalog().catch(() => 'failed');
+      calls[0].rej(new Error('offline'));
+      expect(await failed).toBe('failed');
+      const { result } = renderHook(() => cat.useCatalogVersion());
+      const before = result.current;
+      const pull = cat.refreshCatalog();
+      const lookup = cat.loadCatalog();
+      expect([calls.length, calls[1].init?.cache, calls[2].init?.cache]).toEqual([3, 'no-cache', undefined]);
+      const a = [item('Kori Blade')];
+      calls[2].res(new Response(JSON.stringify({ items: a })));
+      await act(() => lookup);
+      expect(result.current).toBe(before + 1);
+      calls[1].res(new Response(JSON.stringify({ items: same ? a : [item('Kori Blade'), item('Kitana Fan')] })));
+      await act(() => pull);
+      expect([(await cat.loadCatalog()).map((i) => i.name), result.current]).toEqual(same ? [['Kori Blade'], before + 1] : [['Kori Blade', 'Kitana Fan'], before + 2]);
+    }
   });
 });

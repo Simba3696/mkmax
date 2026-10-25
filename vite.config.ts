@@ -7,7 +7,8 @@ import { execSync } from 'node:child_process';
 /**
  * Short commit id and commit date, shown in Settings so you can tell whether a device has picked up the latest deploy.
  * The commit date rather than the build date: the daily schedule refresh rebuilds the same commit, and a date that
- * changed every day would change the bundle with it, making every device download the app again and reload.
+ * changed every day would change the bundle with it, making every device download the app again and show the new-version
+ * bar every day.
  */
 function appVersion() {
   try {
