@@ -55,7 +55,7 @@ const REFRESH_AFTER_MS = 60 * 60 * 1000;
 function download(replace: boolean): Promise<CatalogItem[]> {
   tried = true;
   const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), DOWNLOAD_TIMEOUT_MS);
+  const timer = setTimeout(() => abort.abort(new Error(`MK Mobile Base's card list didn’t download within ${DOWNLOAD_TIMEOUT_MS / 1000} seconds. Check your connection.`)), DOWNLOAD_TIMEOUT_MS);
   return fetch(`${import.meta.env.BASE_URL}catalog.json`, replace ? { cache: 'no-cache', signal: abort.signal } : { signal: abort.signal })
     .then((r) => {
       if (!r.ok) throw new Error(`catalog.json: HTTP ${r.status}`);
@@ -86,6 +86,8 @@ export function loadCatalog(): Promise<CatalogItem[]> {
   if (!loading) {
     loading = download(false).catch((e) => {
       loading = null; // let the next attempt retry
+      // A pull's own download may have brought a copy in meanwhile.
+      if (good) return good;
       throw e;
     });
   }

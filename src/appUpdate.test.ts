@@ -113,46 +113,54 @@ describe('app update', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  // Generated on 2026-10-25 (/ship review, run 15 pass 3)
-  // Value: protects=a new version installed while an older one runs the page brings up the bar even when the library
-  // reports nothing (it stops after the first it sees), and a first install doesn't; fails_when=after one failed
-  // install the bar never shows again, or a first visit shows a bar for the version it's already running;
-  // why_new=review (Red Team); seam=the registration's updatefound and the worker's statechange sent by hand;
-  // no_claim=a real service worker
-  it('flags a new version the library didn’t report, but not a first install', () => {
-    const { result } = renderHook(() => app.useAppUpdateReady());
-    const install = (controlled: boolean) => {
-      sw.controller = controlled ? {} : null;
+  // Generated on 2026-10-25 (/ship review, run 15 pass 3); changed by /ship review on 2026-10-25 (run 19 pass 2, state
+  // machines and testing): a first install is one no worker ran the site before, and a hard-reloaded page counts as run
+  // Value: protects=a new version installed while an older one ran the site brings up the bar even when the library
+  // reports nothing (it stops after the first it sees), also on a page opened with a hard reload, and a first install
+  // doesn't; fails_when=after one failed install the bar never shows again, a hard-reloaded page never offers a version
+  // found later, or a first visit shows a bar for the version it's already running; why_new=review (Red Team, state
+  // machines); seam=registerSW passed in by hand, the registration's updatefound and the worker's statechange sent by
+  // hand; no_claim=a real service worker
+  it('flags a new version the library didn’t report, but not a first install', async () => {
+    const opened = async (controller: object | null, active: Worker | null) => {
+      stop();
+      vi.resetModules();
+      app = await import('./appUpdate');
+      sw.controller = controller;
+      reg.waiting = null;
+      stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', Object.assign(reg, { active }) as unknown as ServiceWorkerRegistration), update)) as never);
+      const { result } = renderHook(() => app.useAppUpdateReady());
       const w = worker('installing');
       reg.installing = w;
       act(() => void reg.dispatchEvent(new Event('updatefound')));
       // A first install passes through waiting too, on its way to running at once.
       reg.waiting = w;
       act(() => void becomes(w, 'installed'));
+      return result.current;
     };
-    install(false);
-    expect(result.current).toBe(false);
-    install(true);
-    expect(result.current).toBe(true);
+    // A first visit, an open copy, and a hard reload (no worker runs the page, but one is active for the site).
+    expect([await opened(null, null), await opened({}, worker('activated')), await opened(null, worker('activated'))]).toEqual([false, true, true]);
   });
 
-  // Generated on 2026-10-25 (/ship coverage audit, run 17)
+  // Generated on 2026-10-25 (/ship coverage audit, run 17); changed by /ship review on 2026-10-25 (run 19 pass 2, state
+  // machines): a hard-reloaded page counts as one a worker ran, so it's offered the waiting version too
   // Value: protects=a copy opened while a new version is already installed and waiting (another copy found it) shows the
-  // bar at once, and a page loaded past the service worker (a hard reload, no controller) doesn't; fails_when=the check
-  // at registration goes, so a copy opened then shows no bar until a pull or its next check half an hour on, or a hard
-  // reload offers the version it already runs; why_new=every other test registers with nothing waiting; seam=registerSW
-  // passed in by hand; no_claim=whether the plugin also reports a version waiting from before (its own waiting event)
-  it('shows a version already waiting when the app opens, unless the page has no controller', async () => {
-    const open = async (controlled: boolean) => {
+  // bar at once, also after a hard reload, and a page no worker ran before doesn't; fails_when=the check at registration
+  // goes, so a copy opened then shows no bar until a pull or its next check half an hour on, or a page with no worker
+  // before offers a version; why_new=every other test registers with nothing waiting; seam=registerSW passed in by hand;
+  // no_claim=whether the plugin also reports a version waiting from before (its own waiting event)
+  it('shows a version already waiting when the app opens, unless no worker ran the site before', async () => {
+    const open = async (controlled: boolean, active: Worker | null) => {
       stop();
       vi.resetModules();
       app = await import('./appUpdate');
       sw.controller = controlled ? {} : null;
       reg.waiting = waiting;
-      stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', reg as unknown as ServiceWorkerRegistration), update)) as never);
+      stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', Object.assign(reg, { active }) as unknown as ServiceWorkerRegistration), update)) as never);
       return renderHook(() => app.useAppUpdateReady()).result.current;
     };
-    expect([await open(false), await open(true)]).toEqual([false, true]);
+    // A hard reload already runs the newest files, so the bar it gets is harmless: Reload switches and reloads.
+    expect([await open(false, null), await open(true, worker('activated')), await open(false, worker('activated'))]).toEqual([false, true, true]);
   });
 
   // Generated on 2026-10-25 (/ship review, run 15 pass 3)
@@ -230,7 +238,8 @@ describe('app update', () => {
     vi.resetModules();
     app = await import('./appUpdate');
     sw.controller = null;
-    stop = app.startServiceWorker((() => update) as never);
+    // As the plugin does: registered before its first worker takes the page over, while that one is still installing.
+    stop = app.startServiceWorker(((o: Hooks) => (o.onRegisteredSW?.('sw.js', Object.assign(reg, { active: null, installing: worker('installing') }) as unknown as ServiceWorkerRegistration), update)) as never);
     const first = renderHook(() => app.useAppUpdateReady());
     act(() => void sw.dispatchEvent(new Event('controllerchange')));
     expect(first.result.current).toBe(false);
@@ -250,8 +259,8 @@ describe('app update', () => {
 
   // Generated on 2026-10-25 (/ship review, run 19, maintainability)
   // Value: protects=the browser's own look for a new version as the app starts counts, so coming back within half an
-  // hour of starting doesn't look again, and coming back later does; fails_when=every first return after a start looks
-  // again; why_new=review: the half-hour wait only counted from the app's own checks; seam=fake Date,
+  // hour of starting doesn't look again, and coming back later, or after the device clock went back, does;
+  // fails_when=every first return after a start looks again, or a clock set back stops the looks for hours; why_new=review: the half-hour wait only counted from the app's own checks; seam=fake Date,
   // document.visibilityState mocked; no_claim=how often a browser looks on its own
   it('counts the start as a look for a new version', async () => {
     stop();
@@ -267,5 +276,8 @@ describe('app update', () => {
     expect(reg.update).toHaveBeenCalledTimes(0);
     back(31);
     expect(reg.update).toHaveBeenCalledTimes(1);
+    // The device clock went back: a last look later than now counts as long ago.
+    back(-29);
+    expect(reg.update).toHaveBeenCalledTimes(2);
   });
 });

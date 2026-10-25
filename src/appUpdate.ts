@@ -15,8 +15,14 @@ function markReady() {
   listeners.forEach((l) => l());
 }
 
-/** A newer version installed and waiting while an older one runs this page (not the first install, which runs at once). */
-const flagIfWaiting = (r: ServiceWorkerRegistration) => r.waiting && navigator.serviceWorker.controller && markReady();
+/**
+ * A worker ran the site before this page did: the page started under one, or one was active when it registered (a hard
+ * reload runs no worker but has one). Then a version waiting or taking the page over is a newer one, not the first install.
+ */
+let hadWorker = false;
+
+/** A newer version installed and waiting (not the first install, which runs at once). */
+const flagIfWaiting = (r: ServiceWorkerRegistration) => r.waiting && hadWorker && markReady();
 
 /**
  * Registers the service worker. A new version found later is installed but never switched to by itself: the app says
@@ -31,7 +37,7 @@ export function startServiceWorker(register: typeof registerSW) {
   // it over; so does a page opened with a hard reload, which no worker runs. Either way it's a new version: say it's
   // ready (its Reload just reloads). Not when a first visit's own worker takes it over, as no worker was there before.
   const sw = 'serviceWorker' in navigator ? navigator.serviceWorker : undefined;
-  let hadWorker = !!sw?.controller;
+  hadWorker = !!sw?.controller;
   const takenOver = () => (hadWorker ? markReady() : void (hadWorker = true));
   sw?.addEventListener('controllerchange', takenOver);
   // The browser looks for a new version as the app starts, so a return in the next half hour doesn't look again.
@@ -58,7 +64,9 @@ export function startServiceWorker(register: typeof registerSW) {
   // A phone app is mostly resumed rather than started again, and the browser only looks for a new version on a start.
   // Some browsers restore a page from the back-forward cache with only pageshow, no visibility change.
   const returned = () => {
-    if (document.visibilityState === 'visible' && Date.now() - checkedAt >= RECHECK_MS) void checkForAppUpdate();
+    const age = Date.now() - checkedAt;
+    // A last look later than now means the device clock went back: that counts as long enough too.
+    if (document.visibilityState === 'visible' && (age < 0 || age >= RECHECK_MS)) void checkForAppUpdate();
   };
   const restored = (e: PageTransitionEvent) => e.persisted && returned();
   document.addEventListener('visibilitychange', returned);
@@ -86,8 +94,8 @@ export function applyAppUpdate() {
   const sw = navigator.serviceWorker;
   const controlled = !!sw.controller;
   if (controlled) sw.addEventListener('controllerchange', () => location.reload(), { once: true });
-  // A page the old version didn't control (a hard reload, or the first visit) isn't told when the new one takes over,
-  // and a version that a newer one replaces before it takes over never does: reload on those instead.
+  // A page the old version didn't control (a hard reload) reloads once the new one is active rather than waiting for it
+  // to take the page over, and a version that a newer one replaces before it takes over never does: reload then too.
   waiting.addEventListener('statechange', () => (waiting.state === 'redundant' || (!controlled && waiting.state === 'activated')) && location.reload());
   void updateSW?.(true);
 }

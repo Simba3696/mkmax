@@ -77,18 +77,21 @@ describe('card catalog fetched again', () => {
     expect((await loadCatalog()).map((i) => i.name)).toEqual(['Kori Blade']);
   });
 
-  // Generated on 2026-10-25 (/ship review, run 16, Red Team)
-  // Value: protects=a catalog download that hangs gives up after 30 seconds, so Find images doesn't wait on it for good
-  // and the next attempt downloads again; fails_when=the download has no time limit; why_new=review (Red Team);
-  // seam=fetch held open by hand (it settles on its abort signal), fake timers; no_claim=how long real browsers wait
+  // Generated on 2026-10-25 (/ship review, run 16, Red Team); changed by /ship review on 2026-10-25 (run 19 pass 2, Red
+  // Team): the download now gives up with a plain message
+  // Value: protects=a catalog download that hangs gives up after 30 seconds with a message Find images can show, and the
+  // next attempt downloads again; fails_when=the download has no time limit, or Find images shows the browser's raw
+  // abort text; why_new=review (Red Team); seam=fetch held open by hand (it fails with its abort signal's reason, as a
+  // browser's does), fake timers; no_claim=how long real browsers wait
   it('gives up on a download that hangs, and the next attempt tries again', async () => {
     const { loadCatalog } = await fresh();
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const calls = held();
-    const first = loadCatalog().catch((e: Error) => e.name);
-    calls[0].init!.signal!.addEventListener('abort', () => calls[0].rej(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+    const first = loadCatalog().catch((e: Error) => e.message);
+    const signal = calls[0].init!.signal!;
+    signal.addEventListener('abort', () => calls[0].rej(signal.reason));
     vi.advanceTimersByTime(30 * 1000);
-    expect(await first).toBe('AbortError');
+    expect(await first).toBe("MK Mobile Base's card list didn’t download within 30 seconds. Check your connection.");
     void loadCatalog();
     expect(calls).toHaveLength(2);
   });
@@ -165,6 +168,24 @@ describe('card catalog fetched again', () => {
 });
 
 describe('card catalog downloads that overlap', () => {
+  // Generated on 2026-10-25 (/ship review, run 19 pass 2, Red Team)
+  // Value: protects=a screen's first download that fails after a pull's own download already brought the catalog in
+  // gets that copy instead of an error, so Cards' rarity check and the Maxed page work; fails_when=the lookup rejects
+  // while a good catalog sits in memory, and with no version bump coming, those screens stay without it;
+  // why_new=review (Red Team): a pull before any screen needed the catalog doesn't share its download; seam=fetch
+  // downloads settled by hand; no_claim=none beyond protects
+  it('answers a lookup whose download fails with the copy a pull brought in meanwhile', async () => {
+    const { loadCatalog, refreshCatalog } = await fresh();
+    const calls = held();
+    const pull = refreshCatalog();
+    const lookup = loadCatalog();
+    expect(calls).toHaveLength(2);
+    calls[0].res(new Response(JSON.stringify({ items: [item('Kori Blade')] })));
+    await pull;
+    calls[1].rej(new TypeError('Failed to fetch'));
+    expect((await lookup).map((i) => i.name)).toEqual(['Kori Blade']);
+  });
+
   // Generated on 2026-10-25 (/ship review, run 16, state machines); changed by /ship review on 2026-10-25 (run 16 pass
   // 3): a pull during the first download now shares it rather than starting a second; changed by /ship review on
   // 2026-10-25 (run 18, Red Team): screens are told only when a first copy follows a failed download

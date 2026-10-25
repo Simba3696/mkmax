@@ -70,15 +70,6 @@ if (typeof document !== 'undefined') {
 }
 
 /**
- * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
- * While a name is being typed the box stays a text box until it's left, so it doesn't turn into the list mid-word once
- * the card saves the first letters; with no towers named yet it's only a text box. A pick from the list goes to onPick
- * (with Undo, on a card); a typed name saves as it's typed, as a rename does. `respells` counts the other cards a typed
- * name would re-spell when it's finished, which a line says beforehand: on its own line at the end of a card's row of
- * controls, or in `hintIn` (Add card's notes under its form, where it can't move the form's boxes), so nothing moves
- * sideways or out of line while it comes and goes.
- */
-/**
  * Each set of towers' options and key lookup, built once and shared by every card's Tower list: a long Tower gear list
  * then neither rebuilds them per row nor redraws the options on each search keystroke.
  */
@@ -99,6 +90,15 @@ function towerList(towers: string[]) {
   return list;
 }
 
+/**
+ * A tower picked from the ones your gear already names, so one tower isn't typed two ways, or a new one typed in.
+ * While a name is being typed the box stays a text box until it's left, so it doesn't turn into the list mid-word once
+ * the card saves the first letters; with no towers named yet it's only a text box. A pick from the list goes to onPick
+ * (with Undo, on a card); a typed name saves as it's typed, as a rename does. `respells` counts the other cards a typed
+ * name would re-spell when it's finished, which a line says beforehand: on its own line at the end of a card's row of
+ * controls, or in `hintIn` (Add card's notes under its form, where it can't move the form's boxes), so nothing moves
+ * sideways or out of line while it comes and goes.
+ */
 function TowerSelect({ towers, value, onChange, onPick, onEnter, respells, hintIn, className, placeholder = 'e.g. Lin Kuei Tower' }: { towers: string[]; value: string | undefined; onChange: TowerWrite; onPick?: (v: string | undefined) => void; onEnter?: () => void; respells: (name: string) => number; hintIn?: HTMLElement | null; className?: string; placeholder?: string }) {
   const pick = onPick ?? onChange;
   const hintId = useId();
