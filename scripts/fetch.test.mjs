@@ -94,7 +94,7 @@ const live = ['character', 'equipment', 'kameo'].flatMap((kind) =>
 );
 const lastPage = change === 'no-page-count' ? undefined : change === 'zero-pages' ? 0 : change === 'endless' ? 1000 : 2;
 const card = (n) => ({
-  title: 'Card ' + n,
+  title: change === 'nameless' && n === 2 ? ' ' : 'Card ' + n,
   slug: change === 'duplicate-slugs' ? 'card' : 'card-' + n,
   tags: change === 'no-rarity' ? [] : [{ slug: 'gold' }],
   image_url: change === 'no-art' ? undefined : 'https://img.test/' + n,
@@ -104,8 +104,14 @@ globalThis.fetch = async (url, opts = {}) => {
   if (change === 'slow') skew += 61_000;
   const page = /[?&]page=(\\d+)/.exec(String(url));
   const current = page && (change === 'repeated-page' ? 1 : Number(page[1]));
+  // A big gold group with art and a small silver group without: too few to show in the whole catalog.
+  const silver = (n) => ({ title: 'Silver ' + n, slug: 'silver-' + n, tags: [{ slug: 'silver' }] });
+  const data = change === 'small-group-no-art'
+    ? [...Array.from({ length: 20 }, (_, i) => card(current + '-' + i)), silver(current)]
+    : [card(current)];
+  const total = (Number.isInteger(lastPage) ? lastPage : 0) * data.length + (change === 'skipped-item' ? 1 : 0);
   const body = page
-    ? { data: [card(current)], meta: { last_page: lastPage, current_page: current } }
+    ? { data, meta: { last_page: lastPage, current_page: current, total } }
     : String(url).endsWith('/events.json')
       ? { seasons: [] }
       : String(url).endsWith('/catalog.json')
@@ -121,14 +127,14 @@ globalThis.fetch = async (url, opts = {}) => {
  * Runs a copy of a download script, writing into a scratch public folder, with MK Mobile Base answering (changed as
  * `change` says): its exit code, its errors, the requests it made, and whether it wrote catalog.json.
  */
-function runOnline(script, change = '', localCatalog = null) {
+function runOnline(script, change = '', localCatalog = null, env = {}) {
   const root = scratchRepo(script);
   writeFileSync(join(root, 'public', 'events.json'), '{"seasons":[]}\n');
   if (localCatalog) writeFileSync(join(root, 'public', 'catalog.json'), JSON.stringify(localCatalog));
   const result = spawnSync(process.execPath, ['--import', pathToFileURL(online).href, join(root, 'scripts', script)], {
     encoding: 'utf8',
     timeout: 20_000,
-    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax', STUB_CHANGE: change },
+    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax', STUB_CHANGE: change, ...env },
   });
   return {
     status: result.status,
@@ -219,7 +225,7 @@ describe('download scripts', () => {
       return { change, status, wroteCatalog };
     };
     const changes = ['no-page-count', 'zero-pages', 'endless', 'no-art', 'no-rarity'];
-    changes.push('repeated-page', 'duplicate-slugs', 'shrunk', 'slow');
+    changes.push('repeated-page', 'duplicate-slugs', 'shrunk', 'slow', 'nameless', 'skipped-item', 'small-group-no-art');
     expect(changes.map(outcome)).toEqual(changes.map((change) => ({ change, status: 1, wroteCatalog: false })));
   }, 45_000);
 
@@ -245,6 +251,8 @@ describe('download scripts', () => {
       outcome('', local('2026-10-01T17:30:00.000Z', 20)),
       outcome('small-drop'),
       outcome('', { items: gold(20) }),
+      // A hand-edited copy with malformed items: only its real cards are compared.
+      outcome('', { fetchedAt: '2026-10-25T17:30:00.000Z', items: [null, 'card', { rarity: 'gold' }, ...gold(2)] }),
     ]).toEqual([
       { status: 0, wroteCatalog: true },
       { status: 1, wroteCatalog: false },
@@ -252,7 +260,18 @@ describe('download scripts', () => {
       { status: 0, wroteCatalog: true },
       { status: 0, wroteCatalog: true },
       { status: 0, wroteCatalog: true },
+      { status: 0, wroteCatalog: true },
     ]);
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 8 pass 3)
+  // Value: protects=after a real removal the owner can run CATALOG_ACCEPT_DROP=1 npm run catalog and commit the fresh
+  // catalog, so the daily deploy stops falling back; fails_when=the switch stops skipping the comparison; why_new=the
+  // documented reset wrote nothing, because the comparison still failed; seam=none (an environment variable the owner
+  // sets); no_claim=that later deploys compare with the committed copy (the newest-copy test covers that)
+  it('write a catalog with far fewer cards when the drop is accepted', () => {
+    const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', 'shrunk', null, { CATALOG_ACCEPT_DROP: '1' });
+    expect({ status, wroteCatalog }).toEqual({ status: 0, wroteCatalog: true });
   }, 45_000);
 
   // Extended by /ship coverage audit on 2026-10-26 (pr-ci run 8): a kind and rarity the download no longer has at all.
