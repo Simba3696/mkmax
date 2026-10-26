@@ -57,11 +57,12 @@ describe('event schedule script', () => {
   });
 
   // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 6)
+  // Changed by /ship review on 2026-10-26 (pr-ci run 20, owner decision D1 A): only a whole list with no names fails.
   // Value: protects=a schedule whose packs, challenges or seasons lose their names fails, so the deploy keeps the live
   // copy rather than one that breaks the Cards and Plan tabs, which read every name; fails_when=the name check is
   // dropped or misses one of the three lists; why_new=parseSchedule only checked sections and counts; seam=none;
   // no_claim=what the app does with a nameless entry in a copy it already has
-  it('fails rather than writing an entry with no name', () => {
+  it('fails when every pack, challenge or season in a list has no name', () => {
     const kold = [week('Kold', '30 September 2026, 16:00 UTC', '7 October 2026, 16:00 UTC')];
     const nameless = (edit) => {
       const schedule = api({ packs: [pack], current: kold, upcoming: [] });
@@ -75,11 +76,6 @@ describe('event schedule script', () => {
     expect(nameless((s) => (s.pages[2].sections[0].records = [week('', dates.Start, dates.End)]))).toThrow(/no name/);
   });
 
-  // Generated on 2026-10-26 (/ship adversarial review, pr-ci run 20)
-  // Value: protects=a season or challenge whose name field the site sent blank (rewards not announced yet) keeps the
-  // entry's own name, so the schedule still deploys; fails_when=a blank field wins over the entry's name (the name
-  // check then fails every refresh); why_new=every case had a filled field or no name at all; seam=none;
-  // no_claim=what the site sends in that field
   // Generated on 2026-10-26 (/ship review, pr-ci run 20, owner decision D1 A)
   // Value: protects=a single pack, challenge or season with no name (one the site hasn't finished) is left out and the
   // rest of the schedule still deploys; fails_when=one nameless entry fails the whole refresh again, or it's written
@@ -100,6 +96,11 @@ describe('event schedule script', () => {
     ]);
   });
 
+  // Generated on 2026-10-26 (/ship adversarial review, pr-ci run 20)
+  // Value: protects=a season or challenge whose name field the site sent blank (rewards not announced yet) keeps the
+  // entry's own name, so the schedule still deploys; fails_when=a blank field wins over the entry's name (the entry is
+  // then left out as nameless); why_new=every case had a filled field or no name at all; seam=none;
+  // no_claim=what the site sends in that field
   it("names an entry by its own name when the site's name field is blank", () => {
     const dates = { Start: '30 September 2026, 16:00 UTC', End: '7 October 2026, 16:00 UTC' };
     const blank = record('GEAR WEEK', { 'Rewards Type': ' ', ...dates });

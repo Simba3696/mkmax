@@ -72,15 +72,15 @@ function runOffline(script, output) {
 // with art and an item count to match, the schedule has one pack and one current season, the live events.json has no
 // past weeks, and the live catalog.json has as many cards of each kind as the download. Each request is noted as above.
 // STUB_CHANGE makes the catalog answer the way a changed or failing API might: no page count, a page count of zero, a
-// page count that never ends, no art, no rarity tags, page 1 whatever page is asked for, the same card twice, a card
-// with a blank name, a Kameo titled just "Kameo", a page count that shrinks between pages with no item count, a
-// card with no slug, art sent as an object or as http: links,
+// page count that never ends, no art, no rarity tags, page 1 whatever page is asked for, the same card twice, every
+// card with a blank name or no slug, every Kameo titled just "Kameo", a fifth of 50 Gold cards a page with blank
+// titles, a page count that shrinks between pages with no item count, art sent as an object or as http: links,
 // a count one higher than the items sent, 5 Silver cards without art among 50 Gold ones a page, far
 // fewer cards than the live copy, or pages slow enough that the download runs out of time (the stand-in moves the clock
-// on a minute per request). Or the way a healthy one might: 50 Gold cards a page plus one new character without art or
-// a rarity (or four, with or without slugs), or no item count, or thumbnails beside the full art (https on page 1, http
-// on page 2, Kameos titled with the Kameo suffix). It can also take the live catalog.json away (404) or give it 3 more
-// cards of each kind.
+// on a minute per request). Or the way a healthy one might: one card with a blank name or no slug, 50 Gold cards a page
+// plus one new character without art or a rarity (or four, with or without slugs), or no item count, or thumbnails
+// beside the full art (https on page 1, http on page 2, Kameos titled with the Kameo suffix). It can also take the
+// live catalog.json away (404) or give it 3 more cards of each kind.
 const online = join(dir, 'online.mjs');
 writeFileSync(
   online,
