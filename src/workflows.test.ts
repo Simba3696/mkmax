@@ -196,6 +196,8 @@ describe('.github/workflows/deploy.yml', () => {
   // on, the failing job runs before the deploy or always, or it stops failing (no exit 1, or allowed to fail);
   // why_new=a fallback showed only as a warning on a green
   // run; seam=none; no_claim=that GitHub emails the owner (that's the account's notification settings)
+  // Extended by /ship review on 2026-10-26 (pr-ci run 14): fails_when also covers the failing step getting its own if:
+  // or shell, or the deploy workflow or the fallback job getting a defaults block.
   it('fails the run after publishing when a download fell back', () => {
     const { build, fallback } = deploy.jobs;
     const reports = (s: Step) => !!s.run?.includes('fell_back=true" >> "$GITHUB_OUTPUT"');
