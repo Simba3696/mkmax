@@ -73,7 +73,8 @@ function runOffline(script, output) {
 // past weeks, and the live catalog.json has as many cards of each kind as the download. Each request is noted as above.
 // STUB_CHANGE makes the catalog answer the way a changed or failing API might: no page count, a page count of zero, a
 // page count that never ends, no art, no rarity tags, page 1 whatever page is asked for, the same card twice, a card
-// with a blank name, a count one higher than the items sent, 5 Silver cards without art among 50 Gold ones a page, far
+// with a blank name, a Kameo titled just "Kameo", a page count that shrinks between pages with no item count,
+// a count one higher than the items sent, 5 Silver cards without art among 50 Gold ones a page, far
 // fewer cards than the live copy, or pages slow enough that the download runs out of time (the stand-in moves the clock
 // on a minute per request). Or the way a healthy one might: 50 Gold cards a page plus one new character without art or
 // a rarity, or no item count. It can also take the live catalog.json away (404) or give it 3 more cards of each kind.
@@ -120,7 +121,14 @@ globalThis.fetch = async (url, opts = {}) => {
         : [card(current)];
   const perPage = data.length - (unfinished && current === 1 ? 1 : 0);
   const total = (Number.isInteger(lastPage) ? lastPage : 0) * perPage + (unfinished ? 1 : 0) + (change === 'skipped-item' ? 1 : 0);
-  const meta = { last_page: lastPage, current_page: current, ...(change === 'no-total' ? {} : { total }) };
+  if (change === 'kameo-only-suffix' && String(url).includes('/kameos/')) data[0] = { ...data[0], title: 'Kameo' };
+  // A page count that shrinks from 3 to 2 after the first page, with no item count to give it away.
+  const shifting = change === 'shifting-pages';
+  const meta = {
+    last_page: shifting ? (current === 1 ? 3 : 2) : lastPage,
+    current_page: current,
+    ...(change === 'no-total' || shifting ? {} : { total }),
+  };
   const body = page
     ? { data, meta }
     : String(url).endsWith('/events.json')
@@ -252,6 +260,8 @@ describe('download scripts', () => {
       nameless: 'an item has no name',
       'skipped-item': 'the site says',
       'small-group-no-art': 'cards have no image',
+      'kameo-only-suffix': 'an item has no name',
+      'shifting-pages': 'the page count changed',
     };
     const outcome = (change) => {
       const { status, stderr, wroteCatalog } = runOnline('fetch-catalog.mjs', change);

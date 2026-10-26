@@ -17,6 +17,7 @@ const DEADLINE = Date.now() + 5 * 60_000;
 
 async function fetchAll(category) {
   const items = [];
+  let pages;
   for (let page = 1; ; page++) {
     if (Date.now() > DEADLINE) throw new Error(`${category} page ${page}: still downloading after 5 minutes`);
     // A stalled download fails after 30 seconds, so the deploy goes on with the live copy instead of waiting.
@@ -32,6 +33,10 @@ async function fetchAll(category) {
     if (!Array.isArray(data) || !Number.isInteger(last) || last < 1 || last > MAX_PAGES) {
       throw new Error(`${category} page ${page}: unexpected page data`);
     }
+    // A page count that shrinks while the pages are read would stop the loop early, and a site that sends no item
+    // count would show no other sign of the missing pages.
+    pages ??= last;
+    if (last !== pages) throw new Error(`${category} page ${page}: the page count changed from ${pages} to ${last}`);
     items.push(...data);
     if (page >= last) {
       // An item that moved across a page boundary while the pages were read is skipped without any other sign.
@@ -62,9 +67,11 @@ for (const [category, kind] of [['characters', 'character'], ['equipment', 'equi
     throw new Error(`${category}: the same item came back twice`);
   }
   for (const item of items) {
-    if (typeof item.title !== 'string' || !item.title.trim()) throw new Error(`${category}: an item has no name`);
     // Kameo titles read "Baraka - Klassic Kameo"; drop the suffix so names match cards like "Baraka, Klassic".
-    const name = kind === 'kameo' ? item.title.replace(/\s*Kameo$/i, '') : item.title;
+    // The name is checked after that, so a Kameo titled just "Kameo" counts as having none.
+    const title = typeof item.title === 'string' ? item.title : '';
+    const name = kind === 'kameo' ? title.replace(/\s*Kameo$/i, '') : title;
+    if (!name.trim()) throw new Error(`${category}: an item has no name`);
     catalog.push({ kind, name, rarity: rarityOf(item), slug: item.slug, image: item.image_thumb_2x_url ?? item.image_url });
   }
 }
