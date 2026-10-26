@@ -87,7 +87,9 @@ async function earlierCopy() {
     return r.json();
   }, 'live');
   const local = await copy(() => JSON.parse(readFileSync(FILE, 'utf8')), 'local');
-  return [live, local].filter(Boolean).sort((a, b) => String(b.fetchedAt).localeCompare(String(a.fetchedAt)))[0];
+  // A copy without a date counts as the oldest, not (as "undefined") the newest.
+  const date = (c) => (typeof c.fetchedAt === 'string' ? c.fetchedAt : '');
+  return [live, local].filter(Boolean).sort((a, b) => date(b).localeCompare(date(a)))[0];
 }
 const byKindAndRarity = (items) => {
   const counts = new Map();

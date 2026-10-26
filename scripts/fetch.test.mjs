@@ -244,9 +244,11 @@ describe('download scripts', () => {
       outcome('shrunk', local('2026-10-25T17:30:00.000Z', 2)),
       outcome('', local('2026-10-01T17:30:00.000Z', 20)),
       outcome('small-drop'),
+      outcome('', { items: gold(20) }),
     ]).toEqual([
       { status: 0, wroteCatalog: true },
       { status: 1, wroteCatalog: false },
+      { status: 0, wroteCatalog: true },
       { status: 0, wroteCatalog: true },
       { status: 0, wroteCatalog: true },
       { status: 0, wroteCatalog: true },
