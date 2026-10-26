@@ -78,7 +78,8 @@ function runOffline(script, output) {
 // a count one higher than the items sent, 5 Silver cards without art among 50 Gold ones a page, far
 // fewer cards than the live copy, or pages slow enough that the download runs out of time (the stand-in moves the clock
 // on a minute per request). Or the way a healthy one might: 50 Gold cards a page plus one new character without art or
-// a rarity, or no item count. It can also take the live catalog.json away (404) or give it 3 more cards of each kind.
+// a rarity, or no item count, or thumbnails beside the full art (https on page 1, http on page 2). It can also take the
+// live catalog.json away (404) or give it 3 more cards of each kind.
 const online = join(dir, 'online.mjs');
 writeFileSync(
   online,
@@ -108,6 +109,7 @@ const card = (n) => ({
       : change === 'object-art'
         ? { url: 'https://img.test/' + n }
         : (change === 'http-art' ? 'http://img.test/' : 'https://img.test/') + n,
+  ...(change === 'thumbs' ? { image_thumb_2x_url: (n === 1 ? 'https://' : 'http://') + 'img.test/thumb/' + n } : {}),
 });
 globalThis.fetch = async (url, opts = {}) => {
   note(url, opts);
@@ -148,6 +150,15 @@ globalThis.fetch = async (url, opts = {}) => {
 `,
 );
 
+/** Runs the copy of a download script in `root` with MK Mobile Base answering, changed as `change` says. */
+const spawnOnline = (root, script, change = '', env = {}) =>
+  spawnSync(process.execPath, ['--import', pathToFileURL(online).href, join(root, 'scripts', script)], {
+    encoding: 'utf8',
+    timeout: 20_000,
+    // CATALOG_ACCEPT_DROP pinned too, so one left set in the shell after a real reset can't change these runs.
+    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax', STUB_CHANGE: change, CATALOG_ACCEPT_DROP: '', ...env },
+  });
+
 /**
  * Runs a copy of a download script, writing into a scratch public folder, with MK Mobile Base answering (changed as
  * `change` says): its exit code, its errors, the requests it made, and whether it wrote catalog.json.
@@ -156,12 +167,7 @@ function runOnline(script, change = '', localCatalog = null, env = {}) {
   const root = scratchRepo(script);
   writeFileSync(join(root, 'public', 'events.json'), '{"seasons":[]}\n');
   if (localCatalog) writeFileSync(join(root, 'public', 'catalog.json'), JSON.stringify(localCatalog));
-  const result = spawnSync(process.execPath, ['--import', pathToFileURL(online).href, join(root, 'scripts', script)], {
-    encoding: 'utf8',
-    timeout: 20_000,
-    // CATALOG_ACCEPT_DROP pinned too, so one left set in the shell after a real reset can't change these runs.
-    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax', STUB_CHANGE: change, CATALOG_ACCEPT_DROP: '', ...env },
-  });
+  const result = spawnOnline(root, script, change, env);
   return {
     status: result.status,
     stderr: result.status ? result.stderr : '',
@@ -342,6 +348,23 @@ describe('download scripts', () => {
       { change: 'new-card', status: 0, wroteCatalog: true },
       { change: 'no-total', status: 0, wroteCatalog: true },
     ]);
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship coverage audit, pr-ci run 17)
+  // Value: protects=each card in the written catalog keeps its https thumbnail, or its https full art when the
+  // thumbnail isn't https; fails_when=the https check is applied after picking a field (an http thumbnail then hides
+  // https full art and the card loses it) or the full art is preferred over the thumbnail; why_new=the stand-in never
+  // sent a thumbnail and no case read the cards written; seam=none (STUB_CHANGE only changes the stand-in's answers);
+  // no_claim=that the site's thumbnails load (the stand-in's links are made up)
+  it("write each card's https thumbnail, or its full art when the thumbnail isn't https", () => {
+    const root = scratchRepo('fetch-catalog.mjs');
+    const { status } = spawnOnline(root, 'fetch-catalog.mjs', 'thumbs');
+    const written = status ? null : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8'));
+    const cards = ['character', 'equipment', 'kameo'].flatMap((kind) => [
+      { kind, name: 'Card 1', rarity: 'gold', slug: 'card-1', image: 'https://img.test/thumb/1' },
+      { kind, name: 'Card 2', rarity: 'gold', slug: 'card-2', image: 'https://img.test/2' },
+    ]);
+    expect([status, written?.items]).toEqual([0, cards]);
   }, 45_000);
 
   // Extended by /ship coverage audit on 2026-10-26 (pr-ci run 8): a kind and rarity the download no longer has at all.
