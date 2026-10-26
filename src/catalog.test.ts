@@ -74,6 +74,17 @@ describe('automatic catalog art', () => {
     expect([...updates.keys()]).toEqual(['Man in the Sky', 'Scorpion, MKII Movie']);
     expect(updates.get('Scorpion, MKII Movie')).toEqual({ imageUrl: 'Scorpion MK2 Movie.webp', imagePage: expect.stringContaining('mkmobilebase.com'), wikiTitle: undefined });
   });
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 17)
+  // Value: protects=a catalog card with no art (one the site hasn't finished, or whose art wasn't an https link)
+  // never replaces older wiki art with nothing and never counts as found; fails_when=an entry without art is
+  // treated as a hit; why_new=every catalog entry in these tests had art; seam=none; no_claim=Find images' wiki
+  // fallback (CardsView) itself
+  it('leaves a card alone when its catalog entry has no art', () => {
+    const noArt = ITEMS.map((i) => (i.name === 'Scorpion MK2 Movie' ? { ...i, image: undefined } : i));
+    const wiki = { ...card('Scorpion, MKII Movie', 'diamond'), imageUrl: 'https://static.wikia.nocookie.net/old.png', wikiTitle: 'Scorpion/MK2 Movie' };
+    expect([...catalogImageUpdates([wiki, card('Man in the Sky', 'rare')], rules, noArt).keys()]).toEqual(['Man in the Sky']);
+  });
 });
 
 

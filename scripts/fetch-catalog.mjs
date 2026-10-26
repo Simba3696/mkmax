@@ -66,7 +66,8 @@ for (const [category, kind] of [['characters', 'character'], ['equipment', 'equi
   // An empty category means the API has changed; failing keeps the deployed catalog rather than shipping one
   // without card art or rarities.
   if (!items.length) throw new Error(`${category}: no items`);
-  // Every card is matched and linked by its slug, so one without is a changed answer, not a repeat.
+  // The repeat check below tells items apart by slug, and the app links each card to its MK Mobile Base page by it,
+  // so one without is a changed answer, not a repeat.
   if (items.some((i) => typeof i.slug !== 'string' || !i.slug)) throw new Error(`${category}: an item has no slug`);
   // A site that ignored the page asked for would send page 1 again and again; when it sends no item count, or the count
   // exactly fills every page, no other check here notices.

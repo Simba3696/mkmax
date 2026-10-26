@@ -760,7 +760,8 @@ function CardList() {
       const found = new Map<string, Pick<Card, 'imageUrl' | 'wikiTitle' | 'imagePage'>>();
       for (const c of missingImages) {
         const hit = findInCatalog(c, ctx.rules.get(c.rarityId), items);
-        if (hit) found.set(c.id, { imageUrl: hit.image, wikiTitle: undefined, imagePage: catalogPageUrl(hit) });
+        // A catalog card with no art falls through to the wiki below.
+        if (hit?.image) found.set(c.id, { imageUrl: hit.image, wikiTitle: undefined, imagePage: catalogPageUrl(hit) });
       }
       // Anything the catalog doesn't have: fall back to the wiki (only for cards with no working image).
       const rest = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl)));
