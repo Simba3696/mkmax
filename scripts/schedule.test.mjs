@@ -38,6 +38,16 @@ describe('event schedule script', () => {
     const kold = [week('Kold', '30 September 2026, 16:00 UTC', '7 October 2026, 16:00 UTC')];
     expect(() => parseSchedule(api({ packs: [], current: kold, upcoming: [] }))).toThrow(/no shop packs/);
     expect(() => parseSchedule(api({ packs: [pack], current: [], upcoming: [] }))).toThrow(/no current Realm Klash season/);
+    // Generated on 2026-10-26 (/ship coverage, pr-ci run 21)
+    // Value: protects=a current week with no name (left out) still counts as no current season, even with a named week
+    // after it; fails_when=the check counts the current section's records again rather than its named weeks;
+    // why_new=every case with a nameless current week had no other week, so the every-season check failed it first;
+    // seam=none; no_claim=what the app does with a schedule that has no current season
+    const fire = [week('Fire', '7 October 2026, 16:00 UTC', '14 October 2026, 16:00 UTC')];
+    const unnamed = [week('', '30 September 2026, 16:00 UTC', '7 October 2026, 16:00 UTC')];
+    expect(() => parseSchedule(api({ packs: [pack], current: unnamed, upcoming: fire }))).toThrow(
+      /no current Realm Klash season/,
+    );
     const renamed = api({ packs: [pack], current: kold, upcoming: [] });
     renamed.pages[0].sections[0].title = 'Packs';
     expect(() => parseSchedule(renamed)).toThrow(/no "Available Packs" section/);

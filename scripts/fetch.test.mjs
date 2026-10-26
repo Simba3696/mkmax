@@ -78,8 +78,9 @@ function runOffline(script, output) {
 // a count one higher than the items sent, 5 Silver cards without art among 50 Gold ones a page, far
 // fewer cards than the live copy, or pages slow enough that the download runs out of time (the stand-in moves the clock
 // on a minute per request). Or the way a healthy one might: 50 Gold cards a page plus one new character without art or
-// a rarity, or no item count, or thumbnails beside the full art (https on page 1, http on page 2). It can also take the
-// live catalog.json away (404) or give it 3 more cards of each kind.
+// a rarity (or four, with or without slugs), or no item count, or thumbnails beside the full art (https on page 1, http
+// on page 2, Kameos titled with the Kameo suffix). It can also take the live catalog.json away (404) or give it 3 more
+// cards of each kind.
 const online = join(dir, 'online.mjs');
 writeFileSync(
   online,
@@ -121,10 +122,10 @@ globalThis.fetch = async (url, opts = {}) => {
   // group plus one new character the site hasn't finished (no rarity, no art), or with a fifth of its titles blank.
   const silver = (n) => ({ title: 'Silver ' + n, slug: 'silver-' + n, tags: [{ slug: 'silver' }] });
   const gold = (n) => Array.from({ length: 50 }, (_, i) => card(n + '-' + i));
-  // One new character the site hasn't finished, or a game update's worth (4).
-  const newCards = change === 'new-card' ? 1 : change === 'new-cards' ? 4 : 0;
+  // One new character the site hasn't finished, or a game update's worth (4), with or without slugs.
+  const newCards = change === 'new-card' ? 1 : change === 'new-cards' || change === 'new-no-slugs' ? 4 : 0;
   const unfinished = newCards > 0 && String(url).includes('/characters/');
-  const newCard = (i) => ({ title: 'New ' + i, slug: 'new-' + i });
+  const newCard = (i) => ({ title: 'New ' + i, slug: change === 'new-no-slugs' ? undefined : 'new-' + i });
   const fresh = unfinished && current === 1 ? Array.from({ length: newCards }, (_, i) => newCard(i)) : [];
   const data =
     change === 'small-group-no-art'
@@ -138,6 +139,8 @@ globalThis.fetch = async (url, opts = {}) => {
   const pages = Number.isInteger(lastPage) ? lastPage : 0;
   const total = pages * perPage + (unfinished ? newCards : 0) + (change === 'skipped-item' ? 1 : 0);
   if (change === 'kameo-only-suffix' && String(url).includes('/kameos/')) data[0] = { ...data[0], title: 'Kameo' };
+  // Kameo titles as the site writes them ("Baraka - Klassic Kameo").
+  if (change === 'thumbs' && String(url).includes('/kameos/')) data[0].title += ' Kameo';
   // A page count that shrinks from 3 to 2 after the first page, with no item count to give it away.
   const shifting = change === 'shifting-pages';
   const meta = {
@@ -385,6 +388,11 @@ describe('download scripts', () => {
   // https full art and the card loses it) or the full art is preferred over the thumbnail; why_new=the stand-in never
   // sent a thumbnail and no case read the cards written; seam=none (STUB_CHANGE only changes the stand-in's answers);
   // no_claim=that the site's thumbnails load (the stand-in's links are made up)
+  // Generated on 2026-10-26 (/ship coverage, pr-ci run 21): Kameos are written without the "Kameo" in their titles.
+  // Value: protects=a Kameo is written under its name without the suffix, so it matches the user's Kameo cards and gets
+  // their art; fails_when=the written name is the raw title while nameOf only filters (it was split out on this
+  // branch); why_new=no stand-in Kameo title had the suffix; seam=none (STUB_CHANGE only changes the stand-in's
+  // answers); no_claim=how the app matches "Baraka - Klassic" to "Baraka, Klassic"
   it("write each card's https thumbnail, or its full art when the thumbnail isn't https", () => {
     const root = scratchRepo('fetch-catalog.mjs');
     const { status } = spawnOnline(root, 'fetch-catalog.mjs', 'thumbs');
@@ -415,6 +423,16 @@ describe('download scripts', () => {
       { change: 'one-nameless', status: 0, warned: true, slugs: kinds.map((k) => k + ' card-1') },
       { change: 'one-no-slug', status: 0, warned: true, slugs: kinds.map((k) => k + ' card-1') },
     ]);
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship coverage, pr-ci run 21)
+  // Value: protects=a game update's worth of new characters with no slug yet (4 of 104) are all left out and the rest
+  // ships; fails_when=the repeat check reads every item again rather than those kept, so slugless items look like one
+  // item sent twice; why_new=every earlier case had one slugless item a category at most; seam=none (STUB_CHANGE only
+  // changes the stand-in's answers); no_claim=the allowance past which they fail
+  it('leave out several items with no slug rather than calling them repeats', () => {
+    const { status, stderr } = spawnOnline(scratchRepo('fetch-catalog.mjs'), 'fetch-catalog.mjs', 'new-no-slugs');
+    expect([status, /left out 4 unfinished item/.test(stderr)]).toEqual([0, true]);
   }, 45_000);
 
   // Extended by /ship coverage audit on 2026-10-26 (pr-ci run 8): a kind and rarity the download no longer has at all.
