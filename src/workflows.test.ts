@@ -200,7 +200,8 @@ describe('.github/workflows/deploy.yml', () => {
     const { build, fallback } = deploy.jobs;
     const reports = (s: Step) => !!s.run?.includes('fell_back=true" >> "$GITHUB_OUTPUT"');
     const reporting = build?.steps.filter(reports).map((s) => s.id);
-    const failing = (s: Step) => [s.uses, s.run?.trim().endsWith('exit 1'), s['continue-on-error']];
+    // A step-level if or shell could skip the exit 1 or change how it runs, as for the pull request check.
+    const failing = (s: Step) => [s.uses, s.run?.trim().endsWith('exit 1'), s['continue-on-error'], s.if, s.shell];
     const fallbackSteps = fallback?.steps.map(failing);
     const muted = fallback?.['continue-on-error'];
     expect([reporting, build?.outputs?.fell_back, fallback?.needs, fallback?.if, fallbackSteps, muted]).toEqual([
@@ -208,7 +209,7 @@ describe('.github/workflows/deploy.yml', () => {
       "${{ steps.catalog.outputs.fell_back == 'true' || steps.events.outputs.fell_back == 'true' }}",
       ['build', 'deploy'],
       "needs.build.outputs.fell_back == 'true'",
-      [[undefined, true, undefined]],
+      [[undefined, true, undefined, undefined, undefined]],
       undefined,
     ]);
   });
