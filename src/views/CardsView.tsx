@@ -751,7 +751,8 @@ function CardList() {
   const brokenUrls = useBrokenImageUrls();
   const needsImage = (c: Card) => wantsCatalogImage(c) || brokenUrls.has(c.imageUrl!);
   // A card MK Mobile Base lists without art that still shows an image: only the site can give it better art (the app
-  // swaps it in by itself once the site has some), so a tap can't help and it isn't counted. Known once the catalog loads.
+  // swaps it in by itself once the site has some), so a tap can't help and it isn't counted. Known once the catalog
+  // loads.
   const waitingForSite = (c: Card) => {
     if (!catalog || !c.imageUrl || brokenUrls.has(c.imageUrl)) return false;
     const hit = findInCatalog(c, ctx.rules.get(c.rarityId), catalog);
