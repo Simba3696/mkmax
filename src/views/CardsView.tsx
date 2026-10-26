@@ -758,10 +758,13 @@ function CardList() {
       const items = await loadCatalog();
       setCatalog(items);
       const found = new Map<string, Pick<Card, 'imageUrl' | 'wikiTitle' | 'imagePage'>>();
+      // Cards the catalog lists without art yet: the site's art may come later, so they aren't marked as checked below.
+      const listed = new Set<string>();
       for (const c of missingImages) {
         const hit = findInCatalog(c, ctx.rules.get(c.rarityId), items);
         // A catalog card with no art falls through to the wiki below.
         if (hit?.image) found.set(c.id, { imageUrl: hit.image, wikiTitle: undefined, imagePage: catalogPageUrl(hit) });
+        else if (hit) listed.add(c.id);
       }
       // Anything the catalog doesn't have: fall back to the wiki (only for cards with no working image).
       const rest = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl)));
@@ -776,7 +779,9 @@ function CardList() {
         }
       }
       // Older wiki images the catalog couldn't improve on: remember they were checked so they stop counting.
-      const keep = missingImages.filter((c) => !found.has(c.id) && c.imageUrl && !brokenUrls.has(c.imageUrl) && c.wikiTitle);
+      const keep = missingImages.filter(
+        (c) => !found.has(c.id) && !listed.has(c.id) && c.imageUrl && !brokenUrls.has(c.imageUrl) && c.wikiTitle,
+      );
       // The lookup can take minutes: a card whose image a sync changed meanwhile (one pasted on another device) keeps it.
       const lookedUp = new Map(missingImages.map((c) => [c.id, c.imageUrl]));
       // Counted from the change itself, so a card a sync gave an image meanwhile is counted as that, not as updated or as
