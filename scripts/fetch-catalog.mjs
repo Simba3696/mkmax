@@ -68,18 +68,19 @@ for (const [category, kind] of [['characters', 'character'], ['equipment', 'equi
     catalog.push({ kind, name, rarity: rarityOf(item), slug: item.slug, image: item.image_thumb_2x_url ?? item.image_url });
   }
 }
-// Every card has art and a rarity today, so a group with more than a few without (all of a small group, or more than
-// a tenth and more than 3 of a larger one) means the API renamed those fields; failing keeps the deployed catalog
-// rather than shipping cards without them. Art is counted per kind and rarity, so a small group can't hide in the whole
-// catalog, and rarity per kind.
-const tooMany = (missing, total) => missing > 0 && (missing === total || missing > Math.max(3, total / 10));
+// Every card has art and a rarity today, so many without means the API renamed those fields; failing keeps the deployed
+// catalog rather than shipping cards without them. A tenth of the whole catalog catches a kind losing them; art is also
+// counted per kind and rarity (more than a tenth and more than 3), so a small group can't hide in the whole catalog.
+// A new card or two the site hasn't finished (no art or rarity yet) fails neither.
+for (const key of ['image', 'rarity']) {
+  const missing = catalog.filter((c) => !c[key]).length;
+  if (missing > catalog.length / 10) throw new Error(`catalog: ${missing} of ${catalog.length} items have no ${key}`);
+}
 for (const [group, cards] of Map.groupBy(catalog, (c) => `${c.kind} ${c.rarity ?? 'without a rarity'}`)) {
   const missing = cards.filter((c) => !c.image).length;
-  if (tooMany(missing, cards.length)) throw new Error(`catalog: ${missing} of ${cards.length} ${group} cards have no image`);
-}
-for (const [kind, cards] of Map.groupBy(catalog, (c) => c.kind)) {
-  const missing = cards.filter((c) => !c.rarity).length;
-  if (tooMany(missing, cards.length)) throw new Error(`catalog: ${missing} of ${cards.length} ${kind} cards have no rarity`);
+  if (missing > Math.max(3, cards.length / 10)) {
+    throw new Error(`catalog: ${missing} of ${cards.length} ${group} cards have no image`);
+  }
 }
 // A kind and rarity with far fewer cards than the newest earlier copy means the site lost them, not that the game
 // removed them, so failing keeps the live catalog. That's the live copy, or the local one (the committed one in CI)
