@@ -252,4 +252,37 @@ describe('download scripts', () => {
       { status: 0, wroteCatalog: true },
     ]);
   }, 45_000);
+
+  // Extended by /ship coverage audit on 2026-10-26 (pr-ci run 8): a kind and rarity the download no longer has at all.
+  // Value: protects=a catalog in which a whole kind and rarity is gone (the site renamed one rarity's tag, or dropped a
+  // group) fails, so the deploy keeps the live catalog; fails_when=the comparison skips or excuses groups the new
+  // download doesn't have, comparing only those still present; why_new=every earlier case kept each group with fewer
+  // cards, never none; seam=none (a newer committed copy holds the group); no_claim=the exact allowance
+  it('fail without writing when a kind and rarity is gone from the download', () => {
+    const fetchedAt = '2026-10-25T17:30:00.000Z';
+    const gold = ['character', 'equipment', 'kameo'].flatMap((kind) => Array(2).fill({ kind, rarity: 'gold' }));
+    const diamonds = Array(10).fill({ kind: 'character', rarity: 'diamond' });
+    const outcome = (items) => {
+      const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', '', { fetchedAt, items });
+      return { status, wroteCatalog };
+    };
+    expect([outcome(gold), outcome([...gold, ...diamonds])]).toEqual([
+      { status: 0, wroteCatalog: true },
+      { status: 1, wroteCatalog: false },
+    ]);
+  }, 45_000);
+
+  // Extended by /ship coverage audit on 2026-10-26 (pr-ci run 8): cards with no rarity in the earlier copy.
+  // Value: protects=an earlier copy with cards the site hadn't given a rarity yet (allowed up to a tenth) doesn't fail
+  // the next deploy once those cards are tagged or gone, so the daily refresh doesn't stop; fails_when=cards without a
+  // rarity are counted as their own group in the comparison; why_new=every earlier copy in these cases had a rarity on
+  // each card; seam=none (a newer committed copy holds the cards); no_claim=cards without a rarity in the download
+  // itself (the tenth allowance)
+  it("don't fail when an earlier copy's cards without a rarity are gone", () => {
+    const fetchedAt = '2026-10-25T17:30:00.000Z';
+    const gold = ['character', 'equipment', 'kameo'].flatMap((kind) => Array(2).fill({ kind, rarity: 'gold' }));
+    const unrated = Array(10).fill({ kind: 'character', rarity: null });
+    const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', '', { fetchedAt, items: [...gold, ...unrated] });
+    expect({ status, wroteCatalog }).toEqual({ status: 0, wroteCatalog: true });
+  }, 45_000);
 });
