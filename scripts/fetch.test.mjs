@@ -68,12 +68,15 @@ function runOffline(script, output) {
   return { status: result.status, requests: requestsOf(result.stderr), unchanged: readFileSync(seeded).equals(before) };
 }
 
-// Loaded in place of the real fetch when MK Mobile Base answers: every catalog category has two pages of cards with
-// art, the schedule has one pack and one current season, the live events.json has no past weeks, and the live
-// catalog.json has as many cards of each kind as the download. Each request is noted as above. STUB_CHANGE makes the
-// catalog answer the way a changed or failing API might: no page count, a page count of zero, a page count that never
-// ends, no art, no rarity tags, page 1 whatever page is asked for, the same card twice, far fewer cards than the live
-// copy, or pages slow enough that the download runs out of time (the stand-in moves the clock on a minute per request).
+// Loaded in place of the real fetch when MK Mobile Base answers: every catalog category has two pages of one Gold card
+// with art and an item count to match, the schedule has one pack and one current season, the live events.json has no
+// past weeks, and the live catalog.json has as many cards of each kind as the download. Each request is noted as above.
+// STUB_CHANGE makes the catalog answer the way a changed or failing API might: no page count, a page count of zero, a
+// page count that never ends, no art, no rarity tags, page 1 whatever page is asked for, the same card twice, a card
+// with a blank name, a count one higher than the items sent, far fewer cards than the live copy, or pages slow enough
+// that the download runs out of time (the stand-in moves the clock on a minute per request). Or the way a healthy one
+// might: 50 Gold cards a page plus 5 Silver ones without art, the 50 plus one new character without art or a rarity,
+// or no item count. It can also take the live catalog.json away (404) or give it 3 more cards of each kind.
 const online = join(dir, 'online.mjs');
 writeFileSync(
   online,
