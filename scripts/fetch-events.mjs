@@ -9,9 +9,11 @@ const HEADERS = { Accept: 'application/json', 'User-Agent': 'mkmax events (https
 /** The deployed app; the deploy workflow sets PAGES_URL. */
 const LIVE = `${process.env.PAGES_URL ?? 'https://simba3696.github.io/mkmax'}/events.json`;
 const FILE = new URL('../public/events.json', import.meta.url);
+/** How long one request may take before it fails. */
+const REQUEST_MS = 30_000;
 
-// A stalled download fails after 30 seconds, so the deploy goes on with the live copy instead of waiting.
-const res = await fetch(API, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
+// A stalled download fails after REQUEST_MS, so the deploy goes on with the live copy instead of waiting.
+const res = await fetch(API, { headers: HEADERS, signal: AbortSignal.timeout(REQUEST_MS) });
 if (!res.ok) throw new Error(`events: HTTP ${res.status}`);
 const schedule = await res.json();
 const { packs, challenges, seasons } = parseSchedule(schedule);
@@ -28,7 +30,7 @@ async function earlierCopy(load, what) {
 // The deployed copy has the weeks this script kept on its last run; the local one (the committed copy in CI)
 // covers a first deploy, or a live site that can't be reached.
 const live = await earlierCopy(async () => {
-  const r = await fetch(LIVE, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
+  const r = await fetch(LIVE, { headers: HEADERS, signal: AbortSignal.timeout(REQUEST_MS) });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }, 'live');
