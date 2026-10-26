@@ -214,8 +214,8 @@ describe('download scripts', () => {
 
   // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 6)
   // Value: protects=a catalog answer in a changed shape fails the script, so the deploy keeps the live catalog instead
-  // of shipping part of it, running until the job's limit, or shipping cards without art; fails_when=the page count
-  // check or the art check is dropped or loosened; why_new=the script only failed on an empty category; seam=none
+  // of shipping part of it, running until the 5-minute deadline, or shipping cards without art; fails_when=the page
+  // count check or the art check is dropped or loosened; why_new=the script only failed on an empty category; seam=none
   // (STUB_CHANGE only changes the stand-in's answers); no_claim=the 10% allowance
   // Extended by /ship coverage audit on 2026-10-25 (pr-ci run 7): a page count of zero, and cards with no rarity.
   // Value: protects=a catalog answer whose page count is zero (which stopped after page 1 before this branch) or whose

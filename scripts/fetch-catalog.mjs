@@ -26,8 +26,8 @@ async function fetchAll(category) {
     });
     if (!res.ok) throw new Error(`${category} page ${page}: HTTP ${res.status}`);
     const { data, meta } = await res.json();
-    // Without a usable page count the loop would stop early (and ship part of the catalog) or never stop (and run
-    // until the deploy's time limit), so either way the deploy keeps the live copy instead.
+    // Without a usable page count the loop would stop early (and ship part of the catalog) or keep asking for pages
+    // until the 5-minute deadline, so this fails it at once and the deploy keeps the live copy instead.
     const last = meta?.last_page;
     if (!Array.isArray(data) || !Number.isInteger(last) || last < 1 || last > MAX_PAGES) {
       throw new Error(`${category} page ${page}: unexpected page data`);
