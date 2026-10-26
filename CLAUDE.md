@@ -41,7 +41,8 @@ Key routing rules:
 - Platform: GitHub Pages, built and published by GitHub Actions
 - Production URL: https://simba3696.github.io/mkmax/
 - Deploy workflow: .github/workflows/deploy.yml (on every push to main, and daily at 17:30 UTC)
-- Deploy status command: curl -s "https://api.github.com/repos/Simba3696/mkmax/actions/workflows/deploy.yml/runs?per_page=1" | jq '.workflow_runs[0] | {head_sha, status, conclusion}'
+- Deploy status command: R=$(curl -s "https://api.github.com/repos/Simba3696/mkmax/actions/workflows/deploy.yml/runs?per_page=1" | jq -c '.workflow_runs[0] | {id, head_sha, status}'); curl -s "https://api.github.com/repos/Simba3696/mkmax/actions/runs/$(echo "$R" | jq -j .id)/jobs" | jq --argjson run "$R" '{head_sha: $run.head_sha, status: $run.status, conclusion: ([.jobs[] | select(.name == "deploy") | .conclusion][0])}'
+- The conclusion is the deploy job's, not the run's: a run whose catalog or event schedule download fell back fails (its fallback job) after the deploy job has published, so a failed run with a successful deploy job means the revision is live with an older catalog or schedule. Don't revert for that.
 - Merge method: squash
 - Project type: web app (installable PWA)
 - Post-deploy health check: curl -s -o /dev/null -w "%{http_code}" https://simba3696.github.io/mkmax/ (expect 200)
@@ -49,7 +50,7 @@ Key routing rules:
 ### Custom deploy hooks
 - Pre-merge: npm run lint && npm test && npm run build
 - Deploy trigger: automatic on push to main
-- Deploy status: curl -s "https://api.github.com/repos/Simba3696/mkmax/actions/workflows/deploy.yml/runs?per_page=1" | jq '.workflow_runs[0] | {head_sha, status, conclusion}'
+- Deploy status: R=$(curl -s "https://api.github.com/repos/Simba3696/mkmax/actions/workflows/deploy.yml/runs?per_page=1" | jq -c '.workflow_runs[0] | {id, head_sha, status}'); curl -s "https://api.github.com/repos/Simba3696/mkmax/actions/runs/$(echo "$R" | jq -j .id)/jobs" | jq --argjson run "$R" '{head_sha: $run.head_sha, status: $run.status, conclusion: ([.jobs[] | select(.name == "deploy") | .conclusion][0])}'
 - Health check: curl -s -o /dev/null -w "%{http_code}" https://simba3696.github.io/mkmax/ (expect 200)
 
 ## GBrain Search Guidance (configured by /sync-gbrain)

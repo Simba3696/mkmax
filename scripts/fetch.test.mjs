@@ -233,8 +233,9 @@ describe('download scripts', () => {
   // clock); no_claim=the 90% and 5-minute values, or a live copy that can't be read (the committed one is used)
   // Extended by /ship review on 2026-10-26 (pr-ci run 10): each case must be caught by its own check.
   // Value: protects=every bad answer is rejected by the check written for it; fails_when=a check is dropped while a
-  // later one (the item count added on this branch) still fails the same case; why_new=the cases asserted only the exit
-  // code; seam=none; no_claim=the wording of each error beyond the matched phrase
+  // later one (the item count added on this branch) still fails the same case; why_new=the cases asserted the exit
+  // code and that nothing was written, not which check failed them; seam=none; no_claim=the wording of each error
+  // beyond the matched phrase
   it("fail without writing when MK Mobile Base's catalog answers look wrong or come too slowly", () => {
     // Each change is matched to the check that should catch it, so a case can't stay green because another check
     // (the item count, say) fails it first.
