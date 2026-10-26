@@ -773,7 +773,9 @@ function CardList() {
       if (rest.length) {
         try {
           const fromWiki = await findCardImages(rest, ctx.rules, (msg) => setImgStatus({ busy: true, msg }));
-          for (const [id, m] of fromWiki) found.set(id, { ...m, imagePage: wikiUrl(m.wikiTitle) });
+          // Wiki art for a card the catalog lists without art isn't marked as checked, so the site's art replaces it
+          // later.
+          for (const [id, m] of fromWiki) found.set(id, { ...m, imagePage: listed.has(id) ? undefined : wikiUrl(m.wikiTitle) });
         } catch (e) {
           wikiError = (e as Error).message;
         }
@@ -791,11 +793,14 @@ function CardList() {
       // Of the cards looked up, those still in the save: a sync may have deleted some during the lookup.
       let total = missingImages.length;
       let left = 0;
+      // Cards the catalog lists without art that have an image to show meanwhile.
+      let waiting = 0;
       update((d) => {
         const cards = d.cards.filter((c) => lookedUp.has(c.id) && lookedUp.get(c.id) === c.imageUrl);
         meanwhile = d.cards.filter((c) => lookedUp.has(c.id) && lookedUp.get(c.id) !== c.imageUrl).length;
         total = d.cards.filter((c) => lookedUp.has(c.id)).length;
         left = cards.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl))).length;
+        waiting = cards.filter((c) => listed.has(c.id) && (found.has(c.id) || (c.imageUrl && !brokenUrls.has(c.imageUrl)))).length;
         const art = cards.flatMap((c) => (found.has(c.id) ? [{ c, m: found.get(c.id)! }] : []));
         const checked = cards.filter((c) => keep.some((k) => k.id === c.id) && c.wikiTitle && c.imagePage !== wikiUrl(c.wikiTitle));
         if (!art.length && !checked.length) return noChange;
@@ -809,7 +814,12 @@ function CardList() {
           ? ` Couldn't reach the MK Mobile wiki (${wikiError}), so ${left} weren't looked up there. Try again later.`
           : ` ${left} not found online: open "Image" on those cards to paste a URL.`;
       const meanwhileMsg = !meanwhile ? '' : meanwhile === 1 ? ' 1 got an image during the lookup and kept it.' : ` ${meanwhile} got images during the lookup and kept them.`;
-      setImgStatus({ busy: false, msg: `Updated ${updated} of ${total}.${meanwhileMsg}${leftMsg}` });
+      const waitingMsg = !waiting
+        ? ''
+        : waiting === 1
+          ? ' 1 is on MK Mobile Base without art yet and gets it once the site adds it.'
+          : ` ${waiting} are on MK Mobile Base without art yet and get it once the site adds it.`;
+      setImgStatus({ busy: false, msg: `Updated ${updated} of ${total}.${meanwhileMsg}${waitingMsg}${leftMsg}` });
     } catch (e) {
       setImgStatus({ busy: false, msg: `Couldn't look up images: ${(e as Error).message}` });
     }
