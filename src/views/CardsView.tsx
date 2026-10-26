@@ -750,7 +750,14 @@ function CardList() {
   // stat screenshots rather than card art), which mkmobilebase usually has a proper card image for.
   const brokenUrls = useBrokenImageUrls();
   const needsImage = (c: Card) => wantsCatalogImage(c) || brokenUrls.has(c.imageUrl!);
-  const missingImages = state.cards.filter(needsImage);
+  // A card MK Mobile Base lists without art that still shows an image: only the site can give it better art (the app
+  // swaps it in by itself once the site has some), so a tap can't help and it isn't counted. Known once the catalog loads.
+  const waitingForSite = (c: Card) => {
+    if (!catalog || !c.imageUrl || brokenUrls.has(c.imageUrl)) return false;
+    const hit = findInCatalog(c, ctx.rules.get(c.rarityId), catalog);
+    return !!hit && !hit.image;
+  };
+  const missingImages = state.cards.filter((c) => needsImage(c) && !waitingForSite(c));
 
   async function findImages() {
     setImgStatus({ busy: true, msg: 'Checking the MK Mobile Base catalog…' });
