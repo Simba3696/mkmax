@@ -57,12 +57,17 @@ function rarityOf(item) {
   return RARITIES.find((r) => new RegExp(`\\b${r}\\b`).test(text)) ?? null;
 }
 
+// Art is saved on cards and synced, so only an https link counts; anything else (an object, an http: or data: link)
+// counts as missing art for the checks below.
+const httpsLink = (url) => (typeof url === 'string' && url.startsWith('https://') ? url : undefined);
 const catalog = [];
 for (const [category, kind] of [['characters', 'character'], ['equipment', 'equipment'], ['kameos', 'kameo']]) {
   const items = await fetchAll(category);
   // An empty category means the API has changed; failing keeps the deployed catalog rather than shipping one
   // without card art or rarities.
   if (!items.length) throw new Error(`${category}: no items`);
+  // Every card is matched and linked by its slug, so one without is a changed answer, not a repeat.
+  if (items.some((i) => typeof i.slug !== 'string' || !i.slug)) throw new Error(`${category}: an item has no slug`);
   // A site that ignored the page asked for would send page 1 again and again; when it sends no item count, or the count
   // exactly fills every page, no other check here notices.
   if (new Set(items.map((i) => i.slug)).size !== items.length) {
@@ -74,7 +79,8 @@ for (const [category, kind] of [['characters', 'character'], ['equipment', 'equi
     const title = typeof item.title === 'string' ? item.title : '';
     const name = kind === 'kameo' ? title.replace(/\s*Kameo$/i, '') : title;
     if (!name.trim()) throw new Error(`${category}: an item has no name`);
-    catalog.push({ kind, name, rarity: rarityOf(item), slug: item.slug, image: item.image_thumb_2x_url ?? item.image_url });
+    const image = httpsLink(item.image_thumb_2x_url) ?? httpsLink(item.image_url);
+    catalog.push({ kind, name, rarity: rarityOf(item), slug: item.slug, image });
   }
 }
 // Every card has art and a rarity today, so many without means the API renamed those fields; failing keeps the deployed

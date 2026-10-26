@@ -73,7 +73,8 @@ function runOffline(script, output) {
 // past weeks, and the live catalog.json has as many cards of each kind as the download. Each request is noted as above.
 // STUB_CHANGE makes the catalog answer the way a changed or failing API might: no page count, a page count of zero, a
 // page count that never ends, no art, no rarity tags, page 1 whatever page is asked for, the same card twice, a card
-// with a blank name, a Kameo titled just "Kameo", a page count that shrinks between pages with no item count,
+// with a blank name, a Kameo titled just "Kameo", a page count that shrinks between pages with no item count, a
+// card with no slug, art sent as an object or as http: links,
 // a count one higher than the items sent, 5 Silver cards without art among 50 Gold ones a page, far
 // fewer cards than the live copy, or pages slow enough that the download runs out of time (the stand-in moves the clock
 // on a minute per request). Or the way a healthy one might: 50 Gold cards a page plus one new character without art or
@@ -99,9 +100,14 @@ const live = ['character', 'equipment', 'kameo'].flatMap((kind) =>
 const lastPage = change === 'no-page-count' ? undefined : change === 'zero-pages' ? 0 : change === 'endless' ? 1000 : 2;
 const card = (n) => ({
   title: change === 'nameless' && n === 2 ? ' ' : 'Card ' + n,
-  slug: change === 'duplicate-slugs' ? 'card' : 'card-' + n,
+  slug: change === 'no-slug' && n === 2 ? undefined : change === 'duplicate-slugs' ? 'card' : 'card-' + n,
   tags: change === 'no-rarity' ? [] : [{ slug: 'gold' }],
-  image_url: change === 'no-art' ? undefined : 'https://img.test/' + n,
+  image_url:
+    change === 'no-art'
+      ? undefined
+      : change === 'object-art'
+        ? { url: 'https://img.test/' + n }
+        : (change === 'http-art' ? 'http://img.test/' : 'https://img.test/') + n,
 });
 globalThis.fetch = async (url, opts = {}) => {
   note(url, opts);
@@ -263,6 +269,9 @@ describe('download scripts', () => {
       'small-group-no-art': 'cards have no image',
       'kameo-only-suffix': 'an item has no name',
       'shifting-pages': 'the page count changed',
+      'no-slug': 'an item has no slug',
+      'object-art': 'items have no image',
+      'http-art': 'items have no image',
     };
     const outcome = (change) => {
       const { status, stderr, wroteCatalog } = runOnline('fetch-catalog.mjs', change);

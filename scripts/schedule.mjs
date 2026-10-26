@@ -25,9 +25,9 @@ const field = (record, label) => record.fields?.find((f) => f.label === label)?.
 
 /**
  * Shop packs, challenges and Realm Klash seasons from the API response. Throws when a page or section is missing,
- * there are no packs or no current season, or an entry has no name: the site has changed its format, and writing
- * empty lists would deploy an empty schedule, while a nameless entry breaks the Cards and Plan tabs, which read every
- * name. The deploy then keeps the copy that's live instead.
+ * there are no packs or no current season, an entry has no name, or a date can't be read (see date above): the site
+ * has changed its format, and writing empty lists would deploy an empty schedule, while a nameless entry breaks the
+ * Cards and Plan tabs, which read every name. The deploy then keeps the copy that's live instead.
  */
 export function parseSchedule(schedule) {
   const section = (pageId, title) => {
@@ -48,7 +48,8 @@ export function parseSchedule(schedule) {
       cost: price ? Number(price[1].replace(/,/g, '')) : null,
       currency: price ? price[2] : null,
       limit: limit ? Number(limit[1]) : null,
-      image: r.image ?? null,
+      // The pack art is shown in the app, so only an https link is kept.
+      image: typeof r.image === 'string' && r.image.startsWith('https://') ? r.image : null,
     };
   });
   const challenges = timed('challenges', ['Current Challenges', 'Upcoming Challenges'], 'Character');
@@ -73,8 +74,10 @@ export function withPastSeasons(seasons, earlier, now) {
   const first = Math.min(...seasons.filter((s) => s.start).map((s) => new Date(s.start).getTime()));
   const kept = new Map();
   for (const s of earlier) {
-    // A nameless week from an older or hand-edited copy would break the Cards and Plan tabs like a fresh one would.
-    if (!s.start || !s.end || typeof s.name !== 'string' || !s.name.trim() || kept.has(s.start)) continue;
+    // A week from an older or hand-edited copy with no name would break the Cards and Plan tabs like a fresh one would,
+    // and one that isn't an object or has dates that aren't text would crash this step every day until it ages out.
+    if (typeof s?.start !== 'string' || typeof s.end !== 'string' || !s.start || !s.end) continue;
+    if (typeof s.name !== 'string' || !s.name.trim() || kept.has(s.start)) continue;
     const end = new Date(s.end).getTime();
     if (end <= first && end >= now.getTime() - KEEP_PAST_SEASONS_MS) kept.set(s.start, s);
   }

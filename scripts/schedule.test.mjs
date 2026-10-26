@@ -116,4 +116,31 @@ describe('event schedule script', () => {
     const earlier = [w('2026-09-23T16:00:00.000Z', '2026-09-30T16:00:00.000Z', ''), w('2026-09-30T16:00:00.000Z', '2026-10-07T16:00:00.000Z')];
     expect(withPastSeasons(current, earlier, new Date('2026-10-08T00:00:00Z'))).toEqual(current);
   });
+
+  // Generated on 2026-10-26 (/ship adversarial review, pr-ci run 16)
+  // Value: protects=a broken week in an older or hand-edited copy (not an object, or dates that aren't text) is skipped
+  // instead of crashing the events refresh every day until it ages out; fails_when=the shape checks on carried-over
+  // weeks are dropped; why_new=only the name was checked; seam=none; no_claim=weeks the site lists now
+  it('skips a past week that is broken rather than failing on it', () => {
+    const w = (start, end, name) => ({ name, start, end });
+    const current = [w('2026-10-07T16:00:00.000Z', '2026-10-14T16:00:00.000Z', 'Kold')];
+    const earlier = [null, 'week', w(1, '2026-09-30T16:00:00.000Z', 'Fire'), w('2026-09-23T16:00:00.000Z', {}, 'Ice')];
+    expect(withPastSeasons(current, earlier, new Date('2026-10-08T00:00:00Z'))).toEqual(current);
+  });
+
+  // Generated on 2026-10-26 (/ship adversarial review, pr-ci run 16)
+  // Value: protects=pack art that isn't an https link never reaches the app; fails_when=the https check on pack
+  // art is dropped; why_new=pack art was copied as sent; seam=none; no_claim=what the site sends today (all https)
+  it('keeps only https pack art', () => {
+    const kold = [week('Kold', '30 September 2026, 16:00 UTC', '7 October 2026, 16:00 UTC')];
+    const art = (image) =>
+      parseSchedule(api({ packs: [{ ...pack, image }], current: kold, upcoming: [] })).packs[0].image;
+    const sent = ['https://img.test/p.png', 'http://img.test/p.png', 'data:image/png;base64,AAAA', { url: 'x' }];
+    expect(sent.map(art)).toEqual([
+      'https://img.test/p.png',
+      null,
+      null,
+      null,
+    ]);
+  });
 });
