@@ -199,14 +199,14 @@ describe('.github/workflows/deploy.yml', () => {
   // Extended by /ship review on 2026-10-26 (pr-ci run 14): fails_when also covers the failing step getting its own if:
   // or shell, or the deploy workflow or the fallback job getting a defaults block, and either download step getting an
   // if:, continue-on-error or its own shell, the build job an if: or defaults, or the report moving after the live
-  // copy is fetched.
+  // copy is fetched, or the deploy job getting an if: (skipping it skips the fallback job too) or continue-on-error.
   it('fails the run after publishing when a download fell back', () => {
     const { build, fallback } = deploy.jobs;
     const report = 'echo "fell_back=true" >> "$GITHUB_OUTPUT"';
     const reports = (s: Step) => !!s.run?.includes(report);
-    // A download step that a daily run could skip, let fail quietly or run in another shell (its own, or the build
-    // job's defaults) would never report a fallback, and the report has to come before the live copy is fetched: the
-    // line after the warning that follows a failed refresh.
+    // A download step that a daily run could skip, let fail quietly or run in another shell (its own, or defaults on
+    // the build job or the workflow) would never report a fallback, and the report has to come before the live copy
+    // is fetched: the line after the warning that follows a failed refresh.
     const lines = (s: Step) => s.run?.trim().split('\n').map((l) => l.trim()) ?? [];
     const reporting = build?.steps
       .filter(reports)
@@ -217,7 +217,9 @@ describe('.github/workflows/deploy.yml', () => {
     const fallbackSteps = fallback?.steps.map(failing);
     const muted = fallback?.['continue-on-error'];
     const defaults = [deploy.defaults, build?.defaults, fallback?.defaults];
-    const job = [fallback?.needs, fallback?.if, fallbackSteps, muted, defaults];
+    // The fallback job needs the deploy job, so a deploy that a run could skip would skip the fallback job with it.
+    const deployJob = [deploy.jobs.deploy?.if, deploy.jobs.deploy?.['continue-on-error']];
+    const job = [fallback?.needs, fallback?.if, fallbackSteps, muted, defaults, deployJob];
     expect([reporting, build?.if, build?.outputs?.fell_back, ...job]).toEqual([
       [
         ['catalog', 'npm run catalog && exit 0', report, undefined, undefined, undefined],
@@ -230,6 +232,7 @@ describe('.github/workflows/deploy.yml', () => {
       [[undefined, true, undefined, undefined, undefined]],
       undefined,
       [undefined, undefined, undefined],
+      [undefined, undefined],
     ]);
   });
 });

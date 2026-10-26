@@ -63,7 +63,8 @@ for (const [category, kind] of [['characters', 'character'], ['equipment', 'equi
   // An empty category means the API has changed; failing keeps the deployed catalog rather than shipping one
   // without card art or rarities.
   if (!items.length) throw new Error(`${category}: no items`);
-  // A site that ignored the page asked for would send page 1 again and again, which every other check here passes.
+  // A site that ignored the page asked for would send page 1 again and again; when it sends no item count, or the count
+  // exactly fills every page, no other check here notices.
   if (new Set(items.map((i) => i.slug)).size !== items.length) {
     throw new Error(`${category}: the same item came back twice`);
   }
