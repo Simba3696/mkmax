@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -235,6 +236,46 @@ describe('.github/workflows/deploy.yml', () => {
       [undefined, undefined, undefined],
       [undefined, undefined],
     ]);
+  });
+});
+
+describe('CLAUDE.md deploy status command', () => {
+  const md = readFileSync(join(here, '..', 'CLAUDE.md'), 'utf8').split(/\r?\n/);
+  const command = (label: string) => md.find((l) => l.startsWith(`- ${label}: `))?.slice(label.length + 4);
+  // GitHub's runners have jq; a machine without it skips the verdicts rather than failing, and CI never skips them.
+  const hasJq = (() => {
+    try {
+      execFileSync('jq', ['--version']);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 19)
+  // Value: protects=/land-and-deploy's verdict on a deploy: success once a deployment went live, cancelled when a newer
+  // merge's deploy (or a hand) cancelled its run first, failure when its run finished with none live, null while it
+  // runs, and both copies of the command alike; fails_when=a branch of the jq is dropped or reordered (a cancelled run
+  // reads failure, the cue to revert a commit that's live) or one copy is edited without the other; why_new=nothing ran
+  // the command after three fixes to it; seam=jq runs the command's own program on the run states GitHub returns;
+  // no_claim=GitHub's API answers and the shell around the jq
+  it.skipIf(!hasJq && !process.env.CI)('says success, cancelled, failure or null, and keeps both copies alike', () => {
+    const status = command('Deploy status command');
+    const program = /--argjson published "\$P" '([^']+)'$/.exec(status ?? '')?.[1];
+    const verdict = (run: object, published: number) => {
+      const args = ['-nc', '--arg', 'sha', 'x', '--argjson', 'run', JSON.stringify(run), '--argjson', 'published'];
+      return JSON.parse(execFileSync('jq', [...args, String(published), program!], { encoding: 'utf8' })).conclusion;
+    };
+    expect([
+      status === command('Deploy status'),
+      verdict({ status: 'completed', conclusion: 'failure' }, 1),
+      verdict({ status: 'completed', conclusion: 'cancelled' }, 1),
+      verdict({ status: 'completed', conclusion: 'cancelled' }, 0),
+      verdict({ status: 'completed', conclusion: 'failure' }, 0),
+      verdict({ status: 'completed', conclusion: 'success' }, 0),
+      verdict({ status: 'in_progress', conclusion: null }, 0),
+      verdict({}, 0),
+    ]).toEqual([true, 'success', 'success', 'cancelled', 'failure', 'failure', null, null]);
   });
 });
 

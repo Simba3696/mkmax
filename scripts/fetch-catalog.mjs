@@ -14,24 +14,29 @@ const tooMany = (n, of) => n > Math.max(3, of / 10);
 /** The deployed app; the deploy workflow sets PAGES_URL. */
 const LIVE = `${process.env.PAGES_URL ?? 'https://simba3696.github.io/mkmax'}/catalog.json`;
 const FILE = new URL('../public/catalog.json', import.meta.url);
-// The whole download takes seconds. Pages that each answer just inside 30 seconds could otherwise add up past the
+/** How long one request may take before it fails. */
+const REQUEST_MS = 30_000;
+// The whole download takes seconds. Pages that each answer just inside REQUEST_MS could otherwise add up past the
 // build job's 15 minutes, which would end the job before it falls back to the live copy.
-const DEADLINE = Date.now() + 5 * 60_000;
+const DEADLINE_MINUTES = 5;
+const DEADLINE = Date.now() + DEADLINE_MINUTES * 60_000;
 
 async function fetchAll(category) {
   const items = [];
   let pages;
   for (let page = 1; ; page++) {
-    if (Date.now() > DEADLINE) throw new Error(`${category} page ${page}: still downloading after 5 minutes`);
-    // A stalled download fails after 30 seconds, so the deploy goes on with the live copy instead of waiting.
+    if (Date.now() > DEADLINE) {
+      throw new Error(`${category} page ${page}: still downloading after ${DEADLINE_MINUTES} minutes`);
+    }
+    // A stalled download fails after REQUEST_MS, so the deploy goes on with the live copy instead of waiting.
     const res = await fetch(`${API}/${category}/articles?per_page=100&page=${page}`, {
       headers: HEADERS,
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(REQUEST_MS),
     });
     if (!res.ok) throw new Error(`${category} page ${page}: HTTP ${res.status}`);
     const { data, meta } = await res.json();
     // Without a usable page count the loop would stop early (and ship part of the catalog) or keep asking for pages
-    // until the 5-minute deadline, so this fails it at once and the deploy keeps the live copy instead.
+    // until the deadline, so this fails it at once and the deploy keeps the live copy instead.
     const last = meta?.last_page;
     if (!Array.isArray(data) || !Number.isInteger(last) || last < 1 || last > MAX_PAGES) {
       throw new Error(`${category} page ${page}: unexpected page data`);
@@ -118,7 +123,7 @@ async function copy(load, what) {
 }
 async function earlierCopy() {
   const live = await copy(async () => {
-    const r = await fetch(LIVE, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
+    const r = await fetch(LIVE, { headers: HEADERS, signal: AbortSignal.timeout(REQUEST_MS) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
   }, 'live');
