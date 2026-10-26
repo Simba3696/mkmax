@@ -295,7 +295,13 @@ describe('download scripts', () => {
   // copy (a first deploy); fails_when=the local copy stops standing in or being preferred when newer, an unreadable
   // live copy fails the download, or the allowance for small groups goes; why_new=every earlier case had a readable
   // live copy and no local one; seam=none (STUB_CHANGE only changes the stand-in's answers); no_claim=the exact
-  // allowance (more than a tenth and more than 3)
+  // allowance (the run 20 rows below pin its tenth)
+  // Extended on 2026-10-26 (/ship coverage, pr-ci run 20): a big group losing a tenth of its cards, and more.
+  // Value: protects=a group of 110 cards may lose 10 but one of 120 can't lose 20, so a site that loses a sixth of a
+  // big group still falls back; fails_when=the tenth in the shared allowance (tooMany) is loosened or tightened, e.g.
+  // to a half, which only "more than 3" cases never notice; why_new=every earlier comparison had 20 cards a group at
+  // most, so the tenth never decided one; seam=none (a newer committed copy holds the bigger groups); no_claim=the
+  // art check's own use of the tenth beyond this shared helper
   it('compare a catalog with the newest earlier copy, allowing a small group to lose a few cards', () => {
     const gold = (count) =>
       ['character', 'equipment', 'kameo'].flatMap((kind) => Array(count).fill({ kind, rarity: 'gold' }));
@@ -313,6 +319,9 @@ describe('download scripts', () => {
       outcome('', { items: gold(20) }),
       // A hand-edited copy with malformed items: only its real cards are compared.
       outcome('', { fetchedAt: '2026-10-25T17:30:00.000Z', items: [null, 'card', { rarity: 'gold' }, ...gold(2)] }),
+      // The download has 100 Gold cards of each kind: down 10 from 110 is within a tenth, down 20 from 120 isn't.
+      outcome('new-card', local('2026-10-25T17:30:00.000Z', 110)),
+      outcome('new-card', local('2026-10-25T17:30:00.000Z', 120)),
     ]).toEqual([
       { status: 0, wroteCatalog: true },
       { status: 1, wroteCatalog: false },
@@ -321,6 +330,8 @@ describe('download scripts', () => {
       { status: 0, wroteCatalog: true },
       { status: 0, wroteCatalog: true },
       { status: 0, wroteCatalog: true },
+      { status: 0, wroteCatalog: true },
+      { status: 1, wroteCatalog: false },
     ]);
   }, 45_000);
 
