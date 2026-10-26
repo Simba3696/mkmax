@@ -1525,6 +1525,7 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
       { kind: 'character', name: 'Liu Kang, Klassic', rarity: 'diamond', slug: 'liu-kang-klassic', image: 'z.png' },
       // Listed without art, like a card the site hasn't finished.
       { kind: 'character', name: 'Shujinko, Unfinished', rarity: 'diamond', slug: 'shujinko-unfinished' },
+      { kind: 'character', name: 'Kung Lao, Unfinished', rarity: 'diamond', slug: 'kung-lao-unfinished' },
     ],
   };
   const catalogResponse = () => new Response(JSON.stringify(CATALOG));
@@ -1637,6 +1638,33 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     await screen.findByText(/^Updated 1 of 1\. 1 is on MK Mobile Base without art yet/);
     expect(store.state.cards[0]).toMatchObject({ imageUrl: 'https://wiki.test/shu.png', wikiTitle: 'Shujinko/Unfinished' });
     expect(store.state.cards[0].imagePage).toBeUndefined();
+  });
+
+  // Generated on 2026-10-26 (/ship coverage, pr-ci run 19)
+  // Value: protects=Find images says how many cards wait for the site's art in the plural ("2 are ... and get it");
+  // fails_when=the plural branch says "1 is" or drops the count; why_new=every waiting test here and in
+  // CardsView.coldCatalog.test.tsx had one card; seam=fetch serves the catalog and answers the wiki's page lookup;
+  // no_claim=the wiki's other lookups (search, gear lists)
+  it('says how many cards wait for the site to add art in the plural', async () => {
+    const pages = {
+      1: { title: 'Shujinko/Unfinished', thumbnail: { source: 'https://wiki.test/shu.png' } },
+      2: { title: 'Kung Lao/Unfinished', thumbnail: { source: 'https://wiki.test/lao.png' } },
+    };
+    vi.stubGlobal('fetch', (url: string) =>
+      String(url).endsWith('catalog.json')
+        ? Promise.resolve(catalogResponse())
+        : String(url).includes('pageimages')
+          ? Promise.resolve(new Response(JSON.stringify({ query: { pages } })))
+          : Promise.reject(new Error('offline')),
+    );
+    renderCards([
+      { id: 'shu', name: 'Shujinko, Unfinished', rarityId: 'diamond', fusion: 2, guest: false },
+      { id: 'lao', name: 'Kung Lao, Unfinished', rarityId: 'diamond', fusion: 2, guest: false },
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Find images (2)' }));
+    await screen.findByText(
+      'Updated 2 of 2. 2 are on MK Mobile Base without art yet and get it once the site adds it.',
+    );
   });
 
   // Generated on 2026-10-26 (/ship coverage audit, pr-ci run 18)
