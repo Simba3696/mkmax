@@ -33,7 +33,13 @@ async function fetchAll(category) {
       throw new Error(`${category} page ${page}: unexpected page data`);
     }
     items.push(...data);
-    if (page >= last) return items;
+    if (page >= last) {
+      // An item that moved across a page boundary while the pages were read is skipped without any other sign.
+      if (Number.isInteger(meta.total) && items.length !== meta.total) {
+        throw new Error(`${category}: got ${items.length} items, the site says ${meta.total}`);
+      }
+      return items;
+    }
   }
 }
 
@@ -56,25 +62,35 @@ for (const [category, kind] of [['characters', 'character'], ['equipment', 'equi
     throw new Error(`${category}: the same item came back twice`);
   }
   for (const item of items) {
+    if (typeof item.title !== 'string' || !item.title.trim()) throw new Error(`${category}: an item has no name`);
     // Kameo titles read "Baraka - Klassic Kameo"; drop the suffix so names match cards like "Baraka, Klassic".
     const name = kind === 'kameo' ? item.title.replace(/\s*Kameo$/i, '') : item.title;
     catalog.push({ kind, name, rarity: rarityOf(item), slug: item.slug, image: item.image_thumb_2x_url ?? item.image_url });
   }
 }
-// Every card has art and a rarity today, so more than a few without means the API renamed those fields; failing keeps
-// the deployed catalog rather than shipping one without them.
-for (const key of ['image', 'rarity']) {
-  const missing = catalog.filter((c) => !c[key]).length;
-  if (missing > catalog.length / 10) throw new Error(`catalog: ${missing} of ${catalog.length} items have no ${key}`);
+// Every card has art and a rarity today, so a group with more than a few without (all of a small group, or more than
+// a tenth and more than 3 of a larger one) means the API renamed those fields; failing keeps the deployed catalog
+// rather than shipping cards without them. Art is counted per kind and rarity, so a small group can't hide in the whole
+// catalog, and rarity per kind.
+const tooMany = (missing, total) => missing > 0 && (missing === total || missing > Math.max(3, total / 10));
+for (const [group, cards] of Map.groupBy(catalog, (c) => `${c.kind} ${c.rarity ?? 'without a rarity'}`)) {
+  const missing = cards.filter((c) => !c.image).length;
+  if (tooMany(missing, cards.length)) throw new Error(`catalog: ${missing} of ${cards.length} ${group} cards have no image`);
+}
+for (const [kind, cards] of Map.groupBy(catalog, (c) => c.kind)) {
+  const missing = cards.filter((c) => !c.rarity).length;
+  if (tooMany(missing, cards.length)) throw new Error(`catalog: ${missing} of ${cards.length} ${kind} cards have no rarity`);
 }
 // A kind and rarity with far fewer cards than the newest earlier copy means the site lost them, not that the game
 // removed them, so failing keeps the live catalog. That's the live copy, or the local one (the committed one in CI)
-// when it's newer or the live one can't be read, so committing a fresh catalog.json resets the comparison after a
-// real removal. Cards without a rarity aren't counted, so fewer of those never fails.
+// when it's newer or the live one can't be read. After a real removal, CATALOG_ACCEPT_DROP=1 npm run catalog skips the
+// comparison so the fresh catalog.json can be committed, and later deploys compare with that. Cards without a rarity
+// aren't counted, so fewer of those never fails.
 async function copy(load, what) {
   try {
     const c = await load();
-    return Array.isArray(c?.items) ? c : null;
+    // A hand-edited copy's malformed items would break the counting below, so only real cards are compared.
+    return Array.isArray(c?.items) ? { ...c, items: c.items.filter((i) => typeof i?.kind === 'string') } : null;
   } catch (e) {
     console.warn(`catalog: couldn't read the ${what} copy (${e.message})`);
     return null;
@@ -98,7 +114,7 @@ const byKindAndRarity = (items) => {
   }
   return counts;
 };
-const earlier = await earlierCopy();
+const earlier = process.env.CATALOG_ACCEPT_DROP === '1' ? null : await earlierCopy();
 if (earlier) {
   const now = byKindAndRarity(catalog);
   for (const [key, was] of byKindAndRarity(earlier.items)) {
