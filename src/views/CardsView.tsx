@@ -9,7 +9,7 @@ import TowersPanel from './TowersPanel';
 import MaxedPanel from './MaxedPanel';
 import { CardsIcon, TowerIcon, TrophyIcon } from '../icons';
 import { findCardImages, wikiUrl } from '../wiki';
-import { catalogPageUrl, findInCatalog, loadCatalog, rarityMismatches, useCatalogVersion, wantsCatalogImage, type CatalogItem } from '../catalog';
+import { catalogPageUrl, findInCatalog, loadCatalog, loadedCatalog, rarityMismatches, useCatalogVersion, wantsCatalogImage, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
 import { applyRarityFix, initialSource } from '../challenges';
 import { challengeFor, challengeWhen, useEvents } from '../events';
@@ -723,7 +723,8 @@ function CardList() {
   // Cards get their art as soon as they're added, even under the wrong rarity, so the rarity check runs whenever
   // the catalog is at hand rather than only from Find images. Read again when a catalog fetched again has changed, or the
   // first one loads after a failed download.
-  const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
+  // Starts from a copy loaded earlier this session, so Find images' count is right from the first render.
+  const [catalog, setCatalog] = useState<CatalogItem[] | null>(loadedCatalog);
   const catalogVersion = useCatalogVersion();
   useEffect(() => {
     let cancelled = false;
@@ -819,7 +820,7 @@ function CardList() {
       const leftMsg = !left
         ? ''
         : wikiError
-          ? ` Couldn't reach the MK Mobile wiki (${wikiError}), so ${left} weren't looked up there. Try again later.`
+          ? ` Couldn't reach the MK Mobile wiki (${wikiError}), so ${left} ${left === 1 ? "wasn't" : "weren't"} looked up there. Try again later.`
           : ` ${left} not found online: open "Image" on those cards to paste a URL.`;
       const meanwhileMsg = !meanwhile ? '' : meanwhile === 1 ? ' 1 got an image during the lookup and kept it.' : ` ${meanwhile} got images during the lookup and kept them.`;
       const waitingMsg = !waiting
