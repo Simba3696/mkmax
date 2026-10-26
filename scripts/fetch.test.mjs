@@ -1,0 +1,470 @@
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { afterAll, describe, expect, it } from 'vitest';
+
+const here = fileURLToPath(new URL('.', import.meta.url));
+const dir = mkdtempSync(join(tmpdir(), 'mkmax-fetch-'));
+afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+// Starts both stand-ins for fetch below: a request counts as limited only when its signal came from
+// AbortSignal.timeout, so a signal that never fires doesn't pass for a time limit.
+const trackTimeouts = `const timed = new WeakSet();
+const timeout = AbortSignal.timeout.bind(AbortSignal);
+AbortSignal.timeout = (ms) => {
+  const signal = timeout(ms);
+  timed.add(signal);
+  return signal;
+};
+const note = (url, opts) => process.stderr.write('REQUEST ' + JSON.stringify({ url: String(url), limited: timed.has(opts.signal) }) + '\\n');
+`;
+
+// Loaded before the script in place of the real fetch: it notes whether each request has a time limit, then fails
+// the way an unreachable MK Mobile Base would, so nothing goes over the network.
+const stub = join(dir, 'offline.mjs');
+writeFileSync(
+  stub,
+  `${trackTimeouts}globalThis.fetch = async (url, opts = {}) => {
+  note(url, opts);
+  throw new Error('offline');
+};
+`,
+);
+
+/** A copy of a download script and schedule.mjs beside an empty public folder, so runs never write the repo's files. */
+function scratchRepo(script) {
+  const root = mkdtempSync(join(dir, 'repo-'));
+  mkdirSync(join(root, 'scripts'));
+  mkdirSync(join(root, 'public'));
+  for (const file of [script, 'schedule.mjs']) copyFileSync(join(here, file), join(root, 'scripts', file));
+  return root;
+}
+
+/** The requests a run noted on stderr. */
+const requestsOf = (stderr) =>
+  stderr
+    .split('\n')
+    .filter((line) => line.startsWith('REQUEST '))
+    .map((line) => JSON.parse(line.slice('REQUEST '.length)));
+
+/**
+ * Runs a copy of a download script offline, with the committed file it writes seeded into its public folder: its exit
+ * code, the requests it made, and whether that file is untouched.
+ */
+function runOffline(script, output) {
+  const root = scratchRepo(basename(script));
+  const seeded = join(root, 'public', basename(output));
+  copyFileSync(output, seeded);
+  const before = readFileSync(seeded);
+  const copy = join(root, 'scripts', basename(script));
+  // PAGES_URL as the deploy sets it, so the deploy's own test run (which has it set) runs the same way.
+  const result = spawnSync(process.execPath, ['--import', pathToFileURL(stub).href, copy], {
+    encoding: 'utf8',
+    timeout: 20_000,
+    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax', CATALOG_ACCEPT_DROP: '' },
+  });
+  return { status: result.status, requests: requestsOf(result.stderr), unchanged: readFileSync(seeded).equals(before) };
+}
+
+// Loaded in place of the real fetch when MK Mobile Base answers: every catalog category has two pages of one Gold card
+// with art and an item count to match, the schedule has one pack and one current season, the live events.json has no
+// past weeks, and the live catalog.json has as many cards of each kind as the download. Each request is noted as above.
+// STUB_CHANGE makes the catalog answer the way a changed or failing API might: no page count, a page count of zero, a
+// page count that never ends, no art, no rarity tags, page 1 whatever page is asked for, the same card twice, every
+// card with a blank name or no slug, every Kameo titled just "Kameo", a fifth of 50 Gold cards a page with blank
+// titles, a page count that shrinks between pages with no item count, art sent as an object or as http: links,
+// a count one higher than the items sent, 5 Silver cards without art among 50 Gold ones a page, far
+// fewer cards than the live copy, or pages slow enough that the download runs out of time (the stand-in moves the clock
+// on a minute per request). Or the way a healthy one might: one card with a blank name or no slug, 50 Gold cards a page
+// plus one new character without art or a rarity (or four, with or without slugs), or no item count, or thumbnails
+// beside the full art (https on page 1, http on page 2, Kameos titled with the Kameo suffix). It can also take the
+// live catalog.json away (404) or give it 3 more cards of each kind.
+const online = join(dir, 'online.mjs');
+writeFileSync(
+  online,
+  `${trackTimeouts}const when = { fields: [{ label: 'Start', value: '1 October 2026, 16:00 UTC' }, { label: 'End', value: 'Permanent' }] };
+const schedule = {
+  pages: [
+    { id: 'packs', sections: [{ title: 'Available Packs', records: [{ name: 'Pack', ...when }] }] },
+    { id: 'challenges', sections: [{ title: 'Current Challenges', records: [] }, { title: 'Upcoming Challenges', records: [] }] },
+    { id: 'realm_wars', sections: [{ title: 'Current Season', records: [{ name: 'Week', ...when }] }, { title: 'Upcoming Seasons', records: [] }] },
+  ],
+};
+const change = process.env.STUB_CHANGE;
+const realNow = Date.now;
+let skew = 0;
+Date.now = () => realNow() + skew;
+const live = ['character', 'equipment', 'kameo'].flatMap((kind) =>
+  Array.from({ length: { shrunk: 20, 'small-drop': 5 }[change] ?? 2 }, () => ({ kind, rarity: 'gold' })),
+);
+const lastPage = change === 'no-page-count' ? undefined : change === 'zero-pages' ? 0 : change === 'endless' ? 1000 : 2;
+const noSlug = (n) => change === 'no-slug' || (change === 'one-no-slug' && n === 2);
+const card = (n) => ({
+  title: change === 'nameless' || (change === 'one-nameless' && n === 2) ? ' ' : 'Card ' + n,
+  slug: noSlug(n) ? undefined : change === 'duplicate-slugs' ? 'card' : 'card-' + n,
+  tags: change === 'no-rarity' ? [] : [{ slug: 'gold' }],
+  image_url:
+    change === 'no-art'
+      ? undefined
+      : change === 'object-art'
+        ? { url: 'https://img.test/' + n }
+        : (change === 'http-art' ? 'http://img.test/' : 'https://img.test/') + n,
+  ...(change === 'thumbs' ? { image_thumb_2x_url: (n === 1 ? 'https://' : 'http://') + 'img.test/thumb/' + n } : {}),
+});
+globalThis.fetch = async (url, opts = {}) => {
+  note(url, opts);
+  if (change === 'slow') skew += 61_000;
+  const page = /[?&]page=(\\d+)/.exec(String(url));
+  const current = page && (change === 'repeated-page' ? 1 : Number(page[1]));
+  // A big gold group with art and a silver group without: too few to show in the whole catalog. Or the same gold
+  // group plus one new character the site hasn't finished (no rarity, no art), or with a fifth of its titles blank.
+  const silver = (n) => ({ title: 'Silver ' + n, slug: 'silver-' + n, tags: [{ slug: 'silver' }] });
+  const gold = (n) => Array.from({ length: 50 }, (_, i) => card(n + '-' + i));
+  // One new character the site hasn't finished, or a game update's worth (4), with or without slugs.
+  const newCards = change === 'new-card' ? 1 : change === 'new-cards' || change === 'new-no-slugs' ? 4 : 0;
+  const unfinished = newCards > 0 && String(url).includes('/characters/');
+  const newCard = (i) => ({ title: 'New ' + i, slug: change === 'new-no-slugs' ? undefined : 'new-' + i });
+  const fresh = unfinished && current === 1 ? Array.from({ length: newCards }, (_, i) => newCard(i)) : [];
+  const data =
+    change === 'small-group-no-art'
+      ? [...gold(current), ...Array.from({ length: 5 }, (_, i) => silver(current + '-' + i))]
+      : newCards
+        ? [...gold(current), ...fresh]
+        : change === 'many-nameless'
+          ? gold(current).map((c, i) => (i < 10 ? { ...c, title: ' ' } : c))
+          : [card(current)];
+  const perPage = data.length - fresh.length;
+  const pages = Number.isInteger(lastPage) ? lastPage : 0;
+  const total = pages * perPage + (unfinished ? newCards : 0) + (change === 'skipped-item' ? 1 : 0);
+  if (change === 'kameo-only-suffix' && String(url).includes('/kameos/')) data[0] = { ...data[0], title: 'Kameo' };
+  // Kameo titles as the site writes them ("Baraka - Klassic Kameo").
+  if (change === 'thumbs' && String(url).includes('/kameos/')) data[0].title += ' Kameo';
+  // A page count that shrinks from 3 to 2 after the first page, with no item count to give it away.
+  const shifting = change === 'shifting-pages';
+  const meta = {
+    last_page: shifting ? (current === 1 ? 3 : 2) : lastPage,
+    current_page: current,
+    ...(change === 'no-total' || shifting ? {} : { total }),
+  };
+  const body = page
+    ? { data, meta }
+    : String(url).endsWith('/events.json')
+      ? { seasons: [] }
+      : String(url).endsWith('/catalog.json')
+        ? { fetchedAt: '2026-10-20T17:30:00.000Z', items: live }
+        : schedule;
+  if (change === 'no-live-copy' && String(url).endsWith('/catalog.json')) return { ok: false, status: 404 };
+  return { ok: true, status: 200, json: async () => body };
+};
+`,
+);
+
+/** Runs the copy of a download script in `root` with MK Mobile Base answering, changed as `change` says. */
+const spawnOnline = (root, script, change = '', env = {}) =>
+  spawnSync(process.execPath, ['--import', pathToFileURL(online).href, join(root, 'scripts', script)], {
+    encoding: 'utf8',
+    timeout: 20_000,
+    // CATALOG_ACCEPT_DROP pinned too, so one left set in the shell after a real reset can't change these runs.
+    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax', STUB_CHANGE: change, CATALOG_ACCEPT_DROP: '', ...env },
+  });
+
+/**
+ * Runs a copy of a download script, writing into a scratch public folder, with MK Mobile Base answering (changed as
+ * `change` says): its exit code, its errors, the requests it made, and whether it wrote catalog.json.
+ */
+function runOnline(script, change = '', localCatalog = null, env = {}) {
+  const root = scratchRepo(script);
+  writeFileSync(join(root, 'public', 'events.json'), '{"seasons":[]}\n');
+  if (localCatalog) writeFileSync(join(root, 'public', 'catalog.json'), JSON.stringify(localCatalog));
+  const result = spawnOnline(root, script, change, env);
+  return {
+    status: result.status,
+    stderr: result.status ? result.stderr : '',
+    requests: requestsOf(result.stderr),
+    wroteCatalog: localCatalog
+      ? JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).fetchedAt !== localCatalog.fetchedAt
+      : existsSync(join(root, 'public', 'catalog.json')),
+  };
+}
+
+describe('download scripts', () => {
+  // Generated on 2026-10-25 (/ship pre-gate, pr-ci run 6)
+  // Value: protects=a deploy whose MK Mobile Base download fails or stalls still goes out with the live copy, within
+  // minutes; fails_when=a script's request loses its time limit (a stalled site would then hold the deploy until the
+  // job's limit and fail it), or a failed download exits 0 or writes the file, so the workflow skips its fallback or
+  // ships a broken copy; why_new=the time limits were added on this branch and nothing ran the scripts; seam=fetch is
+  // replaced in the script's own process; no_claim=the 30-second length, or the workflow's curl fallback itself
+  it('fail without writing when MK Mobile Base is unreachable, with a time limit on each request', () => {
+    // The scripts spelled out from the repo root, so gstack's pre-ship check maps this test to them.
+    expect([
+      runOffline(join(here, '..', 'scripts', 'fetch-events.mjs'), join(here, '..', 'public', 'events.json')),
+      runOffline(join(here, '..', 'scripts', 'fetch-catalog.mjs'), join(here, '..', 'public', 'catalog.json')),
+    ]).toEqual([
+      {
+        status: 1,
+        requests: [{ url: 'https://mkmobilebase.com/api/events/schedule', limited: true }],
+        unchanged: true,
+      },
+      {
+        status: 1,
+        requests: [{ url: 'https://mkmobilebase.com/api/categories/characters/articles?per_page=100&page=1', limited: true }],
+        unchanged: true,
+      },
+    ]);
+  }, 45_000);
+
+  // Extended by /ship coverage audit on 2026-10-25 (pr-ci run 6): every request, not just the first, has a time limit.
+  // Value: protects=a stall on a later page or category from MK Mobile Base fails the script so the deploy falls back
+  // instead of waiting, and a stall on the live events.json or catalog.json is cut off so the script goes on with the
+  // local copy; fails_when=a refactor fetches later pages or categories, or a live copy, without the signal;
+  // why_new=the offline run above fails on the first request, so it never reaches the others; seam=none (fetch is
+  // replaced in the script's own process, and copies of the scripts write into a scratch folder); no_claim=the
+  // 30-second length
+  it('put a time limit on every request when MK Mobile Base answers', () => {
+    const page = (category, n) => `https://mkmobilebase.com/api/categories/${category}/articles?per_page=100&page=${n}`;
+    const limited = (url) => ({ url, limited: true });
+    expect([runOnline('fetch-events.mjs'), runOnline('fetch-catalog.mjs')]).toEqual([
+      {
+        status: 0,
+        stderr: '',
+        requests: ['https://mkmobilebase.com/api/events/schedule', 'https://live.test/mkmax/events.json'].map(limited),
+        wroteCatalog: false,
+      },
+      {
+        status: 0,
+        stderr: '',
+        requests: [
+          ...['characters', 'equipment', 'kameos'].flatMap((c) => [page(c, 1), page(c, 2)]),
+          'https://live.test/mkmax/catalog.json',
+        ].map(limited),
+        wroteCatalog: true,
+      },
+    ]);
+  }, 45_000);
+
+  // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 6)
+  // Value: protects=a catalog answer in a changed shape fails the script, so the deploy keeps the live catalog instead
+  // of shipping part of it, running until the 5-minute deadline, or shipping cards without art; fails_when=the page
+  // count check or the art check is dropped or loosened; why_new=the script only failed on an empty category; seam=none
+  // (STUB_CHANGE only changes the stand-in's answers); no_claim=the 10% allowance
+  // Extended by /ship coverage audit on 2026-10-25 (pr-ci run 7): a page count of zero, and cards with no rarity.
+  // Value: protects=a catalog answer whose page count is zero (which stopped after page 1 before this branch) or whose
+  // cards lost their rarity tags fails, so the deploy keeps the live catalog instead of shipping only the first page of
+  // each category, or cards the app can't sort by rarity; fails_when=the page count check stops rejecting zero, or
+  // rarity leaves the list of fields every card must mostly have; why_new=no-art only reaches the image half of that
+  // check, and no case had a page count below 1; seam=none (STUB_CHANGE only changes the stand-in's answers);
+  // no_claim=the 10% allowance, or a rarity read from the excerpt instead of the tags
+  // Extended by /ship adversarial review on 2026-10-26 (pr-ci run 7): pages the site didn't send, repeated cards, a
+  // catalog far smaller than the live one, and a download still going after 5 minutes.
+  // Value: protects=a site that ignores the page asked for, repeats cards, loses a kind and rarity's cards, or answers
+  // so slowly the build job would end first fails the script, so the deploy keeps the live catalog; fails_when=the
+  // repeat check, the comparison with the live copy or the overall deadline is dropped;
+  // why_new=each of these passed every earlier check; seam=none (STUB_CHANGE only changes the stand-in's answers and
+  // clock); no_claim=the 90% and 5-minute values, or a live copy that can't be read (the committed one is used)
+  // Extended by /ship review on 2026-10-26 (pr-ci run 10): each case must be caught by its own check.
+  // Value: protects=every bad answer is rejected by the check written for it; fails_when=a check is dropped while a
+  // later one (the item count added on this branch) still fails the same case; why_new=the cases asserted the exit
+  // code and that nothing was written, not which check failed them; seam=none; no_claim=the wording of each error
+  // beyond the matched phrase
+  // Changed by /ship review on 2026-10-26 (pr-ci run 20, owner decision D1 A): items with no name or slug fail only
+  // when a whole category has none, or past the allowance (many-nameless); one alone is left out (the test below).
+  it("fail without writing when MK Mobile Base's catalog answers look wrong or come too slowly", () => {
+    // Each change is matched to the check that should catch it, so a case can't stay green because another check
+    // (the item count, say) fails it first.
+    const reasons = {
+      'no-page-count': 'unexpected page data',
+      'zero-pages': 'unexpected page data',
+      endless: 'unexpected page data',
+      'no-art': 'items have no image',
+      'no-rarity': 'items have no rarity',
+      'repeated-page': 'the same item came back twice',
+      'duplicate-slugs': 'the same item came back twice',
+      shrunk: 'down from',
+      slow: 'still downloading after 5 minutes',
+      nameless: 'items have no slug or name',
+      'many-nameless': 'items have no slug or name',
+      'skipped-item': 'the site says',
+      'small-group-no-art': 'cards have no image',
+      'kameo-only-suffix': 'items have no slug or name',
+      'shifting-pages': 'the page count changed',
+      'no-slug': 'items have no slug or name',
+      'object-art': 'items have no image',
+      'http-art': 'items have no image',
+    };
+    const outcome = (change) => {
+      const { status, stderr, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
+      return { change, status, wroteCatalog, caughtBy: Object.values(reasons).find((r) => stderr.includes(r)) };
+    };
+    const changes = Object.keys(reasons);
+    expect(changes.map(outcome)).toEqual(
+      changes.map((change) => ({ change, status: 1, wroteCatalog: false, caughtBy: reasons[change] })),
+    );
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 7 pass 4)
+  // Value: protects=the comparison with an earlier catalog uses the newest copy (so committing a fresh catalog.json
+  // resets it after a real removal), lets a small group lose a card or two, and doesn't fail when there's no earlier
+  // copy (a first deploy); fails_when=the local copy stops standing in or being preferred when newer, an unreadable
+  // live copy fails the download, or the allowance for small groups goes; why_new=every earlier case had a readable
+  // live copy and no local one; seam=none (STUB_CHANGE only changes the stand-in's answers); no_claim=the exact
+  // allowance (the run 20 rows below pin its tenth and its floor of 3)
+  // Extended on 2026-10-26 (/ship coverage, pr-ci run 20): a big group losing a tenth of its cards, and more.
+  // Value: protects=a group of 110 cards may lose 10 but one of 120 can't lose 20, and one of 6 can't lose 4, so a site
+  // that loses a sixth of a big group or most of a small one still falls back; fails_when=the tenth in the shared
+  // allowance (tooMany) is loosened or tightened, e.g. to a half, or its floor of 3 is raised; why_new=every earlier
+  // comparison had 20 cards a group at most, so the tenth never decided one, and none lost more than 3; seam=none (a
+  // newer committed copy holds the bigger groups); no_claim=the art check's own use of the allowance beyond this
+  // shared helper
+  it('compare a catalog with the newest earlier copy, allowing a small group to lose a few cards', () => {
+    const gold = (count) =>
+      ['character', 'equipment', 'kameo'].flatMap((kind) => Array(count).fill({ kind, rarity: 'gold' }));
+    const local = (fetchedAt, count) => ({ fetchedAt, items: gold(count) });
+    const outcome = (change, localCatalog) => {
+      const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', change, localCatalog);
+      return { status, wroteCatalog };
+    };
+    expect([
+      outcome('no-live-copy'),
+      outcome('no-live-copy', local('2026-10-01T17:30:00.000Z', 20)),
+      outcome('shrunk', local('2026-10-25T17:30:00.000Z', 2)),
+      outcome('', local('2026-10-01T17:30:00.000Z', 20)),
+      outcome('small-drop'),
+      outcome('', { items: gold(20) }),
+      // A hand-edited copy with malformed items: only its real cards are compared.
+      outcome('', { fetchedAt: '2026-10-25T17:30:00.000Z', items: [null, 'card', { rarity: 'gold' }, ...gold(2)] }),
+      // The download has 100 Gold cards of each kind: down 10 from 110 is within a tenth, down 20 from 120 isn't.
+      outcome('new-card', local('2026-10-25T17:30:00.000Z', 110)),
+      outcome('new-card', local('2026-10-25T17:30:00.000Z', 120)),
+      // A small group losing 4 of 6 is past the floor of 3, so it falls back too.
+      outcome('', local('2026-10-25T17:30:00.000Z', 6)),
+    ]).toEqual([
+      { status: 0, wroteCatalog: true },
+      { status: 1, wroteCatalog: false },
+      { status: 0, wroteCatalog: true },
+      { status: 0, wroteCatalog: true },
+      { status: 0, wroteCatalog: true },
+      { status: 0, wroteCatalog: true },
+      { status: 0, wroteCatalog: true },
+      { status: 0, wroteCatalog: true },
+      { status: 1, wroteCatalog: false },
+      { status: 1, wroteCatalog: false },
+    ]);
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 8 pass 3)
+  // Value: protects=after a real removal the owner can run CATALOG_ACCEPT_DROP=1 npm run catalog and commit the fresh
+  // catalog, so the daily deploy stops falling back; fails_when=the switch stops skipping the comparison; why_new=the
+  // documented reset wrote nothing, because the comparison still failed; seam=none (an environment variable the owner
+  // sets); no_claim=that later deploys compare with the committed copy (the newest-copy test covers that)
+  it('write a catalog with far fewer cards when the drop is accepted', () => {
+    const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', 'shrunk', null, { CATALOG_ACCEPT_DROP: '1' });
+    expect({ status, wroteCatalog }).toEqual({ status: 0, wroteCatalog: true });
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 8 pass 4)
+  // Extended on 2026-10-26 (/ship adversarial review, pr-ci run 20): four unfinished cards at once, as after an update.
+  // Value: protects=a healthy catalog still deploys when the site has a new card it hasn't finished (no rarity or art
+  // yet), or four of them, or stops sending its item count; fails_when=one unfinished card fails a whole group (the
+  // earlier all-of-a-group rule), cards without a rarity are counted as a group of their own, or a missing total is
+  // treated as a mismatch; why_new=every passing case had finished cards and a total; seam=none (STUB_CHANGE only
+  // changes the stand-in's answers); no_claim=how many unfinished cards are too many
+  it("write the catalog with a new unfinished card, or when the site doesn't send a count", () => {
+    const outcome = (change) => {
+      const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
+      return { change, status, wroteCatalog };
+    };
+    expect(['new-card', 'new-cards', 'no-total'].map(outcome)).toEqual([
+      { change: 'new-card', status: 0, wroteCatalog: true },
+      { change: 'new-cards', status: 0, wroteCatalog: true },
+      { change: 'no-total', status: 0, wroteCatalog: true },
+    ]);
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship coverage audit, pr-ci run 17)
+  // Value: protects=each card in the written catalog keeps its https thumbnail, or its https full art when the
+  // thumbnail isn't https; fails_when=the https check is applied after picking a field (an http thumbnail then hides
+  // https full art and the card loses it) or the full art is preferred over the thumbnail; why_new=the stand-in never
+  // sent a thumbnail and no case read the cards written; seam=none (STUB_CHANGE only changes the stand-in's answers);
+  // no_claim=that the site's thumbnails load (the stand-in's links are made up)
+  // Generated on 2026-10-26 (/ship coverage, pr-ci run 21): Kameos are written without the "Kameo" in their titles.
+  // Value: protects=a Kameo is written under its name without the suffix, so it matches the user's Kameo cards and gets
+  // their art; fails_when=the written name is the raw title while nameOf only filters (it was split out on this
+  // branch); why_new=no stand-in Kameo title had the suffix; seam=none (STUB_CHANGE only changes the stand-in's
+  // answers); no_claim=how the app matches "Baraka - Klassic" to "Baraka, Klassic"
+  it("write each card's https thumbnail, or its full art when the thumbnail isn't https", () => {
+    const root = scratchRepo('fetch-catalog.mjs');
+    const { status } = spawnOnline(root, 'fetch-catalog.mjs', 'thumbs');
+    const written = status ? null : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8'));
+    const cards = ['character', 'equipment', 'kameo'].flatMap((kind) => [
+      { kind, name: 'Card 1', rarity: 'gold', slug: 'card-1', image: 'https://img.test/thumb/1' },
+      { kind, name: 'Card 2', rarity: 'gold', slug: 'card-2', image: 'https://img.test/2' },
+    ]);
+    expect([status, written?.items]).toEqual([0, cards]);
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 20, owner decision D1 A)
+  // Value: protects=an item the site hasn't finished (no name or no slug) is left out with a warning and the rest of
+  // the catalog still ships; fails_when=one unfinished item fails the whole refresh again, or it's written without a
+  // name or slug; why_new=a single nameless or slugless item used to fail the script; seam=none (STUB_CHANGE only
+  // changes the stand-in's answers); no_claim=the allowance past which they fail (the bad-answer test's many-nameless
+  // case covers that)
+  it("leave out an item the site hasn't finished and write the rest", () => {
+    const written = (change) => {
+      const root = scratchRepo('fetch-catalog.mjs');
+      const { status, stderr } = spawnOnline(root, 'fetch-catalog.mjs', change);
+      const items = status ? [] : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).items;
+      const slugs = items.map((i) => i.kind + ' ' + i.slug);
+      return { change, status, warned: /left out 1 unfinished item/.test(stderr), slugs };
+    };
+    const kinds = ['character', 'equipment', 'kameo'];
+    expect(['one-nameless', 'one-no-slug'].map(written)).toEqual([
+      { change: 'one-nameless', status: 0, warned: true, slugs: kinds.map((k) => k + ' card-1') },
+      { change: 'one-no-slug', status: 0, warned: true, slugs: kinds.map((k) => k + ' card-1') },
+    ]);
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship coverage, pr-ci run 21)
+  // Value: protects=a game update's worth of new characters with no slug yet (4 of 104) are all left out and the rest
+  // ships; fails_when=the repeat check reads every item again rather than those kept, so slugless items look like one
+  // item sent twice; why_new=every earlier case had one slugless item a category at most; seam=none (STUB_CHANGE only
+  // changes the stand-in's answers); no_claim=the allowance past which they fail
+  it('leave out several items with no slug rather than calling them repeats', () => {
+    const { status, stderr } = spawnOnline(scratchRepo('fetch-catalog.mjs'), 'fetch-catalog.mjs', 'new-no-slugs');
+    expect([status, /left out 4 unfinished item/.test(stderr)]).toEqual([0, true]);
+  }, 45_000);
+
+  // Extended by /ship coverage audit on 2026-10-26 (pr-ci run 8): a kind and rarity the download no longer has at all.
+  // Value: protects=a catalog in which a whole kind and rarity is gone (the site renamed one rarity's tag, or dropped a
+  // group) fails, so the deploy keeps the live catalog; fails_when=the comparison skips or excuses groups the new
+  // download doesn't have, comparing only those still present; why_new=every earlier case kept each group with fewer
+  // cards, never none; seam=none (a newer committed copy holds the group); no_claim=the exact allowance
+  it('fail without writing when a kind and rarity is gone from the download', () => {
+    const fetchedAt = '2026-10-25T17:30:00.000Z';
+    const gold = ['character', 'equipment', 'kameo'].flatMap((kind) => Array(2).fill({ kind, rarity: 'gold' }));
+    const diamonds = Array(10).fill({ kind: 'character', rarity: 'diamond' });
+    const outcome = (items) => {
+      const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', '', { fetchedAt, items });
+      return { status, wroteCatalog };
+    };
+    expect([outcome(gold), outcome([...gold, ...diamonds])]).toEqual([
+      { status: 0, wroteCatalog: true },
+      { status: 1, wroteCatalog: false },
+    ]);
+  }, 45_000);
+
+  // Extended by /ship coverage audit on 2026-10-26 (pr-ci run 8): cards with no rarity in the earlier copy.
+  // Value: protects=an earlier copy with cards the site hadn't given a rarity yet (allowed up to a tenth) doesn't fail
+  // the next deploy once those cards are tagged or gone, so the daily refresh doesn't stop; fails_when=cards without a
+  // rarity are counted as their own group in the comparison; why_new=every earlier copy in these cases had a rarity on
+  // each card; seam=none (a newer committed copy holds the cards); no_claim=cards without a rarity in the download
+  // itself (the tenth allowance)
+  it("don't fail when an earlier copy's cards without a rarity are gone", () => {
+    const fetchedAt = '2026-10-25T17:30:00.000Z';
+    const gold = ['character', 'equipment', 'kameo'].flatMap((kind) => Array(2).fill({ kind, rarity: 'gold' }));
+    const unrated = Array(10).fill({ kind: 'character', rarity: null });
+    const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', '', { fetchedAt, items: [...gold, ...unrated] });
+    expect({ status, wroteCatalog }).toEqual({ status: 0, wroteCatalog: true });
+  }, 45_000);
+});

@@ -9,7 +9,7 @@ import TowersPanel from './TowersPanel';
 import MaxedPanel from './MaxedPanel';
 import { CardsIcon, TowerIcon, TrophyIcon } from '../icons';
 import { findCardImages, wikiUrl } from '../wiki';
-import { catalogPageUrl, findInCatalog, loadCatalog, rarityMismatches, useCatalogVersion, wantsCatalogImage, type CatalogItem } from '../catalog';
+import { catalogPageUrl, findInCatalog, loadCatalog, loadedCatalog, rarityMismatches, useCatalogVersion, wantsCatalogImage, type CatalogItem } from '../catalog';
 import { cardKey, parseCardList } from '../cardList';
 import { applyRarityFix, initialSource } from '../challenges';
 import { challengeFor, challengeWhen, useEvents } from '../events';
@@ -723,7 +723,8 @@ function CardList() {
   // Cards get their art as soon as they're added, even under the wrong rarity, so the rarity check runs whenever
   // the catalog is at hand rather than only from Find images. Read again when a catalog fetched again has changed, or the
   // first one loads after a failed download.
-  const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
+  // Starts from a copy loaded earlier this session, so Find images' count is right from the first render.
+  const [catalog, setCatalog] = useState<CatalogItem[] | null>(loadedCatalog);
   const catalogVersion = useCatalogVersion();
   useEffect(() => {
     let cancelled = false;
@@ -750,7 +751,15 @@ function CardList() {
   // stat screenshots rather than card art), which mkmobilebase usually has a proper card image for.
   const brokenUrls = useBrokenImageUrls();
   const needsImage = (c: Card) => wantsCatalogImage(c) || brokenUrls.has(c.imageUrl!);
-  const missingImages = state.cards.filter(needsImage);
+  // A card MK Mobile Base lists without art that still shows an image: only the site can give it better art (the app
+  // swaps it in by itself once the site has some), so a tap can't help and it isn't counted. Known once the catalog
+  // loads.
+  const waitingForSite = (c: Card) => {
+    if (!catalog || !c.imageUrl || brokenUrls.has(c.imageUrl)) return false;
+    const hit = findInCatalog(c, ctx.rules.get(c.rarityId), catalog);
+    return !!hit && !hit.image;
+  };
+  const missingImages = state.cards.filter((c) => needsImage(c) && !waitingForSite(c));
 
   async function findImages() {
     setImgStatus({ busy: true, msg: 'Checking the MK Mobile Base catalog…' });
@@ -758,24 +767,33 @@ function CardList() {
       const items = await loadCatalog();
       setCatalog(items);
       const found = new Map<string, Pick<Card, 'imageUrl' | 'wikiTitle' | 'imagePage'>>();
+      // Cards the catalog lists without art yet: the site's art may come later, so they aren't marked as checked below.
+      const listed = new Set<string>();
       for (const c of missingImages) {
         const hit = findInCatalog(c, ctx.rules.get(c.rarityId), items);
-        if (hit) found.set(c.id, { imageUrl: hit.image, wikiTitle: undefined, imagePage: catalogPageUrl(hit) });
+        // A catalog card with no art falls through to the wiki below.
+        if (hit?.image) found.set(c.id, { imageUrl: hit.image, wikiTitle: undefined, imagePage: catalogPageUrl(hit) });
+        else if (hit) listed.add(c.id);
       }
-      // Anything the catalog doesn't have: fall back to the wiki (only for cards with no working image).
+      // Anything the catalog has no art for (not listed, or listed without art): fall back to the wiki (only for cards
+      // with no working image).
       const rest = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl)));
       // A wiki that's down or offline still leaves the catalog's art to save.
       let wikiError: string | undefined;
       if (rest.length) {
         try {
           const fromWiki = await findCardImages(rest, ctx.rules, (msg) => setImgStatus({ busy: true, msg }));
-          for (const [id, m] of fromWiki) found.set(id, { ...m, imagePage: wikiUrl(m.wikiTitle) });
+          // Wiki art for a card the catalog lists without art isn't marked as checked, so the site's art replaces it
+          // later.
+          for (const [id, m] of fromWiki) found.set(id, { ...m, imagePage: listed.has(id) ? undefined : wikiUrl(m.wikiTitle) });
         } catch (e) {
           wikiError = (e as Error).message;
         }
       }
       // Older wiki images the catalog couldn't improve on: remember they were checked so they stop counting.
-      const keep = missingImages.filter((c) => !found.has(c.id) && c.imageUrl && !brokenUrls.has(c.imageUrl) && c.wikiTitle);
+      const keep = missingImages.filter(
+        (c) => !found.has(c.id) && !listed.has(c.id) && c.imageUrl && !brokenUrls.has(c.imageUrl) && c.wikiTitle,
+      );
       // The lookup can take minutes: a card whose image a sync changed meanwhile (one pasted on another device) keeps it.
       const lookedUp = new Map(missingImages.map((c) => [c.id, c.imageUrl]));
       // Counted from the change itself, so a card a sync gave an image meanwhile is counted as that, not as updated or as
@@ -785,11 +803,14 @@ function CardList() {
       // Of the cards looked up, those still in the save: a sync may have deleted some during the lookup.
       let total = missingImages.length;
       let left = 0;
+      // Cards the catalog lists without art that have an image to show meanwhile.
+      let waiting = 0;
       update((d) => {
         const cards = d.cards.filter((c) => lookedUp.has(c.id) && lookedUp.get(c.id) === c.imageUrl);
         meanwhile = d.cards.filter((c) => lookedUp.has(c.id) && lookedUp.get(c.id) !== c.imageUrl).length;
         total = d.cards.filter((c) => lookedUp.has(c.id)).length;
         left = cards.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl))).length;
+        waiting = cards.filter((c) => listed.has(c.id) && (found.has(c.id) || (c.imageUrl && !brokenUrls.has(c.imageUrl)))).length;
         const art = cards.flatMap((c) => (found.has(c.id) ? [{ c, m: found.get(c.id)! }] : []));
         const checked = cards.filter((c) => keep.some((k) => k.id === c.id) && c.wikiTitle && c.imagePage !== wikiUrl(c.wikiTitle));
         if (!art.length && !checked.length) return noChange;
@@ -800,10 +821,15 @@ function CardList() {
       const leftMsg = !left
         ? ''
         : wikiError
-          ? ` Couldn't reach the MK Mobile wiki (${wikiError}), so ${left} weren't looked up there. Try again later.`
+          ? ` Couldn't reach the MK Mobile wiki (${wikiError}), so ${left} ${left === 1 ? "wasn't" : "weren't"} looked up there. Try again later.`
           : ` ${left} not found online: open "Image" on those cards to paste a URL.`;
       const meanwhileMsg = !meanwhile ? '' : meanwhile === 1 ? ' 1 got an image during the lookup and kept it.' : ` ${meanwhile} got images during the lookup and kept them.`;
-      setImgStatus({ busy: false, msg: `Updated ${updated} of ${total}.${meanwhileMsg}${leftMsg}` });
+      const waitingMsg = !waiting
+        ? ''
+        : waiting === 1
+          ? ' 1 is on MK Mobile Base without art yet and gets it once the site adds it.'
+          : ` ${waiting} are on MK Mobile Base without art yet and get it once the site adds it.`;
+      setImgStatus({ busy: false, msg: `Updated ${updated} of ${total}.${meanwhileMsg}${waitingMsg}${leftMsg}` });
     } catch (e) {
       setImgStatus({ busy: false, msg: `Couldn't look up images: ${(e as Error).message}` });
     }

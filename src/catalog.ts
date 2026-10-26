@@ -11,7 +11,8 @@ export interface CatalogItem {
   /** e.g. "diamond", "gold", "epic", "rare", "uncommon". */
   rarity: string | null;
   slug: string;
-  image: string;
+  /** An https link; missing for a card the site hasn't finished, or whose art wasn't an https link. */
+  image?: string;
 }
 
 export const catalogPageUrl = (item: CatalogItem) =>
@@ -84,6 +85,9 @@ function download(replace: boolean): Promise<CatalogItem[]> {
     )
     .finally(() => clearTimeout(timer));
 }
+
+/** The catalog already loaded this session, if any, so a screen can start with it rather than wait a render. */
+export const loadedCatalog = () => good;
 
 /** The catalog: the copy already downloaded if there is one (even while it's being fetched again), else a download. */
 export function loadCatalog(): Promise<CatalogItem[]> {
@@ -218,7 +222,8 @@ export function catalogImageUpdates(cards: Card[], rules: Map<string, RarityRule
   for (const c of cards) {
     if (!wantsCatalogImage(c)) continue;
     const hit = findInCatalog(c, rules.get(c.rarityId), items);
-    if (hit) out.set(c.id, { imageUrl: hit.image, imagePage: catalogPageUrl(hit), wikiTitle: undefined });
+    // A catalog card with no art leaves the card as it is, so older wiki art isn't replaced with nothing.
+    if (hit?.image) out.set(c.id, { imageUrl: hit.image, imagePage: catalogPageUrl(hit), wikiTitle: undefined });
   }
   return out;
 }

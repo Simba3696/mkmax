@@ -6,6 +6,7 @@ import { StoreProvider, useStore } from '../store';
 import { PlanProvider } from '../planner';
 import { SyncLoop } from '../syncLoop';
 import { wikiUrl } from '../wiki';
+import { loadCatalog } from '../catalog';
 import CardsView from './CardsView';
 
 /** Hands the store, as each render sees it, to the test, as any view would use it. */
@@ -1522,6 +1523,9 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
       { kind: 'character', name: 'Raiden, Dark', rarity: 'diamond', slug: 'raiden-dark', image: 'x.png' },
       { kind: 'character', name: 'Kitana, Klassic', rarity: 'diamond', slug: 'kitana-klassic', image: 'y.png' },
       { kind: 'character', name: 'Liu Kang, Klassic', rarity: 'diamond', slug: 'liu-kang-klassic', image: 'z.png' },
+      // Listed without art, like a card the site hasn't finished.
+      { kind: 'character', name: 'Shujinko, Unfinished', rarity: 'diamond', slug: 'shujinko-unfinished' },
+      { kind: 'character', name: 'Kung Lao, Unfinished', rarity: 'diamond', slug: 'kung-lao-unfinished' },
     ],
   };
   const catalogResponse = () => new Response(JSON.stringify(CATALOG));
@@ -1583,6 +1587,114 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     expect(screen.queryByRole('button', { name: /^Find images/ })).toBeNull();
   });
 
+  // Generated on 2026-10-26 (/ship review, pr-ci run 17)
+  // Value: protects=once the catalog is loaded, Find images counts a card with older wiki art only while a tap could
+  // help: not when the catalog lists it without art (only the site can), but yes when the catalog has art for it or
+  // doesn't list it; fails_when=a card waiting for the site's art is counted, or a card a tap could improve is hidden;
+  // why_new=the count didn't look at the catalog; seam=fetch serves the catalog, loaded before the screen opens;
+  // no_claim=the count before any catalog has loaded (CardsView.coldCatalog.test.tsx)
+  it('leaves a card that only the site can give art to out of the Find images count', async () => {
+    const wikiArt = { fusion: 2, guest: false, rarityId: 'diamond', imageUrl: 'old.png', wikiTitle: 'Some Page' };
+    // Loaded first, whatever ran before, so the first render already has it.
+    await loadCatalog();
+    renderCards([{ ...wikiArt, id: 'shu', name: 'Shujinko, Unfinished' }]);
+    expect(screen.queryByRole('button', { name: /^Find images/ })).toBeNull();
+    expect(store.state.cards[0].imagePage).toBeUndefined();
+    cleanup();
+    renderCards([{ ...wikiArt, id: 'raiden', name: 'Raiden, Dark' }, { ...wikiArt, id: 'nobody', name: 'Nobody, Old' }]);
+    expect(screen.getByRole('button', { name: 'Find images (2)' })).toBeTruthy();
+  });
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 18)
+  // Value: protects=a card the catalog lists without art whose image stopped loading is sent to the wiki lookup
+  // (unreachable here) and reported as left, not as waiting with art to show; fails_when=a broken image counts as one to show while the card
+  // waits; why_new=no test broke a listed card's image; seam=the image's error event; no_claim=a wiki that answers
+  it('counts a card the catalog lists without art as left when its image stopped loading', async () => {
+    const dead = 'https://dead.test/shujinko-run-18.png';
+    renderCards([{ id: 'shu', name: 'Shujinko, Unfinished', rarityId: 'diamond', fusion: 2, guest: false, imageUrl: dead, wikiTitle: 'Some Page' }]);
+    fireEvent.error(document.querySelector(`img[src="${dead}"]`)!);
+    fireEvent.click(await screen.findByRole('button', { name: 'Find images (1)' }));
+    await screen.findByText(
+      /^Updated 0 of 1\. Couldn't reach the MK Mobile wiki \(offline\), so 1 wasn't looked up there\. Try again later\.$/,
+    );
+  });
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 17)
+  // Value: protects=wiki art found for a card the catalog lists without art is saved without marking the card as
+  // checked, so the site's art replaces it once the site adds it; fails_when=the wiki art gets its wiki page (the card
+  // stops wanting the site's art) or isn't saved; why_new=no test had the wiki answer for a listed card; seam=fetch
+  // answers the wiki's page lookup; no_claim=the wiki's other lookups (search, gear lists)
+  it('saves wiki art for a card the catalog lists without art, still waiting for the site', async () => {
+    const page = { title: 'Shujinko/Unfinished', thumbnail: { source: 'https://wiki.test/shu.png' } };
+    vi.stubGlobal('fetch', (url: string) =>
+      String(url).endsWith('catalog.json')
+        ? Promise.resolve(catalogResponse())
+        : String(url).includes('pageimages')
+          ? Promise.resolve(new Response(JSON.stringify({ query: { pages: { 1: page } } })))
+          : Promise.reject(new Error('offline')),
+    );
+    renderCards([{ id: 'shu', name: 'Shujinko, Unfinished', rarityId: 'diamond', fusion: 2, guest: false }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Find images (1)' }));
+    await screen.findByText(/^Updated 1 of 1\. 1 is on MK Mobile Base without art yet/);
+    expect(store.state.cards[0]).toMatchObject({ imageUrl: 'https://wiki.test/shu.png', wikiTitle: 'Shujinko/Unfinished' });
+    expect(store.state.cards[0].imagePage).toBeUndefined();
+  });
+
+  // Generated on 2026-10-26 (/ship coverage, pr-ci run 19)
+  // Value: protects=Find images says how many cards wait for the site's art in the plural ("2 are ... and get it");
+  // fails_when=the plural branch says "1 is" or drops the count; why_new=every waiting test here and in
+  // CardsView.coldCatalog.test.tsx had one card; seam=fetch serves the catalog and answers the wiki's page lookup;
+  // no_claim=the wiki's other lookups (search, gear lists)
+  it('says how many cards wait for the site to add art in the plural', async () => {
+    const pages = {
+      1: { title: 'Shujinko/Unfinished', thumbnail: { source: 'https://wiki.test/shu.png' } },
+      2: { title: 'Kung Lao/Unfinished', thumbnail: { source: 'https://wiki.test/lao.png' } },
+    };
+    vi.stubGlobal('fetch', (url: string) =>
+      String(url).endsWith('catalog.json')
+        ? Promise.resolve(catalogResponse())
+        : String(url).includes('pageimages')
+          ? Promise.resolve(new Response(JSON.stringify({ query: { pages } })))
+          : Promise.reject(new Error('offline')),
+    );
+    renderCards([
+      { id: 'shu', name: 'Shujinko, Unfinished', rarityId: 'diamond', fusion: 2, guest: false },
+      { id: 'lao', name: 'Kung Lao, Unfinished', rarityId: 'diamond', fusion: 2, guest: false },
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Find images (2)' }));
+    await screen.findByText(
+      'Updated 2 of 2. 2 are on MK Mobile Base without art yet and get it once the site adds it.',
+    );
+  });
+
+  // Generated on 2026-10-26 (/ship coverage audit, pr-ci run 18)
+  // Value: protects=a card the catalog lists without art that ends with no art at all (wiki unreachable) is reported as
+  // one left to look up, not also as one waiting with art to show; fails_when=every card the catalog lists without art
+  // is counted as waiting, so the status says it gets art later and that it wasn't looked up; why_new=the broken-image
+  // test starts from an image and the wiki-art test finds one, while this card never had one; seam=fetch serves the
+  // catalog and fails the wiki; no_claim=a wiki that answers
+  it('counts a card the catalog lists without art as left, not waiting, when it has no art to show', async () => {
+    renderCards([{ id: 'shu', name: 'Shujinko, Unfinished', rarityId: 'diamond', fusion: 2, guest: false }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Find images (1)' }));
+    await screen.findByText(
+      /^Updated 0 of 1\. Couldn't reach the MK Mobile wiki \(offline\), so 1 wasn't looked up there\. Try again later\.$/,
+    );
+    expect(store.state.cards[0].imageUrl).toBeUndefined();
+  });
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 18)
+  // Value: protects=the wiki-unreachable message says "weren't" for more than one card; fails_when=it always says
+  // "wasn't" or flips the count it switches on; why_new=every test here left one card; seam=fetch serves the catalog
+  // and fails the wiki; no_claim=none beyond protects
+  it('says how many cards were not looked up on the wiki in the plural', async () => {
+    renderCards([
+      { id: 'a', name: 'Nobody, Here', rarityId: 'diamond', fusion: 2, guest: false },
+      { id: 'b', name: 'Nobody, There', rarityId: 'diamond', fusion: 2, guest: false },
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Find images (2)' }));
+    await screen.findByText("Updated 0 of 2. Couldn't reach the MK Mobile wiki (offline), so 2 weren't looked up there. Try again later.");
+  });
+
   // Generated by /ship test coverage audit on 2026-10-14
   // Value: protects=Find images reports a card a sync gave an image during the wiki lookup as kept, not as one left to
   // look up; fails_when=the cards left are counted from the cards looked up, not the save, so it says 2 weren't looked up;
@@ -1602,7 +1714,7 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     act(() => store.update((d) => void (d.cards.find((c) => c.id === 'a')!.imageUrl = PASTED)));
     await act(async () => failWiki!());
     await screen.findByText(
-      "Updated 0 of 2. 1 got an image during the lookup and kept it. Couldn't reach the MK Mobile wiki (offline), so 1 weren't looked up there. Try again later.",
+      "Updated 0 of 2. 1 got an image during the lookup and kept it. Couldn't reach the MK Mobile wiki (offline), so 1 wasn't looked up there. Try again later.",
     );
     expect(saved().cards.map((c: { id: string; imageUrl?: string }) => [c.id, c.imageUrl ?? null])).toEqual([['a', PASTED], ['b', null]]);
   });
@@ -1647,7 +1759,7 @@ describe('Cards: the catalog on a screen a sync has changed', () => {
     await waitFor(() => expect(failWiki).toBeDefined()); // the catalog had neither, so the wiki is asked
     act(() => store.update((d) => void (d.cards = d.cards.filter((c) => c.id !== 'a'))));
     await act(async () => failWiki!());
-    await screen.findByText("Updated 0 of 1. Couldn't reach the MK Mobile wiki (offline), so 1 weren't looked up there. Try again later.");
+    await screen.findByText("Updated 0 of 1. Couldn't reach the MK Mobile wiki (offline), so 1 wasn't looked up there. Try again later.");
   });
 
   // Generated by /ship review fixes on 2026-10-13

@@ -13,7 +13,7 @@ npm run lint    # oxlint
 npm run build   # tsc --noEmit, then vite build
 ```
 
-A change is done when `npm run lint`, `npm test` and `npm run build` all pass. CI runs lint and tests before every deploy, and pushing to `main` deploys.
+A change is done when `npm run lint`, `npm test` and `npm run build` all pass. CI runs lint, tests and a build on every pull request, and lint, tests and a build again before every deploy. Changes reach `main` only as a squash-merged pull request that is up to date with `main` and whose `check` passed (the owner can override on a pull request), and merging deploys.
 
 ## Rules
 
@@ -24,7 +24,7 @@ A change is done when `npm run lint`, `npm test` and `npm run build` all pass. C
 - **Write like the existing docs and commits.** Plain sentences about what the user sees, no jargon. Commit subjects and PR titles (main squash-merges each PR) start with a Conventional Commits type, `feat`, `fix`, `refactor`, `test`, `docs` or `chore`, then a plain lowercase sentence: "feat: show how many cards each rarity and source filter option would list". Comments explain why, not what.
 - **Style with the theme and shared class sets.** Use the colors and sizes from `src/styles.css` and the sets in `src/classes.ts`. Never put two utilities that set the same property on one element at the same breakpoint. Keep phones (below 768px) looking the same; desktop styles go behind `md:` and up. See [Development → Styling](docs/development.md#styling).
 - **MK Mobile patch notes go through the `patch-notes` skill** (`.claude/skills/patch-notes/`): it sorts each change into code, automatic, the user's own data, or not modelled, and agrees a plan before editing.
-- **Don't add dependencies** without a strong reason. The app has two runtime dependencies and should stay small. Tailwind (`tailwindcss`, `@tailwindcss/vite`) is a dev dependency: it runs at build time and adds nothing to the shipped app. So are Testing Library and jsdom, which only the screen tests use.
+- **Don't add dependencies** without a strong reason. The app has two runtime dependencies and should stay small. Tailwind (`tailwindcss`, `@tailwindcss/vite`) is a dev dependency: it runs at build time and adds nothing to the shipped app. So are Testing Library and jsdom, which only the screen tests use, and yaml, which reads the GitHub workflows in `src/workflows.test.ts`.
 
 ## Game rules the code depends on
 

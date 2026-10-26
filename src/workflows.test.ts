@@ -1,0 +1,297 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
+
+// Read as YAML, the way GitHub reads them, so comments, quoting and step names don't change what's checked.
+type Step = {
+  id?: string;
+  uses?: string;
+  run?: string;
+  shell?: unknown;
+  env?: Record<string, unknown>;
+  with?: Record<string, unknown>;
+  if?: unknown;
+  'continue-on-error'?: unknown;
+};
+type Job = {
+  steps: Step[];
+  name?: unknown;
+  strategy?: unknown;
+  env?: Record<string, unknown>;
+  permissions?: unknown;
+  defaults?: unknown;
+  if?: unknown;
+  needs?: unknown;
+  environment?: unknown;
+  outputs?: Record<string, unknown>;
+  'continue-on-error'?: unknown;
+};
+type Workflow = { on: unknown; permissions?: unknown; defaults?: unknown; jobs: Record<string, Job> };
+
+const here = fileURLToPath(new URL('.', import.meta.url));
+const read = (file: string): Workflow => parse(readFileSync(file, 'utf8'));
+const ci = read(join(here, '..', '.github', 'workflows', 'ci.yml'));
+const deploy = read(join(here, '..', '.github', 'workflows', 'deploy.yml'));
+type Pkg = { scripts: Record<string, string>; dependencies?: object; devDependencies?: object };
+const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8')) as Pkg;
+const { scripts } = pkg;
+const jobs = Object.values(ci.jobs);
+const steps = jobs.flatMap((j) => j.steps);
+const isSetupNode = (s: Step) => !!s.uses?.startsWith('actions/setup-node');
+const nodeVersion = (w: Workflow) =>
+  String(
+    Object.values(w.jobs)
+      .flatMap((j) => j.steps)
+      .find(isSetupNode)?.with?.['node-version'],
+  );
+
+// GitHub takes `on` as one event, a list of events, or a map of events to their filters.
+const filtersOf = (on: unknown, event: string): unknown => {
+  if (on === event || (Array.isArray(on) && on.includes(event))) return null;
+  if (on && typeof on === 'object' && !Array.isArray(on) && event in on) {
+    const filters = (on as Record<string, unknown>)[event];
+    return filters && typeof filters === 'object' && Object.keys(filters).length ? filters : null;
+  }
+  return 'not a trigger';
+};
+
+describe('.github/workflows/ci.yml', () => {
+  // Generated on 2026-10-25 (/ship pre-gate, pr-ci)
+  // Value: protects=every pull request runs the three checks AGENTS.md says a change needs before it merges, since
+  // merging to main deploys; fails_when=the trigger moves off pull_request, a types, paths or branches filter skips
+  // some PRs, or a check is dropped, renamed or reordered so a PR shows green without it; why_new=the workflow is new
+  // and nothing else reads it; seam=none; no_claim=that GitHub runs it (seen on the PR's checks)
+  // Extended by /ship coverage audit on 2026-10-25 (pr-ci pass 2): no step or job may be allowed to fail or be skipped.
+  // Value: protects=a red lint, test or build shows red on the PR; fails_when=a step or the job gets an if:, a
+  // continue-on-error or its own shell, so a failing or skipped check still shows a green PR that checked nothing;
+  // why_new=the step list alone passes with a step that can't fail; seam=none; no_claim=main's ruleset that makes
+  // the check required
+  it('runs lint, tests and a build on every pull request', () => {
+    const muted = [...jobs, ...steps].filter((x) => x.if !== undefined || (x['continue-on-error'] ?? false) !== false);
+    const ownShell = [ci.defaults, ...jobs.map((j) => j.defaults), ...steps.map((s) => s.shell)].filter(
+      (x) => x !== undefined,
+    );
+    expect([
+      filtersOf(ci.on, 'pull_request'),
+      steps.flatMap((s) => (s.run ? [s.run.trim()] : [])),
+      muted.length,
+      ownShell.length,
+    ]).toEqual([null, ['npm ci', 'npm run lint', 'npm test', 'npm run build'], 0, 0]);
+  });
+
+  // Generated on 2026-10-25 (/ship coverage audit, pr-ci pass 2)
+  // Value: protects=code in a pull request runs with a token that can only read the repo, so it can't push, tag or
+  // comment; fails_when=the permissions block goes, contents becomes write, any other permission is added, or a job
+  // sets its own permissions over the read-only ones; why_new=nothing read the permissions before; seam=none;
+  // no_claim=the repo's default token setting or fork PR rules
+  it('gives the job a read-only token', () => {
+    expect([ci.permissions, jobs.map((j) => j.permissions)]).toEqual([{ contents: 'read' }, jobs.map(() => undefined)]);
+  });
+
+  // Generated on 2026-10-25 (/ship pre-gate, pr-ci)
+  // Value: protects=a pull request is checked on the Node version the deploy builds with, so a PR that passes doesn't
+  // fail at deploy (jsdom needs Node 22.22 or newer); fails_when=one workflow's node-version changes without the other,
+  // or a second or late setup-node step switches Node for some of the checks; why_new=the two workflows only agree by
+  // copy; seam=none; no_claim=the exact Node release GitHub picks
+  it('uses the same Node version as the deploy', () => {
+    const setups = steps.flatMap((s, i) => (isSetupNode(s) ? [i] : []));
+    const install = steps.findIndex((s) => s.run?.trim() === 'npm ci');
+    expect([/^\d/.test(nodeVersion(ci)), nodeVersion(ci), setups.length, setups[0] < install]).toEqual([
+      true,
+      nodeVersion(deploy),
+      1,
+      true,
+    ]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, pr-ci run 2 Red Team)
+  // Value: protects=a pull request is built and tested under the /mkmax/ path the site is served from, as the deploy
+  // does; fails_when=BASE_PATH is dropped or changed, or a step sets its own, so a broken asset, manifest or service
+  // worker path passes the PR and fails after the merge; why_new=the PR job built with "/" while the deploy uses the
+  // Pages path; seam=none; no_claim=that GitHub Pages serves the repo at /mkmax/ (the deploy reads that from Pages
+  // itself)
+  it('builds with the base path the site is served from', () => {
+    expect([jobs.map((j) => j.env?.BASE_PATH), steps.filter((s) => s.env?.BASE_PATH !== undefined).length]).toEqual([
+      ['/mkmax/'],
+      0,
+    ]);
+  });
+
+  // Generated on 2026-10-25 (/ship review, pr-ci run 2 pass 3)
+  // Value: protects=pull requests can merge once their check passes; fails_when=the job is renamed, given a display
+  // name or a matrix (GitHub then reports it under another name), so main's ruleset waits for a `check` that never
+  // reports and every pull request stays blocked; why_new=the ruleset names the job and nothing in the repo tied the
+  // two; seam=none; no_claim=what the live ruleset requires (set on GitHub)
+  it('keeps the job name main requires', () => {
+    const job = ci.jobs.check;
+    expect([Object.keys(ci.jobs), job?.name, job?.strategy]).toEqual([['check'], undefined, undefined]);
+  });
+
+  // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 4)
+  // Value: protects=the check really lints, tests and builds; fails_when=a pull request turns the lint, test or build
+  // script in package.json into a no-op, so npm test passes without testing anything; why_new=the step list only
+  // names the scripts; seam=none; no_claim=a pull request that changes this test as well (read those diffs by hand)
+  // Extended by /ship adversarial review on 2026-10-25 (pr-ci run 5): lint fails on warnings too, so a missed hook
+  // dependency (a warning in .oxlintrc.json) can't merge green.
+  it('runs the real lint, test and build scripts', () => {
+    expect([scripts.lint, scripts.test, scripts.build]).toEqual([
+      'oxlint --deny-warnings',
+      'vitest run',
+      'tsc --noEmit && vite build',
+    ]);
+  });
+
+  // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 4)
+  // Value: protects=the GitHub token isn't left on disk while npm ci runs dependency install scripts, in this workflow
+  // and the deploy's build job; fails_when=a checkout step drops persist-credentials: false; why_new=checkout keeps
+  // the token by default; seam=none; no_claim=what GitHub grants the token
+  it('keeps the token off disk in both workflows', () => {
+    const checkouts = [ci, deploy].flatMap((w) =>
+      Object.values(w.jobs).flatMap((j) => j.steps.filter((s) => s.uses?.startsWith('actions/checkout'))),
+    );
+    expect(checkouts.map((s) => s.with?.['persist-credentials'])).toEqual([false, false]);
+  });
+});
+
+describe('.github/workflows/deploy.yml', () => {
+  // Generated on 2026-10-25 (/ship adversarial review, pr-ci run 5)
+  // Value: protects=only the deploy job can publish the site, so the build job, which runs npm ci and the
+  // dependencies' install scripts, has a token that can only read and can't get a Pages deploy token; fails_when=pages:
+  // write or id-token: write moves back to the whole workflow or onto the build job, the build gets another write
+  // permission, another job is added or the fallback job gets any permission, or the deploy job gets a step besides
+  // deploy-pages
+  // (a checkout or npm ci would run dependency code with the publishing token); why_new=they were set for the whole
+  // workflow, so every job had them; seam=none; no_claim=that configure-pages and deploy-pages work with these (seen
+  // on the first deploy after the merge)
+  // Extended by /ship review on 2026-10-26 (pr-ci run 11): the deploy job's environment stays github-pages.
+  // Value: protects=the deploy status command in CLAUDE.md, which finds a revision's Pages deployments by that
+  // environment; fails_when=the environment is renamed, so the command finds none and calls every finished deploy a
+  // failure; why_new=nothing pinned the name; seam=none; no_claim=what GitHub's API returns
+  it('lets only the deploy job publish', () => {
+    const deploySteps = deploy.jobs.deploy?.steps.map((s) => s.uses?.split('@')[0] ?? s.run);
+    expect([
+      Object.keys(deploy.jobs),
+      deploy.permissions,
+      deploy.jobs.build?.permissions,
+      deploy.jobs.deploy?.permissions,
+      deploy.jobs.fallback?.permissions,
+      deploySteps,
+      deploy.jobs.deploy?.environment,
+    ]).toEqual([
+      ['build', 'deploy', 'fallback'],
+      { contents: 'read' },
+      { contents: 'read', pages: 'read' },
+      { pages: 'write', 'id-token': 'write' },
+      {},
+      ['actions/deploy-pages'],
+      { name: 'github-pages', url: '${{ steps.deployment.outputs.page_url }}' },
+    ]);
+  });
+
+  // Generated on 2026-10-26 (/ship adversarial review, pr-ci run 7)
+  // Value: protects=a deploy that kept an older catalog or event schedule still publishes, then shows as a failed run,
+  // so GitHub tells the owner; fails_when=either download step stops reporting its fallback, the build stops passing it
+  // on, the failing job runs before the deploy or always, or it stops failing (no exit 1, or allowed to fail);
+  // why_new=a fallback showed only as a warning on a green
+  // run; seam=none; no_claim=that GitHub emails the owner (that's the account's notification settings)
+  // Extended by /ship review on 2026-10-26 (pr-ci run 14): fails_when also covers the failing step getting its own if:
+  // or shell, or the deploy workflow or the fallback job getting a defaults block, and either download step getting an
+  // if:, continue-on-error or its own shell, the build job an if: or defaults, or the report moving after the live
+  // copy is fetched, or the deploy job getting an if: (skipping it skips the fallback job too) or continue-on-error.
+  it('fails the run after publishing when a download fell back', () => {
+    const { build, fallback } = deploy.jobs;
+    const report = 'echo "fell_back=true" >> "$GITHUB_OUTPUT"';
+    const reports = (s: Step) => !!s.run?.includes(report);
+    // A download step that a daily run could skip, let fail quietly or run in another shell (its own, or defaults on
+    // the build job or the workflow) would never report a fallback, and the report has to come before the live copy
+    // is fetched: the line after the warning that follows a failed refresh.
+    const lines = (s: Step) => s.run?.trim().split('\n').map((l) => l.trim()) ?? [];
+    const reporting = build?.steps
+      .filter(reports)
+      .map((s) => [s.id, lines(s)[0], lines(s)[2], s.if, s['continue-on-error'], s.shell]);
+    // In the fallback job, a step-level if, or a shell set on the step, the job or the workflow, could skip the exit 1
+    // or change how it runs, as for the pull request check.
+    const failing = (s: Step) => [s.uses, s.run?.trim().endsWith('exit 1'), s['continue-on-error'], s.if, s.shell];
+    const fallbackSteps = fallback?.steps.map(failing);
+    const muted = fallback?.['continue-on-error'];
+    const defaults = [deploy.defaults, build?.defaults, fallback?.defaults];
+    // The fallback job needs the deploy job, so a deploy that a run could skip would skip the fallback job with it,
+    // and a deploy allowed to fail (continue-on-error) wouldn't fail the run.
+    const deployJob = [deploy.jobs.deploy?.if, deploy.jobs.deploy?.['continue-on-error']];
+    const job = [fallback?.needs, fallback?.if, fallbackSteps, muted, defaults, deployJob];
+    expect([reporting, build?.if, build?.outputs?.fell_back, ...job]).toEqual([
+      [
+        ['catalog', 'npm run catalog && exit 0', report, undefined, undefined, undefined],
+        ['events', 'npm run events && exit 0', report, undefined, undefined, undefined],
+      ],
+      undefined,
+      "${{ steps.catalog.outputs.fell_back == 'true' || steps.events.outputs.fell_back == 'true' }}",
+      ['build', 'deploy'],
+      "needs.build.outputs.fell_back == 'true'",
+      [[undefined, true, undefined, undefined, undefined]],
+      undefined,
+      [undefined, undefined, undefined],
+      [undefined, undefined],
+    ]);
+  });
+});
+
+describe('CLAUDE.md deploy status command', () => {
+  const md = readFileSync(join(here, '..', 'CLAUDE.md'), 'utf8').split(/\r?\n/);
+  const command = (label: string) => md.find((l) => l.startsWith(`- ${label}: `))?.slice(label.length + 4);
+  // GitHub's runners have jq; a machine without it skips the verdicts rather than failing, and CI never skips them.
+  const hasJq = (() => {
+    try {
+      execFileSync('jq', ['--version']);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 19)
+  // Extended by /ship review on 2026-10-26 (pr-ci run 20): a run that timed out reads as cancelled too.
+  // Value: protects=/land-and-deploy's verdict on a deploy: success once a deployment went live, cancelled when a newer
+  // merge's deploy (or a hand) cancelled its run first or it timed out, failure when its run finished with none live,
+  // null while it runs, and both copies of the command alike; fails_when=a branch of the jq is dropped or reordered (a
+  // cancelled or timed-out run reads failure, the cue to revert) or one copy is edited without the other;
+  // why_new=nothing ran the command after three fixes to it; seam=jq runs the command's own program on the run states
+  // GitHub returns; no_claim=GitHub's API answers and the shell around the jq
+  it.skipIf(!hasJq && !process.env.CI)('says success, cancelled, failure or null, and keeps both copies alike', () => {
+    const status = command('Deploy status command');
+    const program = /--argjson published "\$P" '([^']+)'$/.exec(status ?? '')?.[1];
+    const verdict = (run: object, published: number) => {
+      const args = ['-nc', '--arg', 'sha', 'x', '--argjson', 'run', JSON.stringify(run), '--argjson', 'published'];
+      return JSON.parse(execFileSync('jq', [...args, String(published), program!], { encoding: 'utf8' })).conclusion;
+    };
+    expect([
+      status === command('Deploy status'),
+      verdict({ status: 'completed', conclusion: 'failure' }, 1),
+      verdict({ status: 'completed', conclusion: 'cancelled' }, 1),
+      verdict({ status: 'completed', conclusion: 'cancelled' }, 0),
+      verdict({ status: 'completed', conclusion: 'timed_out' }, 0),
+      verdict({ status: 'completed', conclusion: 'failure' }, 0),
+      verdict({ status: 'completed', conclusion: 'success' }, 0),
+      verdict({ status: 'in_progress', conclusion: null }, 0),
+      verdict({}, 0),
+    ]).toEqual([true, 'success', 'success', 'cancelled', 'cancelled', 'failure', 'failure', null, null]);
+  });
+});
+
+describe('package.json', () => {
+  // Extended by /ship coverage audit on 2026-10-25 (pr-ci run 6 pass 2): the app ships only React, and yaml, which
+  // this file reads the workflows with, is a dev dependency.
+  // Value: protects=AGENTS.md's two runtime dependencies, and a fresh install still having yaml for this test;
+  // fails_when=yaml (or anything else) lands in dependencies (npm install without -D), or yaml leaves devDependencies;
+  // why_new=nothing read the dependency lists, and knip already installs yaml, so the import above keeps working
+  // without it listed; seam=none; no_claim=what the bundle contains (Vite leaves out what the app doesn't import)
+  it('keeps two runtime dependencies, with yaml for these tests only', () => {
+    expect([Object.keys(pkg.dependencies ?? {}).sort(), 'yaml' in (pkg.devDependencies ?? {})]).toEqual([
+      ['react', 'react-dom'],
+      true,
+    ]);
+  });
+});

@@ -1,0 +1,39 @@
+name: CI
+
+# Merging into main deploys, so every pull request runs the deploy's lint, tests and build first; main's ruleset
+# requires this check to pass before a merge.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same PR replaces a run still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # main's ruleset requires a check reported as exactly `check`: changing this key, or adding a `name:` or a matrix,
+  # needs the ruleset changed too.
+  check:
+    runs-on: ubuntu-latest
+    # A normal run takes about a minute; a hung one stops here instead of holding the PR check for GitHub's 6 hours.
+    timeout-minutes: 15
+    # The deploy builds and tests with the Pages path, so a PR is checked with the same one. The deploy reads it from
+    # Pages, so change this too if the repo is renamed or given its own domain.
+    env:
+      BASE_PATH: /mkmax/
+    steps:
+      # Keeps the token out of .git/config, where install scripts in dependencies could read it.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

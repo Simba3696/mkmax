@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -20,9 +20,12 @@ function appVersion() {
 }
 
 export default defineConfig({
-  // GitHub Pages serves the app from /<repo>/; the deploy workflow sets BASE_PATH.
+  // GitHub Pages serves the app from /<repo>/; the deploy and pull request workflows set BASE_PATH.
   base: process.env.BASE_PATH ?? '/',
   define: { __APP_VERSION__: JSON.stringify(appVersion()) },
+  // Tests run from this checkout only: not from Claude Code worktrees nested under .claude/worktrees or from gstack's
+  // local scratch files, which hold copies of the tests.
+  test: { exclude: [...configDefaults.exclude, '.claude/worktrees/**', '.gstack/**'] },
   plugins: [
     react(),
     tailwindcss(),

@@ -1,16 +1,19 @@
 // Downloads MK Mobile Base's event schedule (its copy of mkmobileevent.com) into public/events.json: shop packs,
 // challenges and Realm Klash seasons, with dates as ISO strings. The site doesn't allow cross-site requests, so
-// the app reads this file instead. Run by the deploy workflow (daily and on every push), or: npm run events
+// the app reads this file instead. Run by the deploy workflow (daily and on every push to main), or: npm run events
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseSchedule, withPastSeasons } from './schedule.mjs';
 
 const API = 'https://mkmobilebase.com/api/events/schedule';
 const HEADERS = { Accept: 'application/json', 'User-Agent': 'mkmax events (https://github.com/Simba3696/mkmax)' };
-/** The deployed app; the workflow sets PAGES_URL. */
+/** The deployed app; the deploy workflow sets PAGES_URL. */
 const LIVE = `${process.env.PAGES_URL ?? 'https://simba3696.github.io/mkmax'}/events.json`;
 const FILE = new URL('../public/events.json', import.meta.url);
+/** How long one request may take before it fails. */
+const REQUEST_MS = 30_000;
 
-const res = await fetch(API, { headers: HEADERS });
+// A stalled download fails after REQUEST_MS, so the deploy goes on with the live copy instead of waiting.
+const res = await fetch(API, { headers: HEADERS, signal: AbortSignal.timeout(REQUEST_MS) });
 if (!res.ok) throw new Error(`events: HTTP ${res.status}`);
 const schedule = await res.json();
 const { packs, challenges, seasons } = parseSchedule(schedule);
@@ -27,7 +30,7 @@ async function earlierCopy(load, what) {
 // The deployed copy has the weeks this script kept on its last run; the local one (the committed copy in CI)
 // covers a first deploy, or a live site that can't be reached.
 const live = await earlierCopy(async () => {
-  const r = await fetch(LIVE, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
+  const r = await fetch(LIVE, { headers: HEADERS, signal: AbortSignal.timeout(REQUEST_MS) });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }, 'live');
