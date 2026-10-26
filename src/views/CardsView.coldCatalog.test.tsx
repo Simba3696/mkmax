@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-// Its own file, so no catalog has loaded yet when the screen opens (the catalog module keeps the first copy it loads).
+// Its own file, so no catalog has loaded yet when the screen opens: the catalog module keeps a loaded copy, and
+// loadCatalog returns it without downloading again, so in a file where an earlier test loaded one it is always there.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { defaultState } from '../defaults';

@@ -86,10 +86,10 @@ function download(replace: boolean): Promise<CatalogItem[]> {
     .finally(() => clearTimeout(timer));
 }
 
-/** The catalog: the copy already downloaded if there is one (even while it's being fetched again), else a download. */
 /** The catalog already loaded this session, if any, so a screen can start with it rather than wait a render. */
 export const loadedCatalog = () => good;
 
+/** The catalog: the copy already downloaded if there is one (even while it's being fetched again), else a download. */
 export function loadCatalog(): Promise<CatalogItem[]> {
   if (good) return Promise.resolve(good);
   if (!loading) {
