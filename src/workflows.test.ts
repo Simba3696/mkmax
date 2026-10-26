@@ -197,11 +197,13 @@ describe('.github/workflows/deploy.yml', () => {
   // why_new=a fallback showed only as a warning on a green
   // run; seam=none; no_claim=that GitHub emails the owner (that's the account's notification settings)
   // Extended by /ship review on 2026-10-26 (pr-ci run 14): fails_when also covers the failing step getting its own if:
-  // or shell, or the deploy workflow or the fallback job getting a defaults block.
+  // or shell, or the deploy workflow or the fallback job getting a defaults block, and either download step getting an
+  // if:, continue-on-error or its own shell, or the build job an if:.
   it('fails the run after publishing when a download fell back', () => {
     const { build, fallback } = deploy.jobs;
     const reports = (s: Step) => !!s.run?.includes('fell_back=true" >> "$GITHUB_OUTPUT"');
-    const reporting = build?.steps.filter(reports).map((s) => s.id);
+    // A download step, or the build job, that a daily run could skip or let fail quietly would never report a fallback.
+    const reporting = build?.steps.filter(reports).map((s) => [s.id, s.if, s['continue-on-error'], s.shell]);
     // A step-level if, or a shell set on the step, the job or the workflow, could skip the exit 1 or change how it
     // runs, as for the pull request check.
     const failing = (s: Step) => [s.uses, s.run?.trim().endsWith('exit 1'), s['continue-on-error'], s.if, s.shell];
@@ -209,8 +211,12 @@ describe('.github/workflows/deploy.yml', () => {
     const muted = fallback?.['continue-on-error'];
     const defaults = [deploy.defaults, fallback?.defaults];
     const job = [fallback?.needs, fallback?.if, fallbackSteps, muted, defaults];
-    expect([reporting, build?.outputs?.fell_back, ...job]).toEqual([
-      ['catalog', 'events'],
+    expect([reporting, build?.if, build?.outputs?.fell_back, ...job]).toEqual([
+      [
+        ['catalog', undefined, undefined, undefined],
+        ['events', undefined, undefined, undefined],
+      ],
+      undefined,
       "${{ steps.catalog.outputs.fell_back == 'true' || steps.events.outputs.fell_back == 'true' }}",
       ['build', 'deploy'],
       "needs.build.outputs.fell_back == 'true'",

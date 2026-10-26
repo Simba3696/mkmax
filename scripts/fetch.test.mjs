@@ -193,10 +193,10 @@ describe('download scripts', () => {
   }, 45_000);
 
   // Extended by /ship coverage audit on 2026-10-25 (pr-ci run 6): every request, not just the first, has a time limit.
-  // Value: protects=a stall on any MK Mobile Base request (a later page, a later category, or the live events.json the
-  // schedule keeps past weeks from) fails the script so the deploy falls back instead of waiting; fails_when=a
-  // refactor fetches later pages or categories, or the live copy, without the signal; why_new=the offline run above
-  // fails on the first request, so it never reaches the others; seam=none (fetch is replaced in the script's own
+  // Value: protects=a stall on any request (a later page or category from MK Mobile Base, or the live events.json or
+  // catalog.json the scripts keep past weeks from or compare with) fails the script so the deploy falls back instead
+  // of waiting; fails_when=a refactor fetches later pages or categories, or a live copy, without the signal;
+  // why_new=the offline run above fails on the first request, so it never reaches the others; seam=none (fetch is replaced in the script's own
   // process, and copies of the scripts write into a scratch folder); no_claim=the 30-second length
   it('put a time limit on every request when MK Mobile Base answers', () => {
     const page = (category, n) => `https://mkmobilebase.com/api/categories/${category}/articles?per_page=100&page=${n}`;

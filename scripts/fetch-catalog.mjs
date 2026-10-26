@@ -39,7 +39,8 @@ async function fetchAll(category) {
     if (last !== pages) throw new Error(`${category} page ${page}: the page count changed from ${pages} to ${last}`);
     items.push(...data);
     if (page >= last) {
-      // An item that moved across a page boundary while the pages were read is skipped without any other sign.
+      // When the site sends an item count, the items read must match it, so pages that end before the site's own count
+      // (a page count that's too low, or short pages) fail here.
       if (Number.isInteger(meta.total) && items.length !== meta.total) {
         throw new Error(`${category}: got ${items.length} items, the site says ${meta.total}`);
       }
