@@ -8,6 +8,9 @@ const HEADERS = { Accept: 'application/json', 'User-Agent': 'mkmax catalog (http
 const RARITIES = ['diamond', 'gold', 'silver', 'bronze', 'epic', 'rare', 'uncommon', 'common', 'legendary'];
 /** Far past any real category (4 pages of 100 at most today), so a page count that never ends fails instead. */
 const MAX_PAGES = 50;
+/** More than a tenth of a group and more than 3, so the site fixing a card or two in a small group doesn't fail every
+ * deploy. */
+const tooMany = (n, of) => n > Math.max(3, of / 10);
 /** The deployed app; the deploy workflow sets PAGES_URL. */
 const LIVE = `${process.env.PAGES_URL ?? 'https://simba3696.github.io/mkmax'}/catalog.json`;
 const FILE = new URL('../public/catalog.json', import.meta.url);
@@ -94,7 +97,7 @@ for (const key of ['image', 'rarity']) {
 }
 for (const [group, cards] of Map.groupBy(catalog, (c) => `${c.kind} ${c.rarity ?? 'without a rarity'}`)) {
   const missing = cards.filter((c) => !c.image).length;
-  if (missing > Math.max(3, cards.length / 10)) {
+  if (tooMany(missing, cards.length)) {
     throw new Error(`catalog: ${missing} of ${cards.length} ${group} cards have no image`);
   }
 }
@@ -136,8 +139,7 @@ if (earlier) {
   const now = byKindAndRarity(catalog);
   for (const [key, was] of byKindAndRarity(earlier.items)) {
     const count = now.get(key) ?? 0;
-    // More than a tenth and more than 3, so the site fixing a card or two in a small group doesn't fail every deploy.
-    if (was - count > Math.max(3, was / 10)) throw new Error(`catalog: ${count} ${key} cards, down from ${was}`);
+    if (tooMany(was - count, was)) throw new Error(`catalog: ${count} ${key} cards, down from ${was}`);
   }
 }
 catalog.sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));

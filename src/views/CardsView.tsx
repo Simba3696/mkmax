@@ -775,7 +775,8 @@ function CardList() {
         if (hit?.image) found.set(c.id, { imageUrl: hit.image, wikiTitle: undefined, imagePage: catalogPageUrl(hit) });
         else if (hit) listed.add(c.id);
       }
-      // Anything the catalog doesn't have: fall back to the wiki (only for cards with no working image).
+      // Anything the catalog has no art for (not listed, or listed without art): fall back to the wiki (only for cards
+      // with no working image).
       const rest = missingImages.filter((c) => !found.has(c.id) && (!c.imageUrl || brokenUrls.has(c.imageUrl)));
       // A wiki that's down or offline still leaves the catalog's art to save.
       let wikiError: string | undefined;
