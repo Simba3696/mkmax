@@ -204,14 +204,15 @@ describe('.github/workflows/deploy.yml', () => {
     const { build, fallback } = deploy.jobs;
     const report = 'echo "fell_back=true" >> "$GITHUB_OUTPUT"';
     const reports = (s: Step) => !!s.run?.includes(report);
-    // A download step, or the build job, that a daily run could skip or let fail quietly would never report a fallback,
-    // and the report has to come straight after the refresh fails, before the live copy is fetched.
+    // A download step that a daily run could skip, let fail quietly or run in another shell (its own, or the build
+    // job's defaults) would never report a fallback, and the report has to come before the live copy is fetched: the
+    // line after the warning that follows a failed refresh.
     const lines = (s: Step) => s.run?.trim().split('\n').map((l) => l.trim()) ?? [];
     const reporting = build?.steps
       .filter(reports)
       .map((s) => [s.id, lines(s)[0], lines(s)[2], s.if, s['continue-on-error'], s.shell]);
-    // A step-level if, or a shell set on the step, the job or the workflow, could skip the exit 1 or change how it
-    // runs, as for the pull request check.
+    // In the fallback job, a step-level if, or a shell set on the step, the job or the workflow, could skip the exit 1
+    // or change how it runs, as for the pull request check.
     const failing = (s: Step) => [s.uses, s.run?.trim().endsWith('exit 1'), s['continue-on-error'], s.if, s.shell];
     const fallbackSteps = fallback?.steps.map(failing);
     const muted = fallback?.['continue-on-error'];
