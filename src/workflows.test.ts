@@ -217,7 +217,8 @@ describe('.github/workflows/deploy.yml', () => {
     const fallbackSteps = fallback?.steps.map(failing);
     const muted = fallback?.['continue-on-error'];
     const defaults = [deploy.defaults, build?.defaults, fallback?.defaults];
-    // The fallback job needs the deploy job, so a deploy that a run could skip would skip the fallback job with it.
+    // The fallback job needs the deploy job, so a deploy that a run could skip would skip the fallback job with it,
+    // and a deploy allowed to fail (continue-on-error) wouldn't fail the run.
     const deployJob = [deploy.jobs.deploy?.if, deploy.jobs.deploy?.['continue-on-error']];
     const job = [fallback?.needs, fallback?.if, fallbackSteps, muted, defaults, deployJob];
     expect([reporting, build?.if, build?.outputs?.fell_back, ...job]).toEqual([
