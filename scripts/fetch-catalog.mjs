@@ -12,7 +12,7 @@ const MAX_PAGES = 50;
 const LIVE = `${process.env.PAGES_URL ?? 'https://simba3696.github.io/mkmax'}/catalog.json`;
 const FILE = new URL('../public/catalog.json', import.meta.url);
 // The whole download takes seconds. Pages that each answer just inside 30 seconds could otherwise add up past the
-// deploy job's 15 minutes, which would end the job before it falls back to the live copy.
+// build job's 15 minutes, which would end the job before it falls back to the live copy.
 const DEADLINE = Date.now() + 5 * 60_000;
 
 async function fetchAll(category) {

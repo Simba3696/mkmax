@@ -227,7 +227,7 @@ describe('download scripts', () => {
   // Extended by /ship adversarial review on 2026-10-26 (pr-ci run 7): pages the site didn't send, repeated cards, a
   // catalog far smaller than the live one, and a download still going after 5 minutes.
   // Value: protects=a site that ignores the page asked for, repeats cards, loses a kind and rarity's cards, or answers
-  // so slowly the deploy job would end first fails the script, so the deploy keeps the live catalog; fails_when=the
+  // so slowly the build job would end first fails the script, so the deploy keeps the live catalog; fails_when=the
   // repeat check, the comparison with the live copy or the overall deadline is dropped;
   // why_new=each of these passed every earlier check; seam=none (STUB_CHANGE only changes the stand-in's answers and
   // clock); no_claim=the 90% and 5-minute values, or a live copy that can't be read (the committed one is used)
