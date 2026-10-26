@@ -24,6 +24,7 @@ type Job = {
   defaults?: unknown;
   if?: unknown;
   needs?: unknown;
+  environment?: unknown;
   outputs?: Record<string, unknown>;
   'continue-on-error'?: unknown;
 };
@@ -164,6 +165,10 @@ describe('.github/workflows/deploy.yml', () => {
   // (a checkout or npm ci would run dependency code with the publishing token); why_new=they were set for the whole
   // workflow, so every job had them; seam=none; no_claim=that configure-pages and deploy-pages work with these (seen
   // on the first deploy after the merge)
+  // Extended by /ship review on 2026-10-26 (pr-ci run 11): the deploy job's environment stays github-pages.
+  // Value: protects=the deploy status command in CLAUDE.md, which finds a revision's Pages deployments by that
+  // environment; fails_when=the environment is renamed, so the command finds none and calls every finished deploy a
+  // failure; why_new=nothing pinned the name; seam=none; no_claim=what GitHub's API returns
   it('lets only the deploy job publish', () => {
     const deploySteps = deploy.jobs.deploy?.steps.map((s) => s.uses?.split('@')[0] ?? s.run);
     expect([
@@ -173,6 +178,7 @@ describe('.github/workflows/deploy.yml', () => {
       deploy.jobs.deploy?.permissions,
       deploy.jobs.fallback?.permissions,
       deploySteps,
+      deploy.jobs.deploy?.environment,
     ]).toEqual([
       ['build', 'deploy', 'fallback'],
       { contents: 'read' },
@@ -180,6 +186,7 @@ describe('.github/workflows/deploy.yml', () => {
       { pages: 'write', 'id-token': 'write' },
       {},
       ['actions/deploy-pages'],
+      { name: 'github-pages', url: '${{ steps.deployment.outputs.page_url }}' },
     ]);
   });
 
