@@ -198,23 +198,29 @@ describe('.github/workflows/deploy.yml', () => {
   // run; seam=none; no_claim=that GitHub emails the owner (that's the account's notification settings)
   // Extended by /ship review on 2026-10-26 (pr-ci run 14): fails_when also covers the failing step getting its own if:
   // or shell, or the deploy workflow or the fallback job getting a defaults block, and either download step getting an
-  // if:, continue-on-error or its own shell, or the build job an if:.
+  // if:, continue-on-error or its own shell, the build job an if: or defaults, or the report moving after the live
+  // copy is fetched.
   it('fails the run after publishing when a download fell back', () => {
     const { build, fallback } = deploy.jobs;
-    const reports = (s: Step) => !!s.run?.includes('fell_back=true" >> "$GITHUB_OUTPUT"');
-    // A download step, or the build job, that a daily run could skip or let fail quietly would never report a fallback.
-    const reporting = build?.steps.filter(reports).map((s) => [s.id, s.if, s['continue-on-error'], s.shell]);
+    const report = 'echo "fell_back=true" >> "$GITHUB_OUTPUT"';
+    const reports = (s: Step) => !!s.run?.includes(report);
+    // A download step, or the build job, that a daily run could skip or let fail quietly would never report a fallback,
+    // and the report has to come straight after the refresh fails, before the live copy is fetched.
+    const lines = (s: Step) => s.run?.trim().split('\n').map((l) => l.trim()) ?? [];
+    const reporting = build?.steps
+      .filter(reports)
+      .map((s) => [s.id, lines(s)[0], lines(s)[2], s.if, s['continue-on-error'], s.shell]);
     // A step-level if, or a shell set on the step, the job or the workflow, could skip the exit 1 or change how it
     // runs, as for the pull request check.
     const failing = (s: Step) => [s.uses, s.run?.trim().endsWith('exit 1'), s['continue-on-error'], s.if, s.shell];
     const fallbackSteps = fallback?.steps.map(failing);
     const muted = fallback?.['continue-on-error'];
-    const defaults = [deploy.defaults, fallback?.defaults];
+    const defaults = [deploy.defaults, build?.defaults, fallback?.defaults];
     const job = [fallback?.needs, fallback?.if, fallbackSteps, muted, defaults];
     expect([reporting, build?.if, build?.outputs?.fell_back, ...job]).toEqual([
       [
-        ['catalog', undefined, undefined, undefined],
-        ['events', undefined, undefined, undefined],
+        ['catalog', 'npm run catalog && exit 0', report, undefined, undefined, undefined],
+        ['events', 'npm run events && exit 0', report, undefined, undefined, undefined],
       ],
       undefined,
       "${{ steps.catalog.outputs.fell_back == 'true' || steps.events.outputs.fell_back == 'true' }}",
@@ -222,7 +228,7 @@ describe('.github/workflows/deploy.yml', () => {
       "needs.build.outputs.fell_back == 'true'",
       [[undefined, true, undefined, undefined, undefined]],
       undefined,
-      [undefined, undefined],
+      [undefined, undefined, undefined],
     ]);
   });
 });

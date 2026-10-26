@@ -193,9 +193,9 @@ describe('download scripts', () => {
   }, 45_000);
 
   // Extended by /ship coverage audit on 2026-10-25 (pr-ci run 6): every request, not just the first, has a time limit.
-  // Value: protects=a stall on any request (a later page or category from MK Mobile Base, or the live events.json or
-  // catalog.json the scripts keep past weeks from or compare with) fails the script so the deploy falls back instead
-  // of waiting; fails_when=a refactor fetches later pages or categories, or a live copy, without the signal;
+  // Value: protects=a stall on a later page or category from MK Mobile Base fails the script so the deploy falls back
+  // instead of waiting, and a stall on the live events.json or catalog.json is cut off so the script goes on with the
+  // local copy; fails_when=a refactor fetches later pages or categories, or a live copy, without the signal;
   // why_new=the offline run above fails on the first request, so it never reaches the others; seam=none (fetch is
   // replaced in the script's own process, and copies of the scripts write into a scratch folder); no_claim=the
   // 30-second length
