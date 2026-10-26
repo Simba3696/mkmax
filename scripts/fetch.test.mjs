@@ -231,14 +231,35 @@ describe('download scripts', () => {
   // repeat check, the comparison with the live copy or the overall deadline is dropped;
   // why_new=each of these passed every earlier check; seam=none (STUB_CHANGE only changes the stand-in's answers and
   // clock); no_claim=the 90% and 5-minute values, or a live copy that can't be read (the committed one is used)
+  // Extended by /ship review on 2026-10-26 (pr-ci run 10): each case must be caught by its own check.
+  // Value: protects=every bad answer is rejected by the check written for it; fails_when=a check is dropped while a
+  // later one (the item count added on this branch) still fails the same case; why_new=the cases asserted only the exit
+  // code; seam=none; no_claim=the wording of each error beyond the matched phrase
   it("fail without writing when MK Mobile Base's catalog answers look wrong or come too slowly", () => {
-    const outcome = (change) => {
-      const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
-      return { change, status, wroteCatalog };
+    // Each change is matched to the check that should catch it, so a case can't stay green because another check
+    // (the item count, say) fails it first.
+    const reasons = {
+      'no-page-count': 'unexpected page data',
+      'zero-pages': 'unexpected page data',
+      endless: 'unexpected page data',
+      'no-art': 'items have no image',
+      'no-rarity': 'items have no rarity',
+      'repeated-page': 'the same item came back twice',
+      'duplicate-slugs': 'the same item came back twice',
+      shrunk: 'down from',
+      slow: 'still downloading after 5 minutes',
+      nameless: 'an item has no name',
+      'skipped-item': 'the site says',
+      'small-group-no-art': 'cards have no image',
     };
-    const changes = ['no-page-count', 'zero-pages', 'endless', 'no-art', 'no-rarity'];
-    changes.push('repeated-page', 'duplicate-slugs', 'shrunk', 'slow', 'nameless', 'skipped-item', 'small-group-no-art');
-    expect(changes.map(outcome)).toEqual(changes.map((change) => ({ change, status: 1, wroteCatalog: false })));
+    const outcome = (change) => {
+      const { status, stderr, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
+      return { change, status, wroteCatalog, caughtBy: Object.values(reasons).find((r) => stderr.includes(r)) };
+    };
+    const changes = Object.keys(reasons);
+    expect(changes.map(outcome)).toEqual(
+      changes.map((change) => ({ change, status: 1, wroteCatalog: false, caughtBy: reasons[change] })),
+    );
   }, 45_000);
 
   // Generated on 2026-10-26 (/ship review, pr-ci run 7 pass 4)
