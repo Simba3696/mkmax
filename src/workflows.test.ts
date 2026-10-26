@@ -271,11 +271,12 @@ describe('CLAUDE.md deploy status command', () => {
       verdict({ status: 'completed', conclusion: 'failure' }, 1),
       verdict({ status: 'completed', conclusion: 'cancelled' }, 1),
       verdict({ status: 'completed', conclusion: 'cancelled' }, 0),
+      verdict({ status: 'completed', conclusion: 'timed_out' }, 0),
       verdict({ status: 'completed', conclusion: 'failure' }, 0),
       verdict({ status: 'completed', conclusion: 'success' }, 0),
       verdict({ status: 'in_progress', conclusion: null }, 0),
       verdict({}, 0),
-    ]).toEqual([true, 'success', 'success', 'cancelled', 'failure', 'failure', null, null]);
+    ]).toEqual([true, 'success', 'success', 'cancelled', 'cancelled', 'failure', 'failure', null, null]);
   });
 });
 

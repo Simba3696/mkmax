@@ -21,8 +21,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # A deploy takes about a minute. A newer run cancels a hung one anyway; this ends it, as failed, when no newer
-    # run comes (between daily runs) instead of after GitHub's 6 hours.
+    # A deploy takes about a minute. A newer run cancels a hung one anyway; this stops it when no newer run
+    # comes (between daily runs) instead of after GitHub's 6 hours.
     timeout-minutes: 15
     permissions:
       contents: read
