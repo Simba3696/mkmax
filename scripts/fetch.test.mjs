@@ -63,7 +63,7 @@ function runOffline(script, output) {
   const result = spawnSync(process.execPath, ['--import', pathToFileURL(stub).href, copy], {
     encoding: 'utf8',
     timeout: 20_000,
-    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax' },
+    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax', CATALOG_ACCEPT_DROP: '' },
   });
   return { status: result.status, requests: requestsOf(result.stderr), unchanged: readFileSync(seeded).equals(before) };
 }
@@ -104,14 +104,22 @@ globalThis.fetch = async (url, opts = {}) => {
   if (change === 'slow') skew += 61_000;
   const page = /[?&]page=(\\d+)/.exec(String(url));
   const current = page && (change === 'repeated-page' ? 1 : Number(page[1]));
-  // A big gold group with art and a small silver group without: too few to show in the whole catalog.
+  // A big gold group with art and a silver group without: too few to show in the whole catalog. Or the same gold
+  // group plus one new character the site hasn't finished (no rarity, no art).
   const silver = (n) => ({ title: 'Silver ' + n, slug: 'silver-' + n, tags: [{ slug: 'silver' }] });
-  const data = change === 'small-group-no-art'
-    ? [...Array.from({ length: 20 }, (_, i) => card(current + '-' + i)), silver(current)]
-    : [card(current)];
-  const total = (Number.isInteger(lastPage) ? lastPage : 0) * data.length + (change === 'skipped-item' ? 1 : 0);
+  const gold = (n) => Array.from({ length: 50 }, (_, i) => card(n + '-' + i));
+  const unfinished = change === 'new-card' && String(url).includes('/characters/');
+  const data =
+    change === 'small-group-no-art'
+      ? [...gold(current), ...Array.from({ length: 5 }, (_, i) => silver(current + '-' + i))]
+      : change === 'new-card'
+        ? [...gold(current), ...(unfinished && current === 1 ? [{ title: 'New', slug: 'new' }] : [])]
+        : [card(current)];
+  const perPage = data.length - (unfinished && current === 1 ? 1 : 0);
+  const total = (Number.isInteger(lastPage) ? lastPage : 0) * perPage + (unfinished ? 1 : 0) + (change === 'skipped-item' ? 1 : 0);
+  const meta = { last_page: lastPage, current_page: current, ...(change === 'no-total' ? {} : { total }) };
   const body = page
-    ? { data, meta: { last_page: lastPage, current_page: current, total } }
+    ? { data, meta }
     : String(url).endsWith('/events.json')
       ? { seasons: [] }
       : String(url).endsWith('/catalog.json')
@@ -134,7 +142,8 @@ function runOnline(script, change = '', localCatalog = null, env = {}) {
   const result = spawnSync(process.execPath, ['--import', pathToFileURL(online).href, join(root, 'scripts', script)], {
     encoding: 'utf8',
     timeout: 20_000,
-    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax', STUB_CHANGE: change, ...env },
+    // CATALOG_ACCEPT_DROP pinned too, so one left set in the shell after a real reset can't change these runs.
+    env: { ...process.env, PAGES_URL: 'https://live.test/mkmax', STUB_CHANGE: change, CATALOG_ACCEPT_DROP: '', ...env },
   });
   return {
     status: result.status,
@@ -272,6 +281,22 @@ describe('download scripts', () => {
   it('write a catalog with far fewer cards when the drop is accepted', () => {
     const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', 'shrunk', null, { CATALOG_ACCEPT_DROP: '1' });
     expect({ status, wroteCatalog }).toEqual({ status: 0, wroteCatalog: true });
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 8 pass 4)
+  // Value: protects=a healthy catalog still deploys when the site has a new card it hasn't finished (no rarity or art
+  // yet) or stops sending its item count; fails_when=one unfinished card fails a whole group (the earlier all-of-a-group
+  // rule), or a missing total is treated as a mismatch; why_new=every passing case had finished cards and a total;
+  // seam=none (STUB_CHANGE only changes the stand-in's answers); no_claim=how many unfinished cards are too many
+  it("write the catalog with a new unfinished card, or when the site doesn't send a count", () => {
+    const outcome = (change) => {
+      const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
+      return { change, status, wroteCatalog };
+    };
+    expect(['new-card', 'no-total'].map(outcome)).toEqual([
+      { change: 'new-card', status: 0, wroteCatalog: true },
+      { change: 'no-total', status: 0, wroteCatalog: true },
+    ]);
   }, 45_000);
 
   // Extended by /ship coverage audit on 2026-10-26 (pr-ci run 8): a kind and rarity the download no longer has at all.
