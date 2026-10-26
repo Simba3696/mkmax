@@ -65,6 +65,38 @@ describe('event schedule script', () => {
     expect(nameless((s) => (s.pages[2].sections[0].records = [week('', dates.Start, dates.End)]))).toThrow(/no name/);
   });
 
+  // Generated on 2026-10-26 (/ship adversarial review, pr-ci run 20)
+  // Value: protects=a season or challenge whose name field the site sent blank (rewards not announced yet) keeps the
+  // entry's own name, so the schedule still deploys; fails_when=a blank field wins over the entry's name (the name
+  // check then fails every refresh); why_new=every case had a filled field or no name at all; seam=none;
+  // no_claim=what the site sends in that field
+  // Generated on 2026-10-26 (/ship review, pr-ci run 20, owner decision D1 A)
+  // Value: protects=a single pack, challenge or season with no name (one the site hasn't finished) is left out and the
+  // rest of the schedule still deploys; fails_when=one nameless entry fails the whole refresh again, or it's written
+  // with no name (the Cards and Plan tabs read every name); why_new=one nameless entry used to fail the script;
+  // seam=none; no_claim=a whole list with no names, which still fails (the test above)
+  it('leaves out a single entry with no name and keeps the rest', () => {
+    const dates = { Start: '30 September 2026, 16:00 UTC', End: '7 October 2026, 16:00 UTC' };
+    const kold = [week('Kold', dates.Start, dates.End)];
+    const schedule = api({ packs: [pack, { ...pack, name: ' ' }], current: kold, upcoming: [] });
+    const scorpion = record('SCORPION', { Character: 'Scorpion', ...dates });
+    schedule.pages[1].sections[0].records = [scorpion, record(undefined, dates)];
+    schedule.pages[2].sections[1].records = [week('', '7 October 2026, 16:00 UTC', '14 October 2026, 16:00 UTC')];
+    const { packs, challenges, seasons } = parseSchedule(schedule);
+    expect([packs, challenges, seasons].map((list) => list.map((e) => e.name))).toEqual([
+      ['MK11 FROST SUMMON PACK'],
+      ['Scorpion'],
+      ['Kold'],
+    ]);
+  });
+
+  it("names an entry by its own name when the site's name field is blank", () => {
+    const dates = { Start: '30 September 2026, 16:00 UTC', End: '7 October 2026, 16:00 UTC' };
+    const blank = record('GEAR WEEK', { 'Rewards Type': ' ', ...dates });
+    const { seasons } = parseSchedule(api({ packs: [pack], current: [blank], upcoming: [] }));
+    expect(seasons.map((s) => s.name)).toEqual(['GEAR WEEK']);
+  });
+
   it("keeps the season's earlier weeks after the site drops them, so an extended season is still one season", () => {
     // Captured during Kold's first week: Kold, then (added late) a second Kold week.
     const before = parseSchedule(

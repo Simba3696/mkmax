@@ -74,33 +74,42 @@ for (const [category, kind] of [['characters', 'character'], ['equipment', 'equi
   // An empty category means the API has changed; failing keeps the deployed catalog rather than shipping one
   // without card art or rarities.
   if (!items.length) throw new Error(`${category}: no items`);
-  // The repeat check below tells items apart by slug, and the app links each card to its MK Mobile Base page by it,
-  // so one without is a changed answer, not a repeat.
-  if (items.some((i) => typeof i.slug !== 'string' || !i.slug)) throw new Error(`${category}: an item has no slug`);
+  // Kameo titles read "Baraka - Klassic Kameo"; drop the suffix so names match cards like "Baraka, Klassic".
+  // The name is read after that, so a Kameo titled just "Kameo" counts as having none.
+  const nameOf = (item) => {
+    const title = typeof item.title === 'string' ? item.title : '';
+    return kind === 'kameo' ? title.replace(/\s*Kameo$/i, '') : title;
+  };
+  // The app needs a card's name, and links it to its MK Mobile Base page by slug, which the repeat check below also
+  // tells items apart by. An item without either is one the site hasn't finished: it's left out and the rest still
+  // ship. Many of them (more than a tenth and more than 3), or none left, means the API has changed, so that fails.
+  const usable = items.filter((i) => typeof i.slug === 'string' && i.slug && nameOf(i).trim());
+  const skipped = items.length - usable.length;
+  if (!usable.length || tooMany(skipped, items.length)) {
+    throw new Error(`${category}: ${skipped} of ${items.length} items have no slug or name`);
+  }
+  if (skipped) console.warn(`${category}: left out ${skipped} unfinished item(s) with no slug or name`);
   // A site that ignored the page asked for would send page 1 again and again; when it sends no item count, or the count
   // exactly fills every page, no other check here notices.
-  if (new Set(items.map((i) => i.slug)).size !== items.length) {
+  if (new Set(usable.map((i) => i.slug)).size !== usable.length) {
     throw new Error(`${category}: the same item came back twice`);
   }
-  for (const item of items) {
-    // Kameo titles read "Baraka - Klassic Kameo"; drop the suffix so names match cards like "Baraka, Klassic".
-    // The name is checked after that, so a Kameo titled just "Kameo" counts as having none.
-    const title = typeof item.title === 'string' ? item.title : '';
-    const name = kind === 'kameo' ? title.replace(/\s*Kameo$/i, '') : title;
-    if (!name.trim()) throw new Error(`${category}: an item has no name`);
+  for (const item of usable) {
     const image = httpsLink(item.image_thumb_2x_url) ?? httpsLink(item.image_url);
-    catalog.push({ kind, name, rarity: rarityOf(item), slug: item.slug, image });
+    catalog.push({ kind, name: nameOf(item), rarity: rarityOf(item), slug: item.slug, image });
   }
 }
 // Every card has art and a rarity today, so many without means the API renamed those fields; failing keeps the deployed
 // catalog rather than shipping cards without them. A tenth of the whole catalog catches a kind losing them; art is also
 // counted per kind and rarity (more than a tenth and more than 3), so a small group can't hide in the whole catalog.
-// A new card or two the site hasn't finished (no art or rarity yet) fails neither.
+// A new card or two the site hasn't finished (no art or rarity yet) fails neither, and cards with no rarity yet aren't
+// a group of their own there: they're all new, so a game update's worth would fail every deploy until the site
+// finishes them, and the tenth of the whole catalog already limits them.
 for (const key of ['image', 'rarity']) {
   const missing = catalog.filter((c) => !c[key]).length;
   if (missing > catalog.length / 10) throw new Error(`catalog: ${missing} of ${catalog.length} items have no ${key}`);
 }
-for (const [group, cards] of Map.groupBy(catalog, (c) => `${c.kind} ${c.rarity ?? 'without a rarity'}`)) {
+for (const [group, cards] of Map.groupBy(catalog.filter((c) => c.rarity), (c) => `${c.kind} ${c.rarity}`)) {
   const missing = cards.filter((c) => !c.image).length;
   if (tooMany(missing, cards.length)) {
     throw new Error(`catalog: ${missing} of ${cards.length} ${group} cards have no image`);

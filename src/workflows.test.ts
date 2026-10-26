@@ -253,12 +253,13 @@ describe('CLAUDE.md deploy status command', () => {
   })();
 
   // Generated on 2026-10-26 (/ship review, pr-ci run 19)
+  // Extended by /ship review on 2026-10-26 (pr-ci run 20): a run that timed out reads as cancelled too.
   // Value: protects=/land-and-deploy's verdict on a deploy: success once a deployment went live, cancelled when a newer
-  // merge's deploy (or a hand) cancelled its run first, failure when its run finished with none live, null while it
-  // runs, and both copies of the command alike; fails_when=a branch of the jq is dropped or reordered (a cancelled run
-  // reads failure, the cue to revert a commit that's live) or one copy is edited without the other; why_new=nothing ran
-  // the command after three fixes to it; seam=jq runs the command's own program on the run states GitHub returns;
-  // no_claim=GitHub's API answers and the shell around the jq
+  // merge's deploy (or a hand) cancelled its run first or it timed out, failure when its run finished with none live,
+  // null while it runs, and both copies of the command alike; fails_when=a branch of the jq is dropped or reordered (a
+  // cancelled or timed-out run reads failure, the cue to revert) or one copy is edited without the other;
+  // why_new=nothing ran the command after three fixes to it; seam=jq runs the command's own program on the run states
+  // GitHub returns; no_claim=GitHub's API answers and the shell around the jq
   it.skipIf(!hasJq && !process.env.CI)('says success, cancelled, failure or null, and keeps both copies alike', () => {
     const status = command('Deploy status command');
     const program = /--argjson published "\$P" '([^']+)'$/.exec(status ?? '')?.[1];

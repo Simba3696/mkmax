@@ -99,9 +99,10 @@ const live = ['character', 'equipment', 'kameo'].flatMap((kind) =>
   Array.from({ length: { shrunk: 20, 'small-drop': 5 }[change] ?? 2 }, () => ({ kind, rarity: 'gold' })),
 );
 const lastPage = change === 'no-page-count' ? undefined : change === 'zero-pages' ? 0 : change === 'endless' ? 1000 : 2;
+const noSlug = (n) => change === 'no-slug' || (change === 'one-no-slug' && n === 2);
 const card = (n) => ({
-  title: change === 'nameless' && n === 2 ? ' ' : 'Card ' + n,
-  slug: change === 'no-slug' && n === 2 ? undefined : change === 'duplicate-slugs' ? 'card' : 'card-' + n,
+  title: change === 'nameless' || (change === 'one-nameless' && n === 2) ? ' ' : 'Card ' + n,
+  slug: noSlug(n) ? undefined : change === 'duplicate-slugs' ? 'card' : 'card-' + n,
   tags: change === 'no-rarity' ? [] : [{ slug: 'gold' }],
   image_url:
     change === 'no-art'
@@ -117,18 +118,25 @@ globalThis.fetch = async (url, opts = {}) => {
   const page = /[?&]page=(\\d+)/.exec(String(url));
   const current = page && (change === 'repeated-page' ? 1 : Number(page[1]));
   // A big gold group with art and a silver group without: too few to show in the whole catalog. Or the same gold
-  // group plus one new character the site hasn't finished (no rarity, no art).
+  // group plus one new character the site hasn't finished (no rarity, no art), or with a fifth of its titles blank.
   const silver = (n) => ({ title: 'Silver ' + n, slug: 'silver-' + n, tags: [{ slug: 'silver' }] });
   const gold = (n) => Array.from({ length: 50 }, (_, i) => card(n + '-' + i));
-  const unfinished = change === 'new-card' && String(url).includes('/characters/');
+  // One new character the site hasn't finished, or a game update's worth (4).
+  const newCards = change === 'new-card' ? 1 : change === 'new-cards' ? 4 : 0;
+  const unfinished = newCards > 0 && String(url).includes('/characters/');
+  const newCard = (i) => ({ title: 'New ' + i, slug: 'new-' + i });
+  const fresh = unfinished && current === 1 ? Array.from({ length: newCards }, (_, i) => newCard(i)) : [];
   const data =
     change === 'small-group-no-art'
       ? [...gold(current), ...Array.from({ length: 5 }, (_, i) => silver(current + '-' + i))]
-      : change === 'new-card'
-        ? [...gold(current), ...(unfinished && current === 1 ? [{ title: 'New', slug: 'new' }] : [])]
-        : [card(current)];
-  const perPage = data.length - (unfinished && current === 1 ? 1 : 0);
-  const total = (Number.isInteger(lastPage) ? lastPage : 0) * perPage + (unfinished ? 1 : 0) + (change === 'skipped-item' ? 1 : 0);
+      : newCards
+        ? [...gold(current), ...fresh]
+        : change === 'many-nameless'
+          ? gold(current).map((c, i) => (i < 10 ? { ...c, title: ' ' } : c))
+          : [card(current)];
+  const perPage = data.length - fresh.length;
+  const pages = Number.isInteger(lastPage) ? lastPage : 0;
+  const total = pages * perPage + (unfinished ? newCards : 0) + (change === 'skipped-item' ? 1 : 0);
   if (change === 'kameo-only-suffix' && String(url).includes('/kameos/')) data[0] = { ...data[0], title: 'Kameo' };
   // A page count that shrinks from 3 to 2 after the first page, with no item count to give it away.
   const shifting = change === 'shifting-pages';
@@ -257,6 +265,8 @@ describe('download scripts', () => {
   // later one (the item count added on this branch) still fails the same case; why_new=the cases asserted the exit
   // code and that nothing was written, not which check failed them; seam=none; no_claim=the wording of each error
   // beyond the matched phrase
+  // Changed by /ship review on 2026-10-26 (pr-ci run 20, owner decision D1 A): items with no name or slug fail only
+  // when a whole category has none, or past the allowance (many-nameless); one alone is left out (the test below).
   it("fail without writing when MK Mobile Base's catalog answers look wrong or come too slowly", () => {
     // Each change is matched to the check that should catch it, so a case can't stay green because another check
     // (the item count, say) fails it first.
@@ -270,12 +280,13 @@ describe('download scripts', () => {
       'duplicate-slugs': 'the same item came back twice',
       shrunk: 'down from',
       slow: 'still downloading after 5 minutes',
-      nameless: 'an item has no name',
+      nameless: 'items have no slug or name',
+      'many-nameless': 'items have no slug or name',
       'skipped-item': 'the site says',
       'small-group-no-art': 'cards have no image',
-      'kameo-only-suffix': 'an item has no name',
+      'kameo-only-suffix': 'items have no slug or name',
       'shifting-pages': 'the page count changed',
-      'no-slug': 'an item has no slug',
+      'no-slug': 'items have no slug or name',
       'object-art': 'items have no image',
       'http-art': 'items have no image',
     };
@@ -350,17 +361,20 @@ describe('download scripts', () => {
   }, 45_000);
 
   // Generated on 2026-10-26 (/ship review, pr-ci run 8 pass 4)
+  // Extended on 2026-10-26 (/ship adversarial review, pr-ci run 20): four unfinished cards at once, as after an update.
   // Value: protects=a healthy catalog still deploys when the site has a new card it hasn't finished (no rarity or art
-  // yet) or stops sending its item count; fails_when=one unfinished card fails a whole group (the earlier all-of-a-group
-  // rule), or a missing total is treated as a mismatch; why_new=every passing case had finished cards and a total;
-  // seam=none (STUB_CHANGE only changes the stand-in's answers); no_claim=how many unfinished cards are too many
+  // yet), or four of them, or stops sending its item count; fails_when=one unfinished card fails a whole group (the
+  // earlier all-of-a-group rule), cards without a rarity are counted as a group of their own, or a missing total is
+  // treated as a mismatch; why_new=every passing case had finished cards and a total; seam=none (STUB_CHANGE only
+  // changes the stand-in's answers); no_claim=how many unfinished cards are too many
   it("write the catalog with a new unfinished card, or when the site doesn't send a count", () => {
     const outcome = (change) => {
       const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
       return { change, status, wroteCatalog };
     };
-    expect(['new-card', 'no-total'].map(outcome)).toEqual([
+    expect(['new-card', 'new-cards', 'no-total'].map(outcome)).toEqual([
       { change: 'new-card', status: 0, wroteCatalog: true },
+      { change: 'new-cards', status: 0, wroteCatalog: true },
       { change: 'no-total', status: 0, wroteCatalog: true },
     ]);
   }, 45_000);
@@ -380,6 +394,27 @@ describe('download scripts', () => {
       { kind, name: 'Card 2', rarity: 'gold', slug: 'card-2', image: 'https://img.test/2' },
     ]);
     expect([status, written?.items]).toEqual([0, cards]);
+  }, 45_000);
+
+  // Generated on 2026-10-26 (/ship review, pr-ci run 20, owner decision D1 A)
+  // Value: protects=an item the site hasn't finished (no name or no slug) is left out with a warning and the rest of
+  // the catalog still ships; fails_when=one unfinished item fails the whole refresh again, or it's written without a
+  // name or slug; why_new=a single nameless or slugless item used to fail the script; seam=none (STUB_CHANGE only
+  // changes the stand-in's answers); no_claim=the allowance past which they fail (the bad-answer test's many-nameless
+  // case covers that)
+  it("leave out an item the site hasn't finished and write the rest", () => {
+    const written = (change) => {
+      const root = scratchRepo('fetch-catalog.mjs');
+      const { status, stderr } = spawnOnline(root, 'fetch-catalog.mjs', change);
+      const items = status ? [] : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).items;
+      const slugs = items.map((i) => i.kind + ' ' + i.slug);
+      return { change, status, warned: /left out 1 unfinished item/.test(stderr), slugs };
+    };
+    const kinds = ['character', 'equipment', 'kameo'];
+    expect(['one-nameless', 'one-no-slug'].map(written)).toEqual([
+      { change: 'one-nameless', status: 0, warned: true, slugs: kinds.map((k) => k + ' card-1') },
+      { change: 'one-no-slug', status: 0, warned: true, slugs: kinds.map((k) => k + ' card-1') },
+    ]);
   }, 45_000);
 
   // Extended by /ship coverage audit on 2026-10-26 (pr-ci run 8): a kind and rarity the download no longer has at all.
