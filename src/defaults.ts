@@ -78,11 +78,12 @@ export function sampleState(): AppState {
   s.rarities[0].fusionUpKards = 3;
   s.cards = [
     // Stored levels: 1 = F0, 3 = F2, 11 = F10, 14 = A3 …
-    { id: 'c1', name: 'Klassic Sub-Zero', rarityId: 'diamond', fusion: 3, guest: false },
+    // Cards MK Mobile Base lists keep its rarity, so loading the sample shows no rarity notice on Cards.
+    { id: 'c1', name: 'MK11 Sub-Zero', rarityId: 'diamond', fusion: 3, guest: false },
     { id: 'c2', name: 'Guest Rambo', rarityId: 'diamond', fusion: 0, guest: true },
-    { id: 'c3', name: 'Dark Raiden', rarityId: 'diamond', fusion: 7, guest: false },
+    { id: 'c3', name: 'Klassic Raiden', rarityId: 'diamond', fusion: 7, guest: false },
     { id: 'c4', name: 'Shaolin Liu Kang', rarityId: 'diamond', fusion: 2, guest: false },
-    { id: 'c5', name: 'Kold War Scorpion', rarityId: 'gold', fusion: 14, guest: false },
+    { id: 'c5', name: 'Inferno Scorpion', rarityId: 'gold', fusion: 14, guest: false },
     { id: 'c6', name: 'Cryomancer Frost', rarityId: 'gold', fusion: 13, maxLevel: 16, guest: false },
     { id: 'c7', name: 'Shadow Sash', rarityId: 'epic', fusion: 5, guest: false },
     { id: 'c8', name: 'Kombat Kunai', rarityId: 'epic', fusion: 2, guest: false, source: 'krypt' },
