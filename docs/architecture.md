@@ -18,7 +18,7 @@ flowchart LR
   App <-->|"localStorage"| LS[("Saved state")]
   App <-->|"optional, user's token"| Gist[("Secret GitHub Gist")]
   App -->|"image search fallback,<br/>hotlinked art cached by<br/>the service worker"| Wiki["MK Mobile wiki<br/>(API and image host)"]
-  App -.->|"hotlinked art, cached by<br/>the service worker"| MKBImg["MK Mobile Base<br/>image host"]
+  App -.->|"hotlinked art, cached by<br/>the service worker"| MKBImg["MK Mobile Base images<br/>(same site, img tags only)"]
 ```
 
 Two constraints shape this:
