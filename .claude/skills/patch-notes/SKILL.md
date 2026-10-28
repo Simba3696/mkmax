@@ -29,7 +29,7 @@ Go through the notes line by line. Every line lands in exactly one bucket.
 | A new kind of card or rarity | `defaultRarities()` in `src/defaults.ts`, `RarityRule['kind']` in `src/types.ts` | Yes, added once so deleting it sticks (see version 6, Uncommon) |
 | New Gold Elder challenge characters | `CHALLENGE_CHARACTERS` in `src/challenges.ts` | No: new Gold Kameos are tagged when added. Tagging Kameos already in the app needs one |
 | A challenge taken out of rotation | `RETIRED_CHALLENGES` in `src/challenges.ts` | Yes, to untag those Kameos once (see version 7) |
-| **Every update:** its newest characters and gear | Replace `KASKET_EXCLUDED` in `src/kaskets.ts` with them, each with its app rarity id such as `diamond` or `epic` (Kaskets leave them out until the next update) and update its date comment. The Kasket tests in `src/engine.test.ts` use the current names (Sub-Zero MK1, Man in Control and others), so swap them for names from the new list. Ask the user which cards are newest if the notes don't say | No |
+| **Every update:** its newest characters and gear | Replace `KASKET_EXCLUDED` in `src/kaskets.ts` with them, each with its app rarity id such as `diamond` or `epic` (Kaskets leave them out until the next update) and update its date comment. The Kasket tests in `src/engine.test.ts` use names from the current list (Noob Saibot MK1, Mileena Assassin, Havik's Patronage and others), so swap them for names from the new list, except the "update before's newest cards are back in the pool" check (Sub-Zero MK1 now), which takes a name from the list you're replacing. Ask the user which cards are newest if the notes don't say | No |
 | A new Kasket in the shop | `KASKET_RARITY` in `src/kaskets.ts` (its schedule name and rarity) | Only to convert Kaskets already entered by hand (see version 15) |
 | New Realm Klash gear, or a renamed piece | `REALM_KLASH_GEAR` (which pieces get no kards and are always tracked to max; believed final) and `DEFAULT_GEAR_ORDER` in `src/engine.ts`, plus the `listed` names in the `recognises Realm Klash gear by name` test, the list of names in `docs/user-guide.md`, the count of pieces (10) in `AGENTS.md`, `docs/how-it-works.md` and `docs/user-guide.md`, and "the other five" after the default order in `docs/how-it-works.md` and `docs/user-guide.md` | No, unless saved gear order needs fixing |
 | Realm Klash season length changed | `SEASON_DAYS` in `src/engine.ts` | No |
@@ -98,6 +98,7 @@ Ask about anything the notes leave out. Never guess a number the notes don't giv
 - Code changes follow AGENTS.md:
   - tests for engine and normalize changes;
   - the docs updated in the same change, including the game-rules list in AGENTS.md when a rule changed;
-  - `npm run lint`, `npm test` and `npm run build` all passing.
+  - `npm run lint`, `npm test` and `npm run build` all passing;
+  - the README screenshots retaken last when the change can change what a screen shows (see `docs/development.md` → Screenshots).
 - Commit on a new branch with a Conventional Commits type, then a plain lowercase sentence saying what the user sees, as AGENTS.md describes (for example "fix: give Gold ascension the game's Fusion Up Kard costs …"). `main` takes changes only as a squash-merged pull request that is up to date with `main` and whose `check` passed, so open one with `/ship` and land it with `/land-and-deploy`; a push straight to `main` is refused.
 - Give the user the Paste a list block last, with a sentence on where to paste it (Cards → **Paste a list…**).

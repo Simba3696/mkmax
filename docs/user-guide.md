@@ -151,7 +151,7 @@ Pop-ups (like the pack editor) sit above the rest of the app and scroll on their
 
 ### Two-tap buttons
 
-**Delete**, **Clear expired**, **Ended early**, **Disconnect this device**, **Load sample data**, **Erase everything**, **✕** on the [Maxed](#maxed) page, and a rarity's **Remove** when it has cards on the Maxed record need two taps. The first tap changes the button to **Tap again to confirm** for 3 seconds, and only a second tap within those 3 seconds acts, once: a later tap starts over, and so does one after going to another tab and back. Cards, Tower gear and Maxed stay open behind each other, so a quick switch between them keeps the 3 seconds running.
+**Delete**, **Clear expired**, **Ended early**, **Disconnect this device**, **Load sample data**, **Erase everything**, **Discard it** (for unreadable saved data), **✕** on the [Maxed](#maxed) page, and a rarity's **Remove** when it has cards on the Maxed record need two taps. The first tap changes the button to **Tap again to confirm** for 3 seconds, and only a second tap within those 3 seconds acts, once: a later tap starts over, and so does one after going to another tab and back. Cards, Tower gear and Maxed stay open behind each other, so a quick switch between them keeps the 3 seconds running.
 
 ### Undo
 

@@ -24,4 +24,4 @@ A design note is a plan in the conversation, not a file in the repo. Keep it to 
 
 ## After agreement
 
-Implement, run `npm run lint`, `npm test` and `npm run build`, update the docs, and update `docs/architecture.md` if the structure changed.
+Implement, run `npm run lint`, `npm test` and `npm run build`, update the docs, and update `docs/architecture.md` if the structure changed. If the change can change what a screen shows, retake the README screenshots last, once the code is final (see `docs/development.md` → Screenshots).
