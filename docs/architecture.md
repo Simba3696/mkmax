@@ -17,8 +17,8 @@ flowchart LR
   GP --> App["MK Max in the browser"]
   App <-->|"localStorage"| LS[("Saved state")]
   App <-->|"optional, user's token"| Gist[("Secret GitHub Gist")]
-  App -->|"image search fallback,<br/>hotlinked art"| Wiki["MK Mobile wiki<br/>(API and image host)"]
-  App -.->|"hotlinked art,<br/>cached by the service worker"| MKB
+  App -->|"image search fallback,<br/>hotlinked art cached by<br/>the service worker"| Wiki["MK Mobile wiki<br/>(API and image host)"]
+  App -.->|"hotlinked art, cached by<br/>the service worker"| MKB
 ```
 
 Two constraints shape this:
