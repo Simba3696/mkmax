@@ -24,7 +24,7 @@ Saved data reaches the app from localStorage, backups and the gist, and all of i
 4. Add a test in the matching `*.test.ts` that loads an old-version save through `normalize()` and checks the result, plus one showing that a save already at the new version isn't changed again.
 5. `src/sync.ts` treats `version <= 2` as an outdated app. Leave that alone.
 6. If users will notice the change, describe it in `docs/user-guide.md` or `docs/how-it-works.md`. Note the migration in `docs/development.md` only if it has a story worth keeping (like the 2026-09-28 one).
-7. Run `npm run lint`, `npm test` and `npm run build`.
+7. Run `npm run lint`, `npm test` and `npm run build`. If the change can change what a screen shows, retake the README screenshots last (see `docs/development.md` → Screenshots).
 
 ## Pitfalls
 
