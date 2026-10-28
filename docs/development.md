@@ -80,7 +80,7 @@ Only the content area scrolls; the header, the tab bar and the new-version bar (
 
 ## Screenshots
 
-`docs/screenshots/` holds the README images: Plan, Packs and Cards with the sample data (Settings → Load sample data), at 2× scale. `plan.png`, `packs.png` and `cards.png` are the phone shots at 390×844; the `-tablet` ones are 768×1024 and the `-desktop` ones 1440×900. Each shows the top of its tab, with **In the shop** folded on Packs and any MK Mobile Base rarity notice on Cards answered with **Keep mine for all**, so the shots show the cards. Retake all nine after any change to the app's code, once the code is final, so they show the latest build.
+`docs/screenshots/` holds the README images: Plan, Packs and Cards with the sample data (Settings → Load sample data), at 2× scale. `plan.png`, `packs.png` and `cards.png` are the phone shots at 390×844; the `-tablet` ones are 768×1024 and the `-desktop` ones 1440×900. Each shows the top of its tab, with **In the shop** folded on Packs and any MK Mobile Base rarity notice on Cards answered with **Keep mine for all** (or **Keep mine** when only one card disagrees), so the shots show the cards. Retake all nine after any change to the app's code, once the code is final, so they show the latest build.
 
 ## Icons
 

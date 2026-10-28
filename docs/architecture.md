@@ -4,7 +4,7 @@ How MK Max is put together and why. For the scoring maths, see [How it works](ho
 
 ## System context
 
-MK Max is a static, client-only PWA. There's no backend: everything the app knows lives in the browser, and the only outside services it calls at runtime are GitHub (optional sync) and the MK Mobile wiki (an image fallback). Card art is loaded straight from MK Mobile Base and the wiki.
+MK Max is a static, client-only PWA. There's no backend: everything the app knows lives in the browser, and at runtime it calls only GitHub (optional sync) and the MK Mobile wiki (an image search fallback). Card art is the one other outside load: images come straight from MK Mobile Base and the wiki's image host, or from any image link you paste on a card.
 
 ```mermaid
 flowchart LR
