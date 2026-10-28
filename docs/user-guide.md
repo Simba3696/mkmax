@@ -45,7 +45,7 @@ You don't need to create currencies or rarities. You can rename, remove or add t
 
 Settings → Data → **Load sample data** loads a small made-up set:
 
-- 10 cards, such as Klassic Sub-Zero and Guest Rambo.
+- 10 cards, such as MK11 Sub-Zero and Guest Rambo.
 - 4 packs: three ending 2 to 6 days from now, and one permanent.
 - 1200 Souls, 900 Blood Rubies and 3 Diamond kards.
 
