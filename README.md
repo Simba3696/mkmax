@@ -13,6 +13,22 @@
   <img src="docs/screenshots/cards.png" width="260" alt="Cards: your tracked cards, with Tower gear and Maxed a tap away">
 </p>
 
+<details>
+<summary>On a tablet and a desktop</summary>
+
+<p align="center">
+  <img src="docs/screenshots/plan-tablet.png" width="260" alt="Plan on a tablet, with the side rail">
+  <img src="docs/screenshots/packs-tablet.png" width="260" alt="Packs on a tablet">
+  <img src="docs/screenshots/cards-tablet.png" width="260" alt="Cards on a tablet">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/plan-desktop.png" width="800" alt="Plan on a desktop: Wallet and What to buy beside Priority targets and Pack ranking">
+  <img src="docs/screenshots/packs-desktop.png" width="800" alt="Packs on a desktop, two columns of packs">
+  <img src="docs/screenshots/cards-desktop.png" width="800" alt="Cards on a desktop, two columns of cards">
+</p>
+</details>
+
 ## Features
 
 - **Purchase plan.** For each currency (Souls, Blood Rubies, Dragon Krystals, or any you add) it recommends what to buy, putting limited-time packs first, and tells you when to save for a pack that hasn't started yet. Tap a pack to jump to it, or log a purchase without leaving the plan. With a daily income set, it says when you'll afford what it's saving for.
