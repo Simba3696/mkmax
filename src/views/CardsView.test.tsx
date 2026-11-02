@@ -659,7 +659,7 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     fireEvent.change(document.querySelector('textarea')!, { target: { value: lines } });
     act(() => update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'gold'))));
     expect(form.queryAllByText(/^Skipped "/).map((li) => li.textContent)).toEqual([
-      'Skipped "Kitana - Bogus": "Bogus" isn’t a rarity, source, level or stage.',
+      'Skipped "Kitana - Bogus": "Bogus" isn’t a rarity, source, level, stage or waiting count.',
       'Skipped "Scorpion, Klassic": its rarity has since been removed.',
     ]);
   });
@@ -1006,8 +1006,8 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     pasteList('Kitana - Bogus\nKitana - Bogus\nGold\nJade, Lizard\nGold Kameo\nJade, Lizard');
     act(() => update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'gold' && r.id !== 'kameo-gold'))));
     expect(form.queryAllByText(/^Skipped "/).map((li) => li.textContent)).toEqual([
-      'Skipped "Kitana - Bogus": "Bogus" isn’t a rarity, source, level or stage.',
-      'Skipped "Kitana - Bogus": "Bogus" isn’t a rarity, source, level or stage.',
+      'Skipped "Kitana - Bogus": "Bogus" isn’t a rarity, source, level, stage or waiting count.',
+      'Skipped "Kitana - Bogus": "Bogus" isn’t a rarity, source, level, stage or waiting count.',
       'Skipped "Jade, Lizard": its rarity has since been removed.',
       'Skipped "Jade, Lizard": its rarity has since been removed.',
     ]);
@@ -1398,7 +1398,7 @@ describe('Cards: levels and Add card on a screen a sync has changed', () => {
     act(() => update((d) => void (d.rarities = d.rarities.filter((r) => r.id !== 'gold'))));
     const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
     pasteList('Jade, Lizard - Gold - F2\nKitana');
-    expect([form.queryByText(/has since been removed/), form.queryByText(/isn.t a rarity, source, level or stage/) != null]).toEqual([null, true]);
+    expect([form.queryByText(/has since been removed/), form.queryByText(/isn.t a rarity, source, level, stage or waiting count/) != null]).toEqual([null, true]);
   });
 
   // Regression: /ship review of stale-screens-and-schedule — a list kept by Cancel lost the rarities it was typed with
@@ -4571,5 +4571,196 @@ describe('Cards: the Tower list with Undo, a sync and a page switch', () => {
     act(() => update((d) => void (d.cards.find((c) => c.id === 'kunai')!.sourceNote = 'shirai ryu tower')));
     appShows('hidden');
     expect([towerOf('Frost Fan'), lastUndo]).toEqual([undefined, null]);
+  });
+});
+
+describe('Cards: copies waiting on Ascension Kards', () => {
+  let lastUndo: ReturnType<typeof useStore>['lastUndo'] = null;
+  let update!: ReturnType<typeof useStore>['update'];
+  let undoNow!: () => void;
+  function renderWith(tweak: (s: ReturnType<typeof defaultState>) => void) {
+    const s = defaultState();
+    tweak(s);
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <Grab
+            onRender={(store) => {
+              lastUndo = store.lastUndo;
+              update = store.update;
+              undoNow = () => store.undo(store.lastUndo!);
+            }}
+          />
+          <CardsView sub="cards" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    return vi.spyOn(SyncLoop.prototype, 'nextStamp');
+  }
+  const saved = () => JSON.parse(localStorage.getItem('mkmax:v1')!);
+  // A5 is stored as 16 (F10 is 11), with a Max of A5.
+  const kenshi = { id: 'kenshi', name: 'Kenshi, Elder God', rarityId: 'gold', fusion: 15, guest: false, maxLevel: 16 };
+
+  // Value: protects=a Gold card with its last copy waiting stays listed and says so, and Ascend raises it to its cap,
+  // moving it to Maxed with an Undo; fails_when=the card is removed while its copy waits, or Ascend gets no Undo
+  it('lists a card whose copies all wait, and Ascend maxes it with Undo', () => {
+    renderWith((s) => void (s.cards = [{ ...kenshi, waiting: 1 }]));
+    expect(screen.getByText('all copies waiting')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Use \d+ kard/ })).toBeNull();
+    act(() => screen.getByRole('button', { name: 'Ascend to A5' }).click());
+    expect([saved().cards, saved().maxed.map((m: { name: string }) => m.name)]).toEqual([[], ['Kenshi, Elder God']]);
+    expect(lastUndo?.label).toBe('Ascended Kenshi, Elder God to A5 · Kenshi, Elder God is maxed and removed');
+  });
+
+  // Value: protects=the Waiting stepper counts copies within what the card can use, and a tap a sync has made out of date
+  // saves nothing; fails_when=+ goes past the copies left to the cap, or a stale tap stamps the save
+  it('steps the waiting count up to the copies left, and saves nothing for a tap a sync made out of date', () => {
+    const stamps = renderWith((s) => void (s.cards = [{ ...kenshi, fusion: 14 }]));
+    const more = screen.getByRole('button', { name: 'One more copy waiting' });
+    act(() => more.click());
+    act(() => more.click());
+    expect([saved().cards[0].waiting, (more as HTMLButtonElement).disabled]).toEqual([2, true]);
+    expect(screen.getByText('all copies waiting')).toBeTruthy();
+    stamps.mockClear();
+    const fewer = screen.getByRole('button', { name: 'One fewer copy waiting' });
+    act(() => {
+      update((d) => void (d.cards[0].waiting = 1));
+      fewer.click();
+    });
+    expect([saved().cards[0].waiting, stamps.mock.calls.length]).toEqual([1, 1]);
+  });
+
+  // Value: protects=a Gold card entered at its cap while copies still waited comes back off the Maxed record with a
+  // pasted waiting count; fails_when=Paste a list skips the line as already maxed
+  it('brings a maxed Gold card back from a pasted line with a waiting count', () => {
+    renderWith((s) => void (s.maxed = [{ name: 'Kenshi, Elder God', rarityId: 'gold' }]));
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Kenshi, Elder God - Gold - Stage I - A3 - waiting 2' } });
+    act(() => form.getByRole('button', { name: 'Add 1' }).click());
+    expect([saved().cards.map((c: { name: string; fusion: number; waiting?: number }) => [c.name, c.fusion, c.waiting]), saved().maxed]).toEqual([[['Kenshi, Elder God', 14, 2]], []]);
+  });
+
+  // Regression: /review of ascension-waiting — a "waiting 0" line brought a maxed card back, even as not owned
+  // Found by /review on 2026-11-02 (adversarial, maintainability and testing reviews)
+  // Value: protects=a waiting count of 0 doesn't take a card off the Maxed record; fails_when=bringsBack counts any
+  // waiting part, so a roster pasted with a waiting column of 0s undoes every maxed Gold card
+  it('skips a maxed card pasted with waiting 0', () => {
+    renderWith((s) => void (s.maxed = [{ name: 'Kenshi, Elder God', rarityId: 'gold' }]));
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Kenshi, Elder God - Gold - waiting 0' } });
+    expect(form.queryByRole('button', { name: /^Add 1/ })).toBeNull();
+    expect(form.getByText(/skipping 1 already maxed/)).toBeTruthy();
+    expect([saved().cards, saved().maxed]).toEqual([[], [{ name: 'Kenshi, Elder God', rarityId: 'gold' }]]);
+  });
+
+  // Regression: /ship review of ascension-waiting — a + that used a waiting copy had no Undo, and − didn't give it back
+  // Found by /ship on 2026-11-02 (state machines and red team)
+  // Value: protects=a level + that uses a waiting copy offers Ascend's Undo, which puts the copy back; fails_when=the tap
+  // saves with no Undo label, so + then − loses a copy the user has
+  it('offers Undo for a level + that uses a waiting copy, and the Undo puts the copy back', () => {
+    renderWith((s) => void (s.cards = [{ ...kenshi, fusion: 11, waiting: 3 }]));
+    act(() => screen.getByRole('button', { name: 'Raise level' }).click());
+    expect([saved().cards[0].fusion, saved().cards[0].waiting, lastUndo?.label]).toEqual([12, 2, 'Ascended Kenshi, Elder God to A1']);
+    act(() => lastUndo && undoNow());
+    expect([saved().cards[0].fusion, saved().cards[0].waiting]).toEqual([11, 3]);
+  });
+
+  // Regression: /ship review of ascension-waiting — a pasted level reached by ascending kept the copies it used as waiting
+  // Found by /ship on 2026-11-02 (red team)
+  // Value: protects=a pasted level past F10 with no waiting part uses up that many waiting copies, and a pasted
+  // "waiting 0" clears the count rather than saving 0; fails_when=Object.assign keeps the old count, counting copies twice
+  it('takes ascended steps off the waiting count when a pasted line raises the level, and clears it for waiting 0', () => {
+    renderWith((s) => void (s.cards = [{ ...kenshi, fusion: 11, waiting: 3 }, { ...kenshi, id: 'balanced', name: 'Kenshi, Balanced', fusion: 14, waiting: 2 }]));
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Kenshi, Elder God - Gold - A2\nKenshi, Balanced - Gold - waiting 0' } });
+    act(() => form.getByRole('button', { name: /update 2/ }).click());
+    const cards = saved().cards as { name: string; fusion: number; waiting?: number }[];
+    expect(cards.map((c) => [c.name, c.fusion, 'waiting' in c ? c.waiting : 'none'])).toEqual([['Kenshi, Elder God', 13, 1], ['Kenshi, Balanced', 14, 'none']]);
+  });
+
+  // Regression: /ship fix-check of ascension-waiting — a pasted level with an unchanged waiting count lost copies
+  // Found by /ship on 2026-11-02 (fix-check and adversarial review)
+  // Value: protects=a pasted line giving a new level and the card's current waiting count keeps that count; fails_when=the
+  // parser drops an unchanged count from the update, so the save takes the ascended steps off copies the user typed
+  it('keeps a waiting count pasted with a new level, even when the count is unchanged', () => {
+    renderWith((s) => void (s.cards = [{ ...kenshi, fusion: 11, waiting: 3 }]));
+    const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+    fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: 'Kenshi, Elder God - Gold - A2 - waiting 3' } });
+    act(() => form.getByRole('button', { name: /update 1/ }).click());
+    expect([saved().cards[0].fusion, saved().cards[0].waiting]).toEqual([13, 3]);
+  });
+
+  // Regression: /ship review of ascension-waiting (Codex) — a sync that added a waiting copy made + ascend with no Undo
+  // Found by /ship on 2026-11-02
+  // Value: protects=a level tap steps only from the level and waiting count the row showed; fails_when=the guard checks
+  // the level alone, so + uses a copy a sync just added, under a label worked out from the old screen
+  it('saves nothing for a level + after a sync changed the waiting count', () => {
+    const stamps = renderWith((s) => void (s.cards = [{ ...kenshi, fusion: 11 }]));
+    const raise = screen.getByRole('button', { name: 'Raise level' });
+    stamps.mockClear();
+    act(() => {
+      update((d) => void (d.cards[0].waiting = 2));
+      raise.click();
+    });
+    expect([saved().cards[0].fusion, saved().cards[0].waiting, stamps.mock.calls.length]).toEqual([11, 2, 1]);
+  });
+
+  // Value: protects=a Waiting tap offers Undo with the count it set; fails_when=the stepper saves with no Undo label
+  it('offers Undo for a Waiting tap, naming the new count', () => {
+    renderWith((s) => void (s.cards = [{ ...kenshi, fusion: 14 }]));
+    act(() => screen.getByRole('button', { name: 'One more copy waiting' }).click());
+    expect(lastUndo?.label).toBe('Kenshi, Elder God: 1 waiting on Ascension Kards');
+  });
+
+  /** The card's own block in the list: the nearest one holding its Delete button. */
+  const rowOf = (name: string) => {
+    let el: HTMLElement | null = screen.getByText(name);
+    while (el && !within(el).queryByRole('button', { name: 'Delete' })) el = el.parentElement;
+    return within(el!);
+  };
+
+  // Generated by /ship test coverage audit on 2026-11-02
+  // Value: protects=a card with some copies waiting shows both what's left and the waiting count, and a card that can't
+  // hold copies gets no Waiting stepper or Ascend; fails_when=the "N waiting" chip's condition goes, or the room>0 guard
+  // does and every card shows a stepper; why_new=only a card with all copies waiting was drawn; seam=none;
+  // no_claim=a Diamond or gear card (same guard, Gold below F10 stands in)
+  it('shows copies still to collect beside the waiting count, and no Waiting controls on a card below F10', () => {
+    // A2 is stored as 13, with a Max of A5 (16): 3 copies to go, 1 of them waiting.
+    renderWith((s) => void (s.cards = [{ ...kenshi, fusion: 13, waiting: 1 }, { id: 'kano', name: 'Kano, Klassic', rarityId: 'gold', fusion: 10, guest: false }]));
+    const ken = rowOf('Kenshi, Elder God');
+    expect([ken.queryByText('2 to A5') != null, ken.queryByText('1 waiting') != null, ken.queryByText('all copies waiting')]).toEqual([true, true, null]);
+    expect(ken.getByRole('button', { name: 'Ascend to A3' })).toBeTruthy();
+    const kano = rowOf('Kano, Klassic');
+    expect([kano.queryByRole('button', { name: 'One more copy waiting' }), kano.queryByRole('button', { name: /^Ascend/ }), kano.queryByText(/waiting/)]).toEqual([null, null, null]);
+  });
+
+  // Generated by /ship test coverage audit on 2026-11-02
+  // Value: protects=Paste a list updates a listed card's waiting count, and a line a sync already matched saves nothing;
+  // fails_when=the waiting patch is dropped, or the update check compares the raw value, so a 0 line over a count a sync
+  // cleared saves "waiting: 0" with an Undo; why_new=parse is tested, not the Update tap; seam=a grabbed update stands in
+  // for the sync; no_claim=a real sync between devices
+  it('updates a listed card’s waiting count from a pasted line, and saves nothing for one a sync already matched', () => {
+    const stamps = renderWith((s) => void (s.cards = [{ ...kenshi, fusion: 14 }]));
+    const paste = (line: string) => {
+      const form = within(screen.getByRole('heading', { name: 'Add card' }).closest('section')!);
+      fireEvent.click(form.getByRole('button', { name: 'Paste a list…' }));
+      fireEvent.change(document.querySelector('textarea')!, { target: { value: line } });
+      return form.getByRole('button', { name: 'update 1' });
+    };
+    const first = paste('Kenshi, Elder God - Gold - waiting 2');
+    act(() => first.click());
+    expect([saved().cards.map((c: { waiting?: number }) => c.waiting), lastUndo?.label]).toEqual([[2], 'Updated 1']);
+    const zero = paste('Kenshi, Elder God - Gold - waiting 0');
+    stamps.mockClear();
+    act(() => {
+      update((d) => void delete d.cards[0].waiting);
+      zero.click();
+    });
+    expect(['waiting' in saved().cards[0], stamps.mock.calls.length]).toEqual([false, 1]);
   });
 });

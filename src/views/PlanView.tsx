@@ -202,7 +202,7 @@ export default function PlanView({ goto, openPack }: { goto: (t: 'packs' | 'card
                       <button
                         className="text-small"
                         onClick={() => buyNow(b.pack)}
-                        title={b.pack.store ? 'Adds a purchase, deducts the cost and levels up the card' : 'Adds a purchase, deducts the cost and opens the pack to log what you pulled'}
+                        title={b.pack.store ? 'Adds a purchase, deducts the cost and adds the copy to its card' : 'Adds a purchase, deducts the cost and opens the pack to log what you pulled'}
                       >
                         Bought one
                       </button>

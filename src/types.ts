@@ -45,6 +45,13 @@ export interface Card {
    */
   noKards?: boolean;
   /**
+   * Copies collected but waiting on Ascension Kards: in the game a duplicate of a Gold card at F10 or past it stays on
+   * the card until an Ascension Kard ascends it. Counts only on a card that ascends further, and at most the copies
+   * left to its cap: it's limited when read (engine waitingCopies), so a level or Max change made back restores it. The
+   * card stays listed until it's ascended.
+   */
+  waiting?: number;
+  /**
    * Where it comes from besides packs: Krypt or tower gear, or a Kameo from an Elder challenge. Tracked, but not
    * planned for unless a pack sells it.
    */
@@ -135,8 +142,8 @@ export interface MaxedCard {
 }
 
 export interface AppState {
-  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. 8–9 = renamed packs and cards to the game's spelling. 10 = fixed "Kollector’S" pack names and gave Blood Rubies a daily income. 11 = removed Time Krystals (console-only) when unused. 12 = gave Epic and Rare gear their own kard costs and Kameos guests. 13 = gave Gold ascension the game's kard costs. 14 = switched rarities with no kards from the kard threshold to max. 15 = turned hand-made Kaskets into Kaskets. 16 = added No kards on cards, which older builds would ignore. 17 = added the Maxed record, which older builds would drop. 18 = saved each tower in the one spelling the Tower list shows. */
-  version: 18;
+  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. 8–9 = renamed packs and cards to the game's spelling. 10 = fixed "Kollector’S" pack names and gave Blood Rubies a daily income. 11 = removed Time Krystals (console-only) when unused. 12 = gave Epic and Rare gear their own kard costs and Kameos guests. 13 = gave Gold ascension the game's kard costs. 14 = switched rarities with no kards from the kard threshold to max. 15 = turned hand-made Kaskets into Kaskets. 16 = added No kards on cards, which older builds would ignore. 17 = added the Maxed record, which older builds would drop. 18 = saved each tower in the one spelling the Tower list shows. 19 = added copies waiting on Ascension Kards on cards, which older builds would plan for again. */
+  version: 19;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];

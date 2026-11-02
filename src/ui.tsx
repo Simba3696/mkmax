@@ -380,7 +380,11 @@ export function ConfirmButton({ label, onConfirm, className, title, ariaLabel }:
 export function kardNotes(plan: KardPlan, rule: RarityRule, cards: Map<string, Card>): string[] {
   if (plan.cards === 0) {
     // Cards at the threshold that kards can't go to are named, or "no card at F3" would be wrong.
-    const none = [plan.realmKlash > 0 && 'Realm Klash gear gets none.', plan.noKards && 'Cards marked No kards get none.'].filter(Boolean).join(' ');
+    const none = [
+      plan.realmKlash > 0 && 'Realm Klash gear gets none.',
+      plan.noKards && 'Cards marked No kards get none.',
+      plan.waiting && 'Cards with every copy waiting on Ascension Kards need none.',
+    ].filter(Boolean).join(' ');
     return [
       none
         ? `No ${rule.label} card at F${rule.fusionUpThreshold} or higher that kards can go to yet, so these kards wait. ${none}`
@@ -453,7 +457,13 @@ export function kasketLine(pool: KasketPool) {
   }[rule.kind];
   const n = pool.cards.length;
   if (pool.mode === 'new') return n === 1 ? `New card: the only ${one} you don't own` : `New card: 1 in ${n} of the ${many} you don't own`;
-  if (pool.mode === 'unmaxed') return n === 1 ? `You own them all: your only ${one} you haven't maxed` : `You own them all: 1 in ${n} of your ${many} you haven't maxed`;
+  if (pool.mode === 'unmaxed') {
+    const line = n === 1 ? `You own them all: your only ${one} you haven't maxed` : `You own them all: 1 in ${n} of your ${many} you haven't maxed`;
+    // The rest have every copy waiting on Ascension Kards, so a pull of one is wasted.
+    const need = pool.needCopies ?? n;
+    if (need === n) return line;
+    return `${line} (${need === 0 ? (n === 1 ? 'it has' : 'all have') + ' every copy waiting on Ascension Kards' : `${need} still need${need === 1 ? 's' : ''} copies`})`;
+  }
   // "It gives": the newest cards, which it leaves out, may still be unowned.
   if (rule.goal !== 'max') return `You own every ${one} it gives, so this isn't valued`;
   return 'Nothing left in this Kasket that MK Max tracks';

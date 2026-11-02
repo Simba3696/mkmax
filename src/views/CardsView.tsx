@@ -2,7 +2,7 @@ import { Activity, useEffect, useId, useLayoutEffect, useMemo, useRef, useState,
 import { createPortal, flushSync } from 'react-dom';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascensionCaps, atTopLevel, cardGoal, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerName, towerRespells, towerSpellings, unmarkMaxed } from '../engine';
+import { ascend, ascensionCaps, atTopLevel, cardGoal, copiesAtFusion, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerName, towerRespells, towerSpellings, stepWaiting, unmarkMaxed, waitingCopies, waitingRoom } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -447,8 +447,11 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
   const updates = parsed.updates.filter((u) => !isOrphan(u));
   const removedLines = [...parsed.cards.filter(isRemoved).map((c) => c.line), ...parsed.updates.filter(isOrphan).map((u) => u.line)];
   // A card on the Maxed record is maxed, at whatever level its line gives (a roster, or a pack's drops): skipped. Only a
-  // Stage line brings one back, as the game does when an update makes a Gold card ascendable.
-  const isMaxedLine = (c: (typeof parsed.cards)[number]) => c.maxLevel === undefined && onMaxedRecord(state, c);
+  // Stage line brings one back, as the game does when an update makes a Gold card ascendable, or a waiting line: a Gold
+  // card entered at its cap while its last copies were still waiting on Ascension Kards.
+  // A "waiting 0" line has no copies waiting, so it's skipped like any other line for a card on the record.
+  const bringsBack = (c: { maxLevel?: number | null; waiting?: number }) => c.maxLevel !== undefined || (c.waiting ?? 0) > 0;
+  const isMaxedLine = (c: (typeof parsed.cards)[number]) => !bringsBack(c) && onMaxedRecord(state, c);
   // `gone` holds each line as typed with the card it was for, so an edited line (a lower level, say) is offered again,
   // and a line that reads differently once its card is gone (a Stage line brings a maxed card back) still matches.
   const isGone = (c: (typeof parsed.cards)[number]) => gone.has(`${cardKey(c.rarityId, c.name)}|${c.line}`);
@@ -490,8 +493,8 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // to delete them. Nor a card a sync has added meanwhile (the same list pasted on another device), which would
         // then be in twice. Nor updates to cards a sync removed.
         const have = new Set(d.cards.map((x) => cardKey(x.rarityId, x.name)));
-        // Nor one on the Maxed record without a Stage, a sync's entry included.
-        const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name)) && !(c.maxLevel === undefined && onMaxedRecord(d, c)));
+        // Nor one on the Maxed record without a Stage or waiting count, a sync's entry included.
+        const cards = newCards.filter((c) => d.rarities.some((r) => r.id === c.rarityId) && !have.has(cardKey(c.rarityId, c.name)) && !(!bringsBack(c) && onMaxedRecord(d, c)));
         // As Add card does: a level a sync has since taken off the rarity is saved as not owned.
         const levelOf = (c: (typeof newCards)[number]) => ((c.fusion ?? 0) <= maxFusion(d.rarities.find((r) => r.id === c.rarityId)!) ? (c.fusion ?? 0) : 0);
         // Nor to a card left without its rarity (an older build or an imported file can leave one): it has no rules to
@@ -500,7 +503,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         // card, in the Tower list's spelling, isn't a change.
         const changes = (c: Card, patch: (typeof updates)[number]['patch']) =>
           Object.entries(patch).some(([k, v]) =>
-            k === 'maxLevel' ? (c.maxLevel ?? null) !== v : k === 'sourceNote' ? towerKey(c.sourceNote ?? '') !== towerKey((v as string | undefined) ?? '') : c[k as keyof typeof patch] !== v,
+            k === 'maxLevel' ? (c.maxLevel ?? null) !== v : k === 'waiting' ? (c.waiting ?? 0) !== v : k === 'sourceNote' ? towerKey(c.sourceNote ?? '') !== towerKey((v as string | undefined) ?? '') : c[k as keyof typeof patch] !== v,
           );
         const saving = updates.flatMap((u) =>
           d.cards
@@ -526,6 +529,7 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
             source: c.source ?? initialSource(c, d.rarities),
             ...(c.sourceNote && { sourceNote: listSpelling(c.sourceNote) }),
             ...(c.maxLevel != null && { maxLevel: c.maxLevel }),
+            ...(c.waiting && { waiting: c.waiting }),
           }),
         );
         // As Add card does: one pasted at or past its kard threshold, while tracked only that far, goes on to its max.
@@ -536,10 +540,18 @@ function PasteList({ pick, startRarityId }: { pick: number; startRarityId: strin
         const ruleOf = (c: Card) => d.rarities.find((r) => r.id === c.rarityId)!;
         d.cards.push(...fresh);
         // One pasted already maxed goes on the record with no day (when it was maxed isn't known). One pasted back with a
-        // Stage (a Gold card made ascendable) comes off it, since it has copies to go again.
+        // Stage (a Gold card made ascendable) or a waiting count comes off it, since it isn't at its cap in the game.
         recordMaxed(d, fresh.filter((f) => atTopLevel(f, ruleOf(f))));
-        unmarkMaxed(d, fresh.filter((f, i) => cards[i].maxLevel !== undefined && !atTopLevel(f, ruleOf(f))));
-        for (const { c, patch } of saving) Object.assign(c, patch.sourceNote ? { ...patch, sourceNote: listSpelling(patch.sourceNote) } : patch);
+        unmarkMaxed(d, fresh.filter((f, i) => bringsBack(cards[i]) && !atTopLevel(f, ruleOf(f))));
+        for (const { c, patch } of saving) {
+          // A level pasted past F10 with no waiting part was reached by ascending in the game, which used waiting copies:
+          // take those steps off the count, or the same copies would count twice.
+          const rule = ruleOf(c);
+          const ascended = patch.fusion != null && patch.waiting === undefined && c.waiting ? copiesAtFusion(rule, patch.fusion) - copiesAtFusion(rule, Math.max(c.fusion, fLevel(rule.fusionMax))) : 0;
+          Object.assign(c, patch.sourceNote ? { ...patch, sourceNote: listSpelling(patch.sourceNote) } : patch);
+          if (ascended > 0) c.waiting = Math.max(0, (c.waiting ?? 0) - ascended);
+          if (c.waiting === 0) delete c.waiting;
+        }
         added = cards.length;
         updated = saving.length;
         const touched = [...fresh, ...saving.map(({ c }) => c)];
@@ -946,12 +958,32 @@ function CardList() {
   // A level tap steps from the level it showed: saving that level ± 1 would undo a level a sync has added since.
   const stepLevel = (c: Card, by: 1 | -1) => {
     if (ownedFilter !== 'all' && !tapped.has(c.id)) setTapped(new Set([...tapped, c.id]));
-    update((d) => (d.cards.find((x) => x.id === c.id)?.fusion === c.fusion && stepCard(d, c.id, by) ? undefined : noChange));
+    // A + that uses a copy waiting on Ascension Kards is an Ascend, so it gets Ascend's Undo: − wouldn't give the copy back.
+    // It steps only from the level and waiting count the row showed, so a sync that changed either makes it do nothing.
+    const rule = ctx.rules.get(c.rarityId);
+    const shown = rule ? waitingCopies(c, rule) : 0;
+    update(
+      (d) => {
+        const x = d.cards.find((y) => y.id === c.id);
+        const same = x?.fusion === c.fusion && !!rule && waitingCopies(x, rule) === shown;
+        return same && stepCard(d, c.id, by) ? undefined : noChange;
+      },
+      by > 0 && shown > 0 && rule ? `Ascended ${c.name} to ${levelLabel(rule, c.fusion + 1)}` : undefined,
+    );
   };
 
   /** Fuse one level with Fusion Up Kards from the Wallet, as done in the game: the step the button showed, or none. */
   function fuse(c: Card, cost: number) {
     update((d) => (fuseWithKards(d, c.id, cost, c.fusion) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${c.name}`);
+  }
+
+  // Like a level tap, from the count it showed; unlike one, with Undo, as the count can't be read back from anything.
+  const stepWait = (c: Card, by: 1 | -1, shown: number) =>
+    update((d) => (stepWaiting(d, c.id, by, shown) ? undefined : noChange), `${c.name}: ${shown + by} waiting on Ascension Kards`);
+
+  /** Ascend one level with a waiting copy, as done in the game once an Ascension Kard comes in. */
+  function ascendCard(c: Card, rule: RarityRule) {
+    update((d) => (ascend(d, c.id, c.fusion) ? undefined : noChange), `Ascended ${c.name} to ${levelLabel(rule, c.fusion + 1)}`);
   }
 
   // gstack-shortcut(dec-6a428b1f): a card renamed onto a name on the Maxed record stays on it while listed (Remove on Maxed
@@ -1211,6 +1243,8 @@ function CardList() {
           const toMax = copiesToMax(c, rule);
           const kards = ctx.kardCopies.get(c.id) ?? 0;
           const kardCost = kardStep(state, c.id);
+          const waiting = waitingCopies(c, rule);
+          const room = waitingRoom(c, rule);
           return (
             <div key={c.id} className={`${surface} py-[0.7rem] px-[0.9rem] mb-[0.8rem] min-[1344px]:mb-0`}>
               <div className={`${row} items-center`}>
@@ -1237,11 +1271,17 @@ function CardList() {
                       const ch = challengeFor(c, events, now);
                       return ch && <Chip tone="limited">challenge {challengeWhen(ch, now)}</Chip>;
                     })()}
-                    {/* Cards that reach their goal are removed, so every card listed still has copies to go. */}
+                    {/* Cards that reach their goal are removed, so every card listed still has copies to go, or has them all
+                        waiting on Ascension Kards. */}
                     {toThr > 0 && thresholdLevel(rule)! < target && <Chip tone="warn">{toThr} to F{rule.fusionUpThreshold}</Chip>}
-                    <Chip tone={cardGoal(c, rule) === 'threshold' ? 'warn' : 'muted'}>
-                      {maxFusion(rule) === 1 ? 'Not owned yet' : `${toMax} to ${levelLabel(rule, target)}`}
-                    </Chip>
+                    {toMax === 0 && waiting > 0 ? (
+                      <Chip tone="limited">all copies waiting</Chip>
+                    ) : (
+                      <Chip tone={cardGoal(c, rule) === 'threshold' ? 'warn' : 'muted'}>
+                        {maxFusion(rule) === 1 ? 'Not owned yet' : `${toMax} to ${levelLabel(rule, target)}`}
+                      </Chip>
+                    )}
+                    {toMax > 0 && waiting > 0 && <Chip tone="limited">{waiting} waiting</Chip>}
                     {kards > 0 && <Chip tone="good">kards give {kards}</Chip>}
                   </div>
                 </div>
@@ -1260,6 +1300,23 @@ function CardList() {
                   <button onClick={() => fuse(c, kardCost)} title="Fuse one level with Fusion Up Kards from the Wallet">
                     Use {kardCost} kard{kardCost === 1 ? '' : 's'}
                   </button>
+                )}
+                {waiting > 0 && (
+                  <button onClick={() => ascendCard(c, rule)} title="Ascend one level with a waiting copy, as you just did in the game with an Ascension Kard">
+                    Ascend to {levelLabel(rule, c.fusion + 1)}
+                  </button>
+                )}
+                {room > 0 && (
+                  <div className={stepper} title="Copies you have that wait on Ascension Kards">
+                    <span className="text-[0.85rem]">Waiting</span>
+                    <button onClick={() => stepWait(c, -1, waiting)} disabled={waiting <= 0} aria-label="One fewer copy waiting">
+                      −
+                    </button>
+                    <span className={stepperVal}>{waiting}</span>
+                    <button onClick={() => stepWait(c, 1, waiting)} disabled={waiting >= room} aria-label="One more copy waiting">
+                      +
+                    </button>
+                  </div>
                 )}
                 <GoalSelect rule={rule} card={c} onChange={(v) => patch(c.id, { goal: v })} />
                 <CapSelect rule={rule} value={c.maxLevel} onChange={(v) => patch(c.id, { maxLevel: v })} />
