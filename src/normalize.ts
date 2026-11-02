@@ -122,7 +122,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 18,
+    version: 19,
     rarities: s.rarities!.map((r) => ({
       ...r,
       // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
@@ -137,13 +137,17 @@ export function normalize(input: unknown): AppState {
     currencies: s.currencies?.length ? s.currencies : base.currencies,
     // No kards counts only when it's exactly true: any other value (a hand-edited backup's "false", say) is dropped, as
     // it would otherwise turn the flag on, or differ from a card without it and look like a sync conflict. A tower name
-    // that isn't text (a hand-edited number, say) is dropped too, as the Tower list and Tower gear read it as text.
+    // that isn't text (a hand-edited number, say) is dropped too, as the Tower list and Tower gear read it as text. So
+    // is a waiting count that isn't a whole number of copies; one past what the card can use is kept, as it's limited
+    // when read (waitingCopies), so a level or Max change made back brings the copies back.
     cards: s.cards!.map((c) => {
       const badNote = c.sourceNote !== undefined && typeof c.sourceNote !== 'string';
-      if ((c.noKards === undefined || c.noKards === true) && !badNote) return c;
+      const badWaiting = c.waiting !== undefined && !(Number.isInteger(c.waiting) && c.waiting >= 1);
+      if ((c.noKards === undefined || c.noKards === true) && !badNote && !badWaiting) return c;
       const out = { ...c };
       if (out.noKards !== undefined && out.noKards !== true) delete out.noKards;
       if (badNote) delete out.sourceNote;
+      if (badWaiting) delete out.waiting;
       return out;
     }),
     packs: s.packs!,
@@ -208,6 +212,8 @@ export function normalize(input: unknown): AppState {
       return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
     });
   }
+  // Version 19 adds copies waiting on Ascension Kards on cards (`waiting`), so nothing in an older save changes. The bump
+  // keeps a build from before it from pulling a save that uses it: that build would plan copies the card already has.
   // Version 17 adds the Maxed record (`maxed`), which starts empty, so nothing in an older save changes either; the bump
   // keeps a build from before it from pulling the record and dropping it.
   // Version 16 adds No kards on cards (`noKards`), so nothing in an older save changes. The bump is what matters: a build

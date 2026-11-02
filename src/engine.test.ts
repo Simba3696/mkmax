@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addPool, ascensionCaps, respellTower, towerKey, towerName, towerRespells, towerSpellings, unifyTowerSpellings, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addCopy, addPool, ascend, ascendsNext, storeCardFull, ascensionCaps, canAddCopy, levelWithWaiting, stepWaiting, waitingCopies, waitingRoom, respellTower, towerKey, towerName, towerRespells, towerSpellings, unifyTowerSpellings, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -160,7 +160,7 @@ describe('the Maxed record', () => {
   it('loads an older save with an empty record, and keeps only well-formed entries', () => {
     const old = { ...defaultState(), version: 16 } as unknown as AppState;
     delete (old as Partial<AppState>).maxed;
-    expect([normalize(old).version, normalize(old).maxed]).toEqual([18, []]);
+    expect([normalize(old).version, normalize(old).maxed]).toEqual([19, []]);
     const odd = normalize({ ...old, maxed: [{ name: 'Kori Blade', rarityId: 'epic' }, { name: 3 }, null, 'x'] } as unknown as AppState);
     expect(odd.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic' }]);
     // A day that isn't text would break the page, and the same card twice would list twice: one entry, with the day a
@@ -192,7 +192,7 @@ describe('the Maxed record', () => {
       ],
     } as unknown as AppState;
     const out = normalize(old);
-    expect([out.version, out.cards.map((c) => c.sourceNote)]).toEqual([18, ['lin kuei tower', 'lin kuei tower', 'lin kuei tower', 'Wind Tower', 'Wind Tower', 'Shirai Ryu Tower', undefined]]);
+    expect([out.version, out.cards.map((c) => c.sourceNote)]).toEqual([19, ['lin kuei tower', 'lin kuei tower', 'lin kuei tower', 'Wind Tower', 'Wind Tower', 'Shirai Ryu Tower', undefined]]);
     // A save already at version 18 isn't re-spelled again (a spelling typed since stands).
     const current = { ...old, version: 18 } as unknown as AppState;
     expect(normalize(current).cards.map((c) => c.sourceNote)).toEqual(['lin kuei tower ', 'Lin Kuei Tower', 'LIN KUEI TOWER', ' Wind Tower', 'wind tower', 'Shirai Ryu Tower', undefined]);
@@ -2171,5 +2171,206 @@ describe('respellTower', () => {
       typed.map((c) => c.sourceNote),
       saved.cards.map((c) => c.sourceNote),
     ]).toEqual(['lin kuei tower', 'Lin Kuei Tower', ['Lin Kuei Tower'], 0, 1, ['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin\tKuei Tower'], ['Lin Kuei Tower', 'Lin Kuei Tower', 'Lin Kuei Tower']]);
+  });
+});
+
+describe('copies waiting on Ascension Kards', () => {
+  const gold = rules().get('gold')!;
+  const g = (id: string, fusion: number, extra: Partial<Card> = {}) => card(id, fusion, { rarityId: 'gold', ...extra });
+  const kasket = pack('k', [], { kasket: 'gold' });
+
+  // Value: protects=only a card the game would hold copies for can have them, and never more than it can use;
+  // fails_when=a Diamond, a Gold card capped at F10 or one below F10 counts waiting copies, or more than its cap takes
+  it('counts waiting copies only on a card at F10 or past it that ascends further, up to its cap', () => {
+    expect(waitingCopies(g('a', A(2), { maxLevel: A(5), waiting: 2 }), gold)).toBe(2);
+    expect(waitingCopies(g('a', A(2), { maxLevel: A(5), waiting: 9 }), gold)).toBe(3);
+    expect(waitingCopies(g('a', F(10), { waiting: 4 }), gold)).toBe(4); // A10 cap: 10 to go
+    expect(waitingCopies(g('a', F(9), { waiting: 1 }), gold)).toBe(0);
+    expect(waitingCopies(g('a', F(10), { maxLevel: F(10), waiting: 1 }), gold)).toBe(0);
+    expect(waitingCopies(card('d', F(10), { waiting: 1 }), rules().get('diamond')!)).toBe(0);
+    expect(waitingCopies(g('a', A(2), { waiting: '3' as unknown as number }), gold)).toBe(0);
+    expect([waitingRoom(g('a', A(2), { maxLevel: A(5) }), gold), waitingRoom(g('a', F(9)), gold)]).toEqual([3, 0]);
+  });
+
+  // Value: protects=waiting copies count as collected, so the plan stops asking for them, while the card stays listed
+  // until it's ascended; fails_when=a card with every copy waiting is still valued, or is removed as maxed
+  it('counts waiting copies as collected, and keeps the card until it is ascended', () => {
+    const s = setup([g('some', A(1), { maxLevel: A(5), waiting: 2 }), g('all', A(2), { maxLevel: A(5), waiting: 3 })]);
+    const ctx = buildCtx(s);
+    expect([copiesToMax(s.cards[0], gold), copiesToMax(s.cards[1], gold)]).toEqual([2, 0]);
+    expect([copyPhase(ctx, s.cards[0]), copyPhase(ctx, s.cards[1])]).toEqual(['normal', 'maxed']);
+    expect(rankTargets(ctx, NOW).map((t) => t.card.id)).toEqual(['some']);
+    expect(pruneDone(s)).toEqual([]);
+    expect(s.cards.map((c) => c.waiting)).toEqual([2, 3]);
+  });
+
+  // Regression: /review of ascension-waiting — a level or Max change made back lost waiting copies for good
+  // Found by /review on 2026-11-02
+  // Value: protects=a level −/+ or a Max change and back keeps the count, which only counts within what the card can use
+  // meanwhile; fails_when=the count is cut down when saved (pruneDone), so F10 with 3 waiting, − then +, ends with 0
+  it('keeps the waiting count through a level or Max change made back, counting only what the card can use meanwhile', () => {
+    const s = setup([g('w', F(10), { waiting: 3 }), g('capped', A(3), { maxLevel: A(10), waiting: 6 })]);
+    expect(stepCard(s, 'w', -1)).toBe(true);
+    pruneDone(s);
+    expect([waitingCopies(s.cards[0], gold), s.cards[0].waiting]).toEqual([0, 3]);
+    s.cards[0].fusion = F(10); // + would use a waiting copy if one counted; this card has none counting at F9
+    expect(waitingCopies(s.cards[0], gold)).toBe(3);
+    s.cards[1].maxLevel = A(5);
+    pruneDone(s);
+    expect(waitingCopies(s.cards[1], gold)).toBe(2);
+    s.cards[1].maxLevel = A(10);
+    expect(waitingCopies(s.cards[1], gold)).toBe(6);
+  });
+
+  // Regression: /review of ascension-waiting — + on a card with copies waiting counted them twice
+  // Found by /review on 2026-11-02
+  // Value: protects=+ on a card with a copy waiting uses it, as the step does in the game; fails_when=+ raises the level
+  // and leaves the count, so the plan counts that copy twice
+  it('uses a waiting copy when the level goes up by +', () => {
+    const s = setup([g('w', A(1), { maxLevel: A(5), waiting: 2 }), g('none', A(1), { maxLevel: A(5) })]);
+    expect(stepCard(s, 'w', 1)).toBe(true);
+    expect([s.cards[0].fusion, s.cards[0].waiting]).toEqual([A(2), 1]);
+    expect(stepCard(s, 'w', -1)).toBe(true);
+    expect([s.cards[0].fusion, s.cards[0].waiting]).toEqual([A(1), 1]);
+    expect(stepCard(s, 'none', 1)).toBe(true);
+    expect([s.cards[1].fusion, s.cards[1].waiting]).toEqual([A(2), undefined]);
+  });
+
+  // Regression: /review of ascension-waiting — a store buy with no room logged nothing, and its −1 took a real copy
+  // Found by /review on 2026-11-02 (Codex, state machines and the adversarial review)
+  // Value: protects=a store item whose card already holds every copy it can isn't logged, so −1 can't take a waiting copy;
+  // fails_when=recordPurchase counts the buy and takes the cost while addCopy adds nothing
+  it("refuses a store item buy whose card can't hold another copy", () => {
+    const item = pack('item', [{ cardId: 'full', chance: 100 }], { store: true, purchased: 0 });
+    const s = setup([g('full', A(4), { maxLevel: A(5), waiting: 1 })], [item]);
+    const before = s.currencies[0].balance;
+    expect(storeCardFull(s, s.packs[0])).toBe(true);
+    expect(recordPurchase(s, 'item', 1)).toBe(false);
+    expect([s.packs[0].purchased, s.currencies[0].balance, s.cards[0].waiting]).toEqual([0, before, 1]);
+    s.cards[0].waiting = 0;
+    expect(storeCardFull(s, s.packs[0])).toBe(false);
+    expect(recordPurchase(s, 'item', 1)).toBe(true);
+    expect([s.packs[0].purchased, s.cards[0].waiting]).toEqual([1, 1]);
+  });
+
+  // Regression: /review of ascension-waiting (red team) — the Plan said no Gold card was at F3 when all their copies waited
+  // Found by /review on 2026-11-02
+  // Value: protects=the Kard plan names cards it gives no kards because their copies all wait; fails_when=it says "No Gold
+  // card at F3 or higher yet" while one is listed at A4
+  it('says why no kards are planned when every card has its copies waiting', () => {
+    const s = setup([g('w', A(4), { maxLevel: A(5), waiting: 1 })], [], (s) => (s.rarities.find((r) => r.id === 'gold')!.fusionUpKards = 50));
+    const ctx = buildCtx(s);
+    const plan = ctx.kardPlan.get('gold')!;
+    expect([plan.cards, plan.waiting]).toEqual([0, 1]);
+    expect(kardNotes(plan, gold, ctx.cards)).toEqual(['No Gold card at F3 or higher that kards can go to yet, so these kards wait. Cards with every copy waiting on Ascension Kards need none.']);
+  });
+
+  // Value: protects=kards are planned only for the steps waiting copies don't make, and Use N kards isn't offered while
+  // a copy waits; fails_when=kards are spent on steps a waiting copy makes
+  it('plans Fusion Up Kards from the level the waiting copies reach, and offers none while a copy waits', () => {
+    const s = setup([g('w', A(1), { maxLevel: A(5), waiting: 2 })], [], (s) => (s.rarities.find((r) => r.id === 'gold')!.fusionUpKards = 500));
+    expect(levelWithWaiting(s.cards[0], gold)).toBe(A(3));
+    const plan = buildCtx(s).kardPlan.get('gold')!;
+    expect(plan.assignments).toEqual([{ cardId: 'w', from: A(3), to: A(5), kards: ASCENSION_KARD_COSTS[3] + ASCENSION_KARD_COSTS[4] }]);
+    expect(kardStep(s, 'w')).toBeNull();
+    s.cards[0].waiting = 0;
+    expect(kardStep(s, 'w')).toBe(ASCENSION_KARD_COSTS[1]);
+  });
+
+  // Value: protects=the Gold Kasket's pool matches the game's, which lists a card until it's ascended, and a pull of a
+  // card with every copy waiting is worth nothing; fails_when=the pool leaves such cards out (MK Max then overvalues
+  // the Kasket, 1 in 9 where the game says 1 in 41)
+  it('keeps a card with every copy waiting in the Gold Kasket, worth nothing', () => {
+    const s = setup([g('needs', A(1), { maxLevel: A(5) }), g('all', A(2), { maxLevel: A(5), waiting: 3 }), g('more', A(4), { maxLevel: A(5), waiting: 1 })], [kasket]);
+    const ctx = buildCtx(s);
+    const pool = kasketPool(ctx, s.packs[0]);
+    expect([pool.mode, pool.cards.map((c) => c.id), pool.needCopies]).toEqual(['unmaxed', ['needs', 'all', 'more'], 1]);
+    expect(packDrops(ctx, s.packs[0]).map((d) => d.chance)).toEqual([100 / 3, 100 / 3, 100 / 3]);
+    // Worth what a third of a copy of the one card still needing copies is.
+    const third = pack('third', [{ cardId: 'needs', chance: 100 / 3 }]);
+    expect(packEV(ctx, s.packs[0])).toBeCloseTo(packEV(ctx, third));
+    expect(rankPacks(ctx, NOW).find((r) => r.pack.id === 'k')!.targets.map((t) => t.card.id)).toEqual(['needs']);
+    expect(kasketLine(pool)).toBe("You own them all: 1 in 3 of your Gold characters you haven't maxed (1 still needs copies)");
+    const alone = setup([s.cards[1]], [kasket]);
+    expect(kasketLine(kasketPool(buildCtx(alone), alone.packs[0]))).toBe("You own them all: your only Gold character you haven't maxed (it has every copy waiting on Ascension Kards)");
+    // Generated by /ship test coverage audit on 2026-11-02
+    // Value: protects=the Kasket line's plural wording, for several cards all waiting and for several still needing copies;
+    // fails_when=the n>1 branch says "it has", or "2 still needs"; why_new=only the one-card and one-needing lines were
+    // checked; seam=none; no_claim=none beyond protects
+    const lineFor = (cards: Card[]) => {
+      const t = setup(cards, [kasket]);
+      return kasketLine(kasketPool(buildCtx(t), t.packs[0]));
+    };
+    expect(lineFor([s.cards[1], s.cards[2]])).toBe("You own them all: 1 in 2 of your Gold characters you haven't maxed (all have every copy waiting on Ascension Kards)");
+    expect(lineFor([s.cards[0], g('needs2', A(2), { maxLevel: A(5) }), s.cards[1]])).toBe("You own them all: 1 in 3 of your Gold characters you haven't maxed (2 still need copies)");
+  });
+
+  // Value: protects=planned copies past F10 wait, so an ascending card stays in the pool as the game keeps it, while a
+  // card capped at F10 still leaves once it's expected to reach its cap; fails_when=planned buys take ascending cards out
+  it('keeps an ascending card in the pool however many copies are planned, but not one capped at F10', () => {
+    const s = setup([g('ascending', A(1), { maxLevel: A(5) }), g('flat', F(8), { maxLevel: F(10) })], [kasket]);
+    const gained = new Map([['ascending', 9], ['flat', 2]]);
+    expect(kasketPool(buildCtx(s), s.packs[0], gained)).toMatchObject({ mode: 'unmaxed', needCopies: 0, cards: [s.cards[0]] });
+  });
+
+  // Value: protects=Ascend does what the game does: a waiting copy becomes a level, and the cap moves the card to Maxed;
+  // fails_when=it ascends with no copy waiting, steps from a level a sync changed, or loses the other waiting copies
+  it('ascends with a waiting copy, and puts the card on the Maxed record at its cap', () => {
+    const s = setup([g('w', A(3), { maxLevel: A(5), waiting: 2 }), g('none', A(1))]);
+    expect(ascend(s, 'none')).toBe(false);
+    expect(ascend(s, 'w', A(2))).toBe(false);
+    expect(ascend(s, 'w', A(3))).toBe(true);
+    expect([s.cards[0].fusion, s.cards[0].waiting]).toEqual([A(4), 1]);
+    expect(ascend(s, 'w')).toBe(true);
+    expect([s.cards[0].fusion, s.cards[0].waiting]).toEqual([A(5), undefined]);
+    pruneDone(s, NOW);
+    expect([s.cards.map((c) => c.id), s.maxed?.map((m) => m.name)]).toEqual([['none'], ['w']]);
+  });
+
+  // Value: protects=a pulled copy goes where the game puts it, and − takes back the waiting one first; fails_when=a pull
+  // of an ascending card raises its level, or one is added past what the card can use
+  it('logs a pulled copy as waiting on an ascending card, and as a level below F10', () => {
+    const s = setup([g('asc', A(4), { maxLevel: A(5) }), g('low', F(9)), g('cap', F(10), { maxLevel: F(10) })], [pack('item', [{ cardId: 'asc', chance: 100 }], { store: true })]);
+    expect(addCopy(s, 'asc', 1)).toBe(true);
+    expect([s.cards[0].fusion, s.cards[0].waiting, canAddCopy(s.cards[0], gold)]).toEqual([A(4), 1, false]);
+    expect(addCopy(s, 'asc', 1)).toBe(false);
+    expect(addCopy(s, 'asc', -1)).toBe(true);
+    expect([s.cards[0].fusion, s.cards[0].waiting]).toEqual([A(4), undefined]);
+    expect(addCopy(s, 'asc', -1)).toBe(true);
+    expect(s.cards[0].fusion).toBe(A(3));
+    expect(addCopy(s, 'low', 1)).toBe(true);
+    expect([s.cards[1].fusion, s.cards[1].waiting]).toEqual([F(10), undefined]);
+    // A Gold card capped at F10 doesn't ascend, so a copy raises its level, as + always has.
+    expect([ascendsNext(s.cards[2], gold), canAddCopy(s.cards[2], gold)]).toEqual([false, true]);
+    // A store item's copy is logged the same way.
+    expect(recordPurchase(s, 'item', 1)).toBe(true);
+    expect([s.cards[0].fusion, s.cards[0].waiting]).toEqual([A(3), 1]);
+  });
+
+  // Value: protects=a Waiting tap a sync has made out of date changes nothing; fails_when=it steps from the synced count
+  it('steps the waiting count only from the count the screen showed', () => {
+    const s = setup([g('w', A(1), { waiting: 2 })]);
+    expect(stepWaiting(s, 'w', 1, 1)).toBe(false);
+    expect(stepWaiting(s, 'w', 1, 2)).toBe(true);
+    expect(stepWaiting(s, 'w', -1)).toBe(true);
+    expect(s.cards[0].waiting).toBe(2);
+    // Generated by /ship test coverage audit on 2026-11-02
+    // Value: protects=a Waiting step past what the card can use, below 0, or on a card that can't hold copies reports no
+    // change, so the screen saves nothing; fails_when=the clamp goes and the step returns true, stamping a save and an Undo
+    // for a count tidyWaiting sets straight back; why_new=only the stale-count guard was tested; seam=none;
+    // no_claim=the screen's disabled buttons (CardsView.test.tsx)
+    const t = setup([g('full', A(4), { maxLevel: A(5), waiting: 1 }), g('none', A(1)), g('low', F(9))]);
+    expect([stepWaiting(t, 'full', 1), stepWaiting(t, 'none', -1), stepWaiting(t, 'low', 1)]).toEqual([false, false, false]);
+    expect(t.cards.map((c) => c.waiting)).toEqual([1, undefined, undefined]);
+  });
+
+  // Value: protects=a save from before waiting copies loads as version 19, a count that isn't a whole number is dropped,
+  // and one past what the card can use is kept but counts only that far; fails_when=the version isn't bumped (older
+  // builds would pull and replan those copies), or a hand-edited "x" or 1.5 survives a load
+  it('loads a version 18 save as version 19, dropping waiting counts that are not whole numbers', () => {
+    const cards = [g('w', A(2), { maxLevel: A(5), waiting: 7 }), g('bad', A(1), { waiting: 'x' as unknown as number }), g('half', A(1), { waiting: 1.5 })];
+    const old = { ...setup(cards), version: 18 };
+    const out = normalize(JSON.parse(JSON.stringify(old)));
+    expect([out.version, out.cards.map((c) => c.waiting), waitingCopies(out.cards[0], gold)]).toEqual([19, [7, undefined, undefined], 3]);
   });
 });

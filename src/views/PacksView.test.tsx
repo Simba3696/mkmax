@@ -88,6 +88,39 @@ describe('Packs: Clear expired', () => {
 });
 
 describe('Packs: logging a purchase', () => {
+  // Value: protects=a pulled copy of a Gold card past F10 goes into its waiting count on screen, + stops once the card
+  // holds every copy it can, − takes the waiting copy back first, and a store item for it can't be logged then;
+  // fails_when=the pull row still steps the level (stepCard), + stays enabled, the note is missing, or I bought one stays
+  // enabled; why_new=review (testing): engine tests cover addCopy, not the buttons; seam=none; no_claim=the Kasket search
+  it('logs a pulled Gold copy as waiting, stops at what the card can hold, and greys out its store item', () => {
+    const s = JSON.parse(localStorage.getItem('mkmax:v1')!);
+    // A4 is stored as 15 (F10 is 11), with a Max of A5 (16).
+    s.cards.push({ id: 'kenshi', name: 'Kenshi, Elder God', rarityId: 'gold', fusion: 15, maxLevel: 16, guest: false });
+    s.packs.push(pack('Gold Pack', { endsAt: '2026-10-20T12:00', drops: [{ cardId: 'kenshi', chance: 50 }] }));
+    s.packs.push(pack('Kenshi item', { store: true, endsAt: '2026-10-20T12:00', drops: [{ cardId: 'kenshi', chance: 100 }] }));
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <PacksView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const goldPack = within(document.getElementById('pack-Gold Pack')!);
+    fireEvent.click(goldPack.getByRole('button', { name: 'I bought one' }));
+    const row = () => within(screen.getByText('What did you pull?').closest('div')!.parentElement!);
+    fireEvent.click(row().getByRole('button', { name: 'Add a copy' }));
+    const kenshi = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards.find((c: { id: string }) => c.id === 'kenshi');
+    expect([kenshi().fusion, kenshi().waiting]).toEqual([15, 1]);
+    expect(row().getByText(/1 waiting on Ascension Kards/)).toBeTruthy();
+    expect((row().getByRole('button', { name: 'Add a copy' }) as HTMLButtonElement).disabled).toBe(true);
+    const item = within(document.getElementById('pack-Kenshi item')!);
+    expect((item.getByRole('button', { name: 'I bought one' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(item.getByText(/already holds every copy it can/)).toBeTruthy();
+    fireEvent.click(row().getByRole('button', { name: 'Remove a copy' }));
+    expect([kenshi().fusion, kenshi().waiting]).toEqual([15, undefined]);
+  });
+
   // Regression: review of clock-and-gear-taps — a tap with nothing to take back still saved and synced
   // Found by /review on 2026-10-13
   // Value: protects=a −1 with no purchase left to take back (the screen was drawn before the last one) saves nothing;

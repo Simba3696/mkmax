@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { REALM_KLASH_CURRENCY, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, maxFusion, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, stepCard, toLocalInput, urgency } from '../engine';
+import { REALM_KLASH_CURRENCY, addCopy, canAddCopy, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, storeCardFull, toLocalInput, urgency, waitingCopies } from '../engine';
 import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
@@ -121,20 +121,27 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
     else if (delta < 0 && pulling === p.id) setPulling(null);
   };
 
-  /** A pulled card's row in "What did you pull?": + and − step its level. */
+  /**
+   * A pulled card's row in "What did you pull?": + and − add or take back a copy, which steps its level, or for a card
+   * whose next step is ascension, its copies waiting on Ascension Kards (addCopy).
+   */
   const pullRow = (card: Card | undefined) => {
     const rule = card && rules.get(card.rarityId);
     if (!card || !rule) return null;
+    const waiting = waitingCopies(card, rule);
     return (
       <div key={card.id} className={`${row} items-center`}>
         <CardThumb card={card} rule={rule} size={36} />
-        <span className={grow}>{card.name}</span>
+        <span className={grow}>
+          {card.name}
+          {waiting > 0 && <span className="text-small text-muted"> · {waiting} waiting on Ascension Kards</span>}
+        </span>
         <div className={stepper}>
-          <button onClick={() => update((s) => (stepCard(s, card.id, -1) ? undefined : noChange))} disabled={card.fusion <= 0} aria-label="Remove a copy">
+          <button onClick={() => update((s) => (addCopy(s, card.id, -1) ? undefined : noChange))} disabled={card.fusion <= 0} aria-label="Remove a copy">
             −
           </button>
           <span className={stepperVal}>{card.fusion === 0 ? '—' : levelLabel(rule, card.fusion)}</span>
-          <button onClick={() => update((s) => (stepCard(s, card.id, 1) ? undefined : noChange))} disabled={card.fusion >= maxFusion(rule)} aria-label="Add a copy">
+          <button onClick={() => update((s) => (addCopy(s, card.id, 1) ? undefined : noChange))} disabled={!canAddCopy(card, rule)} aria-label="Add a copy">
             +
           </button>
         </div>
@@ -165,6 +172,7 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
         <PackTiming pack={p} now={now} />
       </div>
       {p.kasket !== undefined && <div className={`${note} mt-[0.4rem]`}>{kasketLine(kasketPool(ctx, p))}</div>}
+      {storeCardFull(state, p) && <div className={`${note} mt-[0.4rem]`}>Its card already holds every copy it can, waiting on Ascension Kards, so a buy would add nothing.</div>}
       {packStatus(p, now) === 'expired' && keepWhenExpired(state, p) && (
         <div className={`${note} mt-[0.4rem]`}>
           Kept for next season: <b>Rerun</b> copies its drop and Store item setting, so Blood Rubies keep buying the piece. If you delete it, pick the piece and
@@ -178,9 +186,10 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
           <>
             <button
               className={btn.primary}
-              disabled={p.maxPurchases != null && p.purchased >= p.maxPurchases}
+              // A store item whose card already holds every copy it can (waiting on Ascension Kards) would add nothing.
+              disabled={(p.maxPurchases != null && p.purchased >= p.maxPurchases) || storeCardFull(state, p)}
               onClick={() => buy(p, 1)}
-              title={p.store ? 'Adds a purchase, deducts the cost and levels up the card' : 'Adds a purchase and deducts the cost from your balance'}
+              title={p.store ? 'Adds a purchase, deducts the cost and adds the copy to its card' : 'Adds a purchase and deducts the cost from your balance'}
             >
               I bought one
             </button>

@@ -1,6 +1,6 @@
 // Parses a pasted list of cards for bulk adding. Plain TS so it can be tested.
 import { nameKey } from './names';
-import { ascensionCaps, fLevel, levelLabel, maxFusion, recordKey, towerKey } from './engine';
+import { ascensionCaps, fLevel, levelLabel, maxFusion, recordKey, towerKey, waitingRoom } from './engine';
 import type { Card, RarityRule } from './types';
 
 interface ListedCard {
@@ -16,6 +16,8 @@ interface ListedCard {
   sourceNote?: string;
   /** The Max from a "Stage I" or "Stage II" part; null is the rarity's top level, as the Max select stores it. */
   maxLevel?: number | null;
+  /** Copies waiting on Ascension Kards, from a "waiting 3" part. */
+  waiting?: number;
 }
 
 interface CardUpdate {
@@ -24,7 +26,7 @@ interface CardUpdate {
   /** The line it came from and where, as in ListedCard. */
   line: string;
   row: number;
-  patch: Partial<Pick<Card, 'fusion' | 'source' | 'sourceNote' | 'maxLevel'>>;
+  patch: Partial<Pick<Card, 'fusion' | 'source' | 'sourceNote' | 'maxLevel' | 'waiting'>>;
 }
 
 export interface ParsedList {
@@ -73,6 +75,12 @@ function parseStage(word: string): 1 | 2 | null {
   return m ? (/^(ii|2)$/i.test(m[1]) ? 2 : 1) : null;
 }
 
+/** "waiting 3" → 3: copies waiting on Ascension Kards. Null if it isn't that. */
+function parseWaiting(word: string): number | null {
+  const m = /^waiting\s*(\d+)$/i.exec(word);
+  return m ? Number(m[1]) : null;
+}
+
 /** "F2" → stored level 3, "A3" → past the top fusion, "Unowned" → 0. Null if it isn't a level. */
 function parseLevel(word: string, rule: RarityRule | undefined): number | null {
   if (/^(unowned|not owned|none|new)$/i.test(word)) return 0;
@@ -85,7 +93,8 @@ function parseLevel(word: string, rule: RarityRule | undefined): number | null {
 /**
  * One card per line. A line can be just a name ("Jade, Lizard"), or a name followed by " - " parts in any order:
  * rarity ("Epic"), where it comes from ("Krypt Gear", or a tower name like "Kold Tower"), level ("F2",
- * "Unowned"), and for Gold an ascension stage ("Stage I" is a Max of A5, "Stage II" A10). A line that's only a
+ * "Unowned"), for Gold an ascension stage ("Stage I" is a Max of A5, "Stage II" A10), and copies waiting on
+ * Ascension Kards ("waiting 3", for a card at F10 or past it that ascends further). A line that's only a
  * rarity's name (e.g. "Gold Kameo") switches the rarity for the lines after it, so lists copied from notes with
  * headings work as-is. Underline rows ("-----") and blank lines are skipped, and a leading bullet or number is
  * dropped. `rarities` may list a rarity again under an older name (Paste a list passes the names a list was typed
@@ -118,6 +127,7 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
     let source: Card['source'];
     let sourceNote: string | undefined;
     let stage: 1 | 2 | null = null;
+    let waiting: number | null = null;
     let problem: string | undefined;
     for (const part of parts) {
       const untracked = UNTRACKED_GRADES[part.toLowerCase()];
@@ -128,7 +138,8 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       else if (/tower/i.test(part)) [source, sourceNote] = ['tower', part];
       else if (parseLevel(part, undefined) != null) levelWord = part;
       else if (parseStage(part)) stage = parseStage(part);
-      else problem = `"${part}" isn’t a rarity, source, level or stage`;
+      else if (parseWaiting(part) != null) waiting = parseWaiting(part);
+      else problem = `"${part}" isn’t a rarity, source, level, stage or waiting count`;
     }
     // Lines with details but no rarity are ambiguous (the heading rarity is for plain name lists).
     if (!problem && parts.length > 0 && !rarityId) problem = 'No rarity (e.g. Epic, Rare)';
@@ -165,11 +176,19 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
         out.problems.push({ line, reason: `Already ${levelLabel(rule!, card.fusion)}, past Stage ${stage === 1 ? 'I' : 'II'}’s ${levelLabel(rule!, cap)}` });
         continue;
       }
+      const waitingProblem = waiting != null && rule && waitingCheck({ ...card, fusion: fusion ?? card.fusion, maxLevel: maxLevel === undefined ? card.maxLevel : maxLevel }, rule, waiting);
+      if (waitingProblem) {
+        out.problems.push({ line, reason: waitingProblem });
+        continue;
+      }
       const patch: CardUpdate['patch'] = {};
       if (fusion != null && fusion !== card.fusion) patch.fusion = fusion;
       // One tower however it's typed (towerKey), as on Cards and Tower gear: other capitals alone aren't an update.
       if (source && (source !== card.source || towerKey(sourceNote ?? '') !== towerKey(card.sourceNote ?? ''))) Object.assign(patch, { source, sourceNote });
       if (maxLevel !== undefined && maxLevel !== (card.maxLevel ?? null)) patch.maxLevel = maxLevel;
+      // Given with a new level, the count is kept even when unchanged: a level raised with no waiting part means copies
+      // were used by ascending (CardsView takes them off), which this count says didn't happen.
+      if (waiting != null && (waiting !== (card.waiting ?? 0) || patch.fusion !== undefined)) patch.waiting = waiting;
       if (Object.keys(patch).length) out.updates.push({ cardId: card.id, name: card.name, line, row, patch });
       else out.duplicates.push({ name, key, row });
       continue;
@@ -187,6 +206,11 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       continue;
     }
     const start = fusion ?? (stage ? fLevel(rule!.fusionMax) + (stage - 1) * 5 : undefined);
+    const waitingProblem = waiting != null && rule && waitingCheck({ id: '', name, rarityId, guest: false, fusion: start ?? 0, maxLevel }, rule, waiting);
+    if (waitingProblem) {
+      out.problems.push({ line, reason: waitingProblem });
+      continue;
+    }
     out.cards.push({
       name,
       rarityId,
@@ -196,7 +220,15 @@ export function parseCardList(text: string, rarities: RarityRule[], startRarityI
       ...(source && { source }),
       ...(sourceNote && { sourceNote }),
       ...(maxLevel !== undefined && { maxLevel }),
+      ...(waiting != null && { waiting }),
     });
   }
   return out;
+}
+
+/** Why a card can't have `waiting` copies waiting on Ascension Kards at the level and Max the line gives it, or undefined. */
+function waitingCheck(card: Card, rule: RarityRule, waiting: number) {
+  const room = waitingRoom(card, rule);
+  if (room === 0) return waiting === 0 ? undefined : 'Only a card at F10 or past it that ascends further has copies waiting';
+  if (waiting > room) return `Only ${room} cop${room === 1 ? 'y' : 'ies'} to its Max`;
 }

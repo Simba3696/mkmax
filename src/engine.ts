@@ -62,8 +62,48 @@ export function targetLevel(card: Card, rule: RarityRule) {
   return t;
 }
 
-export const copiesToMax = (card: Card, rule: RarityRule) =>
-  Math.max(0, copiesAtFusion(rule, targetLevel(card, rule)) - copiesAtFusion(rule, card.fusion));
+/** The card's own top level, whatever its goal: F10, or a Gold card's cap. */
+const topLevel = (card: Card, rule: RarityRule) => targetLevel({ ...card, goal: 'max' }, rule);
+
+/**
+ * Whether a new copy of this card waits on Ascension Kards rather than raising it: in the game a duplicate of a card at
+ * F10 or past it stays on the card until an Ascension Kard ascends it. Only a card that ascends further.
+ */
+export const ascendsNext = (card: Card, rule: RarityRule) => card.fusion >= fLevel(rule.fusionMax) && card.fusion < topLevel(card, rule);
+
+/** The most copies this card can have waiting: the copies left to its cap, as the game holds no more than it can use. */
+export const waitingRoom = (card: Card, rule: RarityRule) =>
+  ascendsNext(card, rule) ? copiesAtFusion(rule, topLevel(card, rule)) - copiesAtFusion(rule, card.fusion) : 0;
+
+/** Copies the card has waiting on Ascension Kards (`Card.waiting`), within waitingRoom. */
+export function waitingCopies(card: Card, rule: RarityRule) {
+  const w = card.waiting;
+  return typeof w === 'number' && w >= 1 ? Math.min(Math.floor(w), waitingRoom(card, rule)) : 0;
+}
+
+/** Copies collected toward max: the card's level and the copies waiting on Ascension Kards. */
+const copiesHeld = (card: Card, rule: RarityRule) => copiesAtFusion(rule, card.fusion) + waitingCopies(card, rule);
+
+/** The level the card reaches once its waiting copies are used, which is where Fusion Up Kards would start. */
+export function levelWithWaiting(card: Card, rule: RarityRule) {
+  let level = card.fusion;
+  let left = waitingCopies(card, rule);
+  while (left > 0 && level < maxFusion(rule) && rule.dupesPerLevel[level - 1] <= left) left -= rule.dupesPerLevel[level++ - 1];
+  return level;
+}
+
+/**
+ * Saves the waiting copies as waitingCopies reads them, after a change to the count itself. A level or cap change leaves
+ * the saved count alone, as it's only limited when read, so changing either back brings the copies back.
+ */
+function tidyWaiting(card: Card, rule: RarityRule) {
+  const w = waitingCopies(card, rule);
+  if (w > 0) card.waiting = w;
+  else if (card.waiting !== undefined) delete card.waiting;
+}
+
+/** Copies still to collect: to the card's goal, less its level and the copies waiting on Ascension Kards. */
+export const copiesToMax = (card: Card, rule: RarityRule) => Math.max(0, copiesAtFusion(rule, targetLevel(card, rule)) - copiesHeld(card, rule));
 
 /** Copies to the kard threshold; none for a card that can't take kards, as the threshold means nothing to it. */
 export function copiesToThreshold(card: Card, rule: RarityRule) {
@@ -170,9 +210,10 @@ const dayOf = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).
  * change), card by card (two cards can share a name), for the Undo. With `record` false (a Settings rule change),
  * nothing goes on the record: the rules changed, not what was done in the game.
  *
- * Realm Klash gear also gets a stored goal of max first. The name already makes it max here, but a copy of the app
- * from before the name list only reads the goal, so without it that copy would delete the gear at F3 and sync the
- * deletion back. It also keeps a piece from being removed mid-rename, when the half-typed name is off the list.
+ * A card stays until it's ascended, however many copies wait on Ascension Kards. Realm Klash gear also gets a stored
+ * goal of max first. The name already makes it max here, but a copy of the app from before the name list only reads
+ * the goal, so without it that copy would delete the gear at F3 and sync the deletion back. It also keeps a piece from
+ * being removed mid-rename, when the half-typed name is off the list.
  */
 export function pruneDone(s: AppState, now?: Date, split?: { maxed: string[]; done: string[] }, record = true): string[] {
   const rules = new Map(s.rarities.map((r) => [r.id, r]));
@@ -220,6 +261,8 @@ export interface KardPlan {
   realmKlash: number;
   /** Other cards marked No kards at the threshold or higher and short of their goal, left out of `cards`; unset when none. */
   noKards?: number;
+  /** Cards at the threshold or higher, short of their goal, whose copies to it all wait on Ascension Kards; unset when none. */
+  waiting?: number;
   /** Gear only: the first piece the kards left can't finish, and all the kards it needs to reach its goal. */
   next?: { cardId: string; needs: number };
   /** Gear only: pieces kards can't take all the way to their goal, because a step on the way has no kard cost. */
@@ -318,12 +361,17 @@ function allocateKards(state: AppState) {
     // Only a rarity tracked to max has a kard box, so kards left saved on one tracked to F3 stay unplanned.
     if (thr == null || rule.goal !== 'max' || rule.fusionUpKards <= 0) continue;
     const cap = (c: Card) => targetLevel(c, rule);
-    const open = state.cards.filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c));
+    // Copies waiting on Ascension Kards make their steps, so kards start after them.
+    const start = new Map(state.cards.filter((c) => c.rarityId === rule.id).map((c) => [c.id, levelWithWaiting(c, rule)]));
+    const from = (c: Card) => start.get(c.id)!;
+    const open = state.cards.filter((c) => c.rarityId === rule.id && from(c) >= thr && from(c) < cap(c));
     const realmKlash = open.filter((c) => isRealmKlashGear(state, c)).length;
     const cards = open.filter((c) => !isRealmKlashGear(state, c) && !c.noKards);
     const noKards = open.length - realmKlash - cards.length;
-    const costs = cards.map((c) => kardCost(rule, c.fusion)).filter((k): k is number => k != null);
-    const level = new Map(cards.map((c) => [c.id, c.fusion]));
+    // Still listed, but needing no kards: the copies waiting on Ascension Kards make every step left.
+    const waiting = state.cards.filter((c) => c.rarityId === rule.id && c.fusion >= thr && c.fusion < cap(c) && from(c) >= cap(c)).length;
+    const costs = cards.map((c) => kardCost(rule, from(c))).filter((k): k is number => k != null);
+    const level = new Map(cards.map((c) => [c.id, from(c)]));
     const spent = new Map<string, number>();
     const stepsLeft = (c: Card) => cap(c) - level.get(c.id)!;
     const closer = (a: Card, b: Card) => stepsLeft(a) < stepsLeft(b) || (stepsLeft(a) === stepsLeft(b) && level.get(a.id)! > level.get(b.id)!);
@@ -335,7 +383,7 @@ function allocateKards(state: AppState) {
       // Kards to take a piece all the way to its goal; null when a step on the way can't be done with kards.
       const finishCost = (c: Card) => {
         let k = 0;
-        for (let lvl = c.fusion; lvl < cap(c); lvl++) {
+        for (let lvl = from(c); lvl < cap(c); lvl++) {
           const step = kardCost(rule, lvl);
           if (step == null) return null;
           k += step;
@@ -346,7 +394,7 @@ function allocateKards(state: AppState) {
       stuck = all.filter((x) => x.cost == null).map((x) => x.card.id);
       const queue = all
         .filter((x): x is { card: Card; cost: number } => x.cost != null)
-        .sort((a, b) => a.cost - b.cost || b.card.fusion - a.card.fusion || a.card.name.localeCompare(b.card.name));
+        .sort((a, b) => a.cost - b.cost || from(b.card) - from(a.card) || a.card.name.localeCompare(b.card.name));
       for (const { card, cost } of queue) {
         // Sorted cheapest first, so once one piece is out of reach every later one is too.
         if (cost > left) {
@@ -376,14 +424,14 @@ function allocateKards(state: AppState) {
     const assignments: KardAssignment[] = [];
     for (const c of cards) {
       const to = level.get(c.id)!;
-      if (to === c.fusion) continue;
-      assignments.push({ cardId: c.id, from: c.fusion, to, kards: spent.get(c.id)! });
-      kardCopies.set(c.id, copiesAtFusion(rule, to) - copiesAtFusion(rule, c.fusion));
+      if (to === from(c)) continue;
+      assignments.push({ cardId: c.id, from: from(c), to, kards: spent.get(c.id)! });
+      kardCopies.set(c.id, copiesAtFusion(rule, to) - copiesAtFusion(rule, from(c)));
     }
     // Gear rows follow the finishing order (fewest kards first), so the top row is the piece to fuse first.
     if (rule.kind === 'equipment') assignments.sort((a, b) => finishOrder.get(a.cardId)! - finishOrder.get(b.cardId)!);
     else assignments.sort((a, b) => b.to - a.to || b.kards - a.kards);
-    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash, ...(noKards > 0 && { noKards }), ...(next && { next }), ...(stuck.length > 0 && { stuck }) });
+    kardPlan.set(rule.id, { assignments, left, cards: cards.length, cheapest: costs.length ? Math.min(...costs) : null, realmKlash, ...(noKards > 0 && { noKards }), ...(waiting > 0 && { waiting }), ...(next && { next }), ...(stuck.length > 0 && { stuck }) });
   }
   return { kardCopies, kardPlan };
 }
@@ -404,7 +452,7 @@ export function copyPhase(ctx: Ctx, card: Card, g = 0): Phase {
   if (!rule) return 'skip';
   const remaining = copiesToMax(card, rule);
   if (g >= remaining) return 'maxed';
-  const pos = copiesAtFusion(rule, card.fusion) + g;
+  const pos = copiesHeld(card, rule) + g;
   if (pos < 1) return 'unlock';
   const thr = thresholdLevel(rule);
   // Kards can't stand in for any copy of a card that can't take them, so every copy to its max is valued like those
@@ -422,7 +470,7 @@ function copyValue(ctx: Ctx, card: Card, g = 0): number {
   const w = ctx.state.weights;
   const rule = ctx.rules.get(card.rarityId)!;
   const mult = { unlock: w.unlock, toThreshold: w.belowThreshold, noKards: w.belowThreshold, kardCovered: w.coveredByKards, normal: 1 }[phase];
-  const progress = (copiesAtFusion(rule, card.fusion) + g) / copiesAtFusion(rule, targetLevel(card, rule));
+  const progress = (copiesHeld(card, rule) + g) / copiesAtFusion(rule, targetLevel(card, rule));
   return cardWeight(ctx.state, card) * mult * (1 + w.closenessBonus * progress);
 }
 
@@ -454,11 +502,16 @@ const expectedCopies = (pack: Pack, chance: number) => pack.rolls * (chance / 10
 /** Chance of at least one copy of a drop per purchase. */
 const chanceAtLeastOne = (pack: Pack, chance: number) => 1 - Math.pow(1 - chance / 100, pack.rolls);
 
-/** A card a Kasket can give, with the copies it has (`owned`) and needs for its own max (`full`). */
+/**
+ * A card a Kasket can give, with the copies its level stands for (`owned`), the copies it needs for its own max
+ * (`full`), and the most its level can stand for from new copies alone (`fuses`): copies past F10 wait on Ascension
+ * Kards, so they don't raise it.
+ */
 interface KasketCard {
   card: Card;
   owned: number;
   full: number;
+  fuses: number;
 }
 
 /**
@@ -475,7 +528,10 @@ function kasketCards(ctx: Ctx, rule: RarityRule): KasketCard[] {
     cards = ctx.state.cards
       // Realm Klash gear is only sold for Blood Rubies; Kaskets never give it.
       .filter((c) => c.rarityId === rule.id && !isKasketExcluded(c) && !isRealmKlashGear(ctx.state, c))
-      .map((card) => ({ card, owned: copiesAtFusion(rule, card.fusion), full: copiesAtFusion(rule, targetLevel(card, rule)) }));
+      .map((card) => {
+        const owned = copiesAtFusion(rule, card.fusion);
+        return { card, owned, full: copiesAtFusion(rule, targetLevel(card, rule)), fuses: Math.max(owned, copiesAtFusion(rule, fLevel(rule.fusionMax))) };
+      });
     byRarity.set(rule.id, cards);
   }
   return cards;
@@ -485,6 +541,8 @@ export interface KasketPool {
   /** 'new': cards you don't own; 'unmaxed': you own them all, so cards short of max; 'none': nothing it's valued for. */
   mode: 'new' | 'unmaxed' | 'none';
   cards: Card[];
+  /** 'unmaxed' only: how many of `cards` still need copies, the rest having them all waiting on Ascension Kards. */
+  needCopies?: number;
   /** The rarity it draws from; undefined when that rarity has been removed. */
   rule?: RarityRule;
 }
@@ -495,18 +553,25 @@ export interface KasketPool {
  * has its F3+ pieces deleted, so the app can't see most of what it would give and values it at 0. `gained` is the
  * planner's expected copies so far: a card counts as owned once it's expected one copy, so after as many planned
  * buys as there are new cards, the next one gives an unmaxed card, as in the game.
+ *
+ * Short of max means below its own max in the game, which counts levels, not copies: a Gold card with every copy it
+ * needs waiting on Ascension Kards is still in the pool, and a pull of it is worth nothing. Expected copies raise a
+ * card only up to F10, as the ones past it would wait too, so an ascending card stays in the pool however many are
+ * planned.
  */
 export function kasketPool(ctx: Ctx, pack: Pack, gained: Map<string, number> = new Map()): KasketPool {
   const rule = pack.kasket ? ctx.rules.get(pack.kasket) : undefined;
   if (!rule) return { mode: 'none', cards: [] };
   // Kaskets give characters or gear; a Kameo rarity can only get here from an import, and isn't valued.
   if (rule.kind === 'kameo') return { mode: 'none', cards: [], rule };
-  const copies = (k: KasketCard) => k.owned + (gained.get(k.card.id) ?? 0);
+  const gain = (k: KasketCard) => gained.get(k.card.id) ?? 0;
   const eligible = kasketCards(ctx, rule);
-  const unowned = eligible.filter((k) => copies(k) < 1 - 1e-9).map((k) => k.card);
+  const unowned = eligible.filter((k) => k.owned + gain(k) < 1 - 1e-9).map((k) => k.card);
   if (unowned.length) return { mode: 'new', cards: unowned, rule };
-  const unmaxed = rule.goal === 'max' ? eligible.filter((k) => copies(k) < k.full - 1e-9).map((k) => k.card) : [];
-  return { mode: unmaxed.length ? 'unmaxed' : 'none', cards: unmaxed, rule };
+  const unmaxed = rule.goal === 'max' ? eligible.filter((k) => Math.min(k.owned + gain(k), k.fuses) < k.full - 1e-9) : [];
+  if (!unmaxed.length) return { mode: 'none', cards: [], rule };
+  const needCopies = unmaxed.filter((k) => k.owned + waitingCopies(k.card, rule) + gain(k) < k.full - 1e-9).length;
+  return { mode: 'unmaxed', cards: unmaxed.map((k) => k.card), needCopies, rule };
 }
 
 /** A pack's drops: its saved list, or for a Kasket an even share of its current pool (one card per purchase). */
@@ -862,25 +927,81 @@ export function endingSoon(plan: Plan, now: Date): Pack[] {
 
 // ---------- Recording purchases ----------
 
-/** Level a card up or down by one copy, within its rarity's range. Returns whether its level changed. */
+/**
+ * Level a card up or down by one copy, within its rarity's range. Returns whether its level changed. Up on a card with a
+ * copy waiting on Ascension Kards uses that copy (ascend), as the step does in the game.
+ */
 export function stepCard(d: AppState, cardId: string, delta: 1 | -1) {
   const card = d.cards.find((c) => c.id === cardId);
   const rule = card && d.rarities.find((r) => r.id === card.rarityId);
   if (!card || !rule) return false;
+  if (delta > 0 && waitingCopies(card, rule) > 0) return ascend(d, cardId);
   const was = card.fusion;
   card.fusion = Math.min(maxFusion(rule), Math.max(0, card.fusion + delta));
   return card.fusion !== was;
 }
 
 /**
+ * One more (or one fewer) copy waiting on Ascension Kards, within waitingRoom. Returns whether it changed. `from` is the
+ * count the screen showed, so a tap a sync has made out of date changes nothing.
+ */
+export function stepWaiting(d: AppState, cardId: string, delta: 1 | -1, from?: number) {
+  const card = d.cards.find((c) => c.id === cardId);
+  const rule = card && d.rarities.find((r) => r.id === card.rarityId);
+  if (!card || !rule || (from != null && waitingCopies(card, rule) !== from)) return false;
+  const was = waitingCopies(card, rule);
+  const now = Math.min(waitingRoom(card, rule), Math.max(0, was + delta));
+  if (now === was) return false;
+  card.waiting = now;
+  tidyWaiting(card, rule);
+  return true;
+}
+
+/**
+ * Ascend a card one step with a waiting copy, as done in the game once an Ascension Kard comes in: the copy stops
+ * waiting and the card goes up a level. Returns false when no copy waits or the card is no longer at level `from`.
+ */
+export function ascend(d: AppState, cardId: string, from?: number) {
+  const card = d.cards.find((c) => c.id === cardId);
+  const rule = card && d.rarities.find((r) => r.id === card.rarityId);
+  if (!card || !rule || (from != null && card.fusion !== from)) return false;
+  const waiting = waitingCopies(card, rule);
+  const step = rule.dupesPerLevel[card.fusion - 1];
+  if (!(step <= waiting)) return false;
+  card.fusion += 1;
+  card.waiting = waiting - step;
+  tidyWaiting(card, rule);
+  return true;
+}
+
+/**
+ * A copy pulled from a pack (delta 1), or one taken back (delta -1). A card whose next step is ascension keeps it
+ * waiting on Ascension Kards, as the game does; others go up a level. Taking one back takes a waiting copy first.
+ * Returns whether anything changed.
+ */
+export function addCopy(d: AppState, cardId: string, delta: 1 | -1) {
+  const card = d.cards.find((c) => c.id === cardId);
+  const rule = card && d.rarities.find((r) => r.id === card.rarityId);
+  if (!card || !rule) return false;
+  if (delta > 0 ? ascendsNext(card, rule) : waitingCopies(card, rule) > 0) return stepWaiting(d, cardId, delta);
+  return stepCard(d, cardId, delta);
+}
+
+/** Whether addCopy can add another copy: below the rarity's top level, and with room to wait if it's ascending. */
+export const canAddCopy = (card: Card, rule: RarityRule) =>
+  ascendsNext(card, rule) ? waitingCopies(card, rule) < waitingRoom(card, rule) : card.fusion < maxFusion(rule);
+
+/**
  * The Fusion Up Kards this card's next step would take from the Wallet now, or null when kards can't do it: below
  * the threshold (F3), already at its goal, Realm Klash gear (bought to max, never kards), a card marked No kards, a
- * rarity not tracked to max (it has no kard box), a step with no kard cost, or more kards than the Wallet holds.
+ * rarity not tracked to max (it has no kard box), a step with no kard cost, more kards than the Wallet holds, or a copy
+ * waiting on Ascension Kards (it makes the step, not kards).
  */
 export function kardStep(state: AppState, cardId: string): number | null {
   const card = state.cards.find((c) => c.id === cardId);
   const rule = card && state.rarities.find((r) => r.id === card.rarityId);
   if (!card || !rule || rule.goal !== 'max' || card.noKards || card.fusion >= targetLevel(card, rule) || isRealmKlashGear(state, card)) return null;
+  if (waitingCopies(card, rule) > 0) return null;
   const cost = kardCost(rule, card.fusion);
   return cost != null && cost <= rule.fusionUpKards ? cost : null;
 }
@@ -903,9 +1024,20 @@ export function fuseWithKards(d: AppState, cardId: string, expected?: number, fr
 }
 
 /**
+ * A store item whose card can't take its copy: it has every copy it can hold waiting on Ascension Kards (or is at its
+ * rarity's top level). Logging a buy of it would add nothing, and taking that buy back would take a real copy off.
+ */
+export function storeCardFull(d: AppState, pack: Pack) {
+  const card = pack.store && pack.drops[0] ? d.cards.find((c) => c.id === pack.drops[0].cardId) : undefined;
+  const rule = card && d.rarities.find((r) => r.id === card.rarityId);
+  return !!card && !!rule && !canAddCopy(card, rule);
+}
+
+/**
  * Buy (delta 1) or take back (delta -1) one purchase of a pack: counts it, moves the cost out of (or back into)
- * the balance, and for a store item, which always gives its card, levels that card. Random packs leave the
- * cards to the "What did you pull?" step. Returns false when nothing was logged: the pack is gone, a +1 would pass
+ * the balance, and for a store item, which always gives its card, adds that copy (addCopy). Random packs leave the
+ * cards to the "What did you pull?" step. Returns false when nothing was logged: the pack is gone, its store item's card
+ * can't take another copy (storeCardFull), a +1 would pass
  * its purchase limit, or a −1 has no purchase left to take back.
  *
  * A buy the balance doesn't cover takes it below 0 rather than stopping at 0: the typed balance was out of date,
@@ -915,10 +1047,11 @@ export function recordPurchase(d: AppState, packId: string, delta: 1 | -1) {
   const pack = d.packs.find((x) => x.id === packId);
   if (!pack || (delta < 0 && pack.purchased <= 0)) return false;
   if (delta > 0 && pack.maxPurchases != null && pack.purchased >= pack.maxPurchases) return false;
+  if (delta > 0 && storeCardFull(d, pack)) return false;
   pack.purchased += delta;
   const cur = d.currencies.find((c) => c.id === pack.currencyId);
   if (cur) cur.balance -= delta * pack.cost;
-  if (pack.store && pack.drops[0]) stepCard(d, pack.drops[0].cardId, delta);
+  if (pack.store && pack.drops[0]) addCopy(d, pack.drops[0].cardId, delta);
   return true;
 }
 
