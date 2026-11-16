@@ -33,12 +33,15 @@ writeFileSync(
 `,
 );
 
-/** A copy of a download script and schedule.mjs beside an empty public folder, so runs never write the repo's files. */
+/**
+ * A copy of a download script, schedule.mjs and the app's name matching (src/names.ts, which the catalog script imports)
+ * beside an empty public folder, so runs never write the repo's files.
+ */
 function scratchRepo(script) {
   const root = mkdtempSync(join(dir, 'repo-'));
-  mkdirSync(join(root, 'scripts'));
-  mkdirSync(join(root, 'public'));
+  for (const folder of ['scripts', 'public', 'src']) mkdirSync(join(root, folder));
   for (const file of [script, 'schedule.mjs']) copyFileSync(join(here, file), join(root, 'scripts', file));
+  copyFileSync(join(here, '..', 'src', 'names.ts'), join(root, 'src', 'names.ts'));
   return root;
 }
 
@@ -80,7 +83,16 @@ function runOffline(script, output) {
 // on a minute per request). Or the way a healthy one might: one card with a blank name or no slug, 50 Gold cards a page
 // plus one new character without art or a rarity (or four, with or without slugs), or no item count, or thumbnails
 // beside the full art (https on page 1, http on page 2, Kameos titled with the Kameo suffix). It can also take the
-// live catalog.json away (404) or give it 3 more cards of each kind.
+// live catalog.json away (404) or give it 3 more cards of each kind. For the Klash Tower data it answers the squad
+// builder, ratings, character guides and wiki for the same cards, or fails one of them (no-squad, no-rating,
+// articles-down, wiki-down), drops the characters or the gear slots from the squad builder (squad-characters-gone,
+// squad-renamed), leaves Team Passives off the wiki pages (wiki-empty-many), or moves the clock 20 s per guide
+// (slow-articles); many uses 50 Gold cards a page, so there are enough characters to cap. It can also send tag names
+// and an excerpt with classes on every card (tagged), leave 5 characters and 5 pieces of Rare gear out of the squad
+// builder or without a slot (squad-few-missing), or fail only Card 1's guide (one-article-down). Guides can answer with
+// no Best teams section (articles-empty); the wiki can leave Card 1 out of its category (wiki-missing-page), list Gold
+// Characters over two answers (wiki-paged), drop both Team Passives (wiki-empty), or drop 40 of 100 passives and every
+// Good With section (wiki-some-empty).
 const online = join(dir, 'online.mjs');
 writeFileSync(
   online,
@@ -104,7 +116,13 @@ const noSlug = (n) => change === 'no-slug' || (change === 'one-no-slug' && n ===
 const card = (n) => ({
   title: change === 'nameless' || (change === 'one-nameless' && n === 2) ? ' ' : 'Card ' + n,
   slug: noSlug(n) ? undefined : change === 'duplicate-slugs' ? 'card' : 'card-' + n,
-  tags: change === 'no-rarity' ? [] : [{ slug: 'gold' }],
+  tags:
+    change === 'no-rarity'
+      ? []
+      : change === 'tagged'
+        ? [{ slug: 'gold', name: 'Gold' }, { name: 'Snare' }, { name: ' SNARE ' }, { name: 'Kameo' }, { name: 'Black Dragon' }, { name: '' }, {}]
+        : [{ slug: 'gold' }],
+  ...(change === 'tagged' ? { excerpt: '<p>Elder God, Netherrealm / Gold</p>' } : {}),
   image_url:
     change === 'no-art'
       ? undefined
@@ -113,13 +131,21 @@ const card = (n) => ({
         : (change === 'http-art' ? 'http://img.test/' : 'https://img.test/') + n,
   ...(change === 'thumbs' ? { image_thumb_2x_url: (n === 1 ? 'https://' : 'http://') + 'img.test/thumb/' + n } : {}),
 });
-globalThis.fetch = async (url, opts = {}) => {
-  note(url, opts);
-  if (change === 'slow') skew += 61_000;
-  const page = /[?&]page=(\\d+)/.exec(String(url));
-  const current = page && (change === 'repeated-page' ? 1 : Number(page[1]));
-  // A big gold group with art and a silver group without: too few to show in the whole catalog. Or the same gold
-  // group plus one new character the site hasn't finished (no rarity, no art), or with a fifth of its titles blank.
+// A big gold group with art and a silver group without: too few to show in the whole catalog. Or the same gold
+// group plus one new character the site hasn't finished (no rarity, no art), or with a fifth of its titles blank.
+// The Klash Tower changes (many and on) use the big gold group too, so there are enough characters to cap and count.
+const many = [
+  'many',
+  'slow-articles',
+  'articles-down',
+  'articles-empty',
+  'wiki-empty-many',
+  'wiki-some-empty',
+  'squad-renamed',
+  'squad-characters-gone',
+  'squad-few-missing',
+].includes(change);
+function pageOf(url, current) {
   const silver = (n) => ({ title: 'Silver ' + n, slug: 'silver-' + n, tags: [{ slug: 'silver' }] });
   const gold = (n) => Array.from({ length: 50 }, (_, i) => card(n + '-' + i));
   // One new character the site hasn't finished, or a game update's worth (4), with or without slugs.
@@ -134,32 +160,132 @@ globalThis.fetch = async (url, opts = {}) => {
         ? [...gold(current), ...fresh]
         : change === 'many-nameless'
           ? gold(current).map((c, i) => (i < 10 ? { ...c, title: ' ' } : c))
-          : [card(current)];
+          : many
+            ? gold(current)
+            : [card(current)];
+  // Rare gear, so the tower's gear checks (Rare and Epic only) have gear to check.
+  if (change === 'rare-gear' || change === 'squad-renamed' || change === 'squad-few-missing') {
+    if (String(url).includes('/equipment/')) data.forEach((c) => (c.tags = [{ slug: 'rare' }]));
+  }
   const perPage = data.length - fresh.length;
   const pages = Number.isInteger(lastPage) ? lastPage : 0;
   const total = pages * perPage + (unfinished ? newCards : 0) + (change === 'skipped-item' ? 1 : 0);
   if (change === 'kameo-only-suffix' && String(url).includes('/kameos/')) data[0] = { ...data[0], title: 'Kameo' };
   // Kameo titles as the site writes them ("Baraka - Klassic Kameo").
   if (change === 'thumbs' && String(url).includes('/kameos/')) data[0].title += ' Kameo';
+  return { data, total };
+}
+// The squad builder, ratings, guides and wiki answer for the same cards the pages send. A character's squad-builder
+// name is its title's first word and its team the rest ("Card" and "1"), as the site splits "Kabal" from "Black Dragon".
+const cards = (category) =>
+  [1, 2].flatMap((p) => pageOf('/' + category + '/', p).data).filter((c) => c.slug && c.title && c.title.trim());
+const split = (title) => ({ name: { en: title.slice(0, title.indexOf(' ')) }, team: { en: title.slice(title.indexOf(' ') + 1) } });
+const squad = () => ({
+  characters:
+    change === 'squad-characters-gone'
+      ? []
+      : cards('characters')
+          .slice(change === 'squad-few-missing' ? 5 : 0)
+          .map((c) => ({ code: c.slug, ...split(c.title), attack: { en: '50,000' }, health: { en: '100,000' }, rarity: 'diamond' })),
+  equipment: cards('equipment').map((c, i) => ({
+    code: 'gear-' + c.slug,
+    name: { en: c.title },
+    ...(change === 'squad-renamed' || (change === 'squad-few-missing' && i < 5) ? { kind: 'weapon' } : { type: 'weapon' }),
+    finisherType: 'friendship',
+    characterCodes: ['card-2'],
+  })),
+  kameos: [],
+});
+const nl = String.fromCharCode(10);
+// A character page in the wiki's layout: an abilities table (name, classification, description), with its Team
+// Passive row left out for wiki-empty-many, then a Good With section naming the other card.
+const wikiPage = (title) =>
+  [
+    '==Abilities==',
+    '{| class="article-table"',
+    '|-',
+    '| rowspan="2" |Some Ability',
+    '| style="text-align:center;" |Passive',
+    '| |Does something.',
+    ...(change === 'wiki-empty-many' || change === 'wiki-empty' || (change === 'wiki-some-empty' && Number(title.split('2-')[1]) >= 10)
+      ? []
+      : ['| rowspan="2" |Upon tag-in', '| |Team Passive', '| |' + title.replace('/', ' ') + ' teammates do', "more '''damage'''."]),
+    '|}',
+    ...(change === 'wiki-some-empty' ? [] : ['=== Good With ===', '*[[Card/2|Card 2]]: helps.']),
+    '=== Countered By ===',
+    '*[[Card/1]]: hurts.',
+  ].join(nl);
+const wiki = (url) => {
+  const q = new URL(url).searchParams;
+  if (q.get('list') === 'categorymembers') {
+    const gold = q.get('cmtitle') === 'Category:Gold Characters';
+    const members = (gold ? cards('characters').map((c) => ({ title: c.title.replace(' ', '/') })) : []).filter(
+      (m) => change !== 'wiki-missing-page' || m.title !== 'Card/1',
+    );
+    // Gold Characters in two answers: the first with a continue token, the second (asked with it) with the rest.
+    if (change === 'wiki-paged' && gold) {
+      return q.get('cmcontinue') === 'x'
+        ? { query: { categorymembers: members.slice(1) } }
+        : { query: { categorymembers: members.slice(0, 1) }, continue: { cmcontinue: 'x', continue: '-||' } };
+    }
+    return { query: { categorymembers: members } };
+  }
+  const pages = (q.get('titles') ?? '').split('|').map((title) => ({ title, revisions: [{ slots: { main: { content: wikiPage(title) } } }] }));
+  return { query: { pages } };
+};
+globalThis.fetch = async (url, opts = {}) => {
+  note(url, opts);
+  if (change === 'slow') skew += 61_000;
+  const at = String(url);
+  const page = /[?&]page=(\\d+)/.exec(at);
+  const current = page && (change === 'repeated-page' ? 1 : Number(page[1]));
   // A page count that shrinks from 3 to 2 after the first page, with no item count to give it away.
   const shifting = change === 'shifting-pages';
-  const meta = {
-    last_page: shifting ? (current === 1 ? 3 : 2) : lastPage,
-    current_page: current,
-    ...(change === 'no-total' || shifting ? {} : { total }),
-  };
-  const body = page
-    ? { data, meta }
-    : String(url).endsWith('/events.json')
-      ? { seasons: [] }
-      : String(url).endsWith('/catalog.json')
-        ? { fetchedAt: '2026-10-20T17:30:00.000Z', items: live }
-        : schedule;
-  if (change === 'no-live-copy' && String(url).endsWith('/catalog.json')) return { ok: false, status: 404 };
-  return { ok: true, status: 200, json: async () => body };
+  const ok = (body) => ({ ok: true, status: 200, json: async () => body });
+  const failed = { ok: false, status: 500 };
+  if (page) {
+    const { data, total } = pageOf(at, current);
+    const meta = {
+      last_page: shifting ? (current === 1 ? 3 : 2) : lastPage,
+      current_page: current,
+      ...(change === 'no-total' || shifting ? {} : { total }),
+    };
+    return ok({ data, meta });
+  }
+  if (at.endsWith('/squad-builder-options')) return change === 'no-squad' ? failed : ok(squad());
+  if (at.includes('/api/rating?')) {
+    if (change === 'no-rating') return failed;
+    const characters = at.includes('section=characters');
+    // Card 2 has a score but no votes yet, and gear Card 1 a score that isn't a number: neither is written.
+    return ok({
+      data: characters
+        ? [{ title: 'Card 1', average_score: 4.46, votes_count: 6 }, { title: 'Card 2', average_score: 3.9, votes_count: 0 }]
+        : [{ title: 'Card 1', average_score: '4', votes_count: 3 }],
+    });
+  }
+  if (at.includes('/api/articles/')) {
+    if (change === 'slow-articles') skew += 20_000;
+    if (change === 'articles-down' || (change === 'one-article-down' && at.endsWith('/card-1'))) return failed;
+    const partner = many ? 'card-2-0' : 'card-2';
+    const html = 'Pair with <a href="/en/category/characters/' + partner + '">Card 2</a>.';
+    return ok({ data: { editorial_guide: { sections: change === 'articles-empty' ? [] : [{ key: 'best_teams', html }] } } });
+  }
+  if (at.startsWith('https://mortalkombat-mobile.fandom.com/')) return change === 'wiki-down' ? failed : ok(wiki(at));
+  if (at.endsWith('/events.json')) return ok({ seasons: [] });
+  if (at.endsWith('/catalog.json')) {
+    return change === 'no-live-copy' ? { ok: false, status: 404 } : ok({ fetchedAt: '2026-10-20T17:30:00.000Z', items: live });
+  }
+  return ok(schedule);
 };
 `,
 );
+
+/** A wiki API address the way the catalog script builds it (format and formatversion first). */
+const wikiUrl = (params) => {
+  const u = new URL('https://mortalkombat-mobile.fandom.com/api.php');
+  for (const [k, v] of Object.entries({ format: 'json', formatversion: '2', ...params })) u.searchParams.set(k, v);
+  return u.href;
+};
 
 /** Runs the copy of a download script in `root` with MK Mobile Base answering, changed as `change` says. */
 const spawnOnline = (root, script, change = '', env = {}) =>
@@ -222,6 +348,10 @@ describe('download scripts', () => {
   // why_new=the offline run above fails on the first request, so it never reaches the others; seam=none (fetch is
   // replaced in the script's own process, and copies of the scripts write into a scratch folder); no_claim=the
   // 30-second length
+  // Extended on 2026-11-15 (Klash Tower data, PR 1): the squad builder, ratings, each character's guide and the wiki.
+  // Value: protects=every new Klash Tower request has the same time limit, in the order the script makes them;
+  // fails_when=one of the new requests is made without a signal, or an extra or missing request appears; why_new=the
+  // catalog script only asked for category pages and the live copy before; seam=none; no_claim=the wiki's own limits
   it('put a time limit on every request when MK Mobile Base answers', () => {
     const page = (category, n) => `https://mkmobilebase.com/api/categories/${category}/articles?per_page=100&page=${n}`;
     const limited = (url) => ({ url, limited: true });
@@ -237,7 +367,15 @@ describe('download scripts', () => {
         stderr: '',
         requests: [
           ...['characters', 'equipment', 'kameos'].flatMap((c) => [page(c, 1), page(c, 2)]),
+          'https://mkmobilebase.com/api/squad-builder-options',
+          'https://mkmobilebase.com/api/rating?section=characters&locale=en',
+          'https://mkmobilebase.com/api/rating?section=equipment&locale=en',
           'https://live.test/mkmax/catalog.json',
+          'https://mkmobilebase.com/api/articles/card-1',
+          'https://mkmobilebase.com/api/articles/card-2',
+          wikiUrl({ action: 'query', list: 'categorymembers', cmtitle: 'Category:Diamond Characters', cmlimit: '500', cmnamespace: '0' }),
+          wikiUrl({ action: 'query', list: 'categorymembers', cmtitle: 'Category:Gold Characters', cmlimit: '500', cmnamespace: '0' }),
+          wikiUrl({ action: 'query', prop: 'revisions', rvprop: 'content', rvslots: 'main', titles: 'Card/1|Card/2' }),
         ].map(limited),
         wroteCatalog: true,
       },
@@ -292,6 +430,13 @@ describe('download scripts', () => {
       'no-slug': 'items have no slug or name',
       'object-art': 'items have no image',
       'http-art': 'items have no image',
+      // Klash Tower data (2026-11-15): MK Mobile Base failing, or renaming the fields the tower needs, fails the
+      // refresh like the catalog pages do (it's the same site).
+      'no-squad': 'squad-builder-options: HTTP 500',
+      'squad-characters-gone': 'characters with no squad data',
+      'squad-renamed': 'gear with no slot',
+      'no-rating': 'rating characters: HTTP 500',
+      'articles-down': 'requests failed',
     };
     const outcome = (change) => {
       const { status, stderr, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
@@ -370,16 +515,39 @@ describe('download scripts', () => {
   // earlier all-of-a-group rule), cards without a rarity are counted as a group of their own, or a missing total is
   // treated as a mismatch; why_new=every passing case had finished cards and a total; seam=none (STUB_CHANGE only
   // changes the stand-in's answers); no_claim=how many unfinished cards are too many
+  // Extended by /ship coverage audit on 2026-11-16 (Klash Tower data, PR 1, pass 2): a few cards missing from the
+  // squad builder.
+  // Value: protects=a few Gold characters missing from the squad builder, or Rare gear without a slot (5 of 100 each,
+  // as after an update), don't stop the refresh; fails_when=the tower health checks fail on any missing card or more
+  // than 3, not a tenth; why_new=only all-missing cases ran; seam=none; no_claim=the exact tenth
+  // Extended by /ship plan audit on 2026-11-16 (Klash Tower data, PR 1): what the missing cards are written with.
+  // Value: protects=a character the squad builder doesn't list is written with no team or stats while the rest keep
+  // theirs, and gear sent without a slot is written without one; fails_when=an unmatched card is given another card's
+  // or a default's fields; why_new=the row only checked the catalog was written; seam=none; no_claim=real site names
   it("write the catalog with a new unfinished card, or when the site doesn't send a count", () => {
     const outcome = (change) => {
       const { status, wroteCatalog } = runOnline('fetch-catalog.mjs', change);
       return { change, status, wroteCatalog };
     };
-    expect(['new-card', 'new-cards', 'no-total'].map(outcome)).toEqual([
+    expect(['new-card', 'new-cards', 'no-total', 'squad-few-missing'].map(outcome)).toEqual([
       { change: 'new-card', status: 0, wroteCatalog: true },
       { change: 'new-cards', status: 0, wroteCatalog: true },
       { change: 'no-total', status: 0, wroteCatalog: true },
+      { change: 'squad-few-missing', status: 0, wroteCatalog: true },
     ]);
+    const root = scratchRepo('fetch-catalog.mjs');
+    const { status } = spawnOnline(root, 'fetch-catalog.mjs', 'squad-few-missing');
+    const items = status ? [] : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).items;
+    const characters = items.filter((i) => i.kind === 'character' && i.rarity === 'gold');
+    const gear = items.filter((i) => i.kind === 'equipment' && i.rarity === 'rare');
+    const missing = characters.filter((i) => !i.team);
+    const slotless = gear.filter((i) => !i.slot);
+    expect({
+      missing: missing.length > 0 && missing.length < characters.length / 10,
+      missingBare: missing.every((i) => i.attack === undefined && i.health === undefined),
+      restMatched: characters.filter((i) => i.team).every((i) => i.attack === 50000),
+      slotless: slotless.length > 0 && slotless.length < gear.length / 10,
+    }).toEqual({ missing: true, missingBare: true, restMatched: true, slotless: true });
   }, 45_000);
 
   // Generated on 2026-10-26 (/ship coverage audit, pr-ci run 17)
@@ -401,7 +569,9 @@ describe('download scripts', () => {
       { kind, name: 'Card 1', rarity: 'gold', slug: 'card-1', image: 'https://img.test/thumb/1' },
       { kind, name: 'Card 2', rarity: 'gold', slug: 'card-2', image: 'https://img.test/2' },
     ]);
-    expect([status, written?.items]).toEqual([0, cards]);
+    // Only the fields this test is about; the Klash Tower fields have their own test.
+    const base = written?.items.map(({ kind, name, rarity, slug, image }) => ({ kind, name, rarity, slug, image }));
+    expect([status, base]).toEqual([0, cards]);
   }, 45_000);
 
   // Generated on 2026-10-26 (/ship review, pr-ci run 20, owner decision D1 A)
@@ -451,6 +621,223 @@ describe('download scripts', () => {
     expect([outcome(gold), outcome([...gold, ...diamonds])]).toEqual([
       { status: 0, wroteCatalog: true },
       { status: 1, wroteCatalog: false },
+    ]);
+  }, 45_000);
+
+  // Generated on 2026-11-15 (Klash Tower data, PR 1)
+  // Value: protects=each Gold and Diamond character gets its team, stats, score, best teams, Team Passive and Good With
+  // partners, and gear its slot, set and set owners, matched by name, with rarity still from the catalog's tags;
+  // fails_when=the name join, a field mapping or the wiki parsing breaks, or the squad builder's wrong rarity is used;
+  // why_new=the catalog had none of these fields; seam=none; no_claim=the real sites' answers (stand-ins)
+  // Extended by /ship coverage audit on 2026-11-16 (Klash Tower data, PR 1, pass 2): ratings that don't count.
+  // Value: protects=a card with no votes, or a score that isn't a number, gets no score; fails_when=the votes or number
+  // check goes, so Card 2 is written with 3.9 or gear Card 1 with "4"; why_new=the stand-in only rated Card 1, with
+  // votes; seam=none; no_claim=how the planner weighs few votes
+  it('write the Klash Tower fields for each card, matched by name', () => {
+    const root = scratchRepo('fetch-catalog.mjs');
+    const { status } = spawnOnline(root, 'fetch-catalog.mjs');
+    const items = status ? [] : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).items;
+    const pick = (kind, name) => {
+      const { image: _image, slug: _slug, teamsAt, ...rest } = items.find((i) => i.kind === kind && i.name === name) ?? {};
+      return { ...rest, asked: typeof teamsAt === 'string' };
+    };
+    expect([status, pick('character', 'Card 1'), pick('character', 'Card 2'), pick('equipment', 'Card 1'), pick('kameo', 'Card 1')]).toEqual([
+      0,
+      {
+        kind: 'character',
+        name: 'Card 1',
+        rarity: 'gold',
+        team: '1',
+        attack: 50000,
+        health: 100000,
+        score: 4.5,
+        votes: 6,
+        bestTeams: ['Card 2'],
+        passive: 'Card 1 teammates do more damage.',
+        goodWith: ['Card 2'],
+        asked: true,
+      },
+      // Its guide and Good With name only itself, so it has neither.
+      { kind: 'character', name: 'Card 2', rarity: 'gold', team: '2', attack: 50000, health: 100000, passive: 'Card 2 teammates do more damage.', asked: true },
+      { kind: 'equipment', name: 'Card 1', rarity: 'gold', slot: 'weapon', set: 'friendship', setFor: ['Card 2'], asked: false },
+      { kind: 'kameo', name: 'Card 1', rarity: 'gold', asked: false },
+    ]);
+  }, 45_000);
+
+  // Generated on 2026-11-15 (Klash Tower data, PR 1, owner decisions D9 A and D13 A)
+  // Value: protects=a run asks about at most 80 characters' guides, those never asked first and then the longest ago,
+  // keeps the earlier copy's partners for the rest, and starts no guide request in the last minute before the
+  // deadline; fails_when=the cap, the order or the time budget goes, so a first run asks about every character and can
+  // run out of time; why_new=new requests; seam=none (the stand-in moves the clock 20 s per guide for slow-articles);
+  // no_claim=the site's real answer times
+  // Extended by /ship coverage audit on 2026-11-16 (Klash Tower data, PR 1, pass 2): wiki pages 50 at a time.
+  // Value: protects=all 100 characters' wiki pages are read, 50 titles a request; fails_when=the batch loop reads only
+  // the first 50, or slices wrongly, so later characters lose their Team Passive; why_new=other runs had 2 characters or
+  // checked one; seam=none; no_claim=the wiki's own limit
+  it('ask about at most 80 guides a run, newest cards first, and stop before the deadline', () => {
+    const names = (page) => Array.from({ length: 50 }, (_, i) => `Card ${page}-${i}`);
+    // An earlier copy that asked about the Card 1-… characters, but none of the Card 2-… ones. Card 1-2 is left out:
+    // names match in any word order, so it's the same card as Card 2-1.
+    const local = {
+      fetchedAt: '2026-10-25T17:30:00.000Z',
+      items: names(1)
+        .filter((name) => name !== 'Card 1-2')
+        .map((name) => ({ kind: 'character', rarity: 'gold', name, teamsAt: '2026-11-01', bestTeams: ['Card 2-0'] })),
+    };
+    const root = scratchRepo('fetch-catalog.mjs');
+    writeFileSync(join(root, 'public', 'catalog.json'), JSON.stringify(local));
+    const run = spawnOnline(root, 'fetch-catalog.mjs', 'many');
+    const asked = requestsOf(run.stderr).map((r) => r.url).filter((u) => u.includes('/api/articles/')).map((u) => u.split('/').pop());
+    const items = run.status ? [] : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).items;
+    const kept = items.filter((i) => i.kind === 'character' && i.teamsAt === '2026-11-01');
+    const slow = spawnOnline(scratchRepo('fetch-catalog.mjs'), 'fetch-catalog.mjs', 'slow-articles');
+    const slowAsked = requestsOf(slow.stderr).filter((r) => r.url.includes('/api/articles/')).length;
+    const wikiBatches = requestsOf(run.stderr)
+      .map((r) => new URL(r.url))
+      .filter((u) => u.searchParams.get('prop') === 'revisions')
+      .map((u) => u.searchParams.get('titles').split('|').length);
+    expect({
+      status: run.status,
+      asked: asked.length,
+      newFirst: names(2).every((n) => asked.includes(n.toLowerCase().replace(' ', '-'))),
+      kept: kept.length,
+      keptPartners: kept.every((i) => i.bestTeams?.[0] === 'Card 2-0'),
+      slowStatus: slow.status,
+      slowStopped: slowAsked >= 4 && slowAsked < 80 && /stopped before the deadline/.test(slow.stderr),
+      wikiBatches,
+      lastPassive: items.find((i) => i.kind === 'character' && i.name === 'Card 2-49')?.passive,
+    // 51 never asked (the 50 Card 2-… and Card 1-2) go first, then 29 of the 49 asked before; 20 keep their partners.
+    }).toEqual({
+      status: 0,
+      asked: 80,
+      newFirst: true,
+      kept: 20,
+      keptPartners: true,
+      slowStatus: 0,
+      slowStopped: true,
+      wikiBatches: [50, 50],
+      lastPassive: 'Card 2-49 teammates do more damage.',
+    });
+  }, 45_000);
+
+  // Generated on 2026-11-15 (Klash Tower data, PR 1, owner decisions D4 A and D8 A)
+  // Value: protects=when the wiki is down, or answers with far fewer Team Passives than the earlier copy had, every
+  // character keeps the earlier copy's Team Passive and Good With and the catalog still refreshes; a healthy wiki
+  // replaces them; fails_when=a wiki failure fails the catalog, ships empty passives, or a healthy wiki stops replacing
+  // old text; why_new=new source; seam=none; no_claim=the real wiki's page layouts
+  it('keep the earlier Team Passives when the wiki fails or reads as empty', () => {
+    const earlierItems = (count) =>
+      Array.from({ length: count }, (_, i) => ({
+        kind: 'character',
+        rarity: 'gold',
+        name: count === 2 ? `Card ${i + 1}` : `Card ${1 + Math.floor(i / 50)}-${i % 50}`,
+        passive: 'Old passive.',
+        goodWith: ['Old partner'],
+      }));
+    const passiveOf = (change, count) => {
+      const root = scratchRepo('fetch-catalog.mjs');
+      writeFileSync(join(root, 'public', 'catalog.json'), JSON.stringify({ fetchedAt: '2026-10-25T17:30:00.000Z', items: earlierItems(count) }));
+      const { status, stderr } = spawnOnline(root, 'fetch-catalog.mjs', change);
+      const items = status ? [] : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).items;
+      const first = items.find((i) => i.kind === 'character' && /^Card 1(-0)?$/.test(i.name));
+      return { change, status, passive: first?.passive, goodWith: first?.goodWith, warned: /keeping the earlier copy/.test(stderr) };
+    };
+    const paged = scratchRepo('fetch-catalog.mjs');
+    const pagedRun = spawnOnline(paged, 'fetch-catalog.mjs', 'wiki-paged');
+    const pagedItems = pagedRun.status ? [] : JSON.parse(readFileSync(join(paged, 'public', 'catalog.json'), 'utf8')).items;
+    expect([
+      passiveOf('wiki-down', 2),
+      passiveOf('wiki-empty-many', 100),
+      passiveOf('', 2),
+      passiveOf('wiki-missing-page', 2),
+      passiveOf('wiki-empty', 2),
+      passiveOf('wiki-some-empty', 100),
+      {
+        status: pagedRun.status,
+        askedRest: requestsOf(pagedRun.stderr).some((r) => new URL(r.url).searchParams.get('cmcontinue') === 'x'),
+        passive: pagedItems.find((i) => i.kind === 'character' && i.name === 'Card 2')?.passive,
+      },
+    ]).toEqual([
+      { change: 'wiki-down', status: 0, passive: 'Old passive.', goodWith: ['Old partner'], warned: true },
+      // Only the passives are gone, so only they keep the earlier copy's ("Card 2" matches Card 2-2 in any word order).
+      { change: 'wiki-empty-many', status: 0, passive: 'Old passive.', goodWith: ['Card 2-2'], warned: true },
+      { change: '', status: 0, passive: 'Card 1 teammates do more damage.', goodWith: ['Card 2'], warned: false },
+      // Card 1's page isn't in its category this time, so it keeps its own; Card 2's is read as usual.
+      { change: 'wiki-missing-page', status: 0, passive: 'Old passive.', goodWith: ['Old partner'], warned: false },
+      // Both passives gone is fewer than half, but only 2 fewer: real edits, so they're dropped.
+      { change: 'wiki-empty', status: 0, passive: undefined, goodWith: ['Card 2'], warned: false },
+      // 40 of 100 passives gone is more than 10 but not more than half, so the 60 read are used; every Good With
+      // section is gone, so those keep the earlier copy's.
+      { change: 'wiki-some-empty', status: 0, passive: 'Card 1-0 teammates do more damage.', goodWith: ['Old partner'], warned: true },
+      { status: 0, askedRest: true, passive: 'Card 2 teammates do more damage.' },
+    ]);
+  }, 90_000);
+
+  // Generated by /ship review on 2026-11-16 (Klash Tower data, PR 1, red team)
+  // Value: protects=guides that still answer but name no partners (the site changed their layout) keep every
+  // character's earlier partners, and those characters are asked again first; fails_when=the far-fewer check goes, so
+  // 80 characters a run lose their partners; why_new=only failing guides were checked; seam=none; no_claim=the real
+  // guide layout
+  it('keep the earlier best teams when the guides answer with far fewer partners', () => {
+    const root = scratchRepo('fetch-catalog.mjs');
+    const earlierCard = (i) => ({ kind: 'character', rarity: 'gold', name: `Card 1-${i}`, teamsAt: '2026-11-01', bestTeams: ['Card 2-0'] });
+    // Card 1-2 is left out: names match in any word order, so it's the same card as Card 2-1.
+    const items = Array.from({ length: 50 }, (_, i) => i).filter((i) => i !== 2).map(earlierCard);
+    writeFileSync(join(root, 'public', 'catalog.json'), JSON.stringify({ fetchedAt: '2026-10-25T17:30:00.000Z', items }));
+    const { status, stderr } = spawnOnline(root, 'fetch-catalog.mjs', 'articles-empty');
+    const written = status ? [] : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).items;
+    const kept = written.filter((i) => i.kind === 'character' && i.teamsAt === '2026-11-01' && i.bestTeams?.[0] === 'Card 2-0');
+    expect({ status, kept: kept.length, warned: /best teams for 0 characters, down from 29/.test(stderr) }).toEqual({
+      status: 0,
+      kept: 49,
+      warned: true,
+    });
+  }, 45_000);
+
+  // Generated by /ship coverage audit on 2026-11-16 (Klash Tower data, PR 1, pass 2)
+  // Value: protects=each card's effect, team and class tags are written lower case, once each, sorted, without its
+  // rarity or "Kameo", and characters' and Kameos' classes from the excerpt, never gear's; fails_when=tagsOf or
+  // classesOf stops filtering, trimming or deduping, or gear gets a class; why_new=stand-in cards had no tag names or
+  // excerpt; seam=none; no_claim=the site's real tag names
+  it("write each card's tags, and a character's or Kameo's classes", () => {
+    const root = scratchRepo('fetch-catalog.mjs');
+    const { status } = spawnOnline(root, 'fetch-catalog.mjs', 'tagged');
+    const items = status ? [] : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).items;
+    const pick = (kind) => {
+      const { rarity, tags, class: classes } = items.find((i) => i.kind === kind && i.name === 'Card 1') ?? {};
+      return { kind, rarity, tags, classes };
+    };
+    const tags = ['black dragon', 'snare'];
+    const classes = ['Elder God', 'Netherrealm'];
+    expect([status, ...['character', 'equipment', 'kameo'].map(pick)]).toEqual([
+      0,
+      { kind: 'character', rarity: 'gold', tags, classes },
+      { kind: 'equipment', rarity: 'gold', tags, classes: undefined },
+      { kind: 'kameo', rarity: 'gold', tags, classes },
+    ]);
+  }, 45_000);
+
+  // Generated by /ship coverage audit on 2026-11-16 (Klash Tower data, PR 1, pass 2)
+  // Value: protects=a guide that fails keeps the card's earlier partners and leaves it first in line, and a guide that
+  // names no partners clears stale ones; fails_when=a failed guide marks the card asked or drops its partners, or empty
+  // guides keep old partners; why_new=only all-fail ran; seam=none; no_claim=the guide's real layout
+  it("keep a character's earlier partners when its guide fails, and clear them when its guide names none", () => {
+    const root = scratchRepo('fetch-catalog.mjs');
+    const earlierCard = (name) => ({ kind: 'character', rarity: 'gold', name, teamsAt: '2026-11-01', bestTeams: ['Old partner'] });
+    const local = { fetchedAt: '2026-10-25T17:30:00.000Z', items: [earlierCard('Card 1'), earlierCard('Card 2')] };
+    writeFileSync(join(root, 'public', 'catalog.json'), JSON.stringify(local));
+    const { status, stderr } = spawnOnline(root, 'fetch-catalog.mjs', 'one-article-down');
+    const items = status ? [] : JSON.parse(readFileSync(join(root, 'public', 'catalog.json'), 'utf8')).items;
+    const pick = (name) => {
+      const { teamsAt, bestTeams } = items.find((i) => i.kind === 'character' && i.name === name) ?? {};
+      return { name, askedAgain: typeof teamsAt === 'string' && teamsAt !== '2026-11-01', bestTeams };
+    };
+    expect([status, /articles: card-1: HTTP 500/.test(stderr), pick('Card 1'), pick('Card 2')]).toEqual([
+      0,
+      true,
+      { name: 'Card 1', askedAgain: false, bestTeams: ['Old partner'] },
+      // Its guide names only itself.
+      { name: 'Card 2', askedAgain: true, bestTeams: undefined },
     ]);
   }, 45_000);
 
