@@ -2416,6 +2416,16 @@ describe('the Klash Tower pool and the season', () => {
   // Value: protects=a corrected timer or a stretched season moves the pool's season with the season's items, so it
   // isn't then cleared as an old one; fails_when=moveSeasonEnd skips klashTower.season; why_new=new field; seam=none;
   // no_claim=the App effect
+  // Regression: /ship review on 2026-11-20 (Codex) — a pool ticked with no season end known kept no season, so it was
+  // never cleared.
+  // Value: protects=the first season end set (by the schedule or the user) becomes the season of a pool that had none;
+  // fails_when=a season-less pool is skipped; why_new=only pools with a season were tested; seam=none; no_claim=App
+  it('gives a pool with no season the first season end that is set', () => {
+    const s = { ...defaultState(), realmKlashSeasonEnd: null, klashTower: pool(null) };
+    expect(moveSeasonEnd(s, '2026-01-24T11:00', NOW)).toBe(true);
+    expect(s.klashTower!.season).toBe('2026-01-24T11:00');
+  });
+
   it('moves the pool season with a corrected season end, and keeps a pool from another season', () => {
     // The pool was ticked this season, which ends Jan 24; the timer was then corrected to Jan 26.
     const s = { ...defaultState(), realmKlashSeasonEnd: '2026-01-24T11:59', klashTower: pool('2026-01-24T11:59') };

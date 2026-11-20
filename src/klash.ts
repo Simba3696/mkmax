@@ -67,6 +67,8 @@ export const KAMEO_EFFECT_POINTS = 1;
 /** Gear: a piece of the wearer's own set, and each effect it shares with the wearer. */
 export const OWN_SET_POINTS = 3;
 export const GEAR_EFFECT_POINTS = 1;
+/** The most open characters a floor's trio search tries, strongest first: 30 make about 4,000 trios. */
+export const MAX_TRIO_CANDIDATES = 30;
 /** Gear rarity, so Epic goes where it's allowed and Rare is kept for the floors that can only take Rare. */
 export const GEAR_RARITY_POINTS: Record<string, number> = { epic: 2, rare: 1 };
 
@@ -285,9 +287,15 @@ export function buildTower(items: KlashItem[], pool: string[], pins: Record<stri
   for (const rule of [...FLOORS].reverse()) {
     const pinned = chars.filter((c) => pinOf.get(c) === rule.floor);
     const pinnedKameo = kameos.find((c) => pinOf.get(c) === rule.floor) ?? null;
-    const candidates = chars.filter(
-      (c) => !used.has(c) && rule.characters[c.rarity as 'gold' | 'diamond'] && !(pinnedKameo && nameKey(pinnedKameo.name) === nameKey(c.name)),
-    );
+    // Only the strongest few are tried: every trio of a pool ticked from most of the catalog would freeze a phone. A real
+    // season deals about 26 characters, so it's always tried in full.
+    const candidates = chars
+      .filter((c) => !used.has(c) && rule.characters[c.rarity as 'gold' | 'diamond'] && !(pinnedKameo && nameKey(pinnedKameo.name) === nameKey(c.name)))
+      .map((c) => [c, fighterStrength(ctx, c, rule.characters[c.rarity as 'gold' | 'diamond']!)] as const)
+      .sort((a, b) => b[1] - a[1] || byName(a[0], b[0]))
+      .slice(0, MAX_TRIO_CANDIDATES)
+      .map(([c]) => c)
+      .sort(byName);
     const goldLeft = chars.filter((c) => !used.has(c) && c.rarity === 'gold').length;
     const goldSpare = rule.characters.diamond ? Math.max(0, goldLeft - openBelow(rule.floor, 'gold')) : Infinity;
     const need = Math.min(3 - pinned.length, candidates.length);

@@ -1190,7 +1190,8 @@ export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: str
   // The Klash Tower pool's season moves like an item ending with the season, so a corrected timer, Ended early or a
   // stretched season keeps the pool, and only a new season clears it (klashSeasonOver).
   const k = s.klashTower;
-  if (k?.season && changeovers.includes(k.season)) {
+  // A pool ticked before any season end was known has no season; the first one it learns is the season it's in.
+  if (k && (k.season ? changeovers.includes(k.season) : k.pool.length > 0)) {
     k.season = to;
     moved = true;
   }

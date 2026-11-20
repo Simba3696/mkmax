@@ -491,7 +491,7 @@ Plans your Realm Klash Tower defence. Turn it on in Settings → **Klash Tower**
 
 Each Realm Klash season deals you a pool of cards for the tower (Gold and Diamond characters and Kameos, Rare and Epic gear). Tick them under **Season pool**: the cards are grouped by kind and rarity, each group says how many you've ticked, and the search box matches words in any order. A card MK Mobile Base has no tower data for yet is marked **no data**: you can still tick it, but a character or Kameo then counts by its rarity alone, and gear with no known slot is never placed. **Clear pool** (two taps) clears the pool and pins, with Undo.
 
-The pool belongs to the season you last ticked or unticked a card in. When MK Mobile Base's schedule shows a new season has started, the pool and pins are cleared by themselves, with Undo while the bar shows; Undo keeps them as this season's pool, so they aren't cleared again. A season the game stretches, or a season end you corrected, keeps the pool. With no schedule for today, nothing is cleared.
+The pool belongs to the season you last ticked or unticked a card in (or, if no season end was known then, the first one the app learns). When MK Mobile Base's schedule shows a new season has started, the pool and pins are cleared by themselves, with Undo while the bar shows; Undo keeps them as this season's pool, so they aren't cleared again. A season the game stretches, or a season end you corrected, keeps the pool. With no schedule for today, nothing is cleared.
 
 ### The floors
 

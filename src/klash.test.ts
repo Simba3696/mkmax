@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BELOW_F10, FLOORS, buildTower, klashKey, pinFloors, type KlashItem, type Slot } from './klash';
+import { BELOW_F10, FLOORS, MAX_TRIO_CANDIDATES, buildTower, klashKey, pinFloors, type KlashItem, type Slot } from './klash';
 
 // A small catalog: fighters with stats on a 0..10 scale (attack + health from 0 to 100), so strengths are easy to read.
 const char = (name: string, rarity: 'gold' | 'diamond', total: number, extra: Partial<KlashItem> = {}): KlashItem => ({
@@ -255,6 +255,23 @@ describe('Klash Tower: gear', () => {
     const t = buildTower(cards, keys(cards.slice(2)));
     const owner = t.floors[4].fighters.find((f) => f.gear.length)!;
     expect(owner.item.name).toBe('Side Two');
+  });
+});
+
+describe('Klash Tower: a very large pool', () => {
+  // Regression: /ship review on 2026-11-20 (Codex) — ticking most of the catalog made the trio search build hundreds of
+  // thousands of trios per floor, which can freeze a phone.
+  // Value: protects=a floor tries only its MAX_TRIO_CANDIDATES strongest open characters (with pinned ones kept), so a
+  // huge pool builds in bounded time; fails_when=the cap is dropped (the weak synergy partner below wins again);
+  // why_new=pools so far were small; seam=none; no_claim=the build time itself (not timed, to keep the test steady)
+  it('tries only the strongest characters on a floor, keeping pinned ones', () => {
+    const team = (name: string, total: number) => char(name, 'diamond', total, { team: 'Black Dragon', passive: 'All Black Dragon characters gain power.' });
+    const many = Array.from({ length: MAX_TRIO_CANDIDATES }, (_, i) => char(`Strong ${String(i).padStart(2, '0')}`, 'diamond', 90 - i));
+    const cards = [...anchors, team('Pinned One', 50), team('Pinned Two', 50), ...many, team('Weak Partner', 10)];
+    const pins = { [klashKey(cards[2])]: 5, [klashKey(cards[3])]: 5 };
+    const t = buildTower(cards, keys(cards.slice(2)), pins);
+    // Weak Partner would win on synergy (+6 from the two passives, +1 team), but it's 31st by strength.
+    expect(names(t.floors[4].fighters)).toEqual(['Pinned One', 'Pinned Two', 'Strong 00']);
   });
 });
 
