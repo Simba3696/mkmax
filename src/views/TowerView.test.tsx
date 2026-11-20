@@ -131,6 +131,19 @@ describe('Klash Tower: the pool and the floors', () => {
     expect(screen.getByTestId('undo').textContent).toBe('Removed Gold One from the Klash pool');
   });
 
+  // Value: protects=the pool search matches words in any order, opens the groups it finds cards in, and hides groups with
+  // no match; fails_when=search becomes a plain substring match ("one diamond" finds nothing) or a group stays folded
+  // while searching; why_new=no test types in the search box; seam=fetch serves a small catalog; no_claim=nameKey
+  // spelling rules (names.test.ts)
+  it('searches the pool by words in any order', async () => {
+    renderTower({ enabled: true, pool: [], pins: {}, season: null });
+    const pool = within(await screen.findByRole('region', { name: 'Season pool' }));
+    fireEvent.change(pool.getByLabelText('Search the pool'), { target: { value: 'ONE  diamond' } });
+    expect(pool.getByLabelText('Diamond One')).toBeTruthy();
+    expect([pool.queryByLabelText('Diamond Two'), pool.queryByLabelText('Gold One'), pool.queryByText(/^Gold characters/)]).toEqual([null, null, null]);
+    expect((pool.getByText(/^Diamond characters/).closest('details') as HTMLDetailsElement).open).toBe(true);
+  });
+
   // Value: protects=a ticked card the catalog no longer lists is reported and can be removed, never silently dropped;
   // fails_when=it vanishes from view but stays in the save; why_new=pool keys outlive catalog renames; seam=none
   it('reports ticked cards the card list no longer has, and removes them', async () => {

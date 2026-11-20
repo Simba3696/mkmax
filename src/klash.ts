@@ -299,9 +299,12 @@ export function buildTower(items: KlashItem[], pool: string[], pins: Record<stri
       if (s > bestScore) [best, bestScore] = [combo, s];
     }
     // With too few spare Gold for any full trio, the floor takes the best it can and says what it's short of.
+    // It searches every smaller group within the Gold limit, so the spare Gold it takes are the strongest, not the first.
     if (bestScore === -Infinity && need > 0) {
-      const spare = candidates.filter((c) => c.rarity !== 'gold').concat(candidates.filter((c) => c.rarity === 'gold').slice(0, goldSpare));
-      for (const combo of combinations(spare.sort(byName), Math.min(need, spare.length))) {
+      const golds = candidates.filter((c) => c.rarity === 'gold').length;
+      const size = Math.min(need, candidates.length - golds + Math.min(golds, goldSpare));
+      for (const combo of combinations(candidates, size)) {
+        if (combo.filter((c) => c.rarity === 'gold').length > goldSpare) continue;
         const s = trioScore(ctx, rule, [...pinned, ...combo]);
         if (s > bestScore) [best, bestScore] = [combo, s];
       }

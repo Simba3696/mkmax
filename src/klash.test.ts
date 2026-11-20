@@ -75,6 +75,20 @@ describe('Klash Tower: floor limits', () => {
     expect(t.floors[0].short).toEqual(['needs 3 more Gold characters', 'needs a Gold Kameo']);
     expect(t.floors[1].short[0]).toBe('needs 3 more Gold or Diamond characters');
   });
+
+  // Value: protects=with only Golds in the pool, floor 1 still gets 3, and a higher floor takes the best spare Gold it
+  // can and says what it's short of; fails_when=the short-of-Gold fallback is dropped (floor 4 empty or floor 1 short) or
+  // picks a spare Gold by name instead of strength; why_new=no existing test has fewer Golds than the floors want, so the
+  // fallback branch never runs; seam=none; no_claim=the right split of Golds between floors in game
+  it('fills floor 1 first and gives a higher floor the strongest spare Gold when Golds run short', () => {
+    const cards = [...anchors, char('Gold A', 'gold', 10), char('Gold B', 'gold', 11), char('Gold C', 'gold', 12), char('Gold Z', 'gold', 40)];
+    const t = buildTower(cards, keys(cards.slice(2)));
+    expect(t.floors[0].fighters).toHaveLength(3);
+    expect(t.floors[0].short).toEqual(['needs a Gold Kameo']);
+    expect(names(t.floors[3].fighters)).toEqual(['Gold Z']);
+    expect(t.floors[3].short[0]).toBe('needs 2 more Gold or Diamond characters');
+    expect([t.floors[1].fighters, t.floors[2].fighters]).toEqual([[], []]);
+  });
 });
 
 describe('Klash Tower: the exact-version rule', () => {
@@ -125,6 +139,22 @@ describe('Klash Tower: scoring', () => {
     expect(mystery.strength).toBe(8);
   });
 
+  // Value: protects=a fighter with no stats takes part in no synergy term, in either direction, even when its team,
+  // class and Good With list match a teammate's; fails_when=synergy() scores every trio member instead of only those
+  // with stats, so a no-data fighter wins floors on team data it may not have; why_new=the no-data test above checks
+  // only strength; seam=none; no_claim=whether no-data cards should earn synergy once the catalog fills in
+  it('gives a no-data fighter no synergy with its teammates', () => {
+    const cup = { team: 'Kombat Cup', class: ['Spec Ops'] };
+    const a = char('Cup A', 'diamond', 50, { ...cup, passive: 'All Kombat Cup characters gain power.', goodWith: ['Mystery'] });
+    const mystery: KlashItem = { kind: 'character', name: 'Mystery', rarity: 'diamond', tags: [], ...cup, goodWith: ['Cup A'] };
+    const c = char('Loner', 'diamond', 50);
+    const cards = [...anchors, a, mystery, c];
+    const f5 = buildTower(cards, keys([a, mystery, c])).floors[4];
+    expect(names(f5.fighters)).toEqual(['Cup A', 'Loner', 'Mystery']);
+    expect(f5.reasons).toEqual([]);
+    expect(f5.score).toBe(5 + 5 + f5.fighters.find((f) => f.item.name === 'Mystery')!.strength);
+  });
+
   // Value: protects=the community score nudges only with enough votes; fails_when=two votes move the pick, or the nudge
   // is ignored; why_new=new module; seam=none; no_claim=none beyond protects
   it('nudges by the community score only at 3 or more votes', () => {
@@ -165,6 +195,26 @@ describe('Klash Tower: gear', () => {
     }
     expect(t.floors[4].fighters.reduce((n, f) => n + f.gear.filter((g) => g.extra).length, 0)).toBe(3);
     expect(t.noSlot.map((c) => c.name)).toEqual(['Odd Piece']);
+  });
+
+  // Value: protects=the extra piece goes only to a Diamond, and only once its three slots are full, and pieces no one
+  // can wear are left over; fails_when=pass(true) runs for Golds or before the slots fill (a fighter wears two weapons
+  // while missing armor), or leftovers vanish from the bench; why_new=the gear test above has only Diamonds and gear for
+  // every slot; seam=none; no_claim=which slot the extra piece should be
+  it('gives the extra piece only to a Diamond with all three slots filled, and leaves the rest over', () => {
+    const weapons = [1, 2, 3, 4].map((i) => piece(`Weapon ${i}`, 'epic', 'weapon'));
+    const t = buildTower([...fighters, ...weapons], keys([...fighters.slice(2), ...weapons]));
+    expect(t.floors[4].fighters.map((f) => f.gear.map((g) => [g.slot, g.extra]))).toEqual([[['weapon', false]], [['weapon', false]], [['weapon', false]]]);
+    expect(t.bench.map((c) => c.name)).toEqual(['Weapon 4']);
+
+    const gold = char('Goldie', 'gold', 30);
+    const dia = char('Dia', 'diamond', 60);
+    const gear = (['weapon', 'armor', 'accessory'] as Slot[]).flatMap((s) => [1, 2, 3].map((i) => piece(`${s} ${i}`, 'epic', s)));
+    const cards = [...anchors, gold, dia, ...gear];
+    const u = buildTower(cards, keys(cards.slice(2)), { [klashKey(gold)]: 4, [klashKey(dia)]: 4 });
+    const on4 = Object.fromEntries(u.floors[3].fighters.map((f) => [f.item.name, f.gear.map((g) => g.extra)]));
+    expect(on4).toEqual({ Dia: [false, false, false, true], Goldie: [false, false, false] });
+    expect(u.bench).toHaveLength(2);
   });
 
   // Value: protects=a fighter never wears pieces of both its own Friendship and Brutality sets; fails_when=the clash
@@ -223,6 +273,38 @@ describe('Klash Tower: pins and the pool', () => {
     expect(pinFloors(gold)).toEqual([1, 2, 3, 4]);
     expect(pinFloors(weakD)).toEqual([2, 3, 4, 5]);
     expect(pinFloors(kameos()[0])).toEqual([1, 2, 3]);
+  });
+
+  // Value: protects=a floor keeps at most 3 pinned characters (the first by name) and drops a Kameo pin beside a pinned
+  // fighter of its exact version, and a pinned Kameo keeps the fighter of its exact version off its floor;
+  // fails_when=the slice(0, 3) or the exact-version checks on pins are dropped, so a floor holds 4 fighters or an
+  // illegal Kameo pair; why_new=the existing pin test pins one card per floor and never pins a Kameo; seam=none;
+  // no_claim=the pin picker on screen (TowerView.test.tsx)
+  it('keeps only 3 character pins per floor, and never pins a Kameo beside its exact version', () => {
+    const cards = [...anchors, ...diamonds(5)];
+    const pinned = (n: string[]) => Object.fromEntries(n.map((x) => [klashKey(cards.find((c) => c.name === x)!), 5]));
+    const t = buildTower(cards, keys(cards.slice(2)), pinned(['Diamond B', 'Diamond C', 'Diamond D', 'Diamond E']));
+    expect(t.floors[4].fighters.map((f) => [f.item.name, f.pinned])).toEqual([
+      ['Diamond B', true],
+      ['Diamond C', true],
+      ['Diamond D', true],
+    ]);
+    expect(t.floors.flatMap((f) => f.fighters).find((f) => f.item.name === 'Diamond E')!.pinned).toBe(false);
+
+    const lizard = char('Baraka Lizard', 'diamond', 99);
+    const kitana = char('Kitana Klassic', 'diamond', 98);
+    const ks = [kameo('Baraka - Lizard', 'diamond'), kameo('Kitana Klassic', 'diamond'), kameo('Plain Kameo', 'diamond')];
+    const more = [...anchors, lizard, kitana, ...diamonds(4, 50), ...ks];
+    const pins = { [klashKey(lizard)]: 5, [klashKey(ks[0])]: 5, [klashKey(ks[1])]: 5 };
+    const u = buildTower(more, keys(more.slice(2)), pins);
+    // Baraka Lizard's pin wins, so its Kameo can't be pinned beside it; Kitana's Kameo is pinned there instead, which
+    // keeps the strong Kitana Klassic character off floor 5.
+    expect(u.floors[4].kameo).toMatchObject({ item: { name: 'Kitana Klassic' }, pinned: true });
+    expect(names(u.floors[4].fighters)).toContain('Baraka Lizard');
+    expect(names(u.floors[4].fighters)).not.toContain('Kitana Klassic');
+    const lizardKameo = u.floors.find((f) => f.kameo?.item.name === 'Baraka - Lizard');
+    expect(lizardKameo?.kameo?.pinned).toBe(false);
+    expect(names(lizardKameo!.fighters)).not.toContain('Baraka Lizard');
   });
 
   // Value: protects=a ticked card the catalog no longer has is reported, not silently dropped; fails_when=it vanishes;
