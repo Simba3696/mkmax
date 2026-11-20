@@ -63,6 +63,110 @@ describe('Cards: Fusion Up Kards', () => {
   });
 });
 
+describe('Cards: the copies filter', () => {
+  // Regression: /ship adversarial review on 2026-11-20 — Use N kards didn't keep its card listed, so a fuse to F10 that
+  // brought back a stored waiting count made the card vanish from Needs copies with the tap.
+  // Value: protects=a card fused with kards under Needs copies stays listed once all its copies are waiting; fails_when=
+  // fuse stops calling keepListed; why_new=only level, Waiting and Max taps were kept; seam=none; no_claim=Undo of the fuse
+  it('keeps a card fused with kards listed under Needs copies once all its copies are waiting', () => {
+    const s = defaultState();
+    s.rarities.find((r) => r.id === 'gold')!.fusionUpKards = 99;
+    // F9 (10) with A5 (16) as Max and 5 copies saved as waiting: none count below F10, all 5 do once a fuse reaches it.
+    s.cards = [{ id: 'kenshi', name: 'Kenshi, Elder God', rarityId: 'gold', fusion: 10, maxLevel: 16, waiting: 5, guest: false }];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub="cards" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by owned' }), { target: { value: 'needs' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Use \d+ kards?$/ }));
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).cards[0].fusion).toBe(11);
+    expect(screen.getByText('Kenshi, Elder God')).toBeTruthy();
+    expect(screen.getByText('all copies waiting')).toBeTruthy();
+  });
+
+  // Value: protects=Needs copies lists the Gold cards packs can still help and All copies waiting the ones only an
+  // Ascension Kard can, with counts, and a card a Waiting tap moves across stays listed until the filter changes;
+  // fails_when=a card lands under the wrong option, a count is off, or the tapped row vanishes; why_new=user asked
+  // (2026-11-20) for a way to find Gold cards that still need copies; seam=none; no_claim=the pull step (PacksView.test.tsx)
+  it('splits Gold cards into Needs copies and All copies waiting, keeping a card tapped across', () => {
+    const s = defaultState();
+    // A2 (13) with A5 (16) as Max: 3 copies to go.
+    s.cards = [
+      { id: 'scorpion', name: 'Scorpion', rarityId: 'diamond', fusion: 4, guest: false },
+      { id: 'kenshi', name: 'Kenshi, Elder God', rarityId: 'gold', fusion: 13, maxLevel: 16, waiting: 2, guest: false },
+      { id: 'liu', name: 'Liu Kang, Fire God', rarityId: 'gold', fusion: 13, maxLevel: 16, waiting: 3, guest: false },
+    ];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub="cards" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const filter = screen.getByRole('combobox', { name: 'Filter by owned' });
+    fireEvent.change(screen.getByDisplayValue(/^All rarities/), { target: { value: 'gold' } });
+    expect(within(filter).getByRole('option', { name: 'Needs copies (1)' })).toBeTruthy();
+    expect(within(filter).getByRole('option', { name: 'All copies waiting (1)' })).toBeTruthy();
+    fireEvent.change(filter, { target: { value: 'needs' } });
+    expect(screen.getByText('Kenshi, Elder God')).toBeTruthy();
+    expect(screen.queryByText('Liu Kang, Fire God')).toBeNull();
+    expect(screen.queryByText('Scorpion')).toBeNull();
+    // One more waiting copy fills Kenshi, but he stays listed so the tap can be taken back.
+    fireEvent.click(screen.getByRole('button', { name: 'One more copy waiting' }));
+    expect(screen.getByText('Kenshi, Elder God')).toBeTruthy();
+    expect(screen.getByText('all copies waiting')).toBeTruthy();
+    fireEvent.change(filter, { target: { value: 'waiting' } });
+    expect(screen.getByText('Kenshi, Elder God')).toBeTruthy();
+    expect(screen.getByText('Liu Kang, Fire God')).toBeTruthy();
+    expect(within(filter).getByRole('option', { name: 'Needs copies (0)' })).toBeTruthy();
+    // Extended by /ship test coverage audit on 2026-11-20
+    // Value: protects=a card whose Max is changed under All copies waiting stays listed (and counted there) though it now
+    // needs copies, until the filter changes; fails_when=CapSelect's onChange drops keepListed, so raising Liu Kang's Max
+    // to A10 takes his row away mid-edit with no Undo; why_new=only the Waiting stepper's keepListed was tested; seam=none;
+    // no_claim=Goal, No kards and Ascend (no change they make moves a listed card between these options)
+    let liu: HTMLElement | null = screen.getByText('Liu Kang, Fire God');
+    while (liu && !within(liu).queryByRole('button', { name: 'Delete' })) liu = liu.parentElement;
+    fireEvent.change(within(liu!).getByDisplayValue('A5 (Stage I)'), { target: { value: '21' } });
+    expect(JSON.parse(localStorage.getItem('mkmax:v1')!).cards.find((c: { id: string }) => c.id === 'liu').maxLevel ?? null).toBeNull();
+    expect(screen.getByText('Liu Kang, Fire God')).toBeTruthy();
+    expect([...(filter as HTMLSelectElement).options].slice(3).map((o) => o.textContent)).toEqual(['Needs copies (1)', 'All copies waiting (2)']);
+    fireEvent.change(filter, { target: { value: 'needs' } });
+    expect([screen.queryByText('Liu Kang, Fire God') != null, screen.queryByText('Kenshi, Elder God')]).toEqual([true, null]);
+  });
+
+  // Generated by /ship test coverage audit on 2026-11-20
+  // Value: protects=the Cards page still draws, and Needs copies doesn't count it, when a card with copies waiting sits
+  // under a rarity a sync removed (such cards are hidden everywhere); fails_when=inOwned drops its missing-rule guard, so
+  // allCopiesWaiting reads the removed rarity and the whole page throws, or the hidden card is counted under Needs copies;
+  // why_new=the copies filter test has every card's rarity; seam=none, the save as a sync would leave it;
+  // no_claim=the other filters' counts for hidden cards (unchanged by this change)
+  it('counts no hidden card under the copies options when a sync removed its rarity', () => {
+    const s = defaultState();
+    s.rarities = s.rarities.filter((r) => r.id !== 'gold');
+    s.cards = [
+      { id: 'scorpion', name: 'Scorpion', rarityId: 'diamond', fusion: 4, guest: false },
+      { id: 'kenshi', name: 'Kenshi, Elder God', rarityId: 'gold', fusion: 13, maxLevel: 16, waiting: 2, guest: false },
+    ];
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <CardsView sub="cards" onSub={() => {}} />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const filter = screen.getByRole('combobox', { name: 'Filter by owned' }) as HTMLSelectElement;
+    expect([...filter.options].slice(3).map((o) => o.textContent)).toEqual(['Needs copies (1)', 'All copies waiting (0)']);
+    fireEvent.change(filter, { target: { value: 'needs' } });
+    expect(screen.queryAllByTitle('Tap to rename').map((e) => e.textContent)).toEqual(['Scorpion']);
+  });
+});
+
 describe('Cards: taps on a screen a sync has changed', () => {
   let update!: ReturnType<typeof useStore>['update'];
   function renderCards(fusion: number, kards: number) {
@@ -2117,7 +2221,7 @@ describe('Cards: the Owned filter', () => {
     const names = () => screen.queryAllByTitle('Tap to rename').map((e) => e.textContent);
     const owned = screen.getByLabelText('Filter by owned') as HTMLSelectElement;
     fireEvent.change(owned, { target: { value: 'unowned' } });
-    expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero', 'Kori Blade'], ['Owned or not (3)', 'Not owned (2)', 'Owned (1)']]);
+    expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero', 'Kori Blade'], ['Owned or not (3)', 'Not owned (2)', 'Owned (1)', 'Needs copies (3)', 'All copies waiting (0)']]);
     // Extended by /ship test coverage audit on 2026-10-19
     // Value: protects=the rarity and source options count only the cards the Owned filter lists; fails_when=rarityCount or
     // sourceCount drops the Owned filter, so "All rarities" reads 3 while 2 are listed; why_new=the test read the Owned
@@ -2125,12 +2229,12 @@ describe('Cards: the Owned filter', () => {
     const options = (label: RegExp) => [...(screen.getByDisplayValue(label) as HTMLSelectElement).options].slice(0, 1).map((o) => o.textContent);
     expect([options(/^All rarities/), options(/^Any source/)]).toEqual([['All rarities (2)'], ['Any source (2)']]);
     fireEvent.change(screen.getByDisplayValue(/^All rarities/), { target: { value: 'diamond' } });
-    expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero'], ['Owned or not (2)', 'Not owned (1)', 'Owned (1)']]);
+    expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero'], ['Owned or not (2)', 'Not owned (1)', 'Owned (1)', 'Needs copies (2)', 'All copies waiting (0)']]);
     // Changed by /ship review fixes on 2026-10-18: a card tapped to owned stays listed (so it can be tapped back) until
     // the filter changes. Changed by /ship review fixes on 2026-10-19 (user decision D2, run 5): the option picked counts
     // it too, so "Not owned" matches the rows shown, while "Owned" already counts it as owned.
     act(() => screen.getByRole('button', { name: 'Raise level' }).click());
-    expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero'], ['Owned or not (2)', 'Not owned (1)', 'Owned (2)']]);
+    expect([names(), [...owned.options].map((o) => o.textContent)]).toEqual([['Sub-Zero'], ['Owned or not (2)', 'Not owned (1)', 'Owned (2)', 'Needs copies (2)', 'All copies waiting (0)']]);
     // The rarity and source options count the kept card too: Sub-Zero, and for rarities Kori Blade, still not owned.
     const first = (start: string) => [...document.querySelectorAll('option')].find((o) => o.textContent!.startsWith(start))!.textContent;
     expect([first('All rarities'), first('Any source')]).toEqual(['All rarities (2)', 'Any source (1)']);

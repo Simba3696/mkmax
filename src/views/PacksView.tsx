@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { REALM_KLASH_CURRENCY, addCopy, canAddCopy, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, storeCardFull, toLocalInput, urgency, waitingCopies } from '../engine';
+import { REALM_KLASH_CURRENCY, addCopy, allCopiesWaiting, canAddCopy, kasketPool, keepWhenExpired, kasketPullCards, levelLabel, moveSeasonEnd, packDrops, packStatus, recordPurchase, seasonEnd, storeCardFull, toLocalInput, urgency, waitingCopies } from '../engine';
 import { CardThumb, ConfirmButton, fmt, kasketLine, useDeviceChoice } from '../ui';
 import { actions, btn, card, field, grow, row, rowTitle, stepper, stepperVal, subpanel, toolbar } from '../classes';
 import { PackTiming } from './PlanView';
@@ -54,7 +54,11 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
   const [pulling, setPullingPack] = useState<string | null>(focus?.pull ? focus.id : null);
   /** The card searched for in a Kasket's pull step (it gives one card, so a search beats listing its whole pool). */
   const [pulled, setPulled] = useState('');
+  // Cards tapped in this pull step stay listed, so a + that leaves every copy waiting doesn't take its row (and its −) away.
+  const [pullTapped, setPullTapped] = useState<ReadonlySet<string>>(new Set());
+  // Another buy of the pack whose step is open keeps its kept rows: they go only when the step closes or moves.
   const setPulling = (id: string | null) => {
+    if (id === null || id !== pulling) setPullTapped(new Set());
     setPullingPack(id);
     setPulled('');
   };
@@ -129,6 +133,10 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
     const rule = card && rules.get(card.rarityId);
     if (!card || !rule) return null;
     const waiting = waitingCopies(card, rule);
+    const step = (by: 1 | -1) => {
+      setPullTapped((t) => (t.has(card.id) ? t : new Set([...t, card.id])));
+      update((s) => (addCopy(s, card.id, by) ? undefined : noChange));
+    };
     return (
       <div key={card.id} className={`${row} items-center`}>
         <CardThumb card={card} rule={rule} size={36} />
@@ -137,11 +145,11 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
           {waiting > 0 && <span className="text-small text-muted"> · {waiting} waiting on Ascension Kards</span>}
         </span>
         <div className={stepper}>
-          <button onClick={() => update((s) => (addCopy(s, card.id, -1) ? undefined : noChange))} disabled={card.fusion <= 0} aria-label="Remove a copy">
+          <button onClick={() => step(-1)} disabled={card.fusion <= 0} aria-label="Remove a copy">
             −
           </button>
           <span className={stepperVal}>{card.fusion === 0 ? '—' : levelLabel(rule, card.fusion)}</span>
-          <button onClick={() => update((s) => (addCopy(s, card.id, 1) ? undefined : noChange))} disabled={!canAddCopy(card, rule)} aria-label="Add a copy">
+          <button onClick={() => step(1)} disabled={!canAddCopy(card, rule)} aria-label="Add a copy">
             +
           </button>
         </div>
@@ -229,7 +237,22 @@ export default function PacksView({ focus = null, onFocused }: { focus?: PackFoc
               {pullRow(state.cards.find((c) => c.id === pulled))}
             </>
           ) : (
-            byName(p.drops).map((d) => pullRow(state.cards.find((c) => c.id === d.cardId)))
+            (() => {
+              // A card with every copy waiting on Ascension Kards can't take one more, so its row would only be in the way.
+              const listed = byName(p.drops).flatMap((d) => state.cards.filter((c) => c.id === d.cardId && rules.has(c.rarityId)));
+              const full = (c: Card) => !pullTapped.has(c.id) && allCopiesWaiting(c, rules.get(c.rarityId)!);
+              const left = listed.filter(full).length;
+              return (
+                <>
+                  {listed.filter((c) => !full(c)).map(pullRow)}
+                  {left > 0 && (
+                    <div className="text-small text-muted">
+                      Not listed: {left} card{left === 1 ? '' : 's'} with all copies waiting on Ascension Kards, as another copy would add nothing.
+                    </div>
+                  )}
+                </>
+              );
+            })()
           )}
           <div className={actions}>
             <button className={btn.primary} onClick={() => setPulling(null)}>

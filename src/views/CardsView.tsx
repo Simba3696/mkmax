@@ -2,7 +2,7 @@ import { Activity, useEffect, useId, useLayoutEffect, useMemo, useRef, useState,
 import { createPortal, flushSync } from 'react-dom';
 import { newId, noChange, useStore } from '../store';
 import { usePlan } from '../planner';
-import { ascend, ascensionCaps, atTopLevel, cardGoal, copiesAtFusion, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerName, towerRespells, towerSpellings, stepWaiting, unmarkMaxed, waitingCopies, waitingRoom } from '../engine';
+import { allCopiesWaiting, ascend, ascensionCaps, atTopLevel, cardGoal, copiesAtFusion, copiesToMax, entryGoal, copiesToThreshold, fLevel, fuseWithKards, isMaxed, isRealmKlashName, kardStep, levelLabel, maxFusion, onMaxedRecord, recordMaxed, stepCard, targetLevel, thresholdLevel, respellTower, towerKey, towerName, towerRespells, towerSpellings, stepWaiting, unmarkMaxed, waitingCopies, waitingRoom } from '../engine';
 import { CardThumb, Chip, ConfirmButton, LevelOptions, RarityBadge, onMaxedNote, SOURCE_LABELS, useBrokenImageUrls, useDeviceChoice } from '../ui';
 import { actions, btn, card, check, field, form, grow, hint, row, rowTitle, subpanel, surface, stepper, stepperVal } from '../classes';
 import TowersPanel from './TowersPanel';
@@ -718,11 +718,16 @@ function CardList() {
   const [rarity, setRarity] = useState<string>('all');
   const [q, setQ] = useState('');
   const [sourceFilter, setSourceFilter] = useState<Source | 'all'>('all');
-  const [ownedFilter, setOwnedFilter] = useState<'all' | 'owned' | 'unowned'>('all');
-  // Cards whose level was tapped while the Owned filter was on stay listed until it changes, so one tapped from not owned
-  // to owned (or back) doesn't vanish, with no Undo, before it can be tapped back. A new search starts afresh too.
+  // 'needs' lists cards packs can still help (copies to go); 'waiting' those with every copy waiting on Ascension Kards.
+  const [ownedFilter, setOwnedFilter] = useState<'all' | 'owned' | 'unowned' | 'needs' | 'waiting'>('all');
+  // Cards changed while the Owned filter was on (level, kards, waiting copies, goal, Max or No kards) stay listed until it
+  // changes, so one tapped from not owned to owned (or back) doesn't vanish, with no Undo, before it can be tapped back.
+  // A new search starts afresh too.
   const [tapped, setTapped] = useState<ReadonlySet<string>>(new Set());
   const pickOwned = (v: typeof ownedFilter) => (setOwnedFilter(v), setTapped(new Set()));
+  const keepListed = (c: Card) => {
+    if (ownedFilter !== 'all') setTapped((t) => (t.has(c.id) ? t : new Set([...t, c.id])));
+  };
   const [sortBy, setSortBy] = useDeviceChoice('mkmax:cardSort', CARD_SORTS);
   /**
    * The card being renamed, its name before (which comes back if the name is cleared), what's in the box, and the name
@@ -939,7 +944,8 @@ function CardList() {
 
   // Saved on the card as it is now. Unticking keeps a card at or past F3 on Max, as when one is entered there (see
   // entryGoal); otherwise a piece tracked only to F3 would be removed as done the moment kards were allowed again.
-  const setNoKards = (c: Card, on: boolean) =>
+  const setNoKards = (c: Card, on: boolean) => {
+    keepListed(c);
     update(
       (d) => {
         const x = d.cards.find((y) => y.id === c.id);
@@ -954,10 +960,11 @@ function CardList() {
       },
       on ? `${c.name}: no Fusion Up Kards` : `${c.name}: Fusion Up Kards allowed`,
     );
+  };
 
   // A level tap steps from the level it showed: saving that level ± 1 would undo a level a sync has added since.
   const stepLevel = (c: Card, by: 1 | -1) => {
-    if (ownedFilter !== 'all' && !tapped.has(c.id)) setTapped(new Set([...tapped, c.id]));
+    keepListed(c);
     // A + that uses a copy waiting on Ascension Kards is an Ascend, so it gets Ascend's Undo: − wouldn't give the copy back.
     // It steps only from the level and waiting count the row showed, so a sync that changed either makes it do nothing.
     const rule = ctx.rules.get(c.rarityId);
@@ -974,15 +981,19 @@ function CardList() {
 
   /** Fuse one level with Fusion Up Kards from the Wallet, as done in the game: the step the button showed, or none. */
   function fuse(c: Card, cost: number) {
+    keepListed(c);
     update((d) => (fuseWithKards(d, c.id, cost, c.fusion) == null ? noChange : undefined), `Used ${cost} Fusion Up Kard${cost === 1 ? '' : 's'} on ${c.name}`);
   }
 
   // Like a level tap, from the count it showed; unlike one, with Undo, as the count can't be read back from anything.
-  const stepWait = (c: Card, by: 1 | -1, shown: number) =>
+  const stepWait = (c: Card, by: 1 | -1, shown: number) => {
+    keepListed(c);
     update((d) => (stepWaiting(d, c.id, by, shown) ? undefined : noChange), `${c.name}: ${shown + by} waiting on Ascension Kards`);
+  };
 
   /** Ascend one level with a waiting copy, as done in the game once an Ascension Kard comes in. */
   function ascendCard(c: Card, rule: RarityRule) {
+    keepListed(c);
     update((d) => (ascend(d, c.id, c.fusion) ? undefined : noChange), `Ascended ${c.name} to ${levelLabel(rule, c.fusion + 1)}`);
   }
 
@@ -1070,7 +1081,12 @@ function CardList() {
   // "kind:equipment" etc. groups every rarity of that kind (Diamond + Gold characters, all gear, both Kameo tiers).
   const inRarity = (c: Card, value: string) => value === 'all' || c.rarityId === value || value === `kind:${state.rarities.find((r) => r.id === c.rarityId)?.kind}`;
   const inSource = (c: Card, value: Source | 'all') => value === 'all' || (c.source ?? '') === value;
-  const inOwned = (c: Card, value: typeof ownedFilter) => value === 'all' || (value === 'owned') === c.fusion > 0;
+  const inOwned = (c: Card, value: typeof ownedFilter) => {
+    if (value === 'all') return true;
+    if (value === 'owned' || value === 'unowned') return (value === 'owned') === c.fusion > 0;
+    const rule = ctx.rules.get(c.rarityId);
+    return !!rule && (value === 'waiting') === allCopiesWaiting(c, rule);
+  };
   // The card being renamed stays listed even if its new name no longer matches the search.
   const matchesSearch = (c: Card) => !q || c.id === renaming?.id || c.name.toLowerCase().includes(q.toLowerCase());
   // Listed under the Owned filter picked: a card tapped while it's on stays listed (see `tapped`).
@@ -1194,6 +1210,8 @@ function CardList() {
           <option value="all">{`Owned or not (${ownedCount('all')})`}</option>
           <option value="unowned">{`Not owned (${ownedCount('unowned')})`}</option>
           <option value="owned">{`Owned (${ownedCount('owned')})`}</option>
+          <option value="needs">{`Needs copies (${ownedCount('needs')})`}</option>
+          <option value="waiting">{`All copies waiting (${ownedCount('waiting')})`}</option>
         </select>
         {missingImages.length > 0 && (
           <button className="xl:ml-auto" onClick={findImages} disabled={imgStatus?.busy} title="Look up card art on MK Mobile Base, then the MK Mobile wiki">
@@ -1274,7 +1292,7 @@ function CardList() {
                     {/* Cards that reach their goal are removed, so every card listed still has copies to go, or has them all
                         waiting on Ascension Kards. */}
                     {toThr > 0 && thresholdLevel(rule)! < target && <Chip tone="warn">{toThr} to F{rule.fusionUpThreshold}</Chip>}
-                    {toMax === 0 && waiting > 0 ? (
+                    {allCopiesWaiting(c, rule) ? (
                       <Chip tone="limited">all copies waiting</Chip>
                     ) : (
                       <Chip tone={cardGoal(c, rule) === 'threshold' ? 'warn' : 'muted'}>
@@ -1318,8 +1336,8 @@ function CardList() {
                     </button>
                   </div>
                 )}
-                <GoalSelect rule={rule} card={c} onChange={(v) => patch(c.id, { goal: v })} />
-                <CapSelect rule={rule} value={c.maxLevel} onChange={(v) => patch(c.id, { maxLevel: v })} />
+                <GoalSelect rule={rule} card={c} onChange={(v) => (keepListed(c), patch(c.id, { goal: v }))} />
+                <CapSelect rule={rule} value={c.maxLevel} onChange={(v) => (keepListed(c), patch(c.id, { maxLevel: v }))} />
                 {rule.hasGuests && (
                   <label className={check}>
                     <input type="checkbox" checked={c.guest} onChange={(e) => patch(c.id, { guest: e.target.checked })} />
