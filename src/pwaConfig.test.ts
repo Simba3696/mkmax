@@ -1,7 +1,8 @@
 import { expect, it, vi } from 'vitest';
 
 // The options vite.config.ts hands the PWA plugin, caught at its documented entry point.
-type Options = { registerType?: string; workbox?: { clientsClaim?: boolean; skipWaiting?: boolean } };
+type Rule = { urlPattern: RegExp; handler: string; options: { cacheName: string; networkTimeoutSeconds?: number; expiration?: { maxEntries?: number } } };
+type Options = { registerType?: string; workbox?: { clientsClaim?: boolean; skipWaiting?: boolean; runtimeCaching?: Rule[] } };
 const pwa = vi.hoisted(() => ({ options: undefined as undefined | Options }));
 vi.mock('vite-plugin-pwa', () => ({ VitePWA: (o: Options) => ((pwa.options = o), []) }));
 
@@ -23,4 +24,14 @@ it('builds a service worker that waits for Reload', async () => {
 it('takes over a first visit at once without skipping the wait for Reload', async () => {
   await import('../vite.config');
   expect([pwa.options?.workbox?.clientsClaim, pwa.options?.workbox?.skipWaiting]).toEqual([true, undefined]);
+});
+
+// Value: protects=the card catalog is kept offline, network first with a 4 s fallback like the event schedule, so the
+// Klash Tower tab works with no signal after one online visit; fails_when=the rule is dropped (the tower shows only
+// an error offline) or becomes cache-first (a day-old catalog wins over a fresh one); why_new=new in the Klash Tower
+// planner; seam=the plugin's VitePWA mocked to catch its options; no_claim=the built sw.js
+it('keeps the card catalog for offline use, network first', async () => {
+  await import('../vite.config');
+  const rule = pwa.options?.workbox?.runtimeCaching?.find((r) => r.urlPattern.test('/mkmax/catalog.json'));
+  expect([rule?.handler, rule?.options.networkTimeoutSeconds, rule?.options.expiration?.maxEntries]).toEqual(['NetworkFirst', 4, 1]);
 });

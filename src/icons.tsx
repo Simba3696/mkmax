@@ -60,3 +60,11 @@ export const TrophyIcon = ({ size }: { size?: number }) => (
     <path d="M7 6H4v1a4 4 0 0 0 3 4" />
   </Icon>
 );
+
+/** A shield: the Klash Tower's defence (Tower gear on Cards already has the tower). */
+export const KlashIcon = () => (
+  <Icon>
+    <path d="M12 3l8 3v6c0 4.5-3.4 7.8-8 9-4.6-1.2-8-4.5-8-9V6z" />
+    <path d="M8 11h8M8 15h8" />
+  </Icon>
+);

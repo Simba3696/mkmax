@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addCopy, addPool, ascend, ascendsNext, storeCardFull, ascensionCaps, canAddCopy, levelWithWaiting, stepWaiting, waitingCopies, waitingRoom, respellTower, towerKey, towerName, towerRespells, towerSpellings, unifyTowerSpellings, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addCopy, addPool, clearOldKlashPool, klashSeasonOver, ascend, ascendsNext, storeCardFull, ascensionCaps, canAddCopy, levelWithWaiting, stepWaiting, waitingCopies, waitingRoom, respellTower, towerKey, towerName, towerRespells, towerSpellings, unifyTowerSpellings, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -155,12 +155,29 @@ describe('the Maxed record', () => {
     expect(s.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic', at: '2026-10-18' }]);
   });
 
+  // Value: protects=version 20 loads an older save with the Klash Tower planner off and empty, cleans a hand-edited one
+  // (pins only for pool cards and floors 1 to 5, the switch on only when exactly true) and keeps a current one as it is;
+  // fails_when=klashTower is missing (the Tower tab crashes), junk survives, or a load changes a good save;
+  // why_new=the planner is new in version 20; seam=none; no_claim=sync's refusal of newer saves (sync tests)
+  it('loads an older save with the Klash Tower planner off, and keeps only well-formed planner data', () => {
+    const old = { ...defaultState(), version: 19 } as unknown as AppState;
+    delete (old as Partial<AppState>).klashTower;
+    expect([normalize(old).version, normalize(old).klashTower]).toEqual([20, { enabled: false, pool: [], pins: {}, season: null }]);
+    const odd = normalize({
+      ...old,
+      klashTower: { enabled: 'yes', pool: ['character:a', 'character:a', 3, 'kameo:b'], pins: { 'character:a': 5, 'kameo:b': 6, 'character:gone': 2, x: 'x' }, season: 7 },
+    } as unknown as AppState);
+    expect(odd.klashTower).toEqual({ enabled: false, pool: ['character:a', 'kameo:b'], pins: { 'character:a': 5 }, season: null });
+    const good = { enabled: true, pool: ['character:a'], pins: { 'character:a': 3 }, season: '2026-11-24T05:00' };
+    expect(normalize(JSON.parse(JSON.stringify({ ...defaultState(), klashTower: good }))).klashTower).toEqual(good);
+  });
+
   // Value: protects=version 17 loads older saves with an empty record and drops junk entries a hand-edited file could
   // hold; fails_when=the record is missing (views crash) or a bad entry is kept; why_new=the record is new; seam=none
   it('loads an older save with an empty record, and keeps only well-formed entries', () => {
     const old = { ...defaultState(), version: 16 } as unknown as AppState;
     delete (old as Partial<AppState>).maxed;
-    expect([normalize(old).version, normalize(old).maxed]).toEqual([19, []]);
+    expect([normalize(old).version, normalize(old).maxed]).toEqual([20, []]);
     const odd = normalize({ ...old, maxed: [{ name: 'Kori Blade', rarityId: 'epic' }, { name: 3 }, null, 'x'] } as unknown as AppState);
     expect(odd.maxed).toEqual([{ name: 'Kori Blade', rarityId: 'epic' }]);
     // A day that isn't text would break the page, and the same card twice would list twice: one entry, with the day a
@@ -192,7 +209,7 @@ describe('the Maxed record', () => {
       ],
     } as unknown as AppState;
     const out = normalize(old);
-    expect([out.version, out.cards.map((c) => c.sourceNote)]).toEqual([19, ['lin kuei tower', 'lin kuei tower', 'lin kuei tower', 'Wind Tower', 'Wind Tower', 'Shirai Ryu Tower', undefined]]);
+    expect([out.version, out.cards.map((c) => c.sourceNote)]).toEqual([20, ['lin kuei tower', 'lin kuei tower', 'lin kuei tower', 'Wind Tower', 'Wind Tower', 'Shirai Ryu Tower', undefined]]);
     // A save already at version 18 isn't re-spelled again (a spelling typed since stands).
     const current = { ...old, version: 18 } as unknown as AppState;
     expect(normalize(current).cards.map((c) => c.sourceNote)).toEqual(['lin kuei tower ', 'Lin Kuei Tower', 'LIN KUEI TOWER', ' Wind Tower', 'wind tower', 'Shirai Ryu Tower', undefined]);
@@ -2367,10 +2384,44 @@ describe('copies waiting on Ascension Kards', () => {
   // Value: protects=a save from before waiting copies loads as version 19, a count that isn't a whole number is dropped,
   // and one past what the card can use is kept but counts only that far; fails_when=the version isn't bumped (older
   // builds would pull and replan those copies), or a hand-edited "x" or 1.5 survives a load
-  it('loads a version 18 save as version 19, dropping waiting counts that are not whole numbers', () => {
+  it('loads a version 18 save as the current version, dropping waiting counts that are not whole numbers', () => {
     const cards = [g('w', A(2), { maxLevel: A(5), waiting: 7 }), g('bad', A(1), { waiting: 'x' as unknown as number }), g('half', A(1), { waiting: 1.5 })];
     const old = { ...setup(cards), version: 18 };
     const out = normalize(JSON.parse(JSON.stringify(old)));
-    expect([out.version, out.cards.map((c) => c.waiting), waitingCopies(out.cards[0], gold)]).toEqual([19, [7, undefined, undefined], 3]);
+    expect([out.version, out.cards.map((c) => c.waiting), waitingCopies(out.cards[0], gold)]).toEqual([20, [7, undefined, undefined], 3]);
+  });
+});
+
+describe('the Klash Tower pool and the season', () => {
+  const pool = (season: string | null) => ({ enabled: true, pool: ['character:a'], pins: { 'character:a': 5 }, season });
+  const scheduled = { end: '2026-01-24T11:00', weekEnds: ['2026-01-10T11:00'] };
+
+  // Value: protects=a pool clears only when the schedule's season is a new one: not for this season's end, a stretched
+  // week end, a clock-change hour off either, a pool with no season, or an empty pool; fails_when=a stretched season
+  // or a DST hour wipes the pool, or a real new season keeps last season's ticks; why_new=the clear is new in version
+  // 20; seam=none; no_claim=when App runs it (App.test.tsx)
+  it('counts a pool as over only when it was ticked in an earlier season', () => {
+    expect(klashSeasonOver(pool('2026-01-24T11:00'), scheduled)).toBe(false);
+    expect(klashSeasonOver(pool('2026-01-10T11:00'), scheduled)).toBe(false);
+    expect(klashSeasonOver(pool('2026-01-10T12:00'), scheduled)).toBe(false);
+    expect(klashSeasonOver(pool(null), scheduled)).toBe(false);
+    expect(klashSeasonOver({ ...pool('2025-12-27T11:00'), pool: [], pins: {} }, scheduled)).toBe(false);
+    expect(klashSeasonOver(pool('2025-12-27T11:00'), scheduled)).toBe(true);
+    const s = { ...defaultState(), klashTower: pool('2025-12-27T11:00') };
+    expect([clearOldKlashPool(s, scheduled), s.klashTower]).toEqual([true, { enabled: true, pool: [], pins: {}, season: null }]);
+    expect(clearOldKlashPool(s, scheduled)).toBe(false);
+  });
+
+  // Value: protects=a corrected timer or a stretched season moves the pool's season with the season's items, so it
+  // isn't then cleared as an old one; fails_when=moveSeasonEnd skips klashTower.season; why_new=new field; seam=none;
+  // no_claim=the App effect
+  it('moves the pool season with a corrected season end, and keeps a pool from another season', () => {
+    // The pool was ticked this season, which ends Jan 24; the timer was then corrected to Jan 26.
+    const s = { ...defaultState(), realmKlashSeasonEnd: '2026-01-24T11:59', klashTower: pool('2026-01-24T11:59') };
+    expect(moveSeasonEnd(s, '2026-01-26T20:00', NOW)).toBe(true);
+    expect(s.klashTower!.season).toBe('2026-01-26T20:00');
+    const other = { ...defaultState(), realmKlashSeasonEnd: '2026-01-24T11:59', klashTower: pool('2025-12-27T11:59') };
+    moveSeasonEnd(other, '2026-01-26T20:00', NOW);
+    expect(other.klashTower!.season).toBe('2025-12-27T11:59');
   });
 });

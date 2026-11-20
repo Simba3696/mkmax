@@ -26,6 +26,7 @@
       "src/events.firstload.test.ts",
       "src/events.restore.test.ts",
       "src/events.test.ts",
+      "src/klash.test.ts",
       "src/main.test.tsx",
       "src/planner.test.tsx",
       "src/pregate.test.ts",
@@ -44,6 +45,7 @@
       "src/views/PacksView.test.tsx",
       "src/views/PlanView.test.tsx",
       "src/views/SettingsView.test.tsx",
+      "src/views/TowerView.test.tsx",
       "src/wiki.test.ts",
       "src/workflows.test.ts"
     ],
@@ -63,6 +65,7 @@
       "src/events.firstload.test.ts",
       "src/events.restore.test.ts",
       "src/events.test.ts",
+      "src/klash.test.ts",
       "src/main.test.tsx",
       "src/planner.test.tsx",
       "src/pregate.test.ts",
@@ -81,6 +84,7 @@
       "src/views/PacksView.test.tsx",
       "src/views/PlanView.test.tsx",
       "src/views/SettingsView.test.tsx",
+      "src/views/TowerView.test.tsx",
       "src/wiki.test.ts",
       "src/workflows.test.ts"
     ],
@@ -100,6 +104,7 @@
       "src/events.firstload.test.ts",
       "src/events.restore.test.ts",
       "src/events.test.ts",
+      "src/klash.test.ts",
       "src/main.test.tsx",
       "src/planner.test.tsx",
       "src/pregate.test.ts",
@@ -118,6 +123,7 @@
       "src/views/PacksView.test.tsx",
       "src/views/PlanView.test.tsx",
       "src/views/SettingsView.test.tsx",
+      "src/views/TowerView.test.tsx",
       "src/wiki.test.ts",
       "src/workflows.test.ts"
     ],
@@ -143,6 +149,7 @@
       "src/events.firstload.test.ts",
       "src/events.restore.test.ts",
       "src/events.test.ts",
+      "src/klash.test.ts",
       "src/main.test.tsx",
       "src/planner.test.tsx",
       "src/pregate.test.ts",
@@ -161,6 +168,7 @@
       "src/views/PacksView.test.tsx",
       "src/views/PlanView.test.tsx",
       "src/views/SettingsView.test.tsx",
+      "src/views/TowerView.test.tsx",
       "src/wiki.test.ts",
       "src/workflows.test.ts"
     ]

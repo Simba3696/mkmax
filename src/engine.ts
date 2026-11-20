@@ -1,6 +1,6 @@
 import { nameKey } from './names';
 import { isKasketExcluded } from './kaskets';
-import type { AppState, Card, DropEntry, MaxedCard, Pack, RarityRule } from './types';
+import type { AppState, Card, DropEntry, KlashTower, MaxedCard, Pack, RarityRule } from './types';
 
 // ---------- Fusion math ----------
 // Levels are stored as "copy levels": 0 = not owned, 1 = first copy (F0), 2 = F1, … fusionMax + 1 = F10,
@@ -1111,6 +1111,27 @@ export function stretchedWeekEnds(saved: string | null | undefined, now: Date, w
 }
 
 /**
+ * Whether the Klash Tower pool is from a season before the one the schedule says is on: the season it was ticked in is
+ * neither the scheduled season's end nor one of its earlier week ends (a stretched season), and comes before it. An hour
+ * either way still counts as the same changeover, as a rolled end keeps its local time across a clock change. A pool
+ * with no season (ticked with no season end known) is never over.
+ */
+export function klashSeasonOver(k: KlashTower | undefined, scheduled: { end: string; weekEnds: string[] }) {
+  if (!k?.season || (!k.pool.length && !Object.keys(k.pins).length)) return false;
+  const at = (x: string) => new Date(x).getTime();
+  if (isNaN(at(k.season))) return false;
+  if ([scheduled.end, ...scheduled.weekEnds].some((e) => Math.abs(at(e) - at(k.season!)) <= 3600_000)) return false;
+  return at(k.season) < at(scheduled.end);
+}
+
+/** Clears a Klash Tower pool from an earlier season (klashSeasonOver): pool, pins and season. Returns whether it did. */
+export function clearOldKlashPool(s: AppState, scheduled: { end: string; weekEnds: string[] }) {
+  if (!klashSeasonOver(s.klashTower, scheduled)) return false;
+  s.klashTower = { ...s.klashTower!, pool: [], pins: {}, season: null };
+  return true;
+}
+
+/**
  * Change the current season's end (a corrected timer, or a season that ended early). Every seasonal pack that
  * was ending with it moves too; packs from earlier seasons keep their dates. Mutates the state, and returns whether
  * anything moved: false when the current season end (the saved one rolled forward, see seasonEnd) is already `to`
@@ -1162,6 +1183,13 @@ export function moveSeasonEnd(s: AppState, to: string, now: Date, weekEnds?: str
       p.endsAt = to;
       moved = true;
     }
+  }
+  // The Klash Tower pool's season moves like an item ending with the season, so a corrected timer, Ended early or a
+  // stretched season keeps the pool, and only a new season clears it (klashSeasonOver).
+  const k = s.klashTower;
+  if (k?.season && changeovers.includes(k.season)) {
+    k.season = to;
+    moved = true;
   }
   // When the end isn't moving and no item was on a stretched week end, there's nothing to save: rewriting the saved end
   // (it already rolls forward to `to`) would only make every device save, and ask which copy to keep. Leaving it also

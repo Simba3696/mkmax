@@ -6,21 +6,24 @@ import PullToRefresh from './PullToRefresh';
 import { slideIn, useSwipeTabs } from './useSwipeTabs';
 import { scrollRoot } from './scrollRoot';
 import { catalogImageUpdates, loadCatalog, refreshCatalog, useCatalogVersion, wantsCatalogImage } from './catalog';
-import { endingSoon, moveSeasonEnd, seasonEnd, stretchedWeekEnds } from './engine';
+import { clearOldKlashPool, endingSoon, klashSeasonOver, moveSeasonEnd, seasonEnd, stretchedWeekEnds } from './engine';
 import { refreshEvents, scheduledSeason, useEvents } from './events';
 import { applyAppUpdate, checkForAppUpdate, useAppUpdateReady } from './appUpdate';
 import { usePlan } from './planner';
-import { CardsIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
+import { CardsIcon, KlashIcon, PacksIcon, PlanIcon, SettingsIcon } from './icons';
 import { syncLabel } from './views/SyncPanel';
 import PlanView from './views/PlanView';
 import PacksView, { type PackFocus } from './views/PacksView';
 import CardsView, { type CardsPage } from './views/CardsView';
 import SettingsView from './views/SettingsView';
+import TowerView from './views/TowerView';
 
 const TABS = [
   { id: 'plan', label: 'Plan', Icon: PlanIcon },
   { id: 'packs', label: 'Packs', Icon: PacksIcon },
   { id: 'cards', label: 'Cards', Icon: CardsIcon },
+  // Only while Settings → Klash Tower is on (see shownTabs).
+  { id: 'tower', label: 'Klash', Icon: KlashIcon },
   { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ] as const;
 
@@ -98,7 +101,16 @@ export default function App() {
   // On every tab, as an update waits for the user rather than reloading over whatever they're doing.
   const updateReady = useAppUpdateReady();
   // A mistyped or pasted link (#Packs, a docs anchor) opens Plan rather than a blank page with no tab selected.
-  const [tab, setTab] = useState<TabId>(() => TABS.find((t) => t.id === location.hash.slice(1))?.id ?? 'plan');
+  // The Klash tab shows only while Settings → Klash Tower is on.
+  const shownTabs = TABS.filter((t) => t.id !== 'tower' || !!state.klashTower?.enabled);
+  const [tab, setTab] = useState<TabId>(() => shownTabs.find((t) => t.id === location.hash.slice(1))?.id ?? 'plan');
+  // Turned off (here or on another device) while it's open: back to the Plan, as a link to a hidden tab is.
+  const towerHidden = tab === 'tower' && !state.klashTower?.enabled;
+  useEffect(() => {
+    if (!towerHidden) return;
+    setTab('plan');
+    history.replaceState(null, '', '#plan');
+  }, [towerHidden]);
 
   // Give cards MK Mobile Base art automatically: new cards, cards synced in from another device, and cards still
   // carrying art from the old wiki lookup. Runs again when that set of cards changes, a catalog fetched again has changed,
@@ -150,10 +162,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduledEnd, savedEnd, extendedEnd, sync.settled]);
 
+  // A new season deals a new Klash Tower pool, so last season's ticks and pins go, with Undo. Only once the dates above
+  // are settled (the effect above has nothing left to move): before that, a stretched season or a corrected timer can
+  // still move the pool's season onto this one. With no schedule for today, nothing is cleared.
+  const klashOver = !!season && scheduledEnd === savedEnd && !extendedEnd && klashSeasonOver(state.klashTower, season);
+  useEffect(() => {
+    if (!klashOver || !sync.settled || !season) return;
+    update((d) => (clearOldKlashPool(d, season) ? undefined : noChange), 'New Klash season: cleared the tower pool');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [klashOver, sync.settled]);
+
   const pageRef = useRef<HTMLDivElement>(null);
   /** Direction the next tab change should slide in from, set by go() and used once the new tab has rendered. */
   const enterDir = useRef<1 | -1 | 0>(0);
-  const tabIndex = (t: TabId) => TABS.findIndex((x) => x.id === t);
+  const tabIndex = (t: TabId) => shownTabs.findIndex((x) => x.id === t);
   /** Pack to scroll to when the Packs tab opens, set by tapping a pack in the plan. */
   const [focusPack, setFocusPack] = useState<PackFocus | null>(null);
   const openPack = (id: string, pull = false) => {
@@ -194,9 +216,9 @@ export default function App() {
   // Swipe left for the next tab, right for the previous one; stops at the ends instead of wrapping.
   useSwipeTabs({
     page: () => pageRef.current,
-    canGo: (dir) => !!TABS[tabIndex(tab) + dir],
+    canGo: (dir) => !!shownTabs[tabIndex(tab) + dir],
     onSwipe: (dir) => {
-      const next = TABS[tabIndex(tab) + dir];
+      const next = shownTabs[tabIndex(tab) + dir];
       if (next) go(next.id);
     },
   });
@@ -306,6 +328,7 @@ export default function App() {
             {tab === 'plan' && <PlanView goto={go} openPack={openPack} />}
             {tab === 'packs' && <PacksView focus={focusPack} onFocused={() => setFocusPack(null)} />}
             {tab === 'cards' && <CardsView sub={cardsPage} onSub={setCardsPage} />}
+            {tab === 'tower' && !towerHidden && <TowerView />}
             {tab === 'settings' && <SettingsView />}
           </div>
         </main>
@@ -316,7 +339,7 @@ export default function App() {
         className="flex-none relative z-[5] flex justify-center bg-bar border-t border-line pb-[env(safe-area-inset-bottom)] md:order-first md:flex-col md:justify-start md:gap-1 md:w-[88px] lg:w-[220px] md:border-t-0 md:border-r md:px-2 md:pt-[calc(0.9rem+env(safe-area-inset-top))] md:pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
       >
         <div className="hidden md:flex items-center justify-center lg:justify-start lg:px-3 mb-4">{logo}</div>
-        {TABS.filter((t) => t.id !== 'settings').map(tabButton)}
+        {shownTabs.filter((t) => t.id !== 'settings').map(tabButton)}
         {/* On phones this wrapper vanishes, so Settings is just the last tab; on the rail it sits at the bottom. */}
         <div className="contents md:flex md:flex-col md:gap-2 md:mt-auto">
           {syncPill(

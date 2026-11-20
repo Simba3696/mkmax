@@ -3,11 +3,11 @@
 // the site's API doesn't allow requests from other sites.
 import { useSyncExternalStore } from 'react';
 import { nameKey } from './names';
+import type { KlashItem } from './klash';
 import type { Card, MaxedCard, RarityRule } from './types';
 
-export interface CatalogItem {
-  kind: 'character' | 'equipment' | 'kameo';
-  name: string;
+/** A catalog card; the Klash Tower fields it can carry (stats, teams, gear slots and sets) are KlashItem's. */
+export interface CatalogItem extends KlashItem {
   /** e.g. "diamond", "gold", "epic", "rare", "uncommon". */
   rarity: string | null;
   slug: string;

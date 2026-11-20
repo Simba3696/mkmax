@@ -161,9 +161,9 @@ export default function SettingsView() {
     // From 2xl the rarity editors, the biggest section, get a column of their own on the right and the smaller sections
     // stack in a narrower column on the left, in DOM order (auto-placement skips the right column, which the Fusion
     // rules span). The last row is 1fr so it soaks up Fusion rules' extra height instead of spreading gaps between
-    // the left-hand cards. The 6 in grid-rows is the number of left-column children (SyncPanel, Currencies, GearOrder,
-    // Priority weights, Data, Version); change it when a section is added or removed.
-    <div className="2xl:grid 2xl:grid-cols-[minmax(0,27rem)_minmax(0,1fr)] 2xl:grid-rows-[repeat(6,auto)_1fr] 2xl:gap-x-5 2xl:items-start">
+    // the left-hand cards. The 7 in grid-rows is the number of left-column children (SyncPanel, Currencies, GearOrder,
+    // Klash Tower, Priority weights, Data, Version); change it when a section is added or removed.
+    <div className="2xl:grid 2xl:grid-cols-[minmax(0,27rem)_minmax(0,1fr)] 2xl:grid-rows-[repeat(7,auto)_1fr] 2xl:gap-x-5 2xl:items-start">
       <SyncPanel />
 
       <div className="2xl:col-start-2 2xl:row-[1/-1]">
@@ -451,6 +451,28 @@ export default function SettingsView() {
       </FoldCard>
 
       <GearOrder />
+
+      <FoldCard id="settings-klash" title="Klash Tower">
+        <label className={check}>
+          <input
+            type="checkbox"
+            checked={!!state.klashTower?.enabled}
+            onChange={(e) => {
+              const on = e.target.checked;
+              update(
+                (d) => {
+                  const k = d.klashTower ?? { enabled: false, pool: [], pins: {}, season: null };
+                  if (k.enabled === on) return noChange;
+                  d.klashTower = { ...k, enabled: on };
+                },
+                on ? 'Showed the Klash tab' : 'Hid the Klash tab',
+              );
+            }}
+          />
+          Show the Klash tab
+        </label>
+        <p className={`${note} md:max-w-[75ch]`}>Plans your Realm Klash Tower defence from the season's pool. Turning it off keeps your pool and pins.</p>
+      </FoldCard>
 
       <FoldCard id="settings-weights" title="Priority weights">
         <p className={`${note} md:max-w-[75ch]`}>Every card is being maxed. These only decide which copies the planner goes after first.</p>

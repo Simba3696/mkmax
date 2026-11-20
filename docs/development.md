@@ -28,6 +28,7 @@ For how these pieces fit together, see [Architecture](architecture.md). Guidance
 | Path | What's in it |
 |---|---|
 | `src/engine.ts` | Scoring, the purchase planner, pack ranking and the Fusion Up Kard plan |
+| `src/klash.ts` | The Klash Tower builder: floor limits (`FLOORS`), scoring constants and `buildTower`; pure like the engine |
 | `src/types.ts` | The saved data's shape (`AppState`) |
 | `src/defaults.ts` | Built-in rarities and their Fusion Up Kard costs, default weights, a new install's data and the sample data |
 | `src/challenges.ts` | The hand-kept list of Elder challenge characters, and the retired challenges whose Kameos now come from packs |
