@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultState } from './defaults';
 import {
-  addCopy, addPool, ascend, ascendsNext, storeCardFull, ascensionCaps, canAddCopy, levelWithWaiting, stepWaiting, waitingCopies, waitingRoom, respellTower, towerKey, towerName, towerRespells, towerSpellings, unifyTowerSpellings, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
+  addCopy, addPool, allCopiesWaiting, ascend, ascendsNext, storeCardFull, ascensionCaps, canAddCopy, levelWithWaiting, stepWaiting, waitingCopies, waitingRoom, respellTower, towerKey, towerName, towerRespells, towerSpellings, unifyTowerSpellings, atTopLevel, buildCtx, cardGoal, onMaxedRecord, recordMaxed, unmarkMaxed, entryGoal, buildPlan, cardWeight, copiesAtFusion, editedPack, editorSeasonEnd, fuseWithKards, gearQueue, gearWaiting, kardCost, kardStep, kasketPool, kasketPullCards, copiesToMax, copiesToThreshold, copyPhase, daysToAfford, endingSoon, gearForecast, fLevel as F, isMaxed, isRealmKlashGear, keepWhenExpired, levelLabel, moveSeasonEnd, packDrops, packEndOnSave, packEV, packStatus, poolShare, pruneDone, rankPacks, rankTargets, recordPurchase, removeRarity, moveRarity, savePack, seasonEnd, seasonMoveOnSave, stretchedWeekEnds, suggestSeason, moveInGearOrder, stepCard, targetLevel,
 } from './engine';
 import { isKasketExcluded } from './kaskets';
 import { kardTable, normalize } from './normalize';
@@ -2199,6 +2199,7 @@ describe('copies waiting on Ascension Kards', () => {
     const ctx = buildCtx(s);
     expect([copiesToMax(s.cards[0], gold), copiesToMax(s.cards[1], gold)]).toEqual([2, 0]);
     expect([copyPhase(ctx, s.cards[0]), copyPhase(ctx, s.cards[1])]).toEqual(['normal', 'maxed']);
+    expect([allCopiesWaiting(s.cards[0], gold), allCopiesWaiting(s.cards[1], gold), allCopiesWaiting(g('none', A(2), { maxLevel: A(5) }), gold)]).toEqual([false, true, false]);
     expect(rankTargets(ctx, NOW).map((t) => t.card.id)).toEqual(['some']);
     expect(pruneDone(s)).toEqual([]);
     expect(s.cards.map((c) => c.waiting)).toEqual([2, 3]);
