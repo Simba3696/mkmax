@@ -112,6 +112,9 @@ export function copiesToThreshold(card: Card, rule: RarityRule) {
   return Math.max(0, copiesAtFusion(rule, thr) - copiesAtFusion(rule, card.fusion));
 }
 
+/** Every copy still to its goal is waiting on Ascension Kards: packs can't help it, only an Ascension Kard can. */
+export const allCopiesWaiting = (card: Card, rule: RarityRule) => waitingCopies(card, rule) > 0 && copiesToMax(card, rule) === 0;
+
 export const isMaxed = (card: Card, rule: RarityRule) => card.fusion >= targetLevel(card, rule);
 
 /** At its top level, whatever its goal: its own max (F10, or a Gold card's cap), or owned for a Kameo. That's maxed. */

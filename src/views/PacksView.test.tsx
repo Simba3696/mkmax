@@ -109,7 +109,14 @@ describe('Packs: logging a purchase', () => {
     const goldPack = within(document.getElementById('pack-Gold Pack')!);
     fireEvent.click(goldPack.getByRole('button', { name: 'I bought one' }));
     const row = () => within(screen.getByText('What did you pull?').closest('div')!.parentElement!);
+    // Extended by /ship test coverage audit on 2026-11-20
+    // Value: protects=the "Not listed" note shows only for cards actually left out: none when no card is full, and not for
+    // a card a + here just filled (its row is still listed); fails_when=the note renders for a count of 0, or counts the
+    // kept card, saying it's not listed beside its own row; why_new=the pull-list test only reads the note when a card is
+    // left out; seam=none; no_claim=the note's plural (pull-list test)
+    expect(row().queryByText(/^Not listed:/)).toBeNull();
     fireEvent.click(row().getByRole('button', { name: 'Add a copy' }));
+    expect(row().queryByText(/^Not listed:/)).toBeNull();
     const kenshi = () => JSON.parse(localStorage.getItem('mkmax:v1')!).cards.find((c: { id: string }) => c.id === 'kenshi');
     expect([kenshi().fusion, kenshi().waiting]).toEqual([15, 1]);
     expect(row().getByText(/1 waiting on Ascension Kards/)).toBeTruthy();
@@ -119,6 +126,84 @@ describe('Packs: logging a purchase', () => {
     expect(item.getByText(/already holds every copy it can/)).toBeTruthy();
     fireEvent.click(row().getByRole('button', { name: 'Remove a copy' }));
     expect([kenshi().fusion, kenshi().waiting]).toEqual([15, undefined]);
+  });
+
+  // Value: protects=a random pack's pull step leaves out cards with every copy waiting on Ascension Kards (their + would
+  // do nothing) and says how many, while a card filled by a + in this step keeps its row so − can take the copy back;
+  // fails_when=a full card is listed, the note is missing or miscounts, or the row a + just filled vanishes;
+  // why_new=user asked (2026-11-20) for the pull list without those rows; seam=none; no_claim=the Kasket search
+  it('leaves cards with all copies waiting out of the pull list, but keeps one filled by a + there', () => {
+    const s = JSON.parse(localStorage.getItem('mkmax:v1')!);
+    // A2 (13) with A5 (16) as Max: 3 copies to go. Liu Kang has all 3 waiting; Kenshi has 2, so one + fills him.
+    s.cards.push({ id: 'liu', name: 'Liu Kang, Fire God', rarityId: 'gold', fusion: 13, maxLevel: 16, waiting: 3, guest: false });
+    s.cards.push({ id: 'kenshi', name: 'Kenshi, Elder God', rarityId: 'gold', fusion: 13, maxLevel: 16, waiting: 2, guest: false });
+    s.packs.push(pack('Gold Pack', { endsAt: '2026-10-20T12:00', drops: [{ cardId: 'liu', chance: 50 }, { cardId: 'kenshi', chance: 50 }] }));
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <PacksView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    fireEvent.click(within(document.getElementById('pack-Gold Pack')!).getByRole('button', { name: 'I bought one' }));
+    const step = () => within(screen.getByText('What did you pull?').closest('div')!.parentElement!);
+    expect(step().queryByText('Liu Kang, Fire God')).toBeNull();
+    expect(step().getByText(/Not listed: 1 card with all copies waiting/)).toBeTruthy();
+    fireEvent.click(step().getByRole('button', { name: 'Add a copy' }));
+    // Kenshi now has every copy waiting too, but stays so the tap can be taken back.
+    expect(step().getByText('Kenshi, Elder God')).toBeTruthy();
+    expect(step().getByText(/Not listed: 1 card with/)).toBeTruthy();
+    fireEvent.click(step().getByRole('button', { name: 'Remove a copy' }));
+    const kenshi = JSON.parse(localStorage.getItem('mkmax:v1')!).cards.find((c: { id: string }) => c.id === 'kenshi');
+    expect(kenshi.waiting).toBe(2);
+    // Extended by /ship test coverage audit on 2026-11-20
+    // Value: protects=a card kept listed by a + is kept only while that pull step is open, so the next buy leaves it out
+    // and the note counts both cards in the plural; fails_when=setPulling stops clearing pullTapped (the filled card stays
+    // listed in every later pull step) or the note's plural breaks; why_new=the test above never closed the step or left
+    // out more than one card; seam=none; no_claim=a −1 closing the step (same setPulling call)
+    fireEvent.click(step().getByRole('button', { name: 'Add a copy' }));
+    // Regression: /ship adversarial review on 2026-11-20 — another buy of the same pack while its step was open cleared
+    // the kept rows, so the − for the first pull's copy went with them.
+    // Value: protects=a second buy with the step still open keeps Kenshi's row; fails_when=setPulling clears pullTapped
+    // for the pack already open; why_new=the step was only ever reopened after Done; seam=none; no_claim=a Kasket's search
+    fireEvent.click(within(document.getElementById('pack-Gold Pack')!).getByRole('button', { name: 'I bought one' }));
+    expect(step().getByText('Kenshi, Elder God')).toBeTruthy();
+    fireEvent.click(step().getByRole('button', { name: 'Done' }));
+    fireEvent.click(within(document.getElementById('pack-Gold Pack')!).getByRole('button', { name: 'I bought one' }));
+    expect([step().queryByText('Kenshi, Elder God'), step().queryByRole('button', { name: 'Add a copy' })]).toEqual([null, null]);
+    expect(step().getByText(/^Not listed: 2 cards with all copies waiting on Ascension Kards/)).toBeTruthy();
+  });
+
+  // Generated by /ship test coverage audit on 2026-11-20
+  // Value: protects=a Kasket's pull search still finds and shows a card with every copy waiting (the game's Gold Kasket
+  // can give one until it's ascended), with its waiting count and + greyed out, and no "Not listed" note; fails_when=the
+  // random-pack filter moves into pullRow or the Kasket branch, so the picked card shows no row; why_new=the pull-list
+  // test covers a random pack only; seam=none; no_claim=which cards the Kasket's pool holds (engine kasketPool tests)
+  it("still shows a card with all copies waiting when it's picked in a Kasket's pull search", () => {
+    // jsdom has no scrollIntoView, which the search box calls on focus.
+    Element.prototype.scrollIntoView = () => {};
+    const s = JSON.parse(localStorage.getItem('mkmax:v1')!);
+    // A2 (13) with A5 (16) as Max: all 3 copies to go are waiting.
+    s.cards.push({ id: 'liu', name: 'Liu Kang, Fire God', rarityId: 'gold', fusion: 13, maxLevel: 16, waiting: 3, guest: false });
+    s.packs.push(pack('Gold Kasket', { endsAt: '2026-10-20T12:00', drops: [], kasket: 'gold' }));
+    localStorage.setItem('mkmax:v1', JSON.stringify(s));
+    render(
+      <StoreProvider>
+        <PlanProvider>
+          <PacksView />
+        </PlanProvider>
+      </StoreProvider>,
+    );
+    const kasket = within(document.getElementById('pack-Gold Kasket')!);
+    fireEvent.click(kasket.getByRole('button', { name: 'I bought one' }));
+    const search = kasket.getByRole('combobox', { name: 'Card' });
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: 'Liu' } });
+    fireEvent.mouseDown(within(screen.getByRole('listbox')).getByRole('option', { name: /Liu Kang, Fire God/ }));
+    expect(kasket.getByText(/3 waiting on Ascension Kards/)).toBeTruthy();
+    expect((kasket.getByRole('button', { name: 'Add a copy' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(kasket.queryByText(/^Not listed:/)).toBeNull();
   });
 
   // Regression: review of clock-and-gear-taps — a tap with nothing to take back still saved and synced
