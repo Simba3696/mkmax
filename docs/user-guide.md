@@ -491,13 +491,13 @@ Plans your Realm Klash Tower defence. Turn it on in Settings → **Klash Tower**
 
 Each Realm Klash season deals you a pool of cards for the tower (Gold and Diamond characters and Kameos, Rare and Epic gear). Tick them under **Season pool**: the cards are grouped by kind and rarity, each group says how many you've ticked, and the search box matches words in any order. A card MK Mobile Base has no tower data for yet is marked **no data**: you can still tick it, but a character or Kameo then counts by its rarity alone, and gear with no known slot is never placed. **Clear pool** (two taps) clears the pool and pins, with Undo.
 
-The pool belongs to the season you ticked it in. When MK Mobile Base's schedule shows a new season has started, the pool and pins are cleared by themselves, with Undo while the bar shows. A season the game stretches, or a season end you corrected, keeps the pool. With no schedule for today, nothing is cleared.
+The pool belongs to the season you last ticked or unticked a card in. When MK Mobile Base's schedule shows a new season has started, the pool and pins are cleared by themselves, with Undo while the bar shows; Undo keeps them as this season's pool, so they aren't cleared again. A season the game stretches, or a season end you corrected, keeps the pool. With no schedule for today, nothing is cleared.
 
 ### The floors
 
 Once the pool has cards, the 5 floors fill themselves, floor 5 at the top. Each floor says what the game allows there (for example "Gold F10 or Diamond F9 · Rare F10 and Epic F9 gear · Gold Kameo") and lists its 3 characters, each with its gear (a Diamond's extra piece starts with +), then its Kameo and the main reasons for the pick. The strongest team goes on floor 5, then floor 4 and down, and each card is used once. A floor that's short says what it needs ("Needs 1 more Diamond character"). How the picks are made is in [How it works](how-it-works.md#klash-tower).
 
-**Pin to…** on a character or Kameo keeps it on the floor you pick; the floors refill around it. Only floors its rarity may go on are offered, and a floor already holding 3 pinned characters (or a pinned Kameo) is marked full. Unticking a pinned card drops its pin. A ticked card that's no longer in MK Mobile Base's card list is listed above the floors with **Remove it**. Cards left over once every floor is full are listed under the floors.
+**Pin to…** on a character or Kameo keeps it on the floor you pick; the floors refill around it. Only floors its rarity may go on are offered, a floor already holding 3 pinned characters (or a pinned Kameo) is marked full, and a floor where the same version is pinned as a character or Kameo isn't offered (the game won't put both on one floor). Unticking a pinned card drops its pin. A ticked card that's no longer in MK Mobile Base's card list is listed above the floors with **Remove it**. Cards left over once every floor is full are listed under the floors.
 
 The tab needs MK Mobile Base's card list. After one visit online it's kept for offline use; with no copy at all the tab says it can't load card data, with **Try again**.
 

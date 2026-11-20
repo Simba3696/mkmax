@@ -19,6 +19,9 @@ const items = [
   fighter('Gold Three', 'gold', 10),
   { kind: 'kameo', name: 'Diamond Kameo', rarity: 'diamond', slug: 'dk', class: ['Outworld'], tags: [] },
   { kind: 'equipment', name: 'Rare Blade', rarity: 'rare', slug: 'rb', slot: 'weapon', tags: [] },
+  // A fighter and the Kameo of its exact version, for the pin picker's same-version rule.
+  fighter('Kabal Black Dragon', 'diamond', 60),
+  { kind: 'kameo', name: 'Kabal - Black Dragon', rarity: 'diamond', slug: 'kbd', class: ['Black Dragon'], tags: [] },
 ];
 
 /** What App's Undo bar would say, and the saved planner. */
@@ -151,6 +154,33 @@ describe('Klash Tower: the pool and the floors', () => {
     expect(await screen.findByText(/1 ticked card isn’t in MK Mobile Base's card list any more/)).toBeTruthy();
     fireEvent.click(screen.getByText('Remove it'));
     expect(saved()).toEqual({ enabled: true, pool: ['character:diamond one'], pins: {}, season: null });
+  });
+});
+
+describe('Klash Tower: review fixes', () => {
+  // Regression: /ship review on 2026-11-20 (testing and red team) — a tick kept the pool's old season, so cards ticked
+  // onto last season's pool were cleared with it later.
+  // Value: protects=a tick stamps the season the pool is ticked in; fails_when=the old season is kept while the pool is
+  // non-empty; why_new=only a first tick on an empty pool was tested; seam=none; no_claim=the clear itself (App.test.tsx)
+  it('moves a pool to the current season when a card is ticked onto it', async () => {
+    renderTower({ enabled: true, pool: ['character:diamond one'], pins: {}, season: '2026-01-10T11:00' });
+    fireEvent.click(await screen.findByText(/^Diamond characters/));
+    fireEvent.click(screen.getByLabelText('Diamond Two'));
+    expect(saved().season).toBe('2026-01-24T11:00');
+  });
+
+  // Regression: /ship review on 2026-11-20 (testing) — a Kameo could be pinned to the floor of its exact-version fighter,
+  // and the builder then set the pin aside unseen.
+  // Value: protects=the pin picker refuses the floor where the same version is pinned, in both directions; fails_when=the
+  // floor is offered; why_new=pin limits were tested for full floors only; seam=none; no_claim=the builder's handling
+  it("doesn't offer the floor where a card's exact version is pinned", async () => {
+    renderTower({ enabled: true, pool: ['character:black dragon kabal', 'kameo:black dragon kabal'], pins: { 'character:black dragon kabal': 5 }, season: '2026-01-24T11:00' });
+    const kameoPin = (await screen.findByLabelText('Floor for Kabal - Black Dragon')) as HTMLSelectElement;
+    expect([...kameoPin.options].map((o) => [o.textContent, o.disabled])).toEqual([
+      ['Pin to…', false],
+      ['Floor 4', false],
+      ['Floor 5 (its fighter is there)', true],
+    ]);
   });
 });
 

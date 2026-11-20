@@ -50,7 +50,8 @@ const REFRESH_AFTER_MS = 60 * 60 * 1000;
 
 /**
  * Downloads the catalog. A fetch-again goes past the browser's own copy, which may be from before the daily deploy; the
- * first download may use a recent one, like any other file. It isn't kept for offline use. Only a fetch-again may
+ * first download may use a recent one, like any other file. The service worker keeps the last copy for offline use
+ * (network first, after 4 seconds), so offline or on a hanging connection a fetch-again may get that copy back. Only a fetch-again may
  * replace a copy already here: a first download that lands after a pull's is older.
  */
 function download(replace: boolean): Promise<CatalogItem[]> {

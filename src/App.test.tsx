@@ -596,6 +596,14 @@ describe('the Realm Klash season from the schedule', () => {
       const k = await open([week('Shadow', '03', '10'), week('Kold', '10', '17'), week('Kold 2', '17', '24')], '2026-01-10T11:00:00Z');
       expect(k).toEqual({ enabled: true, pool: [], pins: {}, season: null });
       expect(screen.getByText('New Klash season: cleared the tower pool')).toBeTruthy();
+      // Regression: /ship review on 2026-11-20 (state machines and red team) — Undo brought the pool back with its old
+      // season, so the clear ran again at once and the pool could never be restored.
+      // Value: protects=Undo keeps the pool, as this season's, so it isn't cleared again now or on a later launch;
+      // fails_when=Undo restores the old season; why_new=the test above never tapped Undo; seam=none; no_claim=a sync
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+      await act(async () => {});
+      expect(JSON.parse(localStorage.getItem('mkmax:v1')!).klashTower).toEqual({ enabled: true, pool: ['character:a'], pins: { 'character:a': 5 }, season: local('2026-01-24T11:00:00Z') });
+      expect(screen.queryByText('New Klash season: cleared the tower pool')).toBeNull();
     });
 
     // Value: protects=a season the schedule stretched keeps the pool ticked when it was due to end; fails_when=the clear

@@ -4,6 +4,7 @@ import { usePlan } from '../planner';
 import { loadCatalog, useCatalogVersion, type CatalogItem } from '../catalog';
 import { buildTower, klashKey, pinFloors, type FloorPlan, type FloorRule, type KlashItem, type Tower } from '../klash';
 import { seasonEnd } from '../engine';
+import { nameKey } from '../names';
 import { actions, card, check, grow, hint, row, rowTitle, subpanel } from '../classes';
 import { Chip, ConfirmButton } from '../ui';
 import type { KlashTower } from '../types';
@@ -57,7 +58,17 @@ export default function TowerView() {
     return () => void (cancelled = true);
   }, [attempt, catalogVersion]);
 
-  const tower: Tower | null = useMemo(() => (catalog ? buildTower(catalog, k.pool, k.pins) : null), [catalog, k.pool, k.pins]);
+  // Keyed on what the pool and pins hold: every saved change (a sync pull, card art) gives them new arrays, and building
+  // the tower takes tens of milliseconds on a phone.
+  const poolKey = JSON.stringify(k.pool);
+  const pinsKey = JSON.stringify(k.pins);
+  const tower: Tower | null = useMemo(() => (catalog ? buildTower(catalog, JSON.parse(poolKey), JSON.parse(pinsKey)) : null), [catalog, poolKey, pinsKey]);
+  // Pins per floor and kind ("3|character"), counted once: every pin select reads them on each render.
+  const pinCounts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const [key, floor] of Object.entries(JSON.parse(pinsKey) as Record<string, number>)) n.set(`${floor}|${key.split(':')[0]}`, (n.get(`${floor}|${key.split(':')[0]}`) ?? 0) + 1);
+    return n;
+  }, [pinsKey]);
   const ticked = useMemo(() => new Set(k.pool), [k.pool]);
 
   // Each tap finds its card by key in the save as it is then, so a tap after a sync changed the pool does what it showed.
@@ -70,8 +81,10 @@ export default function TowerView() {
         const pool = on ? [...cur.pool, key] : cur.pool.filter((x) => x !== key);
         const pins = { ...cur.pins };
         if (!on) delete pins[key];
-        // The pool belongs to the season it's ticked in, so a new season can clear it (see clearOldKlashPool).
-        d.klashTower = { ...cur, pool, pins, season: pool.length ? (cur.season ?? seasonEnd(d.realmKlashSeasonEnd, now)) : null };
+        // The pool belongs to the season it's being ticked in, so a new season can clear it (see clearOldKlashPool). Each
+        // tick stamps the current season: cards added to last season's pool (one whose clear was undone, or ticked before
+        // the schedule showed the new season) would otherwise be cleared with it later.
+        d.klashTower = { ...cur, pool, pins, season: pool.length ? (seasonEnd(d.realmKlashSeasonEnd, now) ?? cur.season) : null };
       },
       on ? undefined : `Removed ${item.name} from the Klash pool`,
     );
@@ -102,17 +115,20 @@ export default function TowerView() {
     }, 'Removed cards no longer in the card list');
 
   // A floor that already holds 3 pinned characters (or a pinned Kameo) takes no more pins.
-  const pinCount = (floor: number, kind: KlashItem['kind']) =>
-    catalog ? catalog.filter((c) => c.kind === kind && k.pins[klashKey(c)] === floor && ticked.has(klashKey(c))).length : 0;
+  const pinCount = (floor: number, kind: KlashItem['kind']) => pinCounts.get(`${floor}|${kind}`) ?? 0;
   const pinSelect = (item: KlashItem) => {
     const mine = k.pins[klashKey(item)] ?? null;
     const full = (f: number) => f !== mine && pinCount(f, item.kind) >= (item.kind === 'kameo' ? 1 : 3);
+    // The game won't put a character and the Kameo of its exact version on one floor, so a floor where the other one is
+    // pinned isn't offered (the builder would set the pin aside).
+    const twinFloor = k.pins[`${item.kind === 'kameo' ? 'character' : 'kameo'}:${nameKey(item.name)}`];
+    const taken = (f: number) => f !== mine && twinFloor === f;
     return (
       <select className="w-auto" value={mine ?? ''} onChange={(e) => pin(item, e.target.value ? Number(e.target.value) : null)} aria-label={`Floor for ${item.name}`}>
         <option value="">{mine ? 'Unpin' : 'Pin to…'}</option>
         {pinFloors(item).map((f) => (
-          <option key={f} value={f} disabled={full(f)}>
-            {`Floor ${f}${full(f) ? ' (full)' : ''}`}
+          <option key={f} value={f} disabled={full(f) || taken(f)}>
+            {`Floor ${f}${full(f) ? ' (full)' : taken(f) ? (item.kind === 'kameo' ? ' (its fighter is there)' : ' (its Kameo is there)') : ''}`}
           </option>
         ))}
       </select>

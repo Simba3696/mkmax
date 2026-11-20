@@ -17,6 +17,7 @@ import PacksView, { type PackFocus } from './views/PacksView';
 import CardsView, { type CardsPage } from './views/CardsView';
 import SettingsView from './views/SettingsView';
 import TowerView from './views/TowerView';
+import type { AppState } from './types';
 
 const TABS = [
   { id: 'plan', label: 'Plan', Icon: PlanIcon },
@@ -166,10 +167,12 @@ export default function App() {
   // are settled (the effect above has nothing left to move): before that, a stretched season or a corrected timer can
   // still move the pool's season onto this one. With no schedule for today, nothing is cleared.
   const klashOver = !!season && scheduledEnd === savedEnd && !extendedEnd && klashSeasonOver(state.klashTower, season);
+  // Undo brings the pool back as this season's: the user kept it, and back with its old season it would be cleared again
+  // at once (and on every launch after).
   useEffect(() => {
     if (!klashOver || !sync.settled || !season) return;
-    update((d) => (clearOldKlashPool(d, season) ? undefined : noChange), 'New Klash season: cleared the tower pool');
-    // Once it has cleared, klashOver is false, so running again on a new `season` object does nothing.
+    const keep = (prev: AppState) => void (prev.klashTower && (prev.klashTower = { ...prev.klashTower, season: season.end }));
+    update((d) => (clearOldKlashPool(d, season) ? undefined : noChange), 'New Klash season: cleared the tower pool', { undoFrom: keep });
   }, [klashOver, sync.settled, season, update]);
 
   const pageRef = useRef<HTMLDivElement>(null);
