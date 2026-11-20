@@ -3,11 +3,11 @@
 // the site's API doesn't allow requests from other sites.
 import { useSyncExternalStore } from 'react';
 import { nameKey } from './names';
+import type { KlashItem } from './klash';
 import type { Card, MaxedCard, RarityRule } from './types';
 
-export interface CatalogItem {
-  kind: 'character' | 'equipment' | 'kameo';
-  name: string;
+/** A catalog card; the Klash Tower fields it can carry (stats, teams, gear slots and sets) are KlashItem's. */
+export interface CatalogItem extends KlashItem {
   /** e.g. "diamond", "gold", "epic", "rare", "uncommon". */
   rarity: string | null;
   slug: string;
@@ -50,7 +50,8 @@ const REFRESH_AFTER_MS = 60 * 60 * 1000;
 
 /**
  * Downloads the catalog. A fetch-again goes past the browser's own copy, which may be from before the daily deploy; the
- * first download may use a recent one, like any other file. It isn't kept for offline use. Only a fetch-again may
+ * first download may use a recent one, like any other file. The service worker keeps the last copy for offline use
+ * (network first, after 4 seconds), so offline or on a hanging connection a fetch-again may get that copy back. Only a fetch-again may
  * replace a copy already here: a first download that lands after a pull's is older.
  */
 function download(replace: boolean): Promise<CatalogItem[]> {

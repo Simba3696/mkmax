@@ -1,5 +1,5 @@
 // Brings saves, imports and synced data up to the current shape. Plain TS (no React) so scripts can use it too.
-import type { AppState, Card, MaxedCard, RarityRule } from './types';
+import type { AppState, Card, KlashTower, MaxedCard, RarityRule } from './types';
 import { ASCENSION_KARD_COST, ASCENSION_KARD_COSTS, DIAMOND_KARD_COSTS, GEAR_KARD_COSTS, defaultRarities, defaultState, defaultWeights } from './defaults';
 import { REALM_KLASH_CURRENCY, kasketShape, pruneDone, recordKey, unifyTowerSpellings } from './engine';
 import { isChallengeKameo, isRetiredChallenge } from './challenges';
@@ -97,6 +97,19 @@ function keptMaxed(input: unknown): MaxedCard[] {
   return [...seen.values()];
 }
 
+/**
+ * The Klash Tower part as a hand-edited file or an older save could hold it: off unless exactly true, the pool as text
+ * keys once each, pins only for pool cards and floors 1 to 5, and the season as text or none.
+ */
+function keptKlash(input: unknown): KlashTower {
+  const k = (input && typeof input === 'object' ? input : {}) as Partial<Record<keyof KlashTower, unknown>>;
+  const pool = [...new Set(Array.isArray(k.pool) ? k.pool.filter((x): x is string => typeof x === 'string') : [])];
+  const pins: Record<string, number> = {};
+  if (k.pins && typeof k.pins === 'object')
+    for (const [key, floor] of Object.entries(k.pins)) if (pool.includes(key) && Number.isInteger(floor) && (floor as number) >= 1 && (floor as number) <= 5) pins[key] = floor as number;
+  return { enabled: k.enabled === true, pool, pins, season: typeof k.season === 'string' ? k.season : null };
+}
+
 /** Fill in fields missing from older saves or hand-edited imports, then drop cards that are already done. */
 export function normalize(input: unknown): AppState {
   let s = input as Partial<AppState>;
@@ -122,7 +135,7 @@ export function normalize(input: unknown): AppState {
   }
   const base = defaultState();
   const out: AppState = {
-    version: 19,
+    version: 20,
     rarities: s.rarities!.map((r) => ({
       ...r,
       // Kameos only track owning one (no fusion steps). The old F1→F0 upgrade, run by an outdated copy of the
@@ -156,6 +169,7 @@ export function normalize(input: unknown): AppState {
     dismissedShopPacks: s.dismissedShopPacks ?? [],
     gearOrder: s.gearOrder ?? [],
     maxed: keptMaxed(s.maxed),
+    klashTower: keptKlash(s.klashTower),
     updatedAt: s.updatedAt,
   };
   // Version 5 tags Gold Kameos of challenge characters (they come from Elder challenges). Done once, so a tag
@@ -212,6 +226,8 @@ export function normalize(input: unknown): AppState {
       return kasket ? { ...p, kasket, drops: [], rolls: 1 } : p;
     });
   }
+  // Version 20 adds the Klash Tower planner (`klashTower`), off with an empty pool, so nothing in an older save changes;
+  // the bump keeps a build from before it from pulling the planner and dropping it.
   // Version 19 adds copies waiting on Ascension Kards on cards (`waiting`), so nothing in an older save changes. The bump
   // keeps a build from before it from pulling a save that uses it: that build would plan copies the card already has.
   // Version 17 adds the Maxed record (`maxed`), which starts empty, so nothing in an older save changes either; the bump

@@ -10,6 +10,7 @@ How to use MK Max day to day, and what it tracks. For the maths behind the plan,
 - [Cards tab](#cards-tab)
 - [Packs tab](#packs-tab)
 - [Reading the Plan](#reading-the-plan)
+- [Klash tab](#klash-tab)
 - [Settings](#settings)
 - [What's tracked](#whats-tracked)
 - [Your data, offline use and updates](#your-data-offline-use-and-updates)
@@ -31,7 +32,7 @@ To use it like a phone app, install it from your browser. It has no install butt
 Once installed, it's called **MK Max**, opens in its own window without the browser's bars, and uses a dark theme. Data is kept per browser (see [Where your data lives](#where-your-data-lives)), and on iPhone and iPad the home-screen app keeps its own copy apart from Safari. So install it before you enter much, or bring your data across with [sync](#sync-between-devices) or **Export backup** and **Import backup**.
 
 - Open it online the first time. After that it opens offline too; see [Offline](#offline).
-- It opens on **Plan**. Switching tabs puts `#plan`, `#packs`, `#cards` or `#settings` in the address, so a reload or a bookmark keeps your tab. Any other address after the `#` opens Plan. Each tab opens scrolled to the top.
+- It opens on **Plan**. Switching tabs puts `#plan`, `#packs`, `#cards`, `#tower` (the Klash tab) or `#settings` in the address, so a reload or a bookmark keeps your tab. Any other address after the `#` opens Plan, and so does `#tower` while the Klash tab is off. Each tab opens scrolled to the top.
 
 ### What a new install already has
 
@@ -122,11 +123,11 @@ Each is explained under [Reading the Plan](#reading-the-plan).
 
 ### Phones
 
-A header across the top shows **MK MAX**, "Pack planner" and, with sync on, the sync pill. A bar along the bottom has **Plan**, **Packs**, **Cards** and **Settings**. The current tab has a red line and a red icon. Tap the **MK MAX** logo to go back to the Plan; on the Plan it scrolls back to the top.
+A header across the top shows **MK MAX**, "Pack planner" and, with sync on, the sync pill. A bar along the bottom has **Plan**, **Packs**, **Cards**, **Klash** (only with Settings → Klash Tower on) and **Settings**. The current tab has a red line and a red icon. Tap the **MK MAX** logo to go back to the Plan; on the Plan it scrolls back to the top.
 
 ### Tablets and desktops
 
-On tablets and computers (768px wide and up), the tabs move to a rail on the left: Plan, Packs and Cards at the top, and the sync pill and **Settings** at the bottom. On wider screens the rail is wider and shows the full logo. The logo at the top of the rail goes to the Plan, as on phones. Pages flow into columns on wide screens.
+On tablets and computers (768px wide and up), the tabs move to a rail on the left: Plan, Packs, Cards and Klash (when it's on) at the top, and the sync pill and **Settings** at the bottom. On wider screens the rail is wider and shows the full logo. The logo at the top of the rail goes to the Plan, as on phones. Pages flow into columns on wide screens.
 
 Swiping and pull to refresh need a touch screen. With a mouse, reload the page, or use Settings → **Sync now**.
 
@@ -134,7 +135,7 @@ Swiping and pull to refresh need a touch screen. With a mouse, reload the page, 
 
 Tap a tab, or swipe left or right on the page. The page follows your finger; let go past about a quarter of the screen (or flick) and it slides to the next tab, otherwise it springs back. Tapping a tab slides the same way. With Reduce Motion on, tabs switch without the slide. Swipes that start on a text field, inside a pop-up, on something that scrolls sideways, or right at the screen edge (where iOS has its own back gesture) are ignored.
 
-The order is Plan, Packs, Cards, Settings. Swiping doesn't wrap from Settings back to Plan.
+The order is Plan, Packs, Cards, Klash (when it's on), Settings. Swiping doesn't wrap from Settings back to Plan.
 
 ### Pull to refresh
 
@@ -152,7 +153,7 @@ Pop-ups (like the pack editor) sit above the rest of the app and scroll on their
 
 ### Two-tap buttons
 
-**Delete**, **Clear expired**, **Ended early**, **Disconnect this device**, **Load sample data**, **Erase everything**, **Discard it** (for unreadable saved data), **✕** on the [Maxed](#maxed) page, and a rarity's **Remove** when it has cards on the Maxed record need two taps. The first tap changes the button to **Tap again to confirm** for 3 seconds, and only a second tap within those 3 seconds acts, once: a later tap starts over, and so does one after going to another tab and back. Cards, Tower gear and Maxed stay open behind each other, so a quick switch between them keeps the 3 seconds running.
+**Delete**, **Clear expired**, **Ended early**, **Disconnect this device**, **Load sample data**, **Erase everything**, **Discard it** (for unreadable saved data), **✕** on the [Maxed](#maxed) page, **Clear pool** on the [Klash tab](#klash-tab), and a rarity's **Remove** when it has cards on the Maxed record need two taps. The first tap changes the button to **Tap again to confirm** for 3 seconds, and only a second tap within those 3 seconds acts, once: a later tap starts over, and so does one after going to another tab and back. Cards, Tower gear and Maxed stay open behind each other, so a quick switch between them keeps the 3 seconds running.
 
 ### Undo
 
@@ -160,7 +161,7 @@ After a purchase, deleting a pack or card, clearing expired packs, or a card bei
 
 - The bar has **Undo** and ✕ (to close it). They act on the change the bar showed when you pressed them: if pressing one finishes something you were typing (a new tower name) and that puts a new change in the bar, the new one shows instead, for you to undo or close.
 - The 8 seconds only count while MK Max is showing. Switch to another app and back, and the bar shows for the full 8 seconds again.
-- It also appears for saving a pack ("Saved …"), hiding a shop pack ("Hid …"), pasting a list ("Added N cards, updated M"), pasting maxed cards ("Added N to Maxed") or removing one from the Maxed record, switching cards to MK Mobile Base's rarity ("rarity change for N cards"), ending a Realm Klash season early, moving a rarity up or down ("Moved …"), removing a rarity or currency, **Reset weights**, and turning a rarity's kards off while it tracks to the kard threshold.
+- It also appears for saving a pack ("Saved …"), hiding a shop pack ("Hid …"), pasting a list ("Added N cards, updated M"), pasting maxed cards ("Added N to Maxed") or removing one from the Maxed record, switching cards to MK Mobile Base's rarity ("rarity change for N cards"), ending a Realm Klash season early, moving a rarity up or down ("Moved …"), removing a rarity or currency, **Reset weights**, turning a rarity's kards off while it tracks to the kard threshold, turning the Klash tab on or off, and on the Klash tab unticking a card, **Clear pool**, a pin or unpin, **Remove it**, and a new season clearing the pool (ticking a card has no Undo).
 - Only the latest change can be undone.
 - Undo puts back the whole app as it was, so anything else you changed while the bar was up (like a balance) is undone too.
 - **Import backup**, **Load sample data**, **Erase everything** and a sync download clear the bar and can't be undone.
@@ -483,9 +484,27 @@ Each currency lists its best 3 packs. **Show N more** lists the rest, and **Show
 
 **What a value means:** values have no unit; bigger is better within a currency. As a rough guide, at the default weights one ordinary copy of a card is worth about 1 to 1.5, and more for a guest card, a first copy, a copy that gets a card to F3, or any copy of a card marked **No kards**. The formula is in [How it works](how-it-works.md#scoring).
 
+## Klash tab
+
+Plans your Realm Klash Tower defence. Turn it on in Settings → **Klash Tower**; it's off until you do.
+
+### The season pool
+
+Each Realm Klash season deals you a pool of cards for the tower (Gold and Diamond characters and Kameos, Rare and Epic gear). Tick them under **Season pool**: the cards are grouped by kind and rarity, each group says how many you've ticked, and the search box matches words in any order. A card MK Mobile Base has no tower data for yet is marked **no data**: you can still tick it, but a character or Kameo then counts by its rarity alone, and gear with no known slot is never placed. **Clear pool** (two taps) clears the pool and pins, with Undo.
+
+The pool belongs to the season you last ticked or unticked a card in (or, if no season end was known then, the first one the app learns). When MK Mobile Base's schedule shows a new season has started, the pool and pins are cleared by themselves, with Undo while the bar shows; Undo keeps them as this season's pool, so they aren't cleared again. A season the game stretches, or a season end you corrected, keeps the pool. With no schedule for today, nothing is cleared.
+
+### The floors
+
+Once the pool has cards, the 5 floors fill themselves, floor 5 at the top. Each floor says what the game allows there (for example "Gold F10 or Diamond F9 · Rare F10 and Epic F9 gear · Gold Kameo") and lists its 3 characters, each with its gear (a Diamond's extra piece starts with +), then its Kameo and the main reasons for the pick. The strongest team goes on floor 5, then floor 4 and down, and each card is used once. A floor that's short says what it needs ("Needs 1 more Diamond character"). How the picks are made is in [How it works](how-it-works.md#klash-tower).
+
+**Pin to…** on a character or Kameo keeps it on the floor you pick; the floors refill around it. Only floors its rarity may go on are offered, a floor already holding 3 pinned characters (or a pinned Kameo) is marked full, and a floor where the same version is pinned as a character or Kameo isn't offered (the game won't put both on one floor). Unticking a pinned card drops its pin. A ticked card that's no longer in MK Mobile Base's card list is listed above the floors with **Remove it** (**Remove them** for more than one). Gear MK Mobile Base gives no slot for is listed under the floors as not placed. Cards left over once every floor is full are listed under the floors.
+
+The tab needs MK Mobile Base's card list. After one visit online it's kept for offline use; with no copy at all the tab says it can't load card data, with **Try again**.
+
 ## Settings
 
-Settings has, in order: **Sync between devices**, **Fusion rules**, **Currencies**, **Blood Ruby gear order** (only while Realm Klash gear is left to max), **Priority weights**, **Data**, and the version. Most edits here have no Undo.
+Settings has, in order: **Sync between devices**, **Fusion rules**, **Currencies**, **Blood Ruby gear order** (only while Realm Klash gear is left to max), **Klash Tower**, **Priority weights**, **Data**, and the version. Most edits here have no Undo.
 
 ### Sync between devices
 
@@ -533,6 +552,10 @@ One box per rarity. Kameo rarities, including the built-in Diamond Kameo and Gol
 ### Blood Ruby gear order
 
 The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces with ↑ and ↓; the order syncs. Until you move anything, pieces go in this order: Shadow Sash, Moloch's Ball and Chain, Devastator, Datusha, Bane of the Moroi, Bloody Tomahawk, then the other five by name. Each piece's date assumes every piece above it is bought first. A piece whose store item is out of purchases is skipped for now. A piece with no store item on sale at all is listed under the order as "Not on sale now". Once you've moved pieces with ↑ and ↓, it keeps the place it had then and goes back to it when you add its store item again (a piece added later starts at the bottom); the line lists such pieces in that order.
+
+### Klash Tower
+
+**Show the Klash tab** adds the [Klash tab](#klash-tab). It's off on a new install, and the setting syncs. Turning it off hides the tab (going back to the Plan if it was open) and keeps your pool and pins; a new season doesn't clear them while it's off.
 
 ### Priority weights
 
@@ -594,8 +617,8 @@ The bottom of Settings shows which version you have and the date of that change,
 ### Offline
 
 - **Works offline:** everything you've entered, the plan, and logging purchases.
-- The event schedule falls back to the last copy the app fetched, also when the connection is so slow it hasn't loaded in 4 seconds. Card art you've already seen is kept (up to 500 images, for 90 days).
-- **Needs a connection:** new card art, **Find images**, the rarity fixes, **Completion** on the Maxed page (these use MK Mobile Base's card list, which isn't kept for offline use) and sync. Sync catches up when you're back online.
+- The event schedule and MK Mobile Base's card list fall back to the last copy the app fetched, also when the connection is so slow it hasn't loaded in 4 seconds. So once the app has been opened online, the [Klash tab](#klash-tab), the rarity fixes and **Completion** on the Maxed page work offline too. Card art you've already seen is kept (up to 500 images, for 90 days).
+- **Needs a connection:** new card art, **Find images** and sync. Sync catches up when you're back online.
 
 ### Updates
 
@@ -610,6 +633,7 @@ The bottom of Settings shows which version you have and the date of that change,
 
 - Adds MK Mobile Base art to cards that have none.
 - Takes the Realm Klash season end from the event schedule.
+- Clears the Klash Tower pool and pins when the schedule shows a new Realm Klash season, with Undo, only while the Klash tab is on.
 - Re-reads the event schedule and the card catalog when you come back after an hour or more, and tries again when you come back if no download has worked yet.
 - Looks for a new version when you come back after half an hour or more (it only brings up the Reload bar).
 - Updates countdowns and the plan every minute, and again when you come back to the app after being away for half a minute or more, so a pack that ended while it was in the background stops being planned.
@@ -659,4 +683,5 @@ These notes are about changes to saved data over time. You can skip them.
 - The older hand-kept per-tower counts were dropped.
 - Tower gear naming one tower in different capitals, spaces or apostrophes was given one spelling once (version 18): the one the Tower list on Cards shows.
 - Saves from version 19 can hold copies waiting on Ascension Kards. A copy of MK Max from before that won't sync or import such a save, so open MK Max again on every device to update it.
+- Saves from version 20 can hold the Klash Tower pool, pins and switch. A copy of MK Max from before that won't sync or import such a save, so open MK Max again on every device to update it.
 - Kaskets entered by hand under one of the four shop names were turned into Kaskets once, if the save still had that rarity, so their odds now follow your cards.

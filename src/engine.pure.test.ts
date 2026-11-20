@@ -14,4 +14,6 @@ vi.mock('react', () => {
 it('loads the engine and the game data it uses without React', async () => {
   await expect(import('./engine')).resolves.toHaveProperty('levelLabel');
   await expect(import('./challenges')).resolves.toBeTruthy();
+  // Extended 2026-11-20: the Klash Tower builder follows the same rule.
+  await expect(import('./klash')).resolves.toHaveProperty('buildTower');
 });

@@ -49,6 +49,13 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: { cacheName: 'events', networkTimeoutSeconds: 4, expiration: { maxEntries: 1 } },
           },
+          // The card catalog is rebuilt daily too, and the Klash Tower tab needs it to list the pool and build floors:
+          // kept the same way, so after one online visit the tower, the Maxed page and art lookups work offline.
+          {
+            urlPattern: /\/catalog\.json$/,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'catalog', networkTimeoutSeconds: 4, expiration: { maxEntries: 1 } },
+          },
           {
             urlPattern: /^https:\/\/(static\.wikia\.nocookie\.net|mkmobilebase\.com\/storage)\//,
             handler: 'CacheFirst',

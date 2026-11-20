@@ -65,9 +65,24 @@ The app reads the catalog when it's first needed, and again (skipping the browse
 
 Only image URLs are saved; the art stays on those sites, and the service worker caches it for offline use. For anything neither site has, paste a URL with the card's **Image** button.
 
+## Klash Tower
+
+The Klash tab fills the 5 defensive floors from the season's pool (`buildTower` in `src/klash.ts`). It works out the floors on every device from the pool and pins, and never saves them, so every tie breaks by name and the same pool always builds the same tower.
+
+**Floor limits.** Floor 1: Gold characters at F10, Rare gear at F9, a Gold Kameo. Floor 2: Gold at F10 or Diamond at F9, Rare gear at F10, a Gold Kameo. Floor 3: as floor 2, plus Epic gear at F9. Floor 4: Gold or Diamond at F10, Rare or Epic at F10, a Diamond Kameo. Floor 5: Diamond only at F10, Rare or Epic at F10, a Diamond Kameo. Each card is used once in the tower. A character and a Kameo of the exact same version can't share a floor (other versions can, and so can two versions of one fighter). Each character wears one weapon, one armor and one accessory, and a Diamond one extra piece of any slot. A character can't wear pieces of both its own Friendship and Brutality sets.
+
+**Order.** Floor 5 first: the trio with the most strength plus synergy from what's left, keeping any pinned characters. Only the 30 strongest open characters are tried for a floor, so a pool ticked from most of the catalog still builds quickly; a real season's pool is always tried in full. Then floors 4, 3, 2 and 1 the same way. A floor that may take Diamonds leaves enough Gold characters for floor 1, which can take nothing else. Then each floor gets the Kameo that suits its trio best, then gear: every character's three slots, floor 5 first (each time the best piece left for any slot on the floor), then each Diamond's extra piece. Floors that may take Epic leave enough Rare pieces of each slot for floors 1 and 2.
+
+**Scores** (named constants at the top of `src/klash.ts`, starting guesses to tune after a season):
+
+- **Strength**: attack plus health, scaled from 0 to 10 across every Gold and Diamond character MK Mobile Base lists. A character one level below F10 on its floor counts at 95%. With at least 3 votes, the community score adds (score − 3) × 0.5. A character with no stats counts as the middle character of its rarity, with no synergy.
+- **Synergy**, per trio: +3 for each teammate a character's Team Passive covers (the passive names its team or class; with no passive text from the wiki, the character's own team), +2 for each pair the wiki's Good With list or MK Mobile Base's best teams link, +1 for each pair on the same team, +0.5 for each pair sharing a class. The floor shows its three biggest terms as reasons.
+- **Kameo**: +1 for each fighter sharing its class, and +1 for each effect it shares with the trio (effects are the card's tags other than names, teams, classes, slots and set types).
+- **Gear**: +2 for Epic, +1 for Rare, +3 on the fighter whose own set it belongs to, +1 for each effect it shares with the wearer, and the community nudge as for characters.
+
 ## Klash Tower data
 
-The catalog also carries what the Klash Tower planner scores teams with, for the cards a Klash Tower pool deals (Gold and Diamond characters and Kameos, Rare and Epic gear). The app doesn't use it yet. `npm run catalog` adds it from four places:
+The catalog also carries what the Klash Tower planner scores teams with, for the cards a Klash Tower pool deals (Gold and Diamond characters and Kameos, Rare and Epic gear); the Klash tab builds the tower from it (see [Klash Tower](#klash-tower)). `npm run catalog` adds it from four places:
 
 - **MK Mobile Base's squad builder** (one request): each character's team (Black Dragon, MK11, …), attack and health, and each piece of gear's slot (weapon, armor or accessory), whether it's Friendship or Brutality gear, and whose set it belongs to (`slot`, `set`, `setFor`). The squad builder calls every character Diamond, so rarity still comes from the catalog's own tags.
 - **MK Mobile Base's ratings** (two requests): the community score and how many people voted (`score`, `votes`), for characters and gear.

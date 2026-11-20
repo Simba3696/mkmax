@@ -141,9 +141,24 @@ export interface MaxedCard {
   at?: string;
 }
 
+/**
+ * The Klash Tower planner's saved part; the floors are worked out from it (src/klash.ts), never saved. Cards are kept by
+ * klashKey (kind and order-free name), as the pool comes from the card catalog, not the user's own cards.
+ */
+export interface KlashTower {
+  /** Settings → Klash Tower: shows the Tower tab. Turning it off keeps the pool and pins. */
+  enabled: boolean;
+  /** This season's pool, ticked by the user. */
+  pool: string[];
+  /** Cards the user put on a floor (1 to 5) themselves. */
+  pins: Record<string, number>;
+  /** The Realm Klash season end (datetime-local) the pool was ticked in, so a new season can clear it. */
+  season: string | null;
+}
+
 export interface AppState {
-  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. 8–9 = renamed packs and cards to the game's spelling. 10 = fixed "Kollector’S" pack names and gave Blood Rubies a daily income. 11 = removed Time Krystals (console-only) when unused. 12 = gave Epic and Rare gear their own kard costs and Kameos guests. 13 = gave Gold ascension the game's kard costs. 14 = switched rarities with no kards from the kard threshold to max. 15 = turned hand-made Kaskets into Kaskets. 16 = added No kards on cards, which older builds would ignore. 17 = added the Maxed record, which older builds would drop. 18 = saved each tower in the one spelling the Tower list shows. 19 = added copies waiting on Ascension Kards on cards, which older builds would plan for again. */
-  version: 19;
+  /** 2 = levels stored from F0 (first copy = 1; version 1 stored it as F1). 3 = added a Kameo rarity. 4 = split it into Diamond and Gold Kameos. 5 = tagged challenge Kameos. 6 = added Uncommon gear. 7 = untagged retired challenge Kameos. 8–9 = renamed packs and cards to the game's spelling. 10 = fixed "Kollector’S" pack names and gave Blood Rubies a daily income. 11 = removed Time Krystals (console-only) when unused. 12 = gave Epic and Rare gear their own kard costs and Kameos guests. 13 = gave Gold ascension the game's kard costs. 14 = switched rarities with no kards from the kard threshold to max. 15 = turned hand-made Kaskets into Kaskets. 16 = added No kards on cards, which older builds would ignore. 17 = added the Maxed record, which older builds would drop. 18 = saved each tower in the one spelling the Tower list shows. 19 = added copies waiting on Ascension Kards on cards, which older builds would plan for again. 20 = added the Klash Tower planner (`klashTower`), which older builds would drop. */
+  version: 20;
   rarities: RarityRule[];
   currencies: Currency[];
   cards: Card[];
@@ -157,6 +172,8 @@ export interface AppState {
   gearOrder?: string[];
   /** Cards that reached their top level and left the list, for the Maxed page and completion figures. */
   maxed?: MaxedCard[];
+  /** The Klash Tower planner: whether its tab shows, and this season's pool and pins. */
+  klashTower?: KlashTower;
   /** When this data was last changed (ms since epoch); drives cross-device sync. */
   updatedAt?: number;
 }

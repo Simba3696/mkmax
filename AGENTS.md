@@ -17,7 +17,7 @@ A change is done when `npm run lint`, `npm test` and `npm run build` all pass an
 
 ## Rules
 
-- **Keep `src/engine.ts` pure.** No React, no `fetch`, no `Date.now()`, no `localStorage`. Pass `now` in. New planning logic goes here with tests in `engine.test.ts`.
+- **Keep `src/engine.ts` pure.** No React, no `fetch`, no `Date.now()`, no `localStorage`. Pass `now` in. New planning logic goes here with tests in `engine.test.ts`. The Klash Tower builder, `src/klash.ts`, follows the same rule, with tests in `klash.test.ts`.
 - **All state changes go through `update(recipe, undoLabel?)`** in `store.tsx`. Give user actions that change or remove data an undo label. A recipe that finds nothing to change (the card, pack or row a tap was for is gone, or already that way) returns `noChange`, and finds rows by id, never by their place on screen.
 - **Changing the saved shape or meaning means a migration.** Use the `save-migration` skill (`.claude/skills/save-migration/`). Never pull synced data with `version <= 2`.
 - **Update the docs in the same change.** Behaviour goes in `docs/user-guide.md`, scoring and data sources in `docs/how-it-works.md`, structure in `docs/architecture.md`, setup and conventions in `docs/development.md`. Touch the README's Features list only for headline features. After any change that can change what a screen shows (app code, styles, bundled data, runtime dependencies or Tailwind; not tests, docs, `scripts/` or other dev tools alone), retake the README screenshots last, once the code is final (see [Development → Screenshots](docs/development.md#screenshots)).
@@ -29,6 +29,8 @@ A change is done when `npm run lint`, `npm test` and `npm run build` all pass an
 ## Game rules the code depends on
 
 These aren't obvious from general game knowledge. Don't change them unless asked.
+
+- The Klash Tower (Realm Klash defence) has 5 floors, each 3 characters plus 1 Kameo, from a pool the game deals each season, separate from the user's own cards; each pool card goes on one floor at most. Floor limits: F1 Gold characters F10, Rare gear F9, Gold Kameo; F2 Gold F10 or Diamond F9, Rare F10, Gold Kameo; F3 as F2 plus Epic F9; F4 Gold or Diamond F10, Rare or Epic F10, Diamond Kameo; F5 Diamond F10 only, Rare or Epic F10, Diamond Kameo (`FLOORS` in `src/klash.ts`). Gear: one weapon, armor and accessory each, plus one extra piece of any slot on a Diamond; any gear on anyone, but never pieces of both a character's own Friendship and Brutality sets. A character and a Kameo of the exact same version can't share a floor; two versions of one fighter can. The strongest team goes on floor 5. Battle Modifiers and Tower Talents are picked in game and not modelled.
 
 - The first copy is F0; each level takes one duplicate (F10 = 11 copies). Diamonds max at F10; Gold cards go on to a per-card ascension cap (F10, A5 or A10). The game calls A5 Stage I Ascension and A10 Stage II Ascension; updates move batches of characters to Stage I or Stage II.
 - Each ascension step also takes one duplicate (or Fusion Up Kards in its place), plus Ascension Kards (1, 1, 2, … per step). Ascension Kards are a scarce premium item from season passes and aren't tracked or planned; the user ascends whenever they get one. Until then, a duplicate of a Gold card at F10 or past it waits on the card (`Card.waiting`), no more than it can still use; the card isn't maxed in the game, or in the app, until it's ascended, and Kaskets still give it.
