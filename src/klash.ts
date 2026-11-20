@@ -118,7 +118,9 @@ export interface Tower {
 
 const hasStats = (c: KlashItem) => typeof c.attack === 'number' && typeof c.health === 'number';
 const nudge = (c: KlashItem) => (typeof c.score === 'number' && (c.votes ?? 0) >= MIN_VOTES ? (c.score - SCORE_MIDPOINT) * SCORE_WEIGHT : 0);
-const byName = (a: KlashItem, b: KlashItem) => a.name.localeCompare(b.name);
+// One fixed ordering for ties, not the device's language: every device must build the same tower from the same pool.
+const cmp = new Intl.Collator('en').compare;
+const byName = (a: KlashItem, b: KlashItem) => cmp(a.name, b.name);
 const lower = (s: string) => s.toLowerCase();
 
 /**
@@ -193,7 +195,7 @@ function synergy(trio: KlashItem[]): Reason[] {
       const shared = (a.class ?? []).filter((k) => (b.class ?? []).includes(k));
       if (shared.length) out.push({ points: CLASS_POINTS, text: `${pair[0].name} and ${pair[1].name} are both ${shared[0]}` });
     }
-  return out.sort((x, y) => y.points - x.points || x.text.localeCompare(y.text));
+  return out.sort((x, y) => y.points - x.points || cmp(x.text, y.text));
 }
 
 const fighterStrength = (ctx: Ctx, c: KlashItem, level: 9 | 10) => (ctx.strength(c) + nudge(c)) * (level === 9 ? BELOW_F10 : 1);
@@ -368,7 +370,7 @@ export function buildTower(items: KlashItem[], pool: string[], pins: Record<stri
               const better =
                 !pick ||
                 points > pick.points ||
-                (points === pick.points && (f.item.name.localeCompare(pick.f.item.name) || SLOTS.indexOf(slot) - SLOTS.indexOf(pick.slot) || item.name.localeCompare(pick.item.name)) < 0);
+                (points === pick.points && (cmp(f.item.name, pick.f.item.name) || SLOTS.indexOf(slot) - SLOTS.indexOf(pick.slot) || cmp(item.name, pick.item.name)) < 0);
               if (better) pick = { f, slot, item, points };
             }
           }

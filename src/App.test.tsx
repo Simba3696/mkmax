@@ -565,7 +565,7 @@ describe('the Realm Klash season from the schedule', () => {
     const local = (iso: string) => toLocalInput(new Date(iso));
     const week = (name: string, start: string, end: string) => ({ name, start: `2026-01-${start}T11:00:00Z`, end: `2026-01-${end}T11:00:00Z` });
     /** Loads a save with a ticked pool from the season ending `poolSeason`, under the given schedule, and renders App. */
-    async function open(seasons: ReturnType<typeof week>[], poolSeason: string) {
+    async function open(seasons: ReturnType<typeof week>[], poolSeason: string, enabled = true) {
       vi.useFakeTimers({ toFake: ['Date'] });
       vi.setSystemTime(new Date('2026-01-12T12:00:00Z'));
       const events = { fetchedAt: '2026-01-12T00:00:00Z', capturedAt: null, packs: [], challenges: [], seasons };
@@ -574,7 +574,7 @@ describe('the Realm Klash season from the schedule', () => {
       );
       const s = defaultState();
       s.realmKlashSeasonEnd = local('2026-01-24T11:00:00Z');
-      s.klashTower = { enabled: true, pool: ['character:a'], pins: { 'character:a': 5 }, season: local(poolSeason) };
+      s.klashTower = { enabled, pool: ['character:a'], pins: { 'character:a': 5 }, season: local(poolSeason) };
       s.updatedAt = 1;
       localStorage.setItem('mkmax:v1', JSON.stringify(s));
       await refreshEvents();
@@ -618,6 +618,16 @@ describe('the Realm Klash season from the schedule', () => {
     it('never clears the pool with no schedule for today', async () => {
       const k = await open([], '2025-12-27T11:00:00Z');
       expect(k.pool).toEqual(['character:a']);
+    });
+
+    // Regression: /ship review on 2026-11-20 (adversarial) — the clear ran with the Klash tab turned off, though
+    // Settings says turning it off keeps the pool.
+    // Value: protects=a new season leaves the pool alone while the tab is off; fails_when=the clear ignores the switch;
+    // why_new=the clear was only tested with the tab on; seam=none; no_claim=a sync
+    it('keeps the pool while the Klash tab is turned off', async () => {
+      const k = await open([week('Shadow', '03', '10'), week('Kold', '10', '17'), week('Kold 2', '17', '24')], '2026-01-10T11:00:00Z', false);
+      expect(k.pool).toEqual(['character:a']);
+      expect(screen.queryByText('New Klash season: cleared the tower pool')).toBeNull();
     });
   });
 });

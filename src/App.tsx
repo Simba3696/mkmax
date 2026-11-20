@@ -166,7 +166,8 @@ export default function App() {
   // A new season deals a new Klash Tower pool, so last season's ticks and pins go, with Undo. Only once the dates above
   // are settled (the effect above has nothing left to move): before that, a stretched season or a corrected timer can
   // still move the pool's season onto this one. With no schedule for today, nothing is cleared.
-  const klashOver = !!season && scheduledEnd === savedEnd && !extendedEnd && klashSeasonOver(state.klashTower, season);
+  // Only while the Klash tab is on: turning it off keeps the pool as it is.
+  const klashOver = !!season && !!state.klashTower?.enabled && scheduledEnd === savedEnd && !extendedEnd && klashSeasonOver(state.klashTower, season);
   // Undo brings the pool back as this season's: the user kept it, and back with its old season it would be cleared again
   // at once (and on every launch after).
   useEffect(() => {

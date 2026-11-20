@@ -554,7 +554,7 @@ The Realm Klash gear still to max, in the order Blood Rubies buy it. Move pieces
 
 ### Klash Tower
 
-**Show the Klash tab** adds the [Klash tab](#klash-tab). It's off on a new install, and the setting syncs. Turning it off hides the tab (going back to the Plan if it was open) and keeps your pool and pins.
+**Show the Klash tab** adds the [Klash tab](#klash-tab). It's off on a new install, and the setting syncs. Turning it off hides the tab (going back to the Plan if it was open) and keeps your pool and pins; a new season doesn't clear them while it's off.
 
 ### Priority weights
 
