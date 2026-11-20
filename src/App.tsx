@@ -169,8 +169,8 @@ export default function App() {
   useEffect(() => {
     if (!klashOver || !sync.settled || !season) return;
     update((d) => (clearOldKlashPool(d, season) ? undefined : noChange), 'New Klash season: cleared the tower pool');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [klashOver, sync.settled]);
+    // Once it has cleared, klashOver is false, so running again on a new `season` object does nothing.
+  }, [klashOver, sync.settled, season, update]);
 
   const pageRef = useRef<HTMLDivElement>(null);
   /** Direction the next tab change should slide in from, set by go() and used once the new tab has rendered. */
